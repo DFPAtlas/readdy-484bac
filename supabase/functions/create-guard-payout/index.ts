@@ -7,6 +7,8 @@ const CORS_ALLOWLIST = [
   'https://www.quickguard.uk',
 ];
 
+const IDEMPOTENCY_VERSION = 'v1';
+
 function getAllowedOrigin(origin: string | null): string {
   if (origin && CORS_ALLOWLIST.includes(origin)) return origin;
   return 'https://quickguard.uk';
@@ -75,6 +77,13 @@ interface JobRecord {
   client_id: string;
 }
 
+interface PayoutRecord {
+  id: string;
+  status: string;
+  stripe_transfer_id: string | null;
+  idempotency_key: string | null;
+}
+
 serve(async (req: Request) => {
   const origin = req.headers.get('Origin');
 
@@ -118,29 +127,50 @@ serve(async (req: Request) => {
     const guard = await loadGuard(supabase, assignment.guard_id);
     const job = await loadJob(supabase, assignment.job_id);
 
+    await validatePayoutEligibility(assignment);
     await validateJobPayment(supabase, job.id, job.client_id);
 
-    await checkExistingPayout(supabase, validated.assignmentId);
+    const existingPayout = await checkExistingPayout(supabase, validated.assignmentId);
 
-    const payoutNetPence = derivePayoutAmount(assignment);
+    const { grossPence, feePence, netPence } = derivePayoutAmounts(assignment);
 
-    await verifyStripeConnectAccount(stripe, supabase, guard, assignment.id, job.id, payoutNetPence);
+    await verifyStripeConnectAccount(stripe, supabase, guard, validated.assignmentId, job.id, netPence);
 
-    const idempotencyKey = `guard-payout:${validated.assignmentId}:v1`;
-
+    const idempotencyKey = `guard-payout:${validated.assignmentId}:${IDEMPOTENCY_VERSION}`;
     const now = new Date().toISOString();
-    const payoutRecord = await createPayoutRecord(supabase, {
-      guardId: guard.id,
-      assignmentId: validated.assignmentId,
-      jobId: job.id,
-      netAmountPence: payoutNetPence,
-      idempotencyKey,
-      adminUserId: validated.adminUserId,
-      now,
-    });
+
+    let payoutRecord: PayoutRecord;
+    let recovered = false;
+
+    if (existingPayout) {
+      payoutRecord = existingPayout;
+      recovered = true;
+      safeLog('recovering processing payout', payoutRecord.id, 'assignment', validated.assignmentId);
+
+      if (existingPayout.stripe_transfer_id) {
+        try {
+          const existingTransfer = await stripe.transfers.retrieve(existingPayout.stripe_transfer_id);
+          safeLog('found existing Stripe transfer', existingTransfer.id);
+        } catch {
+          safeLog('stored transfer not found in Stripe, will recreate via idempotency');
+        }
+      }
+    } else {
+      payoutRecord = await createPayoutRecord(supabase, {
+        guardId: guard.id,
+        assignmentId: validated.assignmentId,
+        jobId: job.id,
+        grossAmount: assignment.gross_guard_amount || 0,
+        feeDeducted: assignment.guard_service_fee_amount || 0,
+        netAmount: assignment.guard_net_payout || 0,
+        idempotencyKey,
+        adminUserId: validated.adminUserId,
+        now,
+      });
+    }
 
     const transfer = await createStripeTransfer(stripe, supabase, {
-      netAmountPence: payoutNetPence,
+      netAmountPence: netPence,
       destinationAccount: guard.stripe_account_id!,
       jobTitle: job.job_title || 'Job',
       guardName: guard.full_name || guard.id,
@@ -157,6 +187,7 @@ serve(async (req: Request) => {
       payoutRecordId: payoutRecord.id,
       transferId: transfer.id,
       now,
+      recovered,
     });
 
     await logAudit(supabase, {
@@ -166,20 +197,22 @@ serve(async (req: Request) => {
       assignmentId: validated.assignmentId,
       jobId: job.id,
       guardId: guard.id,
-      netAmountPence: payoutNetPence,
+      netAmountPence: netPence,
       guardStripeAccount: guard.stripe_account_id!,
       transferId: transfer.id,
       idempotencyKey,
       jobTitle: job.job_title || '',
       guardName: guard.full_name || '',
       now,
+      recovered,
     });
 
     return corsResponse(origin, 200, {
       success: true,
       transferId: transfer.id,
-      netAmount: (payoutNetPence / 100).toFixed(2),
-      message: `Payout of £${(payoutNetPence / 100).toFixed(2)} released to ${guard.full_name || 'guard'}`,
+      netAmount: (netPence / 100).toFixed(2),
+      recovered,
+      message: `Payout of £${(netPence / 100).toFixed(2)} released to ${guard.full_name || 'guard'}${recovered ? ' (recovered from processing state)' : ''}`,
     });
   } catch (e: unknown) {
     const err = e as { status: number; message: string };
@@ -353,25 +386,61 @@ async function loadJob(
   return job as JobRecord;
 }
 
+async function validatePayoutEligibility(assignment: AssignmentRecord): Promise<void> {
+  const releaseReadyStatuses = ['client_released'];
+
+  if (!assignment.payment_status) {
+    throw { status: 400, message: 'Assignment not eligible for payout' };
+  }
+
+  if (releaseReadyStatuses.includes(assignment.payment_status)) {
+    return;
+  }
+
+  if (assignment.payment_status === 'paid' || assignment.payment_status === 'paid_out' || assignment.payment_status === 'completed') {
+    throw { status: 409, message: 'Payout already completed' };
+  }
+
+  if (assignment.payment_status === 'payout_processing') {
+    throw { status: 409, message: 'Payout currently processing' };
+  }
+
+  const rejectedStatuses = [
+    'payment_pending',
+    'awaiting_client_release',
+    'failed',
+    'cancelled',
+    'refunded',
+  ];
+
+  if (rejectedStatuses.includes(assignment.payment_status)) {
+    throw { status: 400, message: 'Assignment not eligible for payout' };
+  }
+
+  throw { status: 400, message: 'Assignment not eligible for payout' };
+}
+
 async function validateJobPayment(
   supabase: ReturnType<typeof createClient>,
   jobId: string,
   clientId: string,
 ): Promise<void> {
-  const { data: transaction, error } = await supabase
+  const { data: transactions, error } = await supabase
     .from('transactions')
-    .select('id, status')
+    .select('id, status, transaction_type')
     .eq('job_id', jobId)
     .eq('client_id', clientId)
+    .eq('transaction_type', 'job_payment')
     .eq('status', 'completed')
-    .maybeSingle();
+    .order('created_at', { ascending: false })
+    .limit(1);
 
   if (error) {
     safeLog('transaction lookup error', error.message);
     throw { status: 500, message: 'Unable to process payout' };
   }
 
-  if (!transaction) {
+  if (!transactions || transactions.length === 0) {
     throw { status: 400, message: 'Client payment has not been completed for this job' };
   }
 }
@@ -379,10 +448,10 @@ async function validateJobPayment(
 async function checkExistingPayout(
   supabase: ReturnType<typeof createClient>,
   assignmentId: string,
-): Promise<void> {
+): Promise<PayoutRecord | null> {
   const { data: existing, error } = await supabase
     .from('guard_payouts')
-    .select('id, status, stripe_transfer_id')
+    .select('id, status, stripe_transfer_id, idempotency_key')
     .eq('assignment_id', assignmentId)
     .in('status', ['completed', 'paid_out', 'processing', 'payout_processing'])
     .maybeSingle();
@@ -392,46 +461,47 @@ async function checkExistingPayout(
     throw { status: 500, message: 'Unable to process payout' };
   }
 
-  if (existing) {
-    if (existing.status === 'completed' || existing.status === 'paid_out') {
-      throw { status: 409, message: 'Payout already completed' };
-    }
-    throw { status: 409, message: 'Payout currently processing' };
+  if (!existing) {
+    return null;
   }
+
+  if (existing.status === 'completed' || existing.status === 'paid_out') {
+    throw { status: 409, message: 'Payout already completed' };
+  }
+
+  return existing as PayoutRecord;
 }
 
-function derivePayoutAmount(assignment: AssignmentRecord): number {
-  const netPayout = assignment.guard_net_payout;
-
-  if (netPayout === null || netPayout === undefined) {
-    throw { status: 400, message: 'Payout requires finance review' };
-  }
-
-  const net = Number(netPayout);
-
-  if (!Number.isFinite(net) || net <= 0) {
-    throw { status: 400, message: 'Payout requires finance review' };
-  }
-
+function derivePayoutAmounts(assignment: AssignmentRecord): { grossPence: number; feePence: number; netPence: number } {
   const gross = Number(assignment.gross_guard_amount || 0);
   const fee = Number(assignment.guard_service_fee_amount || 0);
+  const net = Number(assignment.guard_net_payout || 0);
 
-  if (!Number.isFinite(gross) || !Number.isFinite(fee)) {
+  if (!Number.isFinite(gross) || !Number.isFinite(fee) || !Number.isFinite(net)) {
     throw { status: 400, message: 'Payout requires finance review' };
   }
 
-  const reconciled = Math.abs(gross - fee - net);
-  if (reconciled > 1) {
+  if (net <= 0) {
+    throw { status: 400, message: 'Payout requires finance review' };
+  }
+
+  const grossPence = Math.round(gross * 100);
+  const feePence = Math.round(fee * 100);
+  const netPence = Math.round(net * 100);
+
+  if (!Number.isFinite(grossPence) || !Number.isFinite(feePence) || !Number.isFinite(netPence)) {
+    throw { status: 400, message: 'Payout requires finance review' };
+  }
+
+  if (netPence <= 0) {
+    throw { status: 400, message: 'Payout requires finance review' };
+  }
+
+  if (Math.abs(grossPence - feePence - netPence) > 1) {
     throw { status: 409, message: 'Payout requires finance review' };
   }
 
-  const pence = Math.round(net * 100);
-
-  if (!Number.isFinite(pence) || pence <= 0) {
-    throw { status: 400, message: 'Payout requires finance review' };
-  }
-
-  return pence;
+  return { grossPence, feePence, netPence };
 }
 
 async function verifyStripeConnectAccount(
@@ -523,23 +593,23 @@ async function createPayoutRecord(
     guardId: string;
     assignmentId: string;
     jobId: string;
-    netAmountPence: number;
+    grossAmount: number;
+    feeDeducted: number;
+    netAmount: number;
     idempotencyKey: string;
     adminUserId: string;
     now: string;
   },
-): Promise<{ id: string }> {
-  const netAmount = params.netAmountPence / 100;
-
+): Promise<PayoutRecord> {
   const { data: record, error } = await supabase
     .from('guard_payouts')
     .insert({
       guard_id: params.guardId,
       assignment_id: params.assignmentId,
       job_id: params.jobId,
-      amount: netAmount,
-      fee_deducted: 0,
-      net_amount: netAmount,
+      amount: params.grossAmount,
+      fee_deducted: params.feeDeducted,
+      net_amount: params.netAmount,
       status: 'processing',
       platform_fee: 0,
       idempotency_key: params.idempotencyKey,
@@ -548,7 +618,7 @@ async function createPayoutRecord(
       created_at: params.now,
       updated_at: params.now,
     })
-    .select('id')
+    .select('id, status, stripe_transfer_id, idempotency_key')
     .maybeSingle();
 
   if (error) {
@@ -563,7 +633,7 @@ async function createPayoutRecord(
     throw { status: 500, message: 'Unable to process payout' };
   }
 
-  return record;
+  return record as PayoutRecord;
 }
 
 async function createStripeTransfer(
@@ -639,21 +709,52 @@ async function completePayout(
     payoutRecordId: string;
     transferId: string;
     now: string;
+    recovered: boolean;
   },
 ): Promise<void> {
+  const payoutUpdate: Record<string, unknown> = {
+    status: 'completed',
+    stripe_transfer_id: params.transferId,
+    stripe_transfer_status: 'created',
+    completed_date: params.now,
+    updated_at: params.now,
+  };
+
+  if (params.recovered) {
+    payoutUpdate.notes = 'Recovered from processing state via idempotent retry';
+  }
+
   const { error: payoutErr } = await supabase
     .from('guard_payouts')
-    .update({
-      status: 'completed',
-      stripe_transfer_id: params.transferId,
-      stripe_transfer_status: 'created',
-      completed_date: params.now,
-      updated_at: params.now,
-    })
+    .update(payoutUpdate)
     .eq('id', params.payoutRecordId);
 
   if (payoutErr) {
     safeLog('payout completion update error', payoutErr.message);
+
+    await supabase.from('payment_audit_logs').insert({
+      event_type: 'payout_completion_db_failed',
+      reference_type: 'guard_payout',
+      reference_id: params.payoutRecordId,
+      details: {
+        error: payoutErr.message,
+        transfer_id: params.transferId,
+        assignment_id: params.assignmentId,
+        job_id: params.jobId,
+        recovered: params.recovered,
+      },
+      created_at: params.now,
+    }).catch(() => {});
+
+    await supabase.from('guard_payouts')
+      .update({
+        status: 'manual_review',
+        failure_category: 'post_transfer_db_update_failed',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', params.payoutRecordId)
+      .catch(() => {});
+
     throw { status: 500, message: 'Unable to process payout' };
   }
 
@@ -670,20 +771,49 @@ async function completePayout(
 
   if (assignErr) {
     safeLog('assignment update error', assignErr.message);
-    await supabase.from('guard_payouts')
-      .update({ status: 'manual_review', failure_category: 'assignment_update_failed', updated_at: new Date().toISOString() })
-      .eq('id', params.payoutRecordId)
-      .catch(() => {});
+
+    await supabase.from('payment_audit_logs').insert({
+      event_type: 'payout_assignment_update_failed',
+      reference_type: 'guard_payout',
+      reference_id: params.payoutRecordId,
+      details: {
+        error: assignErr.message,
+        transfer_id: params.transferId,
+        assignment_id: params.assignmentId,
+        job_id: params.jobId,
+        recovered: params.recovered,
+      },
+      created_at: params.now,
+    }).catch(() => {});
+
     throw { status: 500, message: 'Unable to process payout' };
   }
 
-  const { error: jobErr } = await supabase
-    .from('jobs')
-    .update({ payment_status: 'paid', updated_at: params.now })
-    .eq('id', params.jobId);
+  const { data: allAssignments, error: allErr } = await supabase
+    .from('job_assignments')
+    .select('id, payment_status')
+    .eq('job_id', params.jobId);
 
-  if (jobErr) {
-    safeLog('job update error', jobErr.message);
+  if (allErr) {
+    safeLog('all assignments query error', allErr.message);
+  }
+
+  if (allAssignments && allAssignments.length > 0) {
+    const finalPaidStatuses = ['paid', 'paid_out', 'completed'];
+    const allPaid = allAssignments.every(
+      (a: { payment_status: string | null }) => a.payment_status && finalPaidStatuses.includes(a.payment_status)
+    );
+
+    if (allPaid) {
+      const { error: jobErr } = await supabase
+        .from('jobs')
+        .update({ payment_status: 'paid', updated_at: params.now })
+        .eq('id', params.jobId);
+
+      if (jobErr) {
+        safeLog('job update error', jobErr.message);
+      }
+    }
   }
 }
 
@@ -703,10 +833,11 @@ async function logAudit(
     jobTitle: string;
     guardName: string;
     now: string;
+    recovered: boolean;
   },
 ): Promise<void> {
   await supabase.from('payment_audit_logs').insert({
-    event_type: 'guard_payout_completed',
+    event_type: params.recovered ? 'guard_payout_recovered' : 'guard_payout_completed',
     reference_type: 'guard_payout',
     reference_id: params.assignmentId,
     changed_by: params.adminUserId,
@@ -720,6 +851,7 @@ async function logAudit(
       net_amount_pence: params.netAmountPence,
       stripe_transfer_id: params.transferId,
       idempotency_key: params.idempotencyKey,
+      recovered: params.recovered,
     },
     created_at: params.now,
   }).catch((e: unknown) => {
