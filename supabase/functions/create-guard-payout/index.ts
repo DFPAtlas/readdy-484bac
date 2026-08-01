@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
@@ -791,27 +792,60 @@ async function completePayout(
 
   const { data: allAssignments, error: allErr } = await supabase
     .from('job_assignments')
-    .select('id, payment_status')
+    .select('id, status, payment_status')
     .eq('job_id', params.jobId);
 
   if (allErr) {
-    safeLog('all assignments query error', allErr.message);
-  }
+    safeLog('job payment status query failed', allErr.message, 'job', params.jobId);
 
-  if (allAssignments && allAssignments.length > 0) {
-    const finalPaidStatuses = ['paid', 'paid_out', 'completed'];
-    const allPaid = allAssignments.every(
-      (a: { payment_status: string | null }) => a.payment_status && finalPaidStatuses.includes(a.payment_status)
+    await supabase.from('payment_audit_logs').insert({
+      event_type: 'payout_job_status_query_failed',
+      reference_type: 'guard_payout',
+      reference_id: params.payoutRecordId,
+      details: {
+        error: allErr.message,
+        transfer_id: params.transferId,
+        assignment_id: params.assignmentId,
+        job_id: params.jobId,
+        recovered: params.recovered,
+      },
+      created_at: params.now,
+    }).catch(() => {});
+  } else if (allAssignments && allAssignments.length > 0) {
+    const nonPayableStatuses = ['cancelled', 'rejected', 'declined', 'withdrawn'];
+    const payableAssignments = allAssignments.filter(
+      (a: { status: string | null }) => !!a.status && !nonPayableStatuses.includes(a.status)
     );
 
-    if (allPaid) {
-      const { error: jobErr } = await supabase
-        .from('jobs')
-        .update({ payment_status: 'paid', updated_at: params.now })
-        .eq('id', params.jobId);
+    if (payableAssignments.length > 0) {
+      const finalPaidStatuses = ['paid', 'paid_out', 'completed'];
+      const allPaid = payableAssignments.every(
+        (a: { payment_status: string | null }) => a.payment_status && finalPaidStatuses.includes(a.payment_status)
+      );
 
-      if (jobErr) {
-        safeLog('job update error', jobErr.message);
+      if (allPaid) {
+        const { error: jobErr } = await supabase
+          .from('jobs')
+          .update({ payment_status: 'paid', updated_at: params.now })
+          .eq('id', params.jobId);
+
+        if (jobErr) {
+          safeLog('job paid status update error', jobErr.message);
+
+          await supabase.from('payment_audit_logs').insert({
+            event_type: 'payout_job_status_update_failed',
+            reference_type: 'guard_payout',
+            reference_id: params.payoutRecordId,
+            details: {
+              error: jobErr.message,
+              transfer_id: params.transferId,
+              assignment_id: params.assignmentId,
+              job_id: params.jobId,
+              recovered: params.recovered,
+            },
+            created_at: params.now,
+          }).catch(() => {});
+        }
       }
     }
   }
