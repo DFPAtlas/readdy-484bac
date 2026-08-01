@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 
@@ -5,9 +6,12 @@ serve(async (req) => {
   const { requestId, action, disputeReason, review } = await req.json();
 
   const authHeader = req.headers.get('Authorization');
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
   const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    supabaseUrl,
+    supabaseServiceKey,
     { db: { schema: 'app' }, global: { headers: { Authorization: authHeader || '' } } }
   );
 
@@ -63,14 +67,14 @@ serve(async (req) => {
       to_status: 'client_released',
       changed_by: user.id,
       changed_by_role: isAdmin ? 'admin' : 'client',
-      reason: 'Client approved completion — payout can now be released',
+      reason: 'Client approved completion \u2014 payout can now be released',
     });
 
     if (guardData?.user_id) {
       await supabase.from('notifications').insert({
         user_id: guardData.user_id,
         user_type: 'guard',
-        title: 'Completion Approved — Payment Released',
+        title: 'Completion Approved \u2014 Payment Released',
         message: `Completion for "${jobTitle}" has been approved. Your payout is now queued for release.`,
         type: 'success',
         is_read: false,
@@ -78,41 +82,6 @@ serve(async (req) => {
         data: { job_id: request.job_id },
         created_at: now,
       });
-    }
-
-    const { data: assignment } = await supabase
-      .from('job_assignments')
-      .select('id, guard_net_payout, guard_id')
-      .eq('job_id', request.job_id)
-      .eq('guard_id', request.guard_id)
-      .maybeSingle();
-
-    if (assignment) {
-      try {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL');
-        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-        await fetch(`${supabaseUrl}/functions/v1/release-guard-payment`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-          },
-          body: JSON.stringify({
-            assignmentId: assignment.id,
-            jobId: request.job_id,
-            guardId: request.guard_id,
-            amount: assignment.guard_net_payout || 0,
-            jobTitle,
-            guardEmail: null,
-            guardName: guardName,
-            adminNotes: 'Auto-released on client approval',
-            completionRequestId: requestId,
-            triggeredBy: isAdmin ? 'admin' : 'client',
-          }),
-        });
-      } catch (payoutErr: any) {
-        console.error('[approve-job-completion] Payout trigger failed:', payoutErr.message);
-      }
     }
 
     if (review) {
@@ -227,25 +196,16 @@ serve(async (req) => {
 
     if (assignment) {
       try {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL');
-        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-        await fetch(`${supabaseUrl}/functions/v1/release-guard-payment`, {
+        const payoutSupabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
+        await fetch(`${supabaseUrl}/functions/v1/create-guard-payout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Authorization': `Bearer ${authHeader?.replace('Bearer ', '') || ''}`,
           },
           body: JSON.stringify({
             assignmentId: assignment.id,
             jobId: request.job_id,
-            guardId: request.guard_id,
-            amount: assignment.guard_net_payout || 0,
-            jobTitle,
-            guardEmail: null,
-            guardName: guardName,
-            adminNotes: 'Admin approved release',
-            completionRequestId: requestId,
-            triggeredBy: 'admin',
           }),
         });
       } catch (payoutErr: any) {

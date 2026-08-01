@@ -106,6 +106,7 @@ serve(async (req: Request) => {
   const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
   if (!stripeSecretKey || !supabaseUrl || !supabaseServiceKey) {
     return corsResponse(origin, 500, { error: 'Unable to process payout' });
@@ -208,12 +209,78 @@ serve(async (req: Request) => {
       recovered,
     });
 
+    let emailSent = false;
+    let emailFailureReason: string | null = null;
+
+    if (resendApiKey && guard.email) {
+      try {
+        const receiptHtml = buildPayoutReceiptHtml({
+          guardName: guard.full_name || 'Guard',
+          jobTitle: job.job_title || 'Job',
+          grossAmount: grossPence / 100,
+          feeAmount: feePence / 100,
+          netAmount: netPence / 100,
+          transferId: transfer.id,
+          payoutDate: now,
+        });
+
+        const resendRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${resendApiKey}`,
+          },
+          body: JSON.stringify({
+            from: 'QuickGuard <payments@quickguard.uk>',
+            to: [guard.email],
+            subject: `Payout Receipt: \u00A3${(netPence / 100).toFixed(2)} for ${job.job_title || 'Job'}`,
+            html: receiptHtml,
+          }),
+        });
+
+        if (resendRes.ok) {
+          emailSent = true;
+        } else {
+          const errText = await resendRes.text().catch(() => 'unknown');
+          emailFailureReason = `Resend API responded with ${resendRes.status}`;
+          safeLog('receipt email http error', resendRes.status, errText.slice(0, 200));
+        }
+      } catch (e: unknown) {
+        emailFailureReason = e instanceof Error ? e.message : 'Unknown email error';
+        safeLog('receipt email exception', emailFailureReason);
+      }
+
+      if (!emailSent) {
+        await supabase.from('payment_audit_logs').insert({
+          event_type: 'payout_receipt_email_failed',
+          reference_type: 'guard_payout',
+          reference_id: payoutRecord.id,
+          details: {
+            error: emailFailureReason,
+            guard_id: guard.id,
+            assignment_id: validated.assignmentId,
+            job_id: job.id,
+            transfer_id: transfer.id,
+          },
+          created_at: now,
+        }).catch(() => {});
+      }
+    }
+
+    const netDisplay = (netPence / 100).toFixed(2);
+    const guardNameDisplay = guard.full_name || 'guard';
+    let message = `Payout of \u00A3${netDisplay} released to ${guardNameDisplay}`;
+    if (recovered) message += ' (recovered from processing state)';
+    if (!emailSent && resendApiKey && guard.email) message += '. Receipt email could not be sent.';
+
     return corsResponse(origin, 200, {
       success: true,
       transferId: transfer.id,
-      netAmount: (netPence / 100).toFixed(2),
+      netAmount: netDisplay,
       recovered,
-      message: `Payout of £${(netPence / 100).toFixed(2)} released to ${guard.full_name || 'guard'}${recovered ? ' (recovered from processing state)' : ''}`,
+      emailSent,
+      emailFailureReason,
+      message,
     });
   } catch (e: unknown) {
     const err = e as { status: number; message: string };
@@ -891,4 +958,26 @@ async function logAudit(
   }).catch((e: unknown) => {
     safeLog('audit log insert error', e instanceof Error ? e.message : 'unknown');
   });
+}
+
+function buildPayoutReceiptHtml(params: {
+  guardName: string;
+  jobTitle: string;
+  grossAmount: number;
+  feeAmount: number;
+  netAmount: number;
+  transferId: string;
+  payoutDate: string;
+}): string {
+  const dateStr = new Date(params.payoutDate).toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  });
+  const timeStr = new Date(params.payoutDate).toLocaleTimeString('en-GB', {
+    hour: '2-digit', minute: '2-digit',
+  });
+  const feePercent = params.grossAmount > 0
+    ? Math.round((params.feeAmount / params.grossAmount) * 100)
+    : 0;
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Payout Receipt</title></head><body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background-color:#f3f4f6;"><table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:40px 20px;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.1);"><tr><td style="background:linear-gradient(135deg,#10B981 0%,#059669 100%);padding:40px 30px;text-align:center;"><h1 style="margin:0;color:#fff;font-size:28px;font-weight:bold;">QuickGuard</h1><p style="margin:10px 0 0;color:#D1FAE5;font-size:16px;">Payout Receipt</p></td></tr><tr><td style="padding:40px 30px;"><div style="background:linear-gradient(135deg,#ECFDF5 0%,#D1FAE5 100%);border:2px solid #10B981;border-radius:10px;padding:30px;text-align:center;margin-bottom:30px;"><p style="margin:0;color:#047857;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Net Payout</p><p style="margin:10px 0 0;color:#065F46;font-size:42px;font-weight:bold;">\u00A3${params.netAmount.toFixed(2)}</p></div><p style="margin:0 0 20px;color:#374151;font-size:16px;line-height:1.6;">Hi <strong>${params.guardName}</strong>,</p><p style="margin:0 0 30px;color:#374151;font-size:16px;line-height:1.6;">Your payment for <strong>${params.jobTitle}</strong> has been transferred to your connected account.</p><table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:30px;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden;"><tr><td style="padding:14px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;"><strong style="color:#374151;">Job Title</strong></td><td style="padding:14px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;text-align:right;color:#6B7280;">${params.jobTitle}</td></tr><tr><td style="padding:14px;border-bottom:1px solid #E5E7EB;"><strong style="color:#374151;">Gross Amount</strong></td><td style="padding:14px;border-bottom:1px solid #E5E7EB;text-align:right;color:#6B7280;">\u00A3${params.grossAmount.toFixed(2)}</td></tr><tr><td style="padding:14px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;"><strong style="color:#374151;">Platform Fee (${feePercent}%)</strong></td><td style="padding:14px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;text-align:right;color:#6B7280;">\u00A3${params.feeAmount.toFixed(2)}</td></tr><tr><td style="padding:16px;background:#F0FDF4;"><strong style="color:#065F46;font-size:18px;">Net Payout</strong></td><td style="padding:16px;background:#F0FDF4;text-align:right;"><strong style="color:#10B981;font-size:22px;">\u00A3${params.netAmount.toFixed(2)}</strong></td></tr><tr><td style="padding:14px;border-bottom:1px solid #E5E7EB;"><strong style="color:#374151;">Transfer ID</strong></td><td style="padding:14px;border-bottom:1px solid #E5E7EB;text-align:right;color:#6B7280;font-family:monospace;font-size:12px;">${params.transferId}</td></tr><tr><td style="padding:14px;background:#F9FAFB;"><strong style="color:#374151;">Date &amp; Time</strong></td><td style="padding:14px;background:#F9FAFB;text-align:right;color:#6B7280;">${dateStr} at ${timeStr}</td></tr></table><div style="background:#DBEAFE;border-left:4px solid #2563EB;padding:16px;margin-bottom:30px;border-radius:4px;"><p style="margin:0;color:#1E40AF;font-size:14px;line-height:1.6;"><strong>Payment Timing:</strong> Funds typically arrive in your bank account within 1-3 business days depending on your bank.</p></div><p style="margin:30px 0 0;color:#6B7280;font-size:14px;text-align:center;">Questions? Contact us at <a href="mailto:support@quickguard.uk" style="color:#1a237e;">support@quickguard.uk</a></p></td></tr><tr><td style="background:#111827;padding:20px 30px;text-align:center;"><p style="margin:0;color:#9CA3AF;font-size:12px;">&copy; ${new Date().getFullYear()} QuickGuard. All rights reserved. This is an automated receipt.</p></td></tr></table></td></tr></table></body></html>`;
 }

@@ -129,11 +129,27 @@ export default function PendingReleaseTable() {
   const handleApprovePayout = async (requestId: string, jobId: string, guardId: string, amount: number, guardName: string, guardEmail: string, jobTitle: string) => {
     setProcessingId(requestId);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token || '';
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        setToast({ message: 'Your admin session has expired. Please sign in again.', type: 'error' });
+        return;
+      }
+
+      const { data: assignment } = await supabase
+        .from('job_assignments')
+        .select('id')
+        .eq('job_id', jobId)
+        .eq('guard_id', guardId)
+        .maybeSingle();
+
+      if (!assignment) {
+        setToast({ message: 'Could not find the assignment for this guard and job.', type: 'error' });
+        return;
+      }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/release-guard-payment`,
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-guard-payout`,
         {
           method: 'POST',
           headers: {
@@ -141,19 +157,22 @@ export default function PendingReleaseTable() {
             'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({
-            guardId,
+            assignmentId: assignment.id,
             jobId,
-            amount,
-            jobTitle,
-            guardEmail,
-            guardName,
-            adminNotes,
-            completionRequestId: requestId,
           }),
         }
       );
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to release payment');
+
+      if (!response.ok) {
+        let message = data.error || 'Failed to release payment';
+        if (response.status === 401) message = 'Your session has expired. Please sign in again.';
+        else if (response.status === 403) message = 'Finance administrator access is required to release payouts.';
+        else if (response.status === 404) message = 'Assignment not found.';
+        else if (response.status === 409) message = data.error || 'This payout has already been processed or requires finance review.';
+        else if (response.status === 500) message = 'The payout could not be processed safely. Please try again.';
+        throw new Error(message);
+      }
 
       await logAdminAction({
         actionType: 'guard_payout_approved',
@@ -162,7 +181,10 @@ export default function PendingReleaseTable() {
         targetName: `${jobId}/${guardId}`,
       });
 
-      setToast({ message: `Payout sent! £${data.netAmount} to ${guardName}. Transfer ID: ${data.transferId}`, type: 'success' });
+      setToast({
+        message: data.message || `Payout of £${data.netAmount} sent to ${guardName}.${data.recovered ? ' (Recovered from processing state)' : ''}`,
+        type: 'success'
+      });
       setSelectedRequest(null);
       setAdminNotes('');
       setPayoutChecks(null);

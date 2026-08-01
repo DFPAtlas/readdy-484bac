@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
@@ -10,6 +11,7 @@ const KNOWN_FUNCTIONS_FALLBACK: Record<string, { name: string; verify_jwt: boole
   "create-subscription-checkout": { name: "Create Subscription Checkout", verify_jwt: true },
   "create-job-payment": { name: "Create Job Payment", verify_jwt: true },
   "create-guard-payout": { name: "Create Guard Payout", verify_jwt: true },
+  "release-guard-payment": { name: "Release Guard Payment (Retired)", verify_jwt: true },
   "email-confirmation": { name: "Email Confirmation", verify_jwt: false },
   "send-job-posted-email": { name: "Send Job Posted Email", verify_jwt: true },
   "get-pending-verifications": { name: "Get Pending Verifications", verify_jwt: true },
@@ -70,7 +72,6 @@ const KNOWN_FUNCTIONS_FALLBACK: Record<string, { name: string; verify_jwt: boole
   "update-after-payment": { name: "Update After Payment", verify_jwt: true },
   "create-connect-account": { name: "Create Connect Account", verify_jwt: true },
   "get-connect-status": { name: "Get Connect Status", verify_jwt: true },
-  "release-guard-payment": { name: "Release Guard Payment", verify_jwt: true },
   "get-client-dashboard-data": { name: "Get Client Dashboard Data", verify_jwt: true },
   "send-failed-payment-email": { name: "Send Failed Payment Email", verify_jwt: true },
   "send-cancellation-notification": { name: "Send Cancellation Notification", verify_jwt: true },
@@ -84,7 +85,7 @@ const KNOWN_FUNCTIONS_FALLBACK: Record<string, { name: string; verify_jwt: boole
   "request-job-completion": { name: "Request Job Completion", verify_jwt: true },
   "approve-job-completion": { name: "Approve Job Completion", verify_jwt: true },
   "get-completion-requests": { name: "Get Completion Requests", verify_jwt: true },
-  "connect-guard-payout": { name: "Connect Guard Payout", verify_jwt: true },
+  "connect-guard-payout": { name: "Connect Guard Payout (Deprecated)", verify_jwt: true },
   "dispute-job": { name: "Dispute Job", verify_jwt: true },
   "resolve-dispute": { name: "Resolve Dispute", verify_jwt: true },
   "get-guard-job-history": { name: "Get Guard Job History", verify_jwt: true },

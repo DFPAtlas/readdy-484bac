@@ -1,5 +1,5 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,8 +11,8 @@ serve(async (req) => {
 
   return new Response(JSON.stringify({
     deprecated: true,
-    message: 'connect-guard-payout is deprecated. Use release-guard-payment instead. This function will be retired.',
-    migrateTo: 'release-guard-payment',
-    note: 'Payouts are now automatically triggered by approve-job-completion. Manual payout via release-guard-payment is still available for admin use.',
+    message: 'connect-guard-payout is deprecated. Use create-guard-payout instead. This function will be retired.',
+    migrateTo: 'create-guard-payout',
+    note: 'Payouts are now handled by create-guard-payout. Manual payout via create-guard-payout is available for admin use. Auto-release is handled by approve-job-completion and auto-release-guard-payments.',
   }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 });

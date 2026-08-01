@@ -171,13 +171,13 @@ export default function AdminHeldPayments() {
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
       if (!accessToken) {
-        setReleaseError('Your admin session has expired. Please log in again.');
+        setReleaseError('Your admin session has expired. Please sign in again.');
         setReleasingId(null);
         return;
       }
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/release-guard-payment`,
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-guard-payout`,
         {
           method: 'POST',
           headers: {
@@ -187,12 +187,6 @@ export default function AdminHeldPayments() {
           body: JSON.stringify({
             assignmentId: payment.assignment_id,
             jobId: payment.job_id,
-            guardId: payment.guard_id,
-            amount: payment.payment_amount,
-            jobTitle: payment.job_title,
-            guardEmail: payment.guard_email,
-            guardName: payment.guard_name,
-            adminNotes: confirmNotes || undefined,
           }),
         }
       );
@@ -200,24 +194,26 @@ export default function AdminHeldPayments() {
       const result = await res.json();
 
       if (!res.ok) {
-        if (result.code === 'FORBIDDEN') {
-          setReleaseError('You do not have permission to release payments. Only super admins and finance admins can perform this action.');
-        } else if (result.code === 'NO_CONNECT_ACCOUNT') {
-          setReleaseError(`${payment.guard_name} hasn't connected their Stripe account yet. Ask them to go to Bank Settings \u2192 Connect Bank Account.`);
-        } else if (result.code === 'ACCOUNT_NOT_READY') {
-          setReleaseError(`${payment.guard_name}'s Stripe account isn't fully set up yet. They need to complete their bank onboarding.`);
-        } else if (result.code === 'NOT_CLIENT_RELEASED') {
-          setReleaseError(`${payment.guard_name}'s payment for "${payment.job_title}" cannot be released yet. The client must approve the job completion and release funds first. Current status: ${result.currentStatus || 'not released'}.`);
+        if (res.status === 401) {
+          setReleaseError('Your session has expired. Please sign in again.');
+        } else if (res.status === 403) {
+          setReleaseError('Finance administrator access is required to release payouts. Only super admins and finance admins can perform this action.');
+        } else if (res.status === 400) {
+          setReleaseError(result.error || 'This assignment is not eligible for payout. The guard may not have a ready Stripe account, or the client has not yet released funds.');
+        } else if (res.status === 404) {
+          setReleaseError('Assignment not found.');
+        } else if (res.status === 409) {
+          setReleaseError(result.error || 'This payout has already been completed, is currently processing, or requires finance review.');
         } else {
-          setReleaseError(result.error || 'Payment release failed');
+          setReleaseError(result.error || 'The payout could not be processed safely.');
         }
         return;
       }
 
-      setReleaseSuccess(result.message);
+      setReleaseSuccess(result.message || `Payout of £${result.netAmount} released successfully.${result.recovered ? ' (Recovered from processing state)' : ''}`);
 
       if (result.emailSent === false) {
-        setEmailWarning(`Receipt email could not be sent to ${payment.guard_name}. Reason: ${result.emailFailureReason || 'Unknown error'}. The Stripe transfer was still processed successfully.`);
+        setEmailWarning(`Receipt email could not be sent to ${payment.guard_name}. The Stripe transfer was still processed successfully.`);
       }
 
       setAllPayments(prev => prev.filter(p => p.assignment_id !== payment.assignment_id));

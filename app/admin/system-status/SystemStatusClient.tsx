@@ -147,9 +147,10 @@ function getPaymentStatusLabel(status: string): string {
 
 // ── Edge functions to ping ─────────────────────────────────────────────
 
-const EDGE_FUNCTIONS: { name: string; slug: string; type: string }[] = [
+const EDGE_FUNCTIONS: { name: string; slug: string; type: string; retired?: boolean }[] = [
   { name: 'Create Job Payment', slug: 'create-job-payment', type: 'payment' },
-  { name: 'Release Guard Payment', slug: 'release-guard-payment', type: 'payment' },
+  { name: 'Create Guard Payout', slug: 'create-guard-payout', type: 'payment' },
+  { name: 'Release Guard Payment (Retired)', slug: 'release-guard-payment', type: 'payment', retired: true },
   { name: 'Auto-Release Guard Payments', slug: 'auto-release-guard-payments', type: 'payment' },
   { name: 'Enhanced Stripe Webhook', slug: 'enhanced-stripe-webhook', type: 'stripe' },
   { name: 'Get Storage Usage', slug: 'get-storage-usage', type: 'storage' },
@@ -256,29 +257,108 @@ export default function SystemStatusClient() {
     setEdgeLoading(true);
     const pings: EdgeFunctionPing[] = [];
 
+    let token = '';
+    const { data: { session } } = await supabase.auth.getSession();
+    token = session?.access_token || '';
+
     await Promise.all(
       EDGE_FUNCTIONS.map(async (fn) => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         const start = performance.now();
         try {
+          const isRetired = fn.retired === true;
+          const method = isRetired ? 'POST' : 'GET';
+          const headers: Record<string, string> = {};
+          if (isRetired && token) {
+            headers['Authorization'] = `Bearer ${token}`;
+            headers['Content-Type'] = 'application/json';
+          }
+
           const res = await fetch(`${SUPABASE_URL}/functions/v1/${fn.slug}`, {
-            method: 'GET',
+            method,
             signal: controller.signal,
             cache: 'no-store',
+            headers: Object.keys(headers).length ? headers : undefined,
+            body: isRetired ? '' : undefined,
           });
           clearTimeout(timeout);
           const latency = Math.round(performance.now() - start);
-          const isError = res.status >= 500;
-          pings.push({
-            name: fn.name,
-            slug: fn.slug,
-            status: isError ? 'degraded' : 'healthy',
-            latency,
-            httpStatus: res.status,
-            error: isError ? `HTTP ${res.status}` : undefined,
-            checkedAt: new Date().toISOString(),
-          });
+
+          if (isRetired) {
+            if (!token) {
+              pings.push({
+                name: fn.name,
+                slug: fn.slug,
+                status: 'degraded',
+                latency,
+                httpStatus: 0,
+                error: 'Auth required for verification — sign in as admin',
+                checkedAt: new Date().toISOString(),
+              });
+            } else if (res.status === 410) {
+              pings.push({
+                name: fn.name,
+                slug: fn.slug,
+                status: 'healthy',
+                latency,
+                httpStatus: 410,
+                error: 'Retired: returns 410 as expected',
+                checkedAt: new Date().toISOString(),
+              });
+            } else if (res.status === 403) {
+              pings.push({
+                name: fn.name,
+                slug: fn.slug,
+                status: 'degraded',
+                latency,
+                httpStatus: res.status,
+                error: 'Auth check passed but role denied 403',
+                checkedAt: new Date().toISOString(),
+              });
+            } else if (res.status === 401) {
+              pings.push({
+                name: fn.name,
+                slug: fn.slug,
+                status: 'degraded',
+                latency,
+                httpStatus: res.status,
+                error: 'JWT validation failed 401',
+                checkedAt: new Date().toISOString(),
+              });
+            } else if (res.status >= 500) {
+              pings.push({
+                name: fn.name,
+                slug: fn.slug,
+                status: 'offline',
+                latency,
+                httpStatus: res.status,
+                error: `Unexpected HTTP ${res.status} — retired function should return 410`,
+                checkedAt: new Date().toISOString(),
+              });
+            } else {
+              pings.push({
+                name: fn.name,
+                slug: fn.slug,
+                status: 'degraded',
+                latency,
+                httpStatus: res.status,
+                error: `Expected 410, got HTTP ${res.status}`,
+                checkedAt: new Date().toISOString(),
+              });
+            }
+          } else {
+            const isError = res.status >= 500;
+            pings.push({
+              name: fn.name,
+              slug: fn.slug,
+              status: isError ? 'degraded' : 'healthy',
+              latency,
+              httpStatus: res.status,
+              error: isError ? `HTTP ${res.status}` : undefined,
+              checkedAt: new Date().toISOString(),
+            });
+          }
         } catch (e: any) {
           clearTimeout(timeout);
           pings.push({
@@ -676,7 +756,11 @@ export default function SystemStatusClient() {
                       </div>
                     )}
                     {ping?.error && (
-                      <p className="text-[10px] text-red-400 mt-2 leading-relaxed">{ping.error}</p>
+                      <p className={`text-[10px] mt-2 leading-relaxed ${
+                        fn.retired && ping.status === 'healthy' ? 'text-emerald-400' :
+                        fn.retired && ping.status === 'degraded' ? 'text-amber-400' :
+                        'text-red-400'
+                      }`}>{ping.error}</p>
                     )}
                   </div>
                 );

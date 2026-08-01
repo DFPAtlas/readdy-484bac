@@ -7,5 +7,8 @@ verify_jwt = true
 [functions.create-guard-payout]
 verify_jwt = true
 
+[functions.release-guard-payment]
+verify_jwt = true
+
 [functions.enhanced-stripe-webhook]
 verify_jwt = false

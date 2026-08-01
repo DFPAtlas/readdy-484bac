@@ -28,7 +28,7 @@ To set a secret: Supabase Dashboard → Project → Edge Functions → Manage se
 
 | Secret | Used By | Notes |
 |---|---|---|
-| `RESEND_API_KEY` | process-email-queue, release-guard-payment, render-email-template | Resend API key for template-based emails |
+| `RESEND_API_KEY` | create-guard-payout, process-email-queue, release-guard-payment, render-email-template | Resend API key for template-based emails |
 | `SMTP_USER` | send-job-posted-email | Gmail SMTP username (TEMPORARY — migrate to Resend before scaling) |
 | `SMTP_PASS` | send-job-posted-email | Gmail SMTP app password (TEMPORARY — migrate to Resend before scaling) |
 | `FROM_EMAIL` | send-welcome-email, send-client-tier-email, send-guard-promo-welcome | Default sender address |
