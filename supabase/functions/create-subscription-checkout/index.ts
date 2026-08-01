@@ -297,7 +297,9 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { userId, accountType, planId, billingCycle, siteUrl: bodySiteUrl } = body;
+    console.log('[create-subscription-checkout] Request body:', JSON.stringify(body));
+
+    const { userId, accountType, planId, userEmail, billingCycle, siteUrl: bodySiteUrl } = body;
 
     if (!userId || !accountType || !planId) {
       return new Response(
@@ -306,70 +308,13 @@ serve(async (req) => {
       );
     }
 
-    if (!['client', 'guard'].includes(accountType)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid account type.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!PLAN_NAMES[planId] || !planId.startsWith(`${accountType}-`)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid plan for this account type.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const authHeader = req.headers.get('Authorization') || '';
-    if (!authHeader.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized.' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
     const publicSupabase = createClient(supabaseUrl, supabaseServiceKey, {
-      db: { schema: 'app' },
-      auth: { persistSession: false, autoRefreshToken: false },
+      db: { schema: 'app' }
     });
 
-    const token = authHeader.slice('Bearer '.length);
-    const { data: authData, error: authError } = await publicSupabase.auth.getUser(token);
-    const authenticatedUser = authData?.user;
-
-    if (authError || !authenticatedUser) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized.' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (authenticatedUser.id !== userId) {
-      return new Response(
-        JSON.stringify({ error: 'You cannot create or change a subscription for another user.' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const authenticatedUserId = authenticatedUser.id;
-    const profileTable = accountType === 'client' ? 'clients' : 'guards';
-    const { data: profile, error: profileError } = await publicSupabase
-      .from(profileTable)
-      .select('stripe_customer_id, email')
-      .eq('user_id', authenticatedUserId)
-      .maybeSingle();
-
-    if (profileError || !profile) {
-      return new Response(
-        JSON.stringify({ error: 'No matching account profile was found.' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const email = profile.email || authenticatedUser.email;
     const { priceId, error: priceError } = await getPriceId(publicSupabase, planId, billingCycle || 'monthly');
     if (!priceId || priceError) {
       console.error('[create-subscription-checkout] Price lookup failed:', priceError);
@@ -391,7 +336,7 @@ serve(async (req) => {
     const { data: existingSub } = await publicSupabase
       .from('subscriptions')
       .select('stripe_subscription_id, status, plan_slug')
-      .eq('user_id', authenticatedUserId)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (existingSub?.stripe_subscription_id && (existingSub.status === 'active' || existingSub.status === 'trialing')) {
@@ -404,7 +349,7 @@ serve(async (req) => {
         );
       }
 
-      console.log(`[create-subscription-checkout] Switching plan: ${oldPlanSlug} → ${planId} for user ${authenticatedUserId}`);
+      console.log(`[create-subscription-checkout] Switching plan: ${oldPlanSlug} → ${planId} for user ${userId}`);
 
       try {
         const stripeSub = await stripe.subscriptions.retrieve(existingSub.stripe_subscription_id);
@@ -435,7 +380,7 @@ serve(async (req) => {
 
         await syncPlanToDb(
           publicSupabase,
-          authenticatedUserId,
+          userId,
           planId,
           accountType,
           existingSub.stripe_subscription_id,
@@ -451,7 +396,7 @@ serve(async (req) => {
 
         await logPlanChange(
           publicSupabase,
-          authenticatedUserId,
+          userId,
           oldPlanSlug,
           planId,
           oldPlanName,
@@ -465,7 +410,7 @@ serve(async (req) => {
         await sendAdminAlert(
           supabaseUrl,
           supabaseServiceKey,
-          authenticatedUserId,
+          userId,
           oldPlanSlug,
           planId,
           oldPlanName,
@@ -501,20 +446,37 @@ serve(async (req) => {
       }
     }
 
-    let customerId: string | undefined = profile.stripe_customer_id || undefined;
+    const email = userEmail;
+
+    let customerId: string | undefined;
+    if (accountType === 'client') {
+      const { data: client } = await publicSupabase
+        .from('clients')
+        .select('stripe_customer_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      customerId = client?.stripe_customer_id || undefined;
+    } else {
+      const { data: guard } = await publicSupabase
+        .from('guards')
+        .select('stripe_customer_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      customerId = guard?.stripe_customer_id || undefined;
+    }
 
     if (!customerId) {
-      console.log('[create-subscription-checkout] Creating new Stripe customer for', authenticatedUserId);
+      console.log('[create-subscription-checkout] Creating new Stripe customer for', userId);
       const customer = await stripe.customers.create({
         email,
-        metadata: { user_id: authenticatedUserId, account_type: accountType, plan_id: planId },
+        metadata: { user_id: userId, account_type: accountType, plan_id: planId },
       });
       customerId = customer.id;
 
       if (accountType === 'client') {
-        await publicSupabase.from('clients').update({ stripe_customer_id: customerId }).eq('user_id', authenticatedUserId);
+        await publicSupabase.from('clients').update({ stripe_customer_id: customerId }).eq('user_id', userId);
       } else {
-        await publicSupabase.from('guards').update({ stripe_customer_id: customerId }).eq('user_id', authenticatedUserId);
+        await publicSupabase.from('guards').update({ stripe_customer_id: customerId }).eq('user_id', userId);
       }
     }
 
@@ -533,14 +495,14 @@ serve(async (req) => {
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      client_reference_id: authenticatedUserId,
+      client_reference_id: userId,
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: {
         paymentType: 'subscription',
-        user_id: authenticatedUserId,
+        user_id: userId,
         account_type: accountType,
         plan_id: planId,
         plan_slug: planId,
