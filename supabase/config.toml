@@ -1,0 +1,11 @@
+[functions.create-subscription-checkout]
+verify_jwt = true
+
+[functions.create-job-payment]
+verify_jwt = true
+
+[functions.create-guard-payout]
+verify_jwt = true
+
+[functions.enhanced-stripe-webhook]
+verify_jwt = false
