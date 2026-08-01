@@ -1,0 +1,64 @@
+QuickGuard Feature Entitlements
+
+Feature Keys
+
+Client Features
+Feature Key | Description | Free | Basic | Pro
+client.post_job | Create job postings | Yes | Yes | Yes
+client.basic_matching | Basic guard matching | Yes | Yes | Yes
+client.email_support | Email support | Yes | Yes | Yes
+client.escrow_payments | Held Job Payment with Stripe processing | Yes | Yes | Yes
+client.ai_matching | AI-powered guard matching | No | Yes | Yes
+client.priority_support | Priority support channel | No | Yes | Yes
+client.analytics | Dashboard analytics | No | Yes | Yes
+client.multiple_guard_selection | Select multiple guards per job | No | Yes | Yes
+client.custom_templates | Custom job templates | No | Yes | Yes
+client.job_templates | Save and reuse job templates | No | Yes | Yes
+client.email_notifications | Email notifications | No | Yes | Yes
+client.bulk_posting | Post multiple jobs at once | No | No | Yes
+client.dedicated_manager | Dedicated account manager | No | No | Yes
+client.unlimited_jobs | Unlimited job postings | No | No | Yes
+
+Guard Features
+Feature Key | Description | Starter | Professional | Premium
+guard.apply_job | Apply to jobs | Yes | Yes | Yes
+guard.ai_matching | AI-powered job matching | Yes | Yes | Yes
+guard.profile_visibility | Public profile visibility | Yes | Yes | Yes
+guard.email_notifications | Email job alerts | Yes | Yes | Yes
+guard.instant_notifications | Real-time job notifications | Yes | Yes | Yes
+guard.secure_payments | Secure payment processing | Yes | Yes | Yes
+guard.performance_analytics | Earnings and performance stats | No | Yes | Yes
+guard.priority_support | Priority support channel | No | Yes | Yes
+guard.job_recommendations | Personalized job recommendations | No | Yes | Yes
+guard.bulk_apply | Bulk job applications | No | No | Yes
+guard.featured_listing | Featured listing in searches | No | No | Yes
+guard.priority_placement | Priority placement in job searches | No | No | Yes
+guard.dedicated_support | Dedicated account support | No | No | Yes
+
+Gated Routes
+Route | Required Feature
+/client/post-job | client.post_job
+/client/jobs/tracker | client.analytics
+/client/dashboard | client.analytics
+/guard/earnings | guard.performance_analytics
+/guard/notification-settings | guard.priority_support
+
+Stripe Webhook Events
+Event | DB Action
+checkout.session.completed | Upsert subscription, set status=active, store plan_slug
+customer.subscription.created | Upsert subscription row
+customer.subscription.updated | Update status, current_period_end, cancel_at_period_end
+customer.subscription.deleted | Set status=cancelled
+invoice.payment_succeeded | Update last_payment_date, clear failures
+invoice.payment_failed | Increment failure count, set past_due
+payment_intent.payment_failed | Update transactions.status=failed
+
+Idempotency
+All webhook events checked against app.processed_events(id). Duplicates return 200 with { idempotent: true }.
+
+Database Objects
+- app.plans - 6 seeded plans with features JSONB arrays
+- app.subscriptions - linked to users via plan_slug
+- app.user_entitlements - view resolving effective plan with free fallback
+- app.processed_events - webhook idempotency
+- public.user_entitlements - public view with security_invoker

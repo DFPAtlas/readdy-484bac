@@ -1,0 +1,480 @@
+QUICKGUARD UAT CHECKLIST
+========================
+
+Manual testing checklist for User Acceptance Testing (UAT).
+Check each item, note any issues in the "Result" column.
+
+
+1. GUARD REGISTRATION
+---------------------
+1.1  Visit /guard/register
+     Expected: Registration form loads with Guard Promo banner
+     Result: ___
+
+1.2  Fill all wizard fields and submit
+     Expected: Account created, redirected to complete-profile-wizard
+     Result: ___
+
+1.3  Check in-app notifications
+     Expected: Welcome notification received
+     Result: ___
+
+1.4  Check welcome email (if template exists)
+     Expected: Welcome email received
+     Result: ___
+
+1.5  Try registering with same email again
+     Expected: Error "An account with this email already exists"
+     Result: ___
+
+1.6  Google OAuth registration
+     Expected: Account created, redirected to dashboard
+     Result: ___
+
+
+2. CLIENT REGISTRATION
+-----------------------
+2.1  Visit /client/register
+     Expected: Registration form loads
+     Result: ___
+
+2.2  Fill wizard and submit
+     Expected: Account created, redirected to complete-profile-wizard
+     Result: ___
+
+2.3  Check in-app notifications
+     Expected: Welcome notification received
+     Result: ___
+
+2.4  Check welcome email (if template exists)
+     Expected: Welcome email received
+     Result: ___
+
+2.5  Google OAuth registration
+     Expected: Account created, redirected to dashboard
+     Result: ___
+
+
+3. ADMIN LOGIN
+--------------
+3.1  Visit /admin/login
+     Expected: Login form loads
+     Result: ___
+
+3.2  Enter valid admin credentials
+     Expected: Redirected to /admin/dashboard
+     Result: ___
+
+3.3  Enter invalid credentials
+     Expected: Error message displayed
+     Result: ___
+
+3.4  Session timeout (wait 8 hours or reduce config)
+     Expected: Redirected to login with timeout warning
+     Result: ___
+
+3.5  Logout
+     Expected: Clears session, redirected to login
+     Result: ___
+
+
+4. GUARD PROFILE COMPLETION
+----------------------------
+4.1  Complete profile wizard after registration
+     Expected: All fields save correctly
+     Result: ___
+
+4.2  Upload SIA licence image
+     Expected: Image uploads and displays
+     Result: ___
+
+4.3  Upload driving licence front/back
+     Expected: Images upload and display
+     Result: ___
+
+4.4  Upload proof of address
+     Expected: Image uploads and displays
+     Result: ___
+
+4.5  Edit profile from /guard/profile
+     Expected: Changes persist
+     Result: ___
+
+4.6  Bank details setup
+     Expected: Bank details save correctly
+     Result: ___
+
+
+5. SIA VERIFICATION UPLOAD
+---------------------------
+5.1  Upload SIA licence during profile wizard
+     Expected: Licence number, expiry date, cardholder name saved
+     Result: ___
+
+5.2  Admin views pending verifications at /admin/verify-guards
+     Expected: Guard appears in pending list
+     Result: ___
+
+5.3  Admin approves verification
+     Expected: Guard status updates to verified, notification sent
+     Result: ___
+
+5.4  Admin rejects verification
+     Expected: Guard notified with reason
+     Result: ___
+
+
+6. CLIENT JOB POSTING
+---------------------
+6.1  Visit /client/post-job
+     Expected: 6-step wizard loads
+     Result: ___
+
+6.2  Complete Step 1 (Job Basics)
+     Expected: Validation passes, can proceed
+     Result: ___
+
+6.3  Complete Step 2 (Location)
+     Expected: Address fields save, geocoding works
+     Result: ___
+
+6.4  Complete Step 3 (Shift Times)
+     Expected: Date/time validation works
+     Result: ___
+
+6.5  Complete Step 4 (Requirements)
+     Expected: SIA/licence requirements save
+     Result: ___
+
+6.6  Complete Step 5 (Pay & Budget)
+     Expected: Rate and contact validation works
+     Result: ___
+
+6.7  Review and Post
+     Expected: Job created, appears in /client/jobs
+     Result: ___
+
+6.8  Save as draft mid-wizard
+     Expected: Draft appears in Drafts list
+     Result: ___
+
+6.9  Save as template
+     Expected: Template appears in Templates list
+     Result: ___
+
+6.10 Duplicate previous job
+     Expected: Fields pre-filled from previous job
+     Result: ___
+
+6.11 Apply saved site
+     Expected: Site details auto-fill location fields
+     Result: ___
+
+6.12 Test monthly job limit
+     Expected: Error shown when limit reached, upgrade prompt appears
+     Result: ___
+
+
+7. GUARD JOB APPLICATION
+------------------------
+7.1  Visit /guard/dashboard
+     Expected: Recommended jobs panel shows open jobs
+     Result: ___
+
+7.2  Click Apply on a job
+     Expected: Application submitted, tracker updates
+     Result: ___
+
+7.3  View applications in Application Tracker
+     Expected: Shows pending/accepted statuses
+     Result: ___
+
+7.4  Test application limit
+     Expected: Blocked at plan limit, upgrade prompt appears
+     Result: ___
+
+7.5  Receive job match notification
+     Expected: In-app notification + email (if configured)
+     Result: ___
+
+
+8. CLIENT SELECTS GUARD
+------------------------
+8.1  Visit job applicants at /client/jobs/[id]/select-guards
+     Expected: Applicants list loads
+     Result: ___
+
+8.2  Filter applicants
+     Expected: Filters work correctly
+     Result: ___
+
+8.3  View guard profile modal
+     Expected: Guard details, ratings, SIA status shown
+     Result: ___
+
+8.4  Compare guards
+     Expected: Side-by-side comparison modal works
+     Result: ___
+
+8.5  Select guard(s)
+     Expected: Guard moves to Selected list
+     Result: ___
+
+8.6  Confirm selection
+     Expected: Confirmation modal, guards notified
+     Result: ___
+
+
+9. STRIPE SUBSCRIPTION CHECKOUT
+--------------------------------
+9.1  Visit /upgrade
+     Expected: Plans load with pricing
+     Result: ___
+
+9.2  Click Subscribe on a paid plan
+     Expected: Redirected to Stripe Checkout
+     Result: ___
+
+9.3  Complete test payment (use Stripe test card 4242 4242 4242 4242)
+     Expected: Redirected to /subscription/success
+     Result: ___
+
+9.4  Subscription success page
+     Expected: Shows 3-step progress, confirms activation
+     Result: ___
+
+9.5  Check admin subscription management
+     Expected: Subscription appears with correct status
+     Result: ___
+
+9.6  Switch from free to paid plan
+     Expected: Upgrade page shows Plan Change Notice
+     Result: ___
+
+9.7  Switch between paid plans
+     Expected: Plan Change Notice shown, new checkout starts
+     Result: ___
+
+9.8  Cancel subscription
+     Expected: cancel_at_period_end set, notification sent
+     Result: ___
+
+9.9  Resume subscription
+     Expected: cancel_at_period_end removed, notification sent
+     Result: ___
+
+
+10. STRIPE WEBHOOK VERIFICATION
+--------------------------------
+10.1 Confirm Stripe Dashboard has only ONE webhook endpoint configured
+     Expected: Points to enhanced-stripe-webhook
+     Result: ___
+
+10.2 Check checkout.session.completed webhook
+     Expected: Subscription created/updated in Supabase
+     Result: ___
+
+10.3 Check customer.subscription.updated webhook
+     Expected: Status/period synced correctly
+     Result: ___
+
+10.4 Check customer.subscription.deleted webhook
+     Expected: Status set to cancelled, entitlements updated
+     Result: ___
+
+10.5 Check invoice.payment_failed webhook
+     Expected: Failure count incremented, notification sent
+     Result: ___
+
+10.6 Check webhook idempotency
+     Expected: Duplicate events not processed twice
+     Result: ___
+
+
+11. EMAIL NOTIFICATIONS
+-----------------------
+11.1 Job posted email
+     Expected: Client receives confirmation email
+     Result: ___
+
+11.2 Job match email
+     Expected: Guards receive match notification
+     Result: ___
+
+11.3 Application status email
+     Expected: Guard notified on acceptance/rejection
+     Result: ___
+
+11.4 Booking confirmation email
+     Expected: Guard receives shift confirmation
+     Result: ___
+
+11.5 Payment receipt email
+     Expected: Client receives payment receipt
+     Result: ___
+
+11.6 Failed payment email
+     Expected: Client notified of payment failure
+     Result: ___
+
+11.7 Welcome email (new registration)
+     Expected: New users receive welcome email
+     Result: ___
+
+11.8 Daily/weekly digest emails
+     Expected: Digest emails sent on schedule
+     Result: ___
+
+
+12. PASSWORD RESET
+-------------------
+12.1 Guard forgot password
+     Expected: Reset email sent, password changed
+     Result: ___
+
+12.2 Client forgot password
+     Expected: Reset email sent, password changed
+     Result: ___
+
+12.3 Admin reset password
+     Expected: Reset email sent, password changed
+     Result: ___
+
+12.4 Password strength indicator
+     Expected: Shows during new password creation
+     Result: ___
+
+
+13. FEATURE GATING
+-------------------
+13.1 Free client tries to access Pro-only route
+     Expected: UpgradePrompt shown
+     Result: ___
+
+13.2 Free guard tries to exceed application limit
+     Expected: Blocked with upgrade prompt
+     Result: ___
+
+13.3 Free client tries to exceed job limit
+     Expected: Blocked with upgrade prompt
+     Result: ___
+
+13.4 Free guard dashboard shows entitlement banner
+     Expected: Banner visible
+     Result: ___
+
+13.5 Trial user dashboard shows trial banner
+     Expected: Trial banner with days remaining
+     Result: ___
+
+
+14. UPGRADE POPUP
+-----------------
+14.1 Click restricted feature (free tier)
+     Expected: UpgradeRequiredModal shown
+     Result: ___
+
+14.2 Click Upgrade Now in modal
+     Expected: Redirected to /upgrade with reason param
+     Result: ___
+
+14.3 Upgrade page shows feature context
+     Expected: Explains which feature is locked and what plan unlocks it
+     Result: ___
+
+14.4 Analytics upgrade flow
+     Expected: Shows analytics feature preview cards
+     Result: ___
+
+
+15. DASHBOARD LIVE DATA
+-----------------------
+15.1 Admin dashboard stats
+     Expected: All numbers from live Supabase queries, not mock data
+     Result: ___
+
+15.2 Admin dashboard activity
+     Expected: Recent activity reflects real actions
+     Result: ___
+
+15.3 Client dashboard Business Overview
+     Expected: Shows real job/service stats
+     Result: ___
+
+15.4 Client dashboard Job Pipeline
+     Expected: Shows real pipeline counts
+     Result: ___
+
+15.5 Client dashboard Action Required
+     Expected: Shows real actionable items
+     Result: ___
+
+15.6 Guard dashboard stats
+     Expected: Shows real earnings, jobs, applications
+     Result: ___
+
+15.7 Guard dashboard Upcoming Shifts
+     Expected: Shows real confirmed shifts
+     Result: ___
+
+15.8 Guard dashboard Recommended Jobs
+     Expected: Shows real open jobs
+     Result: ___
+
+
+16. COMPLAINT FLOW
+------------------
+16.1 Client submits complaint from job detail page
+     Expected: Complaint created, confirmation shown
+     Result: ___
+
+16.2 Admin views complaints at /admin/complaints
+     Expected: Complaint appears in table
+     Result: ___
+
+16.3 Admin filters complaints
+     Expected: Filters work correctly
+     Result: ___
+
+16.4 Admin opens complaint detail
+     Expected: Timeline, status, details shown
+     Result: ___
+
+16.5 Admin updates complaint status
+     Expected: Status changes, audit trail updated
+     Result: ___
+
+
+17. MOBILE VIEW TEST
+--------------------
+17.1 Test homepage on mobile (375px width)
+     Expected: Layout adapts, no horizontal scroll
+     Result: ___
+
+17.2 Test registration wizard on mobile
+     Expected: All steps usable without overflow
+     Result: ___
+
+17.3 Test guard dashboard on mobile
+     Expected: Cards stack, actions accessible
+     Result: ___
+
+17.4 Test client dashboard on mobile
+     Expected: Stats cards readable, navigation works
+     Result: ___
+
+17.5 Test admin pages on tablet (768px)
+     Expected: Sidebar collapses, tables scrollable
+     Result: ___
+
+17.6 Test job posting wizard on mobile
+     Expected: All 6 steps work with mobile inputs
+     Result: ___
+
+
+=================================================================
+NOTES
+=================================================================
+- Use Stripe test mode for all payment tests (card: 4242 4242 4242 4242, any future date, any CVC)
+- Document any failures with screenshots and steps to reproduce
+- Mark items as PASS, FAIL, or N/A

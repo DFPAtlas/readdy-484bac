@@ -1,0 +1,184 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response(
+      JSON.stringify({ error: 'Server configuration error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  try {
+    let body = {};
+    try {
+      body = await req.json();
+    } catch {
+      body = {};
+    }
+
+    const action = body?.action || 'list';
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      db: { schema: 'app' }
+    });
+
+    const authHeader = req.headers.get('Authorization');
+    let adminCheck = null;
+
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      if (token.length > 40) {
+        const { data: { user } } = await supabase.auth.getUser(token);
+        if (user) {
+          const { data: jwtMatch } = await supabase
+            .from('admin_users')
+            .select('id, email, full_name')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .maybeSingle();
+          adminCheck = jwtMatch;
+        }
+      }
+    }
+
+    if (!adminCheck) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: admin access required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (action === 'list') {
+      const page = Math.max(1, parseInt(body?.page || '1', 10));
+      const pageSize = Math.max(1, Math.min(100, parseInt(body?.pageSize || '12', 10)));
+      const search = (body?.search || '').trim();
+      const filter = body?.filter || 'all';
+      const sortBy = body?.sortBy || 'joined';
+
+      let query = supabase.from('clients').select('*', { count: 'exact' });
+
+      if (search) {
+        const s = `%${search}%`;
+        query = query.or(
+          `first_name.ilike.${s},last_name.ilike.${s},contact_name.ilike.${s},email.ilike.${s},company_name.ilike.${s},city.ilike.${s},industry.ilike.${s}`
+        );
+      }
+
+      if (filter === 'verified') {
+        query = query.eq('verified', true);
+      } else if (filter === 'unverified') {
+        query = query.eq('verified', false);
+      } else if (filter === 'suspended') {
+        query = query.eq('is_suspended', true);
+      } else if (filter === 'complete') {
+        query = query.eq('profile_completed', true);
+      } else if (filter === 'incomplete') {
+        query = query.eq('profile_completed', false);
+      }
+
+      if (sortBy === 'name') {
+        query = query.order('contact_name', { ascending: true });
+      } else if (sortBy === 'jobs') {
+        query = query.order('total_jobs_posted', { ascending: false });
+      } else if (sortBy === 'spent') {
+        query = query.order('total_spent', { ascending: false });
+      } else {
+        query = query.order('created_at', { ascending: false });
+      }
+
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      query = query.range(from, to);
+
+      const { data: clients, error: queryError, count } = await query;
+
+      if (queryError) {
+        return new Response(
+          JSON.stringify({ error: queryError.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const totalCount = count || 0;
+
+      const statsQuery = supabase.from('clients').select('verified, profile_completed, is_suspended, total_spent');
+      const { data: allStats, error: statsError } = await statsQuery;
+
+      let stats = { total: 0, verified: 0, profileComplete: 0, suspended: 0, totalSpent: 0 };
+      if (!statsError && allStats) {
+        stats = {
+          total: allStats.length,
+          verified: allStats.filter((c: any) => c.verified).length,
+          profileComplete: allStats.filter((c: any) => c.profile_completed).length,
+          suspended: allStats.filter((c: any) => c.is_suspended).length,
+          totalSpent: allStats.reduce((s: number, c: any) => s + (c.total_spent || 0), 0),
+        };
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          totalCount,
+          page,
+          pageSize,
+          data: clients || [],
+          stats,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (action === 'update') {
+      const { id, updates } = body;
+      if (!id || !updates || typeof updates !== 'object') {
+        return new Response(
+          JSON.stringify({ error: 'Missing id or updates' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data, error } = await supabase
+        .from('clients')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        return new Response(
+          JSON.stringify({ error: error.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, data }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ error: 'Invalid action' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (err) {
+    const msg = err && typeof err === 'object' && 'message' in err ? (err as Error).message : String(err);
+    return new Response(
+      JSON.stringify({ error: msg || 'Unknown error' }),
+      { status: 500, headers: { ...corsHeaders, 'Type': 'application/json' } }
+    );
+  }
+});

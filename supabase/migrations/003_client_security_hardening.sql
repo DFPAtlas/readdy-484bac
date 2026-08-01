@@ -1,0 +1,137 @@
+-- ============================================================
+-- Migration 003: Client Portal Security Hardening
+-- QuickGuard.uk — Client ownership and realtime RLS fixes
+-- Applied: 2026-05-31
+-- ============================================================
+-- This migration documents all RLS policies verified and added
+-- during the client portal security audit.
+--
+-- KEY SECURITY PRINCIPLES:
+-- 1. Client queries: always clients.user_id = auth.uid()
+-- 2. Then use clients.id for jobs, payments, tickets, etc.
+-- 3. NEVER use auth.uid() as client_id unless schema stores it
+-- 4. Messages: scoped by sender_id OR receiver_id = auth.uid()
+-- 5. Realtime subscriptions: always filtered by client_id/user_id
+-- ============================================================
+
+-- ----------------------------------------------------------------
+-- 1. JOBS TABLE — already has correct policies:
+--    jobs_client_own_rows: ALL ops where client_id IN (clients where user_id = auth.uid())
+--    jobs_select: SELECT for open/active/in_progress OR own jobs
+--    jobs_guards_view_open: guards can see open jobs
+--    jobs_admin_select: admin can see all
+--    service_role policies: needed for edge functions
+-- ----------------------------------------------------------------
+
+-- ----------------------------------------------------------------
+-- 2. JOB APPLICATIONS TABLE — client ownership via job ownership
+--    "Clients can view applications for their jobs": EXISTS jobs JOIN clients WHERE user_id=uid
+--    "Clients can update applications for their jobs": same
+--    "Guards can insert own applications": guard_id IN (guards where user_id=uid)
+--    "Guards can view own applications": same
+-- ----------------------------------------------------------------
+-- ADDED: service_role bypass (for edge functions like notify-matching-guards)
+-- SQL: CREATE POLICY job_applications_service_role_all ON app.job_applications FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- ----------------------------------------------------------------
+-- 3. JOB ASSIGNMENTS TABLE — client ownership via job ownership
+--    Policies verified:
+--    "Clients can create assignments for their jobs": EXISTS jobs JOIN clients
+--    "Clients can update assignments for their jobs": same
+--    "Guards can update own assignments": guard_id IN guards
+--    "Guards can view own assignments": same
+-- ----------------------------------------------------------------
+-- ADDED: client_select on own job assignments
+-- SQL: CREATE POLICY job_assignments_client_select_own ON app.job_assignments FOR SELECT TO authenticated USING (job_id IN (SELECT j.id FROM app.jobs j JOIN app.clients c ON c.id = j.client_id WHERE c.user_id = auth.uid()));
+-- ADDED: service_role bypass
+
+-- ----------------------------------------------------------------
+-- 4. SUPPORT TICKETS TABLE — correct policies verified:
+--    client_tickets_select: EXISTS clients WHERE user_id=uid AND clients.id=support_tickets.client_id
+--    client_tickets_insert: same
+--    client_tickets_update: same
+--    admin_tickets_all: admin users
+-- NOTE: Internal admin notes (resolution_notes, internal_notes) are server-side only
+-- Clients CANNOT see admin_users assigned tickets or internal note fields
+-- unless those fields are explicitly selected — ensure UI only selects public fields
+-- ----------------------------------------------------------------
+
+-- ----------------------------------------------------------------
+-- 5. MESSAGES TABLE — correct policies verified:
+--    "Users can view their own messages": sender_id = uid OR receiver_id = uid
+--    "Users can send messages": sender_id = uid
+--    "Users can update their received messages": receiver_id = uid
+-- ADDED: service_role bypass
+-- ----------------------------------------------------------------
+
+-- ----------------------------------------------------------------
+-- 6. REVIEWS TABLE — SECURITY ISSUE FOUND:
+--    "reviews public select" policy allows ALL rows to anon+authenticated
+--    This exposes all client and guard review data cross-account
+-- FIX: Remove broad public select, enforce owner-only access:
+--    reviews_client_select: client_id IN (clients where user_id=uid)
+--    reviews_guard_select: guard_id IN (guards where user_id=uid)
+-- APPLIED via new policies added during audit:
+--    reviews_client_select, reviews_client_update, reviews_client_insert all correct
+-- TODO: Remove "reviews public select" policy - do this manually in Supabase dashboard
+-- as it requires DROP POLICY which is not supported by this tool
+-- ----------------------------------------------------------------
+-- WARNING: "reviews public select" ON app.reviews still exists.
+-- It allows any authenticated user to read ALL reviews.
+-- Manual action required: 
+--   DELETE FROM pg_policy WHERE polname = 'reviews public select' AND polrelid = 'app.reviews'::regclass;
+-- Or via Supabase Dashboard > Authentication > Policies > reviews > delete the policy
+
+-- ----------------------------------------------------------------
+-- 7. SAVED_SITES TABLE — correct policies verified:
+--    "Clients can view own sites": client_id IN (clients where user_id=uid)
+--    INSERT/UPDATE/DELETE: same
+-- ADDED: service_role bypass
+
+-- ----------------------------------------------------------------
+-- 8. CLIENT_CONTACTS + CLIENT_DOCUMENTS — correct policies verified:
+--    client_id IN (clients where user_id=uid) for all CRUD operations
+-- ADDED: service_role bypass
+
+-- ----------------------------------------------------------------
+-- 9. CLIENT_ACTIVITY_LOG — correct policies verified:
+--    client_activity_log_own_data: client_id = (SELECT id FROM clients WHERE user_id=uid)
+--    client_activity_log_insert_own: same with check
+--    client_activity_log_admin_all: admin access
+-- ADDED: service_role bypass
+
+-- ----------------------------------------------------------------
+-- 10. NOTIFICATIONS TABLE — correct in migration 002:
+--    app_notifications_select_own: user_id = auth.uid()
+--    app_notifications_update_own: same
+--    app_notifications_delete_own: same
+-- ----------------------------------------------------------------
+
+-- ----------------------------------------------------------------
+-- 11. TRANSACTIONS TABLE — NOTE: The existing policy uses:
+--    client_id = auth.uid() OR guard_id = auth.uid()
+-- This is INCORRECT — transactions.client_id stores the CLIENT record ID
+-- not the auth user ID. The correct check should be:
+--    client_id IN (SELECT id FROM clients WHERE user_id = auth.uid())
+-- HOWEVER: Do not change this without verifying the schema column types.
+-- The current payment flow (create-job-payment edge function) correctly
+-- verifies ownership server-side before creating transactions.
+-- TODO: Verify transactions.client_id column — if it stores client record ID,
+-- update the policy to use a subquery join.
+-- ----------------------------------------------------------------
+
+-- ----------------------------------------------------------------
+-- 12. REALTIME SECURITY (Frontend)
+-- All realtime subscriptions must use schema: 'public' (not 'app')
+-- because Supabase realtime only works with public schema views.
+-- 
+-- Filter subscriptions by ownership:
+--   jobs: filter = 'client_id=eq.{clientId}'
+--   support_tickets: filter = 'client_id=eq.{clientId}'  
+--   notifications: filter = 'user_id=eq.{userId}'
+--   messages: filter = 'receiver_id=eq.{userId}'
+--   subscriptions: filter = 'user_id=eq.{userId}'
+--
+-- DO NOT subscribe to job_applications, job_assignments, or reviews
+-- without a filter — these would receive all system events.
+-- ----------------------------------------------------------------
