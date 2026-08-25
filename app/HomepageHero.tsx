@@ -24,6 +24,7 @@ export default function HomepageHero() {
           <img
             src="https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp"
             alt="QuickGuard"
+            title="QuickGuard"
             width={36}
             height={36}
             className="w-9 h-9 rounded-lg object-contain"

@@ -3,14 +3,14 @@ import type { Metadata } from 'next';
 import UseCaseSchema from './UseCaseSchema';
 
 export const metadata: Metadata = {
-  title: 'Security for Construction Sites | Hire SIA Guards Overnight — QuickGuard',
+  title: 'SIA Construction Site Security Guards',
   description: 'Hire SIA-licensed security guards for construction sites and building projects. Overnight patrol, site access control, equipment protection. Direct booking, no agency.',
   alternates: {
     canonical: 'https://quickguard.uk/security-for-building-sites',
   },
   openGraph: {
-    title: 'Security for Construction Sites | QuickGuard',
-    description: 'Hire SIA-licensed security guards for construction sites. Overnight patrol, equipment protection.',
+    title: 'Construction Site Security Guards | Hire SIA Security UK',
+    description: 'Hire SIA-licensed security guards for construction sites and building projects. Overnight patrol, site access control, equipment protection. Direct booking, no agency.',
     url: 'https://quickguard.uk/security-for-building-sites',
     siteName: 'QuickGuard',
     type: 'website',
@@ -25,8 +25,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Security for Construction Sites | QuickGuard',
-    description: 'Hire SIA-licensed security guards for construction sites. Overnight patrol, equipment protection.',
+    title: 'Construction Site Security Guards | Hire SIA Security UK',
+    description: 'Hire SIA-licensed security guards for construction sites and building projects. Overnight patrol, site access control, equipment protection. Direct booking, no agency.',
     images: ['https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20security%20guard%20in%20high-visibility%20vest%20and%20formal%20uniform%20standing%20at%20the%20entrance%20of%20a%20large%20construction%20site%20at%20dusk%20with%20scaffolding%20and%20steel%20framework%20silhouetted%20against%20an%20orange%20and%20deep%20blue%20sunset%20sky%2C%20construction%20equipment%20and%20materials%20visible%20in%20soft%20focus%20background%2C%20dramatic%20cinematic%20lighting%20with%20warm%20golden%20hour%20tones%20on%20the%20left%20side%20transitioning%20to%20deep%20navy%20blue%20on%20the%20right%2C%20clean%20professional%20composition%20with%20ample%20negative%20space%20on%20the%20left%20for%20text%20overlay%2C%20modern%20commercial%20photography%20style%2C%20realistic%20sharp%20details%2C%20premium%20security%20industry%20aesthetic%2C%20simple%20uncluttered%20background&width=1200&height=630&seq=qg_construction_og_20260702&orientation=landscape'],
   },
 };
@@ -36,7 +36,7 @@ const data = {
   title: 'Construction Site Security',
   headline: 'Construction Site Security — Overnight & Day Patrol',
   subheadline: 'Protect your building site, equipment, and materials with verified SIA guards. Book overnight security, access control, and perimeter patrol directly — no agency contracts needed.',
-  heroImage: 'https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20security%20guard%20in%20high-visibility%20vest%20and%20formal%20uniform%20standing%20at%20the%20entrance%20of%20a%20large%20construction%20site%20at%20dusk%20with%20scaffolding%20and%20steel%20framework%20silhouetted%20against%20an%20orange%20and%20deep%20blue%20sunset%20sky%2C%20construction%20equipment%20and%20materials%20visible%20in%20soft%20focus%20background%2C%20dramatic%20cinematic%20lighting%20with%20warm%20golden%20hour%20tones%20on%20the%20left%20side%20transitioning%20to%20deep%20navy%20blue%20on%20the%20right%2C%20clean%20professional%20composition%20with%20ample%20negative%20space%20on%20the%20left%20for%20text%20overlay%2C%20modern%20commercial%20photography%20style%2C%20realistic%20sharp%20details%2C%20premium%20security%20industry%20aesthetic%2C%20simple%20uncluttered%20background&width=1600&height=900&seq=qg_construction_hero_20260508&orientation=landscape',
+  heroImage: 'https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20security%20guard%20in%20high-visibility%20vest%20and%20formal%20uniform%20standing%20at%20the%20entrance%20of%20a%20large%20construction%20site%20at%20dusk%20with%20scaffolding%20and%20steel%20framework%20silhouetted%20against%20an%20orange%20and%20deep%20blue%20sunset%20sky%2C%20construction%20equipment%20and%20materials%20visible%20in%20soft%20focus%20background%2C%20dramatic%20cinematic%20lighting%20with%20warm%20golden%20hour%20tones%20on%20the%20left%20side%20transitioning%20to%20deep%20navy%20blue%20on%20the%20right%2C%20clean%20professional%20composition%20with%20ample%20negative%20space%20on%20the%20left%20for%20text%20overlay%2C%20modern%20commercial%20photography%20style%2C%20realistic%20sharp%20details%2C%20premium%20security%20industry%20aesthetic%2C%20simple%20uncluttered%20background&width=1280&height=720&seq=qg_construction_hero_20260508&orientation=landscape',
   venueCategory: 'construction_site',
   ctaLabel: 'Hire Site Security',
   steps: [

@@ -6,8 +6,11 @@ export const metadata: Metadata = {
     'Sign in to your QuickGuard client dashboard to post security jobs, manage bookings, and hire SIA-licensed guards across the UK.',
   keywords:
     'client login QuickGuard, hire security guards, security staffing dashboard, UK security booking',
-  alternates: {
-    canonical: 'https://quickguard.uk/client/login',
+  robots: {
+    index: false,
+    follow: false,
+    noarchive: true,
+    nosnippet: true,
   },
   openGraph: {
     title: 'Client Login | QuickGuard',

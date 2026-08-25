@@ -6,7 +6,7 @@ import ClientGuideSchema from './ClientGuideSchema';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'How to Hire Security Guards | Client Guide | QuickGuard UK',
+  title: 'How to Hire Security Guards UK',
   description:
     'Step-by-step guide for UK businesses hiring security guards. Learn to post jobs, review SIA-verified profiles, and process secure payments on QuickGuard.',
   keywords:

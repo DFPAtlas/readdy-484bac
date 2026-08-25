@@ -98,7 +98,7 @@ export default function HomepageClient() {
               How QuickGuard Works
             </h2>
             <p className="text-xl text-slate-400 max-w-3xl mx-auto">
-              Our AI-powered platform streamlines the process of connecting security professionals with clients
+              QuickGuard is a UK security staffing platform that connects SIA-licensed guards directly with businesses and venues. No agency fees, no long contracts — hire professional security by the shift in minutes.
             </p>
           </div>
 
@@ -180,7 +180,7 @@ export default function HomepageClient() {
               Why Choose QuickGuard?
             </h2>
             <p className="text-xl text-slate-400 max-w-3xl mx-auto">
-              A secure, efficient platform trusted by security professionals and businesses across the UK
+              A secure, efficient platform trusted by security professionals and businesses across the UK — with verified guards, protected payments, and 24/7 support whenever you need it.
             </p>
           </div>
 

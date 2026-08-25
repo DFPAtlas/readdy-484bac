@@ -79,6 +79,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" translate="no" className={pacifico.variable} suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://storage.helloreaddy.io" crossOrigin="anonymous" />
+      </head>
       <body>
         <Suspense fallback={
           <div className="min-h-screen bg-[#0B1933] flex items-center justify-center">

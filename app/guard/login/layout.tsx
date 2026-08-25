@@ -6,8 +6,11 @@ export const metadata: Metadata = {
     'Sign in to your QuickGuard guard dashboard to find security jobs, manage your schedule, and track earnings. For SIA-licensed professionals across the UK.',
   keywords:
     'security guard login, QuickGuard dashboard, SIA guard sign in, find security jobs UK',
-  alternates: {
-    canonical: 'https://quickguard.uk/guard/login',
+  robots: {
+    index: false,
+    follow: false,
+    noarchive: true,
+    nosnippet: true,
   },
   openGraph: {
     title: 'Security Guard Login | QuickGuard',

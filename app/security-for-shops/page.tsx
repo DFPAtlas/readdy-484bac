@@ -3,14 +3,14 @@ import type { Metadata } from 'next';
 import UseCaseSchema from '../security-for-building-sites/UseCaseSchema';
 
 export const metadata: Metadata = {
-  title: 'Security for Shops & Retail | Hire SIA Security Guards — QuickGuard',
+  title: 'SIA Retail Security Guards',
   description: 'Hire SIA-licensed security guards for your shop or retail store directly through QuickGuard. Loss prevention, floor walking, overnight cover. No agency fees.',
   alternates: {
     canonical: 'https://quickguard.uk/security-for-shops',
   },
   openGraph: {
-    title: 'Security for Shops & Retail | QuickGuard',
-    description: 'Hire SIA-licensed security guards for your shop. Loss prevention, floor walking, overnight cover.',
+    title: 'Retail & Shop Security Guards | Hire SIA Loss Prevention',
+    description: 'Hire SIA-licensed security guards for your shop or retail store directly through QuickGuard. Loss prevention, floor walking, overnight cover. No agency fees.',
     url: 'https://quickguard.uk/security-for-shops',
     siteName: 'QuickGuard',
     type: 'website',
@@ -25,8 +25,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Security for Shops & Retail | QuickGuard',
-    description: 'Hire SIA-licensed security guards for your shop. Loss prevention, floor walking, overnight cover.',
+    title: 'Retail & Shop Security Guards | Hire SIA Loss Prevention',
+    description: 'Hire SIA-licensed security guards for your shop or retail store directly through QuickGuard. Loss prevention, floor walking, overnight cover. No agency fees.',
     images: ['https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20security%20guard%20in%20formal%20black%20uniform%20standing%20inside%20a%20bright%20modern%20retail%20clothing%20store%20with%20polished%20floors%20and%20elegant%20displays%2C%20calm%20and%20attentive%20posture%2C%20natural%20daylight%20streaming%20through%20large%20glass%20windows%20creating%20soft%20even%20illumination%2C%20clean%20minimalist%20interior%20design%20with%20neutral%20tones%20and%20subtle%20accent%20colours%2C%20left%20side%20of%20image%20features%20a%20clean%20pale%20background%20perfect%20for%20text%20overlay%2C%20professional%20corporate%20photography%20style%20with%20sharp%20realistic%20details%2C%20modern%20premium%20retail%20security%20aesthetic%2C%20high%20quality%20commercial%20photo%20composition&width=1200&height=630&seq=qg_retail_og_20260702&orientation=landscape'],
   },
 };

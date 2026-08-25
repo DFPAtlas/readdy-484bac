@@ -13,6 +13,7 @@ export default function Footer() {
               <img
                 src="https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp"
                 alt="QuickGuard"
+                title="QuickGuard"
                 width={40}
                 height={40}
                 className="w-10 h-10 rounded-lg object-contain"

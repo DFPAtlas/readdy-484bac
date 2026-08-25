@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import ClientHowItWorks from './ClientHowItWorks';
 
 export const metadata: Metadata = {
-  title: 'How to Hire a Security Guard Directly | QuickGuard for Clients',
+  title: 'Hire Security Guards Directly',
   description:
     'Learn how to hire SIA-licensed security guards directly on QuickGuard. No agency, no contracts. Post your job, browse verified guards, and book by the shift in minutes.',
   keywords:

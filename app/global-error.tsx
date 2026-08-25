@@ -15,6 +15,10 @@ export default function GlobalError({
         <link
           href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap"
           rel="stylesheet"
+          media="print"
+          onLoad={(e) => {
+            (e.currentTarget as HTMLLinkElement).media = 'all';
+          }}
         />
       </head>
       <body>

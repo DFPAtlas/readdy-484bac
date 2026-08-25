@@ -118,7 +118,9 @@ function FindGuardContent() {
             </Link>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Find a Guard</h1>
-          <p className="text-slate-400">Browse SIA-verified guards available for direct booking</p>
+          <p className="text-slate-400 max-w-3xl leading-relaxed">
+            Browse SIA-verified security guards available for direct booking across the UK. Compare ratings, hourly rates, licence types, and years of experience to find the right professional for your venue, event, or site — then book by the shift with no agency fees.
+          </p>
         </div>
       </div>
 
@@ -285,6 +287,32 @@ function FindGuardContent() {
           </>
         )}
       </div>
+
+      <section className="bg-[#0e1628] border-t border-slate-800/60 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="max-w-3xl mx-auto text-center mb-12">
+            <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">How to Choose the Right Security Guard</h2>
+            <p className="text-slate-400 leading-relaxed">
+              Finding the right security professional comes down to matching your venue, schedule, and requirements with a guard&apos;s verified licence, experience, and ratings. Here&apos;s what to look for as you browse profiles.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {[
+              { icon: 'ri-shield-check-line', title: 'Verify the SIA Licence', desc: 'Every guard on QuickGuard holds a valid SIA licence, checked against the official register before they can accept direct bookings.' },
+              { icon: 'ri-star-line', title: 'Read Real Reviews', desc: 'Ratings come from completed jobs with genuine clients. A strong track record means a professional you can trust on site.' },
+              { icon: 'ri-money-pound-circle-line', title: 'Check the Hourly Rate', desc: 'Rates are shown transparently per hour. Compare profiles to find quality cover that fits your budget, with no hidden agency markups.' },
+            ].map((item) => (
+              <div key={item.title} className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-6 text-center">
+                <div className="w-12 h-12 flex items-center justify-center bg-teal-500/10 border border-teal-400/20 rounded-xl mx-auto mb-4">
+                  <i className={`${item.icon} text-teal-400 text-xl`} />
+                </div>
+                <h3 className="font-semibold text-white mb-2">{item.title}</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

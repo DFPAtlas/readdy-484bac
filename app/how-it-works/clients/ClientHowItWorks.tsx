@@ -149,6 +149,9 @@ export default function ClientHowItWorks() {
                 <img
                   src="https://readdy.ai/api/search-image?query=Modern%20dark-themed%20laptop%20screen%20displaying%20a%20security%20guard%20hiring%20platform%20dashboard%20showing%20guard%20profiles%20with%20ratings%20and%20booking%20buttons%2C%20dark%20navy%20blue%20UI%20theme%20with%20teal%20accent%20highlights%2C%20clean%20software%20screenshot%20aesthetic%2C%20professional%20SaaS%20interface%20on%20a%20desk%20with%20ambient%20lighting%2C%20representing%20an%20online%20marketplace%20for%20hiring%20security%20guards&width=640&height=360&seq=hiw-clients-video-thumb-001&orientation=landscape"
                   alt="QuickGuard walkthrough video thumbnail"
+                  title="Watch how to book a security guard on QuickGuard"
+                  loading="lazy"
+                  decoding="async"
                   className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-500 ${videoPlaying ? 'opacity-0' : 'opacity-100'}`}
                 />
                 {!videoPlaying && (

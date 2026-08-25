@@ -3,7 +3,7 @@ import HowItWorksClient from './HowItWorksClient';
 import HowItWorksSchema from './HowItWorksSchema';
 
 export const metadata: Metadata = {
-  title: 'How to Hire Security Guards UK | QuickGuard in 5 Steps',
+  title: 'How to Hire Security Guards',
   description:
     'Learn how to hire SIA-licensed security guards in 5 simple steps. Post your job, get matched with verified guards, and pay securely. UK-wide coverage.',
   keywords:

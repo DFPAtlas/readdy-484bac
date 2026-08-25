@@ -6,7 +6,7 @@ import GuardGuideSchema from './GuardGuideSchema';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Find Security Guard Jobs UK | Guard Guide | QuickGuard',
+  title: 'Security Guard Jobs UK',
   description:
     'Complete guide for SIA-licensed guards. Register, get verified, find security work across the UK, and receive secure payments through QuickGuard.',
   keywords:

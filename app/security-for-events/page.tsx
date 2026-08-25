@@ -3,14 +3,14 @@ import type { Metadata } from 'next';
 import UseCaseSchema from '../security-for-building-sites/UseCaseSchema';
 
 export const metadata: Metadata = {
-  title: 'Security for Events | Weddings, Parties, Festivals — QuickGuard',
+  title: 'SIA Event Security Guards UK',
   description: 'Hire SIA-licensed security guards for private events, weddings, parties, and festivals. Crowd control, guest safety, perimeter security. Direct booking with verified guards.',
   alternates: {
     canonical: 'https://quickguard.uk/security-for-events',
   },
   openGraph: {
-    title: 'Security for Events | QuickGuard',
-    description: 'Hire SIA-licensed security guards for weddings, parties, and festivals. Crowd control, guest safety.',
+    title: 'Event Security Guards | SIA Licensed Wedding & Party Cover',
+    description: 'Hire SIA-licensed security guards for private events, weddings, parties, and festivals. Crowd control, guest safety, perimeter security. Direct booking with verified guards.',
     url: 'https://quickguard.uk/security-for-events',
     siteName: 'QuickGuard',
     type: 'website',
@@ -25,8 +25,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Security for Events | QuickGuard',
-    description: 'Hire SIA-licensed security guards for weddings, parties, and festivals. Crowd control, guest safety.',
+    title: 'Event Security Guards | SIA Licensed Wedding & Party Cover',
+    description: 'Hire SIA-licensed security guards for private events, weddings, parties, and festivals. Crowd control, guest safety, perimeter security. Direct booking with verified guards.',
     images: ['https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20security%20guard%20in%20smart%20black%20formal%20uniform%20with%20visible%20SIA%20badge%20standing%20at%20an%20elegant%20outdoor%20wedding%20marquee%20event%20with%20white%20draped%20fabric%20and%20string%20lights%20visible%20in%20soft%20evening%20light%2C%20guests%20mingling%20in%20the%20warm%20golden%20bokeh%20background%2C%20sophisticated%20and%20festive%20atmosphere%2C%20deep%20navy%20blue%20and%20warm%20gold%20colour%20palette%2C%20left%20side%20features%20clean%20dark%20gradient%20background%20ideal%20for%20white%20text%20overlay%2C%20high-end%20editorial%20photography%20style%20with%20natural%20lighting%2C%20modern%20minimalist%20composition%2C%20premium%20event%20security%20aesthetic%2C%20realistic%20sharp%20details%2C%20simple%20uncluttered%20background&width=1200&height=630&seq=qg_events_og_20260702&orientation=landscape'],
   },
 };

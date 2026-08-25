@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Find a Security Guard UK | Browse SIA Verified Guards | QuickGuard',
+  title: 'Find SIA Security Guards UK',
   description:
     'Browse and book verified SIA-licensed security guards across the UK. Filter by licence type, venue category, rating, and postcode. Direct booking with no agency fees.',
   keywords:

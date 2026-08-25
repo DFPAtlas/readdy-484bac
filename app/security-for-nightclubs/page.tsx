@@ -3,14 +3,14 @@ import type { Metadata } from 'next';
 import UseCaseSchema from '../security-for-building-sites/UseCaseSchema';
 
 export const metadata: Metadata = {
-  title: 'Security for Nightclubs & Bars | Hire SIA Door Supervisors — QuickGuard',
+  title: 'SIA Door Supervisors for Nightclubs',
   description: 'Hire SIA-licensed door supervisors for your nightclub or bar directly through QuickGuard. No agency fees, no contracts. Book by the shift. Instant matching across the UK.',
   alternates: {
     canonical: 'https://quickguard.uk/security-for-nightclubs',
   },
   openGraph: {
-    title: 'Security for Nightclubs | QuickGuard',
-    description: 'Hire SIA-licensed door supervisors for your nightclub or bar. No agency fees, no contracts.',
+    title: 'Nightclub & Bar Door Supervisors | Hire SIA Security UK',
+    description: 'Hire SIA-licensed door supervisors for your nightclub or bar directly through QuickGuard. No agency fees, no contracts. Book by the shift. Instant matching across the UK.',
     url: 'https://quickguard.uk/security-for-nightclubs',
     siteName: 'QuickGuard',
     type: 'website',
@@ -25,8 +25,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Security for Nightclubs | QuickGuard',
-    description: 'Hire SIA-licensed door supervisors for your nightclub or bar. No agency fees, no contracts.',
+    title: 'Nightclub & Bar Door Supervisors | Hire SIA Security UK',
+    description: 'Hire SIA-licensed door supervisors for your nightclub or bar directly through QuickGuard. No agency fees, no contracts. Book by the shift. Instant matching across the UK.',
     images: ['https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20door%20supervisor%20standing%20confidently%20at%20the%20entrance%20of%20a%20modern%20upscale%20nightclub%20with%20neon%20ambient%20lighting%2C%20dark%20moody%20atmosphere%20with%20deep%20blue%20and%20teal%20colour%20palette%2C%20sharp%20professional%20uniform%20with%20visible%20SIA%20badge%2C%20blurred%20crowd%20and%20city%20nightlife%20in%20soft%20focus%20background%2C%20cinematic%20high-end%20photography%20style%2C%20left%20side%20features%20clean%20dark%20gradient%20background%20for%20text%20overlay%2C%20modern%20minimalist%20web%20design%20hero%20aesthetic%2C%20excellent%20contrast%20ensuring%20text%20readability%2C%20dramatic%20lighting%20with%20rim%20light%20on%20the%20subject%2C%20simple%20uncluttered%20background%20composition%2C%20premium%20commercial%20photography&width=1200&height=630&seq=qg_nightclub_og_20260702&orientation=landscape'],
   },
 };
@@ -36,7 +36,7 @@ const data = {
   title: 'Nightclub & Bar Security',
   headline: 'Hire SIA Door Supervisors for Your Venue',
   subheadline: 'Professional door staff directly from verified SIA-licensed guards. No agency markup. No long-term contracts. Book the shifts you need, when you need them.',
-  heroImage: 'https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20door%20supervisor%20standing%20confidently%20at%20the%20entrance%20of%20a%20modern%20upscale%20nightclub%20with%20neon%20ambient%20lighting%2C%20dark%20moody%20atmosphere%20with%20deep%20blue%20and%20teal%20colour%20palette%2C%20sharp%20professional%20uniform%20with%20visible%20SIA%20badge%2C%20blurred%20crowd%20and%20city%20nightlife%20in%20soft%20focus%20background%2C%20cinematic%20high-end%20photography%20style%2C%20left%20side%20features%20clean%20dark%20gradient%20background%20for%20text%20overlay%2C%20modern%20minimalist%20web%20design%20hero%20aesthetic%2C%20excellent%20contrast%20ensuring%20text%20readability%2C%20dramatic%20lighting%20with%20rim%20light%20on%20the%20subject%2C%20simple%20uncluttered%20background%20composition%2C%20premium%20commercial%20photography&width=1600&height=900&seq=qg_nightclub_hero_20260508&orientation=landscape',
+  heroImage: 'https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20door%20supervisor%20standing%20confidently%20at%20the%20entrance%20of%20a%20modern%20upscale%20nightclub%20with%20neon%20ambient%20lighting%2C%20dark%20moody%20atmosphere%20with%20deep%20blue%20and%20teal%20colour%20palette%2C%20sharp%20professional%20uniform%20with%20visible%20SIA%20badge%2C%20blurred%20crowd%20and%20city%20nightlife%20in%20soft%20focus%20background%2C%20cinematic%20high-end%20photography%20style%2C%20left%20side%20features%20clean%20dark%20gradient%20background%20for%20text%20overlay%2C%20modern%20minimalist%20web%20design%20hero%20aesthetic%2C%20excellent%20contrast%20ensuring%20text%20readability%2C%20dramatic%20lighting%20with%20rim%20light%20on%20the%20subject%2C%20simple%20uncluttered%20background%20composition%2C%20premium%20commercial%20photography&width=1280&height=720&seq=qg_nightclub_hero_20260508&orientation=landscape',
   venueCategory: 'nightclub_bar',
   ctaLabel: 'Hire a Door Supervisor',
   steps: [

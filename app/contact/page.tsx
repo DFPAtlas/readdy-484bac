@@ -3,7 +3,7 @@ import ContactClient from './ContactClient';
 import ContactSchema from './ContactSchema';
 
 export const metadata: Metadata = {
-  title: 'Contact QuickGuard | Security Guard Hire Enquiries UK',
+  title: 'Contact QuickGuard for Security Hire',
   description:
     'Get in touch with QuickGuard for security guard bookings, SIA verification queries, or partnerships. UK-based team, 24/7 support for clients and guards.',
   keywords:
