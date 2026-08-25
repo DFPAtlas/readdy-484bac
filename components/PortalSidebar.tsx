@@ -63,6 +63,7 @@ const GUARD_NAV = [
   { href: '/guard/profile', icon: 'ri-user-settings-line', label: 'Profile' },
   { href: '/guard/bank-settings', icon: 'ri-bank-card-line', label: 'Bank Settings' },
   { href: '/guard/notifications', icon: 'ri-notification-3-line', label: 'Notifications' },
+  { href: '/guard/support', icon: 'ri-customer-service-2-line', label: 'Support Centre' },
   { href: '/guard/rewards', icon: 'ri-coins-line', label: 'QG Rewards' },
 ];
 

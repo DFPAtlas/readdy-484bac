@@ -69,6 +69,7 @@ export default function GuardDashboardClient() {
   const [activeTab, setActiveTab] = useState('assignments');
   const [filterStatus, setFilterStatus] = useState('all');
   const [unreadCount, setUnreadCount] = useState(0);
+  const [openTicketCount, setOpenTicketCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [userEntitlement, setUserEntitlement] = useState<UserEntitlement | null>(null);
   const [guardToast, setGuardToast] = useState('');
@@ -225,6 +226,17 @@ export default function GuardDashboardClient() {
   }, [guard?.id]);
 
   useEffect(() => {
+    if (!guard?.id || !guardUserId) return;
+    const channel = supabase
+      .channel(`guard-dashboard-support-${guard.id}`)
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'support_tickets', filter: `guard_id=eq.${guard.id}` }, () => {
+        loadOpenTicketCount(guardUserId);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [guard?.id, guardUserId]);
+
+  useEffect(() => {
     const hash = window.location.hash.replace('#', '');
     if (hash && ['assignments', 'upcoming', 'applications', 'responses', 'available', 'reviews', 'notifications', 'support'].includes(hash)) {
       setActiveTab(hash);
@@ -244,6 +256,7 @@ export default function GuardDashboardClient() {
       loadClientResponses(userId, adminMode),
       loadAvailableJobs(),
       loadContactSubmissions(userId),
+      loadOpenTicketCount(userId),
       loadUserEntitlement(userId),
     ]);
     traceLog('loadDashboardDataComplete', { dataErrors, guardLoaded: !!guard });
@@ -450,6 +463,27 @@ export default function GuardDashboardClient() {
       setContactSubmissions(data || []);
     } catch {
       setDataErrors(prev => [...prev, 'contact_submissions']);
+    }
+  };
+
+  const loadOpenTicketCount = async (userId: string) => {
+    try {
+      const { data: guardData } = await supabase
+        .from('guards')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (!guardData) return;
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .select('id')
+        .eq('guard_id', guardData.id)
+        .eq('is_deleted', false)
+        .in('status', ['open', 'awaiting_guard', 'under_review', 'escalated']);
+      if (error) throw error;
+      setOpenTicketCount((data || []).length);
+    } catch {
+      setDataErrors(prev => [...prev, 'support_tickets']);
     }
   };
 
@@ -1004,6 +1038,7 @@ export default function GuardDashboardClient() {
                     loadClientResponses(guardUserId, isAdmin);
                     loadAvailableJobs(0);
                     loadContactSubmissions(guardUserId);
+                    loadOpenTicketCount(guardUserId);
                     loadUserEntitlement(guardUserId);
                   }
                 }}
@@ -1192,7 +1227,7 @@ export default function GuardDashboardClient() {
 
           {/* Quick Actions - full width strip */}
           <div className="mb-6">
-            <QuickActionsPanel />
+            <QuickActionsPanel openTicketCount={openTicketCount} />
           </div>
 
           {/* Main workspace - equal two columns */}
@@ -1280,8 +1315,11 @@ export default function GuardDashboardClient() {
               <button onClick={() => setActiveTab('notifications')} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition-all whitespace-nowrap rounded-t-lg flex items-center gap-1 ${activeTab === 'notifications' ? 'text-teal-400 bg-teal-500/5 border-b-2 border-teal-400' : 'text-slate-400 hover:text-slate-200'}`}>
                 History
               </button>
-              <button onClick={() => setActiveTab('support')} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition-all whitespace-nowrap rounded-t-lg flex items-center gap-1 ${activeTab === 'support' ? 'text-teal-400 bg-teal-500/5 border-b-2 border-teal-400' : 'text-slate-400 hover:text-slate-200'}`}>
+              <button onClick={() => setActiveTab('support')} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition-all whitespace-nowrap rounded-t-lg relative flex items-center gap-1 ${activeTab === 'support' ? 'text-teal-400 bg-teal-500/5 border-b-2 border-teal-400' : 'text-slate-400 hover:text-slate-200'}`}>
                 Support
+                {openTicketCount > 0 && (
+                  <span className="ml-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">{openTicketCount}</span>
+                )}
               </button>
             </div>
 
@@ -1564,44 +1602,23 @@ export default function GuardDashboardClient() {
 
             {activeTab === 'support' && (
               <div className="space-y-4">
-                {contactSubmissions.length === 0 ? (
-                  <div className="text-center py-12 px-4">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-[#111d35] rounded-2xl border border-[#1a2b4a] flex items-center justify-center">
-                      <i className="ri-customer-service-2-line text-3xl text-slate-600"></i>
-                    </div>
-                    <p className="text-sm font-semibold text-white mb-1">No Support Submissions</p>
-                    <p className="text-xs text-slate-500 mb-4">Reach out via the contact page and your messages will appear here</p>
-                    {!isAdmin && (
-                      <Link href="/contact" className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-500 text-white rounded-xl text-sm font-semibold hover:bg-teal-400 shadow-lg shadow-teal-500/20 transition-all whitespace-nowrap cursor-pointer">
-                        <i className="ri-customer-service-2-line"></i>
-                        Contact Support
-                      </Link>
-                    )}
+                <div className="border border-[#1a2b4a] rounded-xl p-6 sm:p-10 text-center bg-[#0B1933]">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-teal-500/10 rounded-2xl flex items-center justify-center border border-teal-500/20">
+                    <i className="ri-customer-service-2-line text-3xl text-teal-400"></i>
                   </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-sm text-slate-400">Showing your last {contactSubmissions.length} submissions</p>
-                      <Link href="/contact" className="text-teal-400 text-sm font-medium hover:underline whitespace-nowrap">New message →</Link>
-                    </div>
-                    <div className="space-y-3">
-                      {contactSubmissions.map((sub) => (
-                        <div key={sub.id} className="flex items-center justify-between p-4 rounded-xl border border-[#1a2b4a] bg-[#0B1933] hover:border-teal-500/30 transition-all">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-3 mb-1">
-                              <p className="text-base font-semibold text-slate-200 truncate">{sub.subject ?? 'No subject'}</p>
-                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${sub.status === 'new' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/25' : sub.status === 'in progress' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25' : sub.status === 'resolved' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' : 'bg-slate-500/15 text-slate-400 border border-slate-500/25'}`}>
-                                {sub.status}
-                              </span>
-                            </div>
-                            <p className="text-sm text-slate-400 truncate">{sub.message}</p>
-                            <p className="text-xs text-slate-600 mt-1">{sub.category ?? 'General'} · {new Date(sub.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
+                  <h3 className="text-lg font-semibold text-white mb-2">
+                    {openTicketCount > 0
+                      ? `${openTicketCount} open ticket${openTicketCount !== 1 ? 's' : ''} need${openTicketCount === 1 ? 's' : ''} your attention`
+                      : 'No open support tickets'}
+                  </h3>
+                  <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
+                    Track payments, disputes, and account issues from your dedicated Support Centre. Reply to messages and get help faster.
+                  </p>
+                  <Link href="/guard/support" className="inline-flex items-center gap-2 px-6 py-3 bg-teal-500 text-white rounded-xl text-sm font-semibold hover:bg-teal-400 shadow-lg shadow-teal-500/20 transition-all whitespace-nowrap cursor-pointer">
+                    <i className="ri-customer-service-2-line"></i>
+                    Open Support Centre
+                  </Link>
+                </div>
               </div>
             )}
 

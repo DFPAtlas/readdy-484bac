@@ -2,13 +2,10 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { logClientActivity, ACTIVITY_TYPES, ACTIVITY_CATEGORIES } from '@/lib/client-activity';
-import PriorityBadge, { getSuggestedPriority } from './PriorityBadge';
+import { getSuggestedPriority } from './PriorityBadge';
 
 interface CreateTicketModalProps {
-  clientId: string;
-  jobs: any[];
-  prefillJobId?: string;
+  guardId: string;
   prefillCategory?: string;
   onClose: () => void;
   onSuccess: () => void;
@@ -17,13 +14,11 @@ interface CreateTicketModalProps {
 const CATEGORIES = [
   { value: 'general_support', label: 'General Support', icon: 'ri-customer-service-2-line' },
   { value: 'payment_issue', label: 'Payment Issue', icon: 'ri-secure-payment-line' },
-  { value: 'guard_no_show', label: 'Guard No-Show', icon: 'ri-user-unfollow-line' },
-  { value: 'late_arrival', label: 'Late Arrival', icon: 'ri-time-line' },
-  { value: 'poor_performance', label: 'Poor Performance', icon: 'ri-emotion-unhappy-line' },
-  { value: 'refund_request', label: 'Refund Request', icon: 'ri-refund-line' },
-  { value: 'job_cancellation', label: 'Job Cancellation', icon: 'ri-close-circle-line' },
+  { value: 'late_payment', label: 'Late Payment', icon: 'ri-time-line' },
+  { value: 'client_no_show', label: 'Client No-Show', icon: 'ri-user-unfollow-line' },
+  { value: 'job_dispute', label: 'Job Dispute', icon: 'ri-emotion-unhappy-line' },
   { value: 'technical_issue', label: 'Technical Issue', icon: 'ri-bug-line' },
-  { value: 'account_billing', label: 'Account/Billing Help', icon: 'ri-bank-card-line' },
+  { value: 'account_billing', label: 'Account/Billing', icon: 'ri-bank-card-line' },
 ];
 
 const PRIORITIES = [
@@ -38,103 +33,45 @@ const CONTACT_PREFS = [
   { value: 'phone', label: 'Phone', icon: 'ri-phone-line' },
 ];
 
-export default function CreateTicketModal({ clientId, jobs, prefillJobId, prefillCategory, onClose, onSuccess }: CreateTicketModalProps) {
+export default function CreateTicketModal({ guardId, prefillCategory, onClose, onSuccess }: CreateTicketModalProps) {
   const [category, setCategory] = useState(prefillCategory || '');
-  const [relatedJobId, setRelatedJobId] = useState(prefillJobId || '');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState('normal');
+  const [priority, setPriority] = useState(prefillCategory ? getSuggestedPriority(prefillCategory) : 'normal');
   const [contactPreference, setContactPreference] = useState('email');
   const [evidenceUrl, setEvidenceUrl] = useState('');
-  const [requestedRefundAmount, setRequestedRefundAmount] = useState('');
-  const [refundReason, setRefundReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [bridgeWarning, setBridgeWarning] = useState('');
-  const [step, setStep] = useState(1);
 
   const handleCategoryChange = (val: string) => {
     setCategory(val);
     setPriority(getSuggestedPriority(val));
-    if (val === 'refund_request') {
-      setStep(2);
-    } else {
-      setStep(1);
-    }
   };
 
   const handleSubmit = async () => {
     setError('');
-    setBridgeWarning('');
     if (!category) { setError('Please select a category.'); return; }
     if (!subject.trim()) { setError('Please enter a subject.'); return; }
     if (!description.trim()) { setError('Please provide a description.'); return; }
 
-    if (category === 'refund_request') {
-      if (!requestedRefundAmount || parseFloat(requestedRefundAmount) <= 0) {
-        setError('Please enter a valid refund amount.'); return;
-      }
-    }
-
     setSubmitting(true);
     try {
-      const insertData: any = {
-        client_id: clientId,
-        related_job_id: relatedJobId || null,
-        category,
-        subject: subject.trim(),
-        description: description.trim(),
-        priority,
-        status: 'open',
-        contact_preference: contactPreference,
-        evidence_url: evidenceUrl || null,
-      };
-
-      if (category === 'refund_request') {
-        insertData.requested_refund_amount = parseFloat(requestedRefundAmount);
-        insertData.refund_reason = refundReason.trim() || null;
-      }
-
-      const { data: createdTicket, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from('support_tickets')
-        .insert(insertData)
-        .select('id, ticket_reference')
-        .single();
+        .insert({
+          guard_id: guardId,
+          client_id: null,
+          related_job_id: null,
+          category,
+          subject: subject.trim(),
+          description: description.trim(),
+          priority,
+          status: 'open',
+          contact_preference: contactPreference,
+          evidence_url: evidenceUrl || null,
+        });
 
       if (insertError) throw insertError;
-      if (!createdTicket || !createdTicket.id) {
-        throw new Error('Failed to submit ticket. Please try again.');
-      }
-
-      const activityPayload: any = {
-        action_type: ACTIVITY_TYPES.TICKET_CREATED,
-        action_description: `Support ticket created: ${subject.trim()}`,
-        category: ACTIVITY_CATEGORIES.SUPPORT,
-        related_ticket_id: createdTicket.id,
-        related_job_id: relatedJobId || null,
-        metadata: { category, priority, contact_preference: contactPreference },
-      };
-
-      let bridgeOk = false;
-      try {
-        const { data: bridgeData, error: bridgeError } = await supabase.functions.invoke(
-          'dfp-support-ticket-bridge',
-          {
-            body: { ticketId: createdTicket.id },
-          }
-        );
-        bridgeOk = !bridgeError && bridgeData?.success === true;
-      } catch {
-        bridgeOk = false;
-      }
-
-      await logClientActivity(activityPayload);
-
-      if (!bridgeOk) {
-        setBridgeWarning(
-          'Your support ticket was created, but central support synchronisation is still pending. Our team can still see your QuickGuard ticket.'
-        );
-      }
 
       onSuccess();
     } catch (err: any) {
@@ -144,16 +81,13 @@ export default function CreateTicketModal({ clientId, jobs, prefillJobId, prefil
     }
   };
 
-  const isRefund = category === 'refund_request';
-  const isJobRelated = category === 'guard_no_show' || category === 'late_arrival' || category === 'poor_performance' || category === 'refund_request';
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-[#111d35] rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-[#1e2d4d]">
         <div className="sticky top-0 bg-[#111d35] border-b border-[#1e2d4d] px-6 py-4 flex items-center justify-between rounded-t-2xl">
           <div>
             <h3 className="text-lg font-bold text-white">New Support Ticket</h3>
-            <p className="text-sm text-slate-500 mt-0.5">Step {step} of {isRefund ? 2 : 1}</p>
+            <p className="text-sm text-slate-500 mt-0.5">Tell us what you need help with</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#162036] transition-colors cursor-pointer">
             <i className="ri-close-line text-slate-500 text-xl"></i>
@@ -168,19 +102,12 @@ export default function CreateTicketModal({ clientId, jobs, prefillJobId, prefil
             </div>
           )}
 
-          {bridgeWarning && !error && (
-            <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-3 flex items-start gap-2">
-              <i className="ri-information-line text-amber-400 mt-0.5"></i>
-              <p className="text-sm text-amber-400">{bridgeWarning}</p>
-            </div>
-          )}
-
           {/* Category */}
           <div>
             <label className="block text-sm font-semibold text-slate-300 mb-2">
               Category <span className="text-red-500">*</span>
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.value}
@@ -197,48 +124,6 @@ export default function CreateTicketModal({ clientId, jobs, prefillJobId, prefil
               ))}
             </div>
           </div>
-
-          {/* Related Job */}
-          {isJobRelated && (
-            <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
-                Related Job <span className="text-red-500">*</span>
-              </label>
-              {jobs.length === 0 ? (
-                <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-3 text-sm text-amber-400">
-                  <i className="ri-information-line mr-1"></i>
-                  You have no jobs to link. <a href="/client/post-job" className="underline text-teal-400">Post a job</a> first.
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {jobs.map((job: any) => (
-                    <button
-                      key={job.id}
-                      onClick={() => setRelatedJobId(job.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all cursor-pointer text-left ${
-                        relatedJobId === job.id
-                          ? 'border-teal-500 bg-teal-500/10'
-                          : 'border-[#1e2d4d] hover:border-slate-600'
-                      }`}
-                    >
-                      <div className="w-9 h-9 rounded-lg bg-[#162036] flex items-center justify-center flex-shrink-0">
-                        <i className="ri-briefcase-4-line text-teal-400"></i>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-200 truncate">{job.job_title}</p>
-                        <p className="text-xs text-slate-500">{job.venue_city} · {job.start_date}</p>
-                      </div>
-                      {relatedJobId === job.id && (
-                        <div className="w-5 h-5 flex items-center justify-center">
-                          <i className="ri-checkbox-circle-fill text-teal-500 text-lg"></i>
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Subject */}
           <div>
@@ -268,7 +153,7 @@ export default function CreateTicketModal({ clientId, jobs, prefillJobId, prefil
                   onClick={() => setPriority(p.value)}
                   className={`flex-1 py-2 rounded-xl border-2 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                     priority === p.value
-                      ? p.color + ' border-opacity-100'
+                      ? p.color
                       : 'border-[#1e2d4d] text-slate-500 hover:border-slate-600'
                   }`}
                 >
@@ -280,46 +165,6 @@ export default function CreateTicketModal({ clientId, jobs, prefillJobId, prefil
               {category ? `Suggested priority: ${PRIORITIES.find(p => p.value === getSuggestedPriority(category))?.label}` : 'Select a category to see suggested priority'}
             </p>
           </div>
-
-          {/* Refund Details */}
-          {isRefund && (
-            <div className="bg-orange-500/5 border border-orange-500/15 rounded-xl p-4 space-y-4">
-              <p className="text-sm font-semibold text-orange-400 flex items-center gap-2">
-                <i className="ri-refund-line"></i>Refund Details
-              </p>
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">
-                  Requested Refund Amount (£) <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">£</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={requestedRefundAmount}
-                    onChange={(e) => setRequestedRefundAmount(e.target.value)}
-                    className="w-full pl-7 pr-4 py-3 border border-[#1e2d4d] rounded-xl text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-[#162036] text-white"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">
-                  Reason for Refund
-                </label>
-                <textarea
-                  value={refundReason}
-                  onChange={(e) => setRefundReason(e.target.value)}
-                  rows={3}
-                  maxLength={500}
-                  className="w-full px-4 py-3 border border-[#1e2d4d] rounded-xl text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none bg-[#162036] text-white"
-                  placeholder="Explain why you are requesting a refund..."
-                />
-                <p className="text-xs text-slate-500 mt-1 text-right">{refundReason.length}/500</p>
-              </div>
-            </div>
-          )}
 
           {/* Description */}
           <div>

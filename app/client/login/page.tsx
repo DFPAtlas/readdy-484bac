@@ -395,20 +395,6 @@ export default function ClientLogin() {
             <i className="ri-lock-line text-[#AAB7C4]/20 text-xs" />
             <span>Secure &amp; SIA Verified</span>
           </div>
-
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => {
-                const widget = document.querySelector('#vapi-widget-floating-button') as HTMLElement;
-                if (widget) widget.click();
-              }}
-              className="inline-flex items-center gap-2 text-sm transition-colors hover:text-[#3B82F6] cursor-pointer"
-              style={{ color: "#1DA1F2" }}
-            >
-              <i className="ri-customer-service-line" />
-              Need help signing in? Chat with us
-            </button>
-          </div>
         </LoginFormCard>
       </div>
     </div>

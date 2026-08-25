@@ -1,25 +1,21 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import Link from 'next/link';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
-import { useClientGuard } from '@/hooks/useClientGuard';
+import { useGuardGuard } from '@/hooks/useGuardGuard';
 import TicketCard from './TicketCard';
 import CreateTicketModal from './CreateTicketModal';
 import TicketDetailDrawer from './TicketDetailDrawer';
-import StatusBadge from './StatusBadge';
-import PriorityBadge from './PriorityBadge';
-import SearchFilterBar from '../components/SearchFilterBar';
-import BulkActionBar from '../components/BulkActionBar';
-import { useRouter } from 'next/navigation';
+import SearchFilterBar from '@/app/client/components/SearchFilterBar';
+import BulkActionBar from '@/app/client/components/BulkActionBar';
 
 const TABS = [
   { key: 'all', label: 'All Tickets', icon: 'ri-list-check-2' },
   { key: 'open', label: 'Open', icon: 'ri-folder-open-line' },
-  { key: 'awaiting_client', label: 'Awaiting Reply', icon: 'ri-reply-line' },
+  { key: 'awaiting_guard', label: 'Awaiting Reply', icon: 'ri-reply-line' },
   { key: 'under_review', label: 'Under Review', icon: 'ri-search-line' },
   { key: 'escalated', label: 'Escalated', icon: 'ri-arrow-up-line' },
   { key: 'resolved', label: 'Resolved', icon: 'ri-checkbox-circle-line' },
@@ -29,30 +25,17 @@ const TABS = [
 const STATUS_FILTERS: Record<string, string[]> = {
   all: [],
   open: ['open'],
-  awaiting_client: ['awaiting_client'],
+  awaiting_guard: ['awaiting_guard'],
   under_review: ['under_review'],
   escalated: ['escalated'],
   resolved: ['resolved', 'closed'],
   closed: ['closed'],
 };
 
-const CATEGORY_FILTERS = [
-  { value: 'all', label: 'All Categories' },
-  { value: 'general_support', label: 'General Support' },
-  { value: 'payment_issue', label: 'Payment Issue' },
-  { value: 'guard_no_show', label: 'Guard No-Show' },
-  { value: 'late_arrival', label: 'Late Arrival' },
-  { value: 'poor_performance', label: 'Poor Performance' },
-  { value: 'refund_request', label: 'Refund Request' },
-  { value: 'job_cancellation', label: 'Job Cancellation' },
-  { value: 'technical_issue', label: 'Technical Issue' },
-  { value: 'account_billing', label: 'Account/Billing' },
-];
-
 const TICKET_SORT_OPTIONS = [
   { value: 'urgent', label: 'Urgent First' },
   { value: 'newest', label: 'Newest' },
-  { value: 'awaiting_client', label: 'Awaiting Client Reply' },
+  { value: 'awaiting_guard', label: 'Awaiting Guard Reply' },
   { value: 'last_updated', label: 'Last Updated' },
 ];
 
@@ -63,7 +46,7 @@ const TICKET_FILTER_CONFIGS = [
     type: 'select' as const,
     options: [
       { value: 'open', label: 'Open' },
-      { value: 'awaiting_client', label: 'Awaiting Client' },
+      { value: 'awaiting_guard', label: 'Awaiting Guard' },
       { value: 'under_review', label: 'Under Review' },
       { value: 'escalated', label: 'Escalated' },
       { value: 'resolved', label: 'Resolved' },
@@ -88,11 +71,9 @@ const TICKET_FILTER_CONFIGS = [
     options: [
       { value: 'general_support', label: 'General Support' },
       { value: 'payment_issue', label: 'Payment Issue' },
-      { value: 'guard_no_show', label: 'Guard No-Show' },
-      { value: 'late_arrival', label: 'Late Arrival' },
-      { value: 'poor_performance', label: 'Poor Performance' },
-      { value: 'refund_request', label: 'Refund Request' },
-      { value: 'job_cancellation', label: 'Job Cancellation' },
+      { value: 'late_payment', label: 'Late Payment' },
+      { value: 'client_no_show', label: 'Client No-Show' },
+      { value: 'job_dispute', label: 'Job Dispute' },
       { value: 'technical_issue', label: 'Technical Issue' },
       { value: 'account_billing', label: 'Account/Billing' },
     ],
@@ -102,15 +83,6 @@ const TICKET_FILTER_CONFIGS = [
     label: 'Date Range',
     type: 'dateRange' as const,
   },
-  {
-    key: 'related_job',
-    label: 'Has Job',
-    type: 'select' as const,
-    options: [
-      { value: 'yes', label: 'Related to Job' },
-      { value: 'no', label: 'No Job' },
-    ],
-  },
 ];
 
 function getInitials(name: string): string {
@@ -119,14 +91,16 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+function capitalize(s: string): string {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ') : s;
+}
+
 export default function SupportPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { loading: authLoading, allowed } = useClientGuard();
+  const { loading: authLoading, allowed } = useGuardGuard();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [tickets, setTickets] = useState<any[]>([]);
-  const [jobs, setJobs] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -134,23 +108,19 @@ export default function SupportPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [relatedJobFilter, setRelatedJobFilter] = useState('all');
   const [sortBy, setSortBy] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [clientId, setClientId] = useState<string | null>(null);
-  const [companyName, setCompanyName] = useState('Client');
-  const [subscriptionTier, setSubscriptionTier] = useState('Basic');
-  const [initials, setInitials] = useState('CL');
+  const [guardId, setGuardId] = useState<string | null>(null);
+  const [guardName, setGuardName] = useState('Guard');
+  const [verificationStatus, setVerificationStatus] = useState('Guard');
+  const [initials, setInitials] = useState('GD');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [prefillCategory, setPrefillCategory] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [toast, setToast] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [prefillJobId, setPrefillJobId] = useState<string>('');
-  const [prefillCategory, setPrefillCategory] = useState<string>('');
-  const [hasProcessedParams, setHasProcessedParams] = useState(false);
 
-  // Bulk selection state
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
   const [bulkProcessing, setBulkProcessing] = useState(false);
@@ -162,46 +132,29 @@ export default function SupportPage() {
     if (!silent) setLoadError(false);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/client/login'); return; }
+      if (!user) { router.push('/guard/login'); return; }
 
-      const { data: client } = await supabase
-        .from('clients')
-        .select('id, company_name, subscription_tier')
+      const { data: guard } = await supabase
+        .from('guards')
+        .select('id, full_name, verification_status')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (!client) { router.push('/client/login'); return; }
+      if (!guard) { router.push('/guard/login'); return; }
 
-      setClientId(client.id);
-      setCompanyName(client.company_name || 'Client');
-      setSubscriptionTier(client.subscription_tier || 'Basic');
-      setInitials(getInitials(client.company_name || 'Client'));
+      setGuardId(guard.id);
+      setGuardName(guard.full_name || 'Guard');
+      setVerificationStatus(guard.verification_status ? capitalize(guard.verification_status) : 'Guard');
+      setInitials(getInitials(guard.full_name || 'Guard'));
 
       const { data: ticketsData } = await supabase
         .from('support_tickets')
         .select('*')
-        .eq('client_id', client.id)
+        .eq('guard_id', guard.id)
         .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
-      const { data: jobsData } = await supabase
-        .from('jobs')
-        .select('id, job_title, venue_city, start_date, status')
-        .eq('client_id', client.id)
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false });
-
-      const jobsList = jobsData || [];
-      setJobs(jobsList);
-
-      const jobMap = new Map(jobsList.map((j: any) => [j.id, j]));
-
-      const formatted = (ticketsData || []).map((t: any) => ({
-        ...t,
-        job_title: jobMap.get(t.related_job_id)?.job_title || null,
-      }));
-
-      setTickets(formatted);
+      setTickets(ticketsData || []);
       setLastUpdated(new Date());
     } catch {
       if (!silent) setLoadError(true);
@@ -213,32 +166,23 @@ export default function SupportPage() {
 
   useEffect(() => {
     loadTickets();
+  }, [loadTickets]);
+
+  useEffect(() => {
+    if (!guardId) return;
     const channel = supabase
-      .channel(`client-support-tickets-${clientId}`)
+      .channel(`guard-support-tickets-${guardId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'app',
         table: 'support_tickets',
-        filter: `client_id=eq.${clientId}`,
+        filter: `guard_id=eq.${guardId}`,
       }, () => {
         loadTickets(true);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [loadTickets, clientId]);
-
-  useEffect(() => {
-    if (!hasProcessedParams) {
-      const newCategory = searchParams.get('new');
-      const jobId = searchParams.get('job');
-      if (newCategory) {
-        setPrefillCategory(newCategory);
-        setPrefillJobId(jobId || '');
-        setShowCreateModal(true);
-        setHasProcessedParams(true);
-      }
-    }
-  }, [searchParams, hasProcessedParams]);
+  }, [loadTickets, guardId]);
 
   useEffect(() => {
     if (toast) {
@@ -275,10 +219,6 @@ export default function SupportPage() {
     if (statusFilter !== 'all' && ticket.status !== statusFilter) return false;
     if (categoryFilter !== 'all' && ticket.category !== categoryFilter) return false;
     if (priorityFilter !== 'all' && ticket.priority !== priorityFilter) return false;
-    if (relatedJobFilter !== 'all') {
-      if (relatedJobFilter === 'yes' && !ticket.related_job_id) return false;
-      if (relatedJobFilter === 'no' && ticket.related_job_id) return false;
-    }
     if (dateFrom && ticket.created_at && ticket.created_at < dateFrom) return false;
     if (dateTo && ticket.created_at && ticket.created_at > dateTo + 'T23:59:59') return false;
 
@@ -297,9 +237,9 @@ export default function SupportPage() {
       return (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) - (priorityOrder[a.priority as keyof typeof priorityOrder] || 0);
     }
     if (sortBy === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    if (sortBy === 'awaiting_client') {
-      const aAwaiting = a.status === 'awaiting_client' ? 1 : 0;
-      const bAwaiting = b.status === 'awaiting_client' ? 1 : 0;
+    if (sortBy === 'awaiting_guard') {
+      const aAwaiting = a.status === 'awaiting_guard' ? 1 : 0;
+      const bAwaiting = b.status === 'awaiting_guard' ? 1 : 0;
       return bAwaiting - aAwaiting;
     }
     if (sortBy === 'last_updated') return new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime();
@@ -309,19 +249,18 @@ export default function SupportPage() {
   const stats = {
     total: tickets.length,
     open: tickets.filter(t => t.status === 'open').length,
-    awaitingClient: tickets.filter(t => t.status === 'awaiting_client').length,
+    awaitingGuard: tickets.filter(t => t.status === 'awaiting_guard').length,
     underReview: tickets.filter(t => t.status === 'under_review').length,
     escalated: tickets.filter(t => t.status === 'escalated').length,
     resolved: tickets.filter(t => t.status === 'resolved').length,
     closed: tickets.filter(t => t.status === 'closed').length,
     urgent: tickets.filter(t => t.priority === 'urgent' && t.status !== 'resolved' && t.status !== 'closed').length,
-    refundRequests: tickets.filter(t => t.category === 'refund_request' && t.status !== 'resolved' && t.status !== 'closed').length,
   };
 
   const getTabCount = (key: string) => {
     if (key === 'all') return stats.total;
     if (key === 'open') return stats.open;
-    if (key === 'awaiting_client') return stats.awaitingClient;
+    if (key === 'awaiting_guard') return stats.awaitingGuard;
     if (key === 'under_review') return stats.underReview;
     if (key === 'escalated') return stats.escalated;
     if (key === 'resolved') return stats.resolved + stats.closed;
@@ -329,9 +268,8 @@ export default function SupportPage() {
     return 0;
   };
 
-  const handleOpenCreate = (jobId?: string, category?: string) => {
-    setPrefillJobId(jobId || '');
-    setPrefillCategory(category || '');
+  const handleOpenCreate = (category = '') => {
+    setPrefillCategory(category);
     setShowCreateModal(true);
   };
 
@@ -342,7 +280,7 @@ export default function SupportPage() {
     }
     const headers = [
       'Reference', 'Category', 'Subject', 'Priority', 'Status',
-      'Job', 'Created', 'Updated', 'Resolved', 'Description'
+      'Created', 'Updated', 'Resolved', 'Description'
     ];
     const rows = filteredTickets.map((t: any) => [
       t.ticket_reference,
@@ -350,7 +288,6 @@ export default function SupportPage() {
       t.subject,
       t.priority,
       t.status,
-      t.job_title || '',
       t.created_at,
       t.updated_at,
       t.resolved_at || '',
@@ -361,7 +298,7 @@ export default function SupportPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `quickguard-support-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `quickguard-guard-support-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -376,7 +313,6 @@ export default function SupportPage() {
     setStatusFilter('all');
     setDateFrom('');
     setDateTo('');
-    setRelatedJobFilter('all');
     setSortBy('');
     setShowFilters(false);
   };
@@ -385,12 +321,10 @@ export default function SupportPage() {
     if (key === 'status') setStatusFilter(value);
     else if (key === 'priority') setPriorityFilter(value);
     else if (key === 'category') setCategoryFilter(value);
-    else if (key === 'related_job') setRelatedJobFilter(value);
     else if (key === 'date_from') setDateFrom(value);
     else if (key === 'date_to') setDateTo(value);
   };
 
-  // --- Bulk action handlers ---
   const toggleTicketSelection = (id: string) => {
     setSelectedTicketIds(prev => {
       const next = new Set(prev);
@@ -405,17 +339,16 @@ export default function SupportPage() {
     if (selected.length === 0) { setToast('No tickets selected'); return; }
     setBulkProcessing(true);
     setBulkActionKey('export');
-    const headers = ['Reference', 'Category', 'Subject', 'Priority', 'Status', 'Job', 'Created', 'Updated'];
+    const headers = ['Reference', 'Category', 'Subject', 'Priority', 'Status', 'Created', 'Updated'];
     const rows = selected.map((t: any) => [
-      t.ticket_reference, t.category, t.subject, t.priority, t.status,
-      t.job_title || '', t.created_at, t.updated_at,
+      t.ticket_reference, t.category, t.subject, t.priority, t.status, t.created_at, t.updated_at,
     ]);
     const csv = [headers.join(','), ...rows.map((r: any) => r.map((v: any) => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `quickguard-support-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `quickguard-guard-support-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -428,14 +361,10 @@ export default function SupportPage() {
   };
 
   const handleBulkMarkResolved = async () => {
-    const ids = Array.from(selectedTicketIds);
     const resolvable = filteredTickets.filter(t => selectedTicketIds.has(t.id) && !['resolved', 'closed'].includes(t.status)).map(t => t.id);
-    if (resolvable.length === 0) { setToast('No tickets that can be resolved'); return; }
+    if (resolvable.length === 0) { setToast('No tickets that can be closed'); return; }
     setBulkProcessing(true);
     setBulkActionKey('resolve');
-    // NOTE: clients cannot directly resolve tickets — only request closure
-    // We'll mark as awaiting_client action with a note
-    // TODO: If backend supports client-requested resolution, wire this up
     await supabase
       .from('support_tickets')
       .update({ status: 'closed', updated_at: new Date().toISOString() })
@@ -452,14 +381,12 @@ export default function SupportPage() {
     if (actionKey === 'export') handleBulkExportTickets();
     else if (actionKey === 'resolve') handleBulkMarkResolved();
   };
-  // --- End bulk action handlers ---
 
   if (loading || authLoading || !allowed) {
     return (
       <div className="min-h-screen bg-[#0B1933] flex flex-col lg:flex-row">
-        <PortalSidebar role="client" displayName="Client" subtitle="Free" initials="CL" />
+        <PortalSidebar role="guard" displayName="Guard" subtitle="Guard" initials="GD" />
         <div className="flex-1 min-h-screen flex flex-col pb-20 lg:pb-0">
-          {/* Header Skeleton */}
           <header className="bg-[#111d35] border-b border-[#1e2d4d] px-4 sm:px-8 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sticky top-0 z-20">
             <div className="space-y-1">
               <div className="h-3 w-28 bg-[#162036] rounded animate-pulse"></div>
@@ -471,9 +398,7 @@ export default function SupportPage() {
               <div className="h-8 sm:h-9 w-28 sm:w-32 bg-teal-500/20 rounded-xl animate-pulse"></div>
             </div>
           </header>
-
           <main className="flex-1 px-4 sm:px-8 py-4 sm:py-8">
-            {/* Stats Bar Skeleton */}
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3 mb-4 sm:mb-6">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
@@ -485,41 +410,6 @@ export default function SupportPage() {
                 </div>
               ))}
             </div>
-
-            {/* Alert Banner Skeleton */}
-            <div className="bg-[#111d35] border border-[#1e2d4d] rounded-xl px-4 py-3 mb-4 sm:mb-6 flex items-center gap-3">
-              <div className="w-8 h-8 bg-[#162036] rounded-lg flex-shrink-0 animate-pulse"></div>
-              <div className="h-3 w-48 sm:w-64 bg-[#162036] rounded animate-pulse"></div>
-              <div className="ml-auto h-3 w-14 bg-[#162036] rounded animate-pulse"></div>
-            </div>
-
-            {/* Quick Actions Skeleton */}
-            <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-3 sm:p-4 mb-4 sm:mb-6">
-              <div className="h-4 w-32 bg-[#162036] rounded animate-pulse mb-3"></div>
-              <div className="flex flex-wrap gap-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-8 w-28 sm:w-32 bg-[#162036] rounded-xl animate-pulse"></div>
-                ))}
-              </div>
-            </div>
-
-            {/* Tabs Skeleton */}
-            <div className="flex flex-wrap gap-2 mb-4 overflow-x-auto pb-1">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <div key={i} className={`h-8 sm:h-9 rounded-xl animate-pulse ${i === 0 ? 'w-28 sm:w-32 bg-teal-500/20' : 'w-24 sm:w-28 bg-[#162036]'}`}></div>
-              ))}
-            </div>
-
-            {/* Search & Filter Skeleton */}
-            <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-3 sm:p-4 mb-4 sm:mb-6">
-              <div className="h-10 w-full bg-[#162036] rounded-xl animate-pulse mb-3"></div>
-              <div className="flex flex-wrap gap-2">
-                <div className="h-8 w-20 sm:w-24 bg-[#162036] rounded-lg animate-pulse"></div>
-                <div className="h-8 w-24 sm:w-28 bg-[#162036] rounded-lg animate-pulse"></div>
-              </div>
-            </div>
-
-            {/* Ticket Card Skeletons */}
             <div className="space-y-3 sm:space-y-4">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4 sm:p-5">
@@ -535,10 +425,6 @@ export default function SupportPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="sm:ml-auto flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1">
-                      <div className="h-3 w-16 bg-[#162036] rounded animate-pulse"></div>
-                      <div className="h-5 w-20 sm:w-24 bg-[#162036] rounded-full animate-pulse"></div>
-                    </div>
                   </div>
                 </div>
               ))}
@@ -552,9 +438,9 @@ export default function SupportPage() {
   return (
     <div className="min-h-screen bg-[#0B1933] flex flex-col lg:flex-row">
       <PortalSidebar
-        role="client"
-        displayName={companyName || 'Client'}
-        subtitle={subscriptionTier || 'Free'}
+        role="guard"
+        displayName={guardName || 'Guard'}
+        subtitle={verificationStatus || 'Guard'}
         initials={initials}
       />
 
@@ -562,7 +448,7 @@ export default function SupportPage() {
         {/* Header */}
         <header className="bg-[#111d35] border-b border-[#1e2d4d] px-8 py-4 flex items-center justify-between sticky top-0 z-20">
           <div>
-            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Client Portal</p>
+            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Guard Portal</p>
             <h1 className="text-xl font-bold text-white flex items-center gap-2">
               Support Centre
               {stats.open > 0 && (
@@ -591,7 +477,7 @@ export default function SupportPage() {
               Refresh
             </button>
             <button
-              onClick={() => handleOpenCreate()}
+              onClick={handleOpenCreate}
               className="flex items-center gap-2 bg-teal-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap"
             >
               <i className="ri-add-line"></i>
@@ -606,12 +492,12 @@ export default function SupportPage() {
             {[
               { label: 'Total', value: stats.total, icon: 'ri-list-check-2', color: 'text-teal-400' },
               { label: 'Open', value: stats.open, icon: 'ri-folder-open-line', color: 'text-red-400' },
-              { label: 'Awaiting Reply', value: stats.awaitingClient, icon: 'ri-reply-line', color: 'text-amber-400' },
+              { label: 'Awaiting Reply', value: stats.awaitingGuard, icon: 'ri-reply-line', color: 'text-amber-400' },
               { label: 'Under Review', value: stats.underReview, icon: 'ri-search-line', color: 'text-violet-400' },
               { label: 'Escalated', value: stats.escalated, icon: 'ri-arrow-up-line', color: 'text-orange-400' },
               { label: 'Resolved', value: stats.resolved, icon: 'ri-checkbox-circle-line', color: 'text-emerald-400' },
+              { label: 'Closed', value: stats.closed, icon: 'ri-lock-line', color: 'text-slate-400' },
               { label: 'Urgent', value: stats.urgent, icon: 'ri-fire-line', color: 'text-red-400' },
-              { label: 'Refunds', value: stats.refundRequests, icon: 'ri-refund-line', color: 'text-orange-400' },
             ].map((s) => (
               <div key={s.label} className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-3 flex items-center gap-3">
                 <div className="w-9 h-9 bg-[#162036] rounded-lg flex items-center justify-center flex-shrink-0">
@@ -626,16 +512,16 @@ export default function SupportPage() {
           </div>
 
           {/* Alert Banner */}
-          {stats.awaitingClient > 0 && (
+          {stats.awaitingGuard > 0 && (
             <div className="bg-amber-500/5 border border-amber-500/15 rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
               <div className="w-8 h-8 bg-amber-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
                 <i className="ri-reply-line text-amber-400"></i>
               </div>
               <p className="text-sm text-amber-400 font-medium">
-                {stats.awaitingClient} ticket{stats.awaitingClient > 1 ? 's' : ''} waiting for your reply
+                {stats.awaitingGuard} ticket{stats.awaitingGuard > 1 ? 's' : ''} waiting for your reply
               </p>
               <button
-                onClick={() => setActiveTab('awaiting_client')}
+                onClick={() => setActiveTab('awaiting_guard')}
                 className="ml-auto text-xs text-teal-400 font-semibold hover:underline cursor-pointer whitespace-nowrap"
               >
                 View Now
@@ -643,22 +529,22 @@ export default function SupportPage() {
             </div>
           )}
 
-          {/* Quick Actions for Incidents */}
+          {/* Quick Actions */}
           <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4 mb-6">
             <p className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
               <i className="ri-flashlight-line text-teal-400"></i>
-              Report an Incident
+              Report a Problem
             </p>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: 'Guard No-Show', category: 'guard_no_show', icon: 'ri-user-unfollow-line', color: 'text-red-400', border: 'border-red-500/25', bg: 'hover:bg-red-500/10' },
-                { label: 'Late Arrival', category: 'late_arrival', icon: 'ri-time-line', color: 'text-orange-400', border: 'border-orange-500/25', bg: 'hover:bg-orange-500/10' },
-                { label: 'Poor Performance', category: 'poor_performance', icon: 'ri-emotion-unhappy-line', color: 'text-amber-400', border: 'border-amber-500/25', bg: 'hover:bg-amber-500/10' },
-                { label: 'Request Refund', category: 'refund_request', icon: 'ri-refund-line', color: 'text-violet-400', border: 'border-violet-500/25', bg: 'hover:bg-violet-500/10' },
+                { label: 'Payment Issue', category: 'payment_issue', icon: 'ri-secure-payment-line', color: 'text-red-400', border: 'border-red-500/25', bg: 'hover:bg-red-500/10' },
+                { label: 'Late Payment', category: 'late_payment', icon: 'ri-time-line', color: 'text-orange-400', border: 'border-orange-500/25', bg: 'hover:bg-orange-500/10' },
+                { label: 'Client No-Show', category: 'client_no_show', icon: 'ri-user-unfollow-line', color: 'text-amber-400', border: 'border-amber-500/25', bg: 'hover:bg-amber-500/10' },
+                { label: 'Technical Issue', category: 'technical_issue', icon: 'ri-bug-line', color: 'text-violet-400', border: 'border-violet-500/25', bg: 'hover:bg-violet-500/10' },
               ].map((action) => (
                 <button
                   key={action.category}
-                  onClick={() => handleOpenCreate('', action.category)}
+                  onClick={() => handleOpenCreate(action.category)}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border ${action.border} ${action.color} text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${action.bg}`}
                 >
                   <i className={action.icon}></i>
@@ -694,7 +580,7 @@ export default function SupportPage() {
             })}
           </div>
 
-          {/* Search & Filters — replaced with SearchFilterBar */}
+          {/* Search & Filters */}
           <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4 mb-6">
             <SearchFilterBar
               searchQuery={searchQuery}
@@ -704,7 +590,6 @@ export default function SupportPage() {
                 status: statusFilter,
                 priority: priorityFilter,
                 category: categoryFilter,
-                related_job: relatedJobFilter,
                 date_from: dateFrom,
                 date_to: dateTo,
               }}
@@ -769,17 +654,12 @@ export default function SupportPage() {
                 {searchQuery ? 'No tickets match your search' : 'No support tickets yet'}
               </h3>
               <p className="text-slate-500 text-sm mb-6">
-                {searchQuery ? 'Try a different search term or clear your filters' : 'Create a new ticket if you need help with a job, payment, or account issue'}
+                {searchQuery ? 'Try a different search term or clear your filters' : 'Create a new ticket if you need help with a payment, job, or account issue'}
               </p>
               {!searchQuery && (
-                <div className="flex flex-wrap gap-3 justify-center">
-                  <button onClick={() => handleOpenCreate()} className="inline-flex items-center gap-2 bg-teal-500 text-white text-sm font-semibold px-6 py-3 rounded-xl hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap">
-                    <i className="ri-add-line"></i>Create Ticket
-                  </button>
-                  <Link href="/client/help#support-disputes" className="inline-flex items-center gap-2 bg-[#162036] text-slate-300 text-sm font-semibold px-6 py-3 rounded-xl hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap border border-[#1e2d4d]">
-                    <i className="ri-question-answer-line"></i>Help Guide
-                  </Link>
-                </div>
+                <button onClick={handleOpenCreate} className="inline-flex items-center gap-2 bg-teal-500 text-white text-sm font-semibold px-6 py-3 rounded-xl hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap">
+                  <i className="ri-add-line"></i>Create Ticket
+                </button>
               )}
               {searchQuery && (
                 <button onClick={handleClearFilters} className="inline-flex items-center gap-2 bg-[#162036] text-teal-400 text-sm font-semibold px-6 py-3 rounded-xl hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap border border-[#1e2d4d]">
@@ -829,15 +709,9 @@ export default function SupportPage() {
       {/* Modals / Drawers */}
       {showCreateModal && (
         <CreateTicketModal
-          clientId={clientId || ''}
-          jobs={jobs}
-          prefillJobId={prefillJobId}
+          guardId={guardId || ''}
           prefillCategory={prefillCategory}
-          onClose={() => {
-            setShowCreateModal(false);
-            setPrefillJobId('');
-            setPrefillCategory('');
-          }}
+          onClose={() => { setShowCreateModal(false); setPrefillCategory(''); }}
           onSuccess={() => {
             loadTickets(true);
             setShowCreateModal(false);
@@ -848,7 +722,7 @@ export default function SupportPage() {
       {selectedTicket && (
         <TicketDetailDrawer
           ticket={selectedTicket}
-          clientId={clientId || ''}
+          guardId={guardId || ''}
           onClose={() => setSelectedTicket(null)}
           onUpdated={() => loadTickets(true)}
         />

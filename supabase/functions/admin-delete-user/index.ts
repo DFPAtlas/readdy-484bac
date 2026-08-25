@@ -1,6 +1,5 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -40,17 +39,11 @@ serve(async (req: Request) => {
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
-      db: { schema: "public" },
+      db: { schema: "app" },
     });
 
-    const userClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      auth: { persistSession: false },
-      db: { schema: "public" },
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-
-    const { data: { user: caller } } = await userClient.auth.getUser(token);
-    if (!caller) {
+    const { data: { user: caller }, error: authError } = await adminClient.auth.getUser(token);
+    if (authError || !caller) {
       return new Response(
         JSON.stringify({ error: "Not authenticated" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -67,32 +60,6 @@ serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: "Only active super_admin users can delete accounts" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (adminUser.user_id === user_id) {
-      return new Response(
-        JSON.stringify({ error: "Cannot delete your own account" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const { count: superAdminCount } = await adminClient
-      .from("admin_users")
-      .select("*", { count: "exact", head: true })
-      .eq("role", "super_admin")
-      .eq("is_active", true);
-
-    const { data: targetAdmin } = await adminClient
-      .from("admin_users")
-      .select("id, role")
-      .eq("user_id", user_id)
-      .maybeSingle();
-
-    if (targetAdmin && targetAdmin.role === "super_admin" && (superAdminCount || 0) <= 1) {
-      return new Response(
-        JSON.stringify({ error: "Cannot delete the last active super_admin" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -127,6 +94,32 @@ serve(async (req: Request) => {
       }
       targetRecord = data;
       targetUserId = data.user_id || user_id;
+    }
+
+    if (adminUser.user_id === targetUserId) {
+      return new Response(
+        JSON.stringify({ error: "Cannot delete your own account" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { count: superAdminCount } = await adminClient
+      .from("admin_users")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "super_admin")
+      .eq("is_active", true);
+
+    const { data: targetAdmin } = await adminClient
+      .from("admin_users")
+      .select("id, role")
+      .eq("user_id", targetUserId)
+      .maybeSingle();
+
+    if (targetAdmin && targetAdmin.role === "super_admin" && (superAdminCount || 0) <= 1) {
+      return new Response(
+        JSON.stringify({ error: "Cannot delete the last active super_admin" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const summary: {
@@ -240,7 +233,6 @@ serve(async (req: Request) => {
       }
     }
 
-    // Financial tables: anonymise, do NOT hard-delete
     const financialTables = [
       { table: "subscriptions", column: "user_id" },
       { table: "subscription_payments", column: "user_id" },
@@ -259,7 +251,6 @@ serve(async (req: Request) => {
       }
     }
 
-    // Count users table row
     const { count: userCount } = await adminClient
       .from("users")
       .select("*", { count: "exact", head: true })
@@ -269,7 +260,6 @@ serve(async (req: Request) => {
       summary.totalRows += userCount;
     }
 
-    // Scan storage buckets
     const storagePaths = [targetRecord.id, targetUserId];
     const buckets = user_type === "client"
       ? ["avatars", "guard-documents", "guard-profiles", "ID-images", "sia-licences", "quickguard-email-assets"]
@@ -281,7 +271,6 @@ serve(async (req: Request) => {
     summary.totalFiles = summary.storageFiles.length;
 
     if (isDryRun) {
-      // Write to BOTH audit tables
       const auditEntry = {
         admin_user_id: adminUser.user_id,
         admin_username: adminUser.email || adminUser.full_name || "unknown",
@@ -320,7 +309,6 @@ serve(async (req: Request) => {
       );
     }
 
-    // REAL DELETION
     const failedItems: string[] = [];
     const deletedTables: string[] = [];
     const deletionResult: Record<string, number> = {};
@@ -346,7 +334,6 @@ serve(async (req: Request) => {
       }
     }
 
-    // Delete users row
     try {
       await adminClient.from("users").delete().eq("id", targetUserId);
       deletedTables.push("users");
@@ -354,7 +341,6 @@ serve(async (req: Request) => {
       failedItems.push(`users: ${e.message}`);
     }
 
-    // Anonymise financial records
     const anonymisedEmail = `deleted-user-${targetUserId}@quickguard.local`;
     for (const entry of financialTables) {
       try {
@@ -380,7 +366,6 @@ serve(async (req: Request) => {
       }
     }
 
-    // Delete storage files
     const deletedFiles: string[] = [];
     const failedFiles: string[] = [];
     for (const filePath of summary.storageFiles) {
@@ -400,7 +385,6 @@ serve(async (req: Request) => {
       }
     }
 
-    // Delete or deactivate auth user
     let authAction = "none";
     try {
       const { data: authUser } = await adminClient.auth.admin.getUserById(targetUserId);
@@ -425,7 +409,6 @@ serve(async (req: Request) => {
 
     const finalStatus = failedItems.length > 0 ? "partial" : "completed";
 
-    // Write to admin_activity_log
     await adminClient.from("admin_activity_log").insert({
       admin_user_id: adminUser.user_id,
       admin_username: adminUser.email || adminUser.full_name || "unknown",
@@ -449,7 +432,6 @@ serve(async (req: Request) => {
       },
     });
 
-    // Write to structured deletion audit log
     await adminClient.from("admin_deletion_audit_log").insert({
       admin_user_id: adminUser.user_id,
       target_user_id: targetUserId,

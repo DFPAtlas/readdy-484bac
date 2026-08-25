@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { Pacifico } from 'next/font/google';
 import './globals.css';
 import ClientLayout from './ClientLayout';
-import ReaddyWidget from '@/components/ReaddyWidget';
 import { Suspense } from 'react';
 
 const pacifico = Pacifico({
@@ -91,7 +90,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         }>
           <ClientLayout>{children}</ClientLayout>
         </Suspense>
-        <ReaddyWidget />
       </body>
     </html>
   );

@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useRouteGuard } from "@/hooks/useRouteGuard";
-import { useClientGuard } from "@/hooks/useClientGuard";
 import { supabase } from "@/lib/supabase";
 import { getCurrentUser, getClientDashboardStats, getRecommendedGuards } from "@/lib/client-queries";
 import type {
@@ -103,7 +102,6 @@ interface GlobalPromoCounts {
 export default function ClientDashboardPage() {
   const router = useRouter();
   const { checking, blocked } = useRouteGuard();
-  const { loading: authLoading, allowed } = useClientGuard();
   const [client, setClient] = useState<ClientDetails | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [stats, setStats] = useState<JobStat | null>(null);
@@ -529,14 +527,6 @@ export default function ClientDashboardPage() {
       channels.forEach((ch) => supabase.removeChannel(ch));
     };
   }, [userId, clientId, debouncedReload]);
-
-  if (authLoading || !allowed) {
-    return (
-      <div className="min-h-screen bg-[#0B1933] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-teal-500 border-t-transparent" />
-      </div>
-    );
-  }
 
   if (loading || checking) {
     return (

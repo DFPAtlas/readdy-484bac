@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouteGuard } from '@/hooks/useRouteGuard';
-import { useClientGuard } from '@/hooks/useClientGuard';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
 import { useSafetyData, useUpdateSafetyCheck, useUpdateJobSafety } from './useSafetyData';
@@ -23,7 +22,6 @@ interface ClientDetails {
 
 export default function TrustSafetyClient() {
   const { checking, blocked } = useRouteGuard();
-  const { loading: authLoading, allowed } = useClientGuard();
   const [client, setClient] = useState<ClientDetails | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [assignments, setAssignments] = useState<Record<string, GuardAssignment[]>>({});
@@ -103,14 +101,6 @@ export default function TrustSafetyClient() {
       window.location.reload();
     }
   };
-
-  if (authLoading || !allowed) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-[#0B1933] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-teal-500 border-t-transparent" />
-      </div>
-    );
-  }
 
   if (loading || checking) {
     return (

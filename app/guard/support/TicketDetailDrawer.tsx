@@ -23,11 +23,6 @@ interface Ticket {
   description: string;
   priority: string;
   status: string;
-  related_job_id?: string;
-  job_title?: string;
-  payment_amount?: number;
-  requested_refund_amount?: number;
-  refund_reason?: string;
   evidence_url?: string;
   contact_preference?: string;
   admin_notes?: string;
@@ -39,7 +34,7 @@ interface Ticket {
 
 interface TicketDetailDrawerProps {
   ticket: Ticket;
-  clientId: string;
+  guardId: string;
   onClose: () => void;
   onUpdated: () => void;
 }
@@ -47,11 +42,9 @@ interface TicketDetailDrawerProps {
 const categoryLabels: Record<string, string> = {
   general_support: 'General Support',
   payment_issue: 'Payment Issue',
-  guard_no_show: 'Guard No-Show',
-  late_arrival: 'Late Arrival',
-  poor_performance: 'Poor Performance',
-  refund_request: 'Refund Request',
-  job_cancellation: 'Job Cancellation',
+  late_payment: 'Late Payment',
+  client_no_show: 'Client No-Show',
+  job_dispute: 'Job Dispute',
   technical_issue: 'Technical Issue',
   account_billing: 'Account/Billing Help',
 };
@@ -64,13 +57,12 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdated }: TicketDetailDrawerProps) {
+export default function TicketDetailDrawer({ ticket, guardId, onClose, onUpdated }: TicketDetailDrawerProps) {
   const [messages, setMessages] = useState<TicketMessage[]>([]);
   const [replyText, setReplyText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [warning, setWarning] = useState('');
   const [ticketStatus, setTicketStatus] = useState(ticket.status);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -108,19 +100,18 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
   const handleSendReply = async () => {
     if (!replyText.trim()) return;
     setError('');
-    setWarning('');
     setSending(true);
     try {
       const { data: createdMessage, error: msgError } = await supabase
         .from('ticket_messages')
         .insert({
           ticket_id: ticket.id,
-          sender_id: clientId,
-          sender_type: 'client',
+          sender_id: guardId,
+          sender_type: 'guard',
           message_text: replyText.trim(),
           is_internal: false,
         })
-        .select('id, created_at')
+        .select('id')
         .single();
 
       if (msgError || !createdMessage?.id) {
@@ -139,15 +130,6 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
       setReplyText('');
       onUpdated();
       loadMessages();
-
-      const { error: bridgeError } = await supabase.functions.invoke(
-        'dfp-support-message-bridge',
-        { body: { messageId: createdMessage.id } },
-      );
-
-      if (bridgeError) {
-        setWarning('Your reply was saved, but delivery to support could not be confirmed.');
-      }
     } catch (err: any) {
       setError(err.message || 'Failed to send reply');
     } finally {
@@ -156,7 +138,6 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
   };
 
   const canReply = ticketStatus !== 'resolved' && ticketStatus !== 'closed';
-  const isRefund = ticket.category === 'refund_request';
   const isResolved = ticketStatus === 'resolved' || ticketStatus === 'closed';
 
   return (
@@ -210,43 +191,8 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
                   <span className="text-slate-500">Contact</span>
                   <span className="text-slate-200 capitalize">{ticket.contact_preference || 'Email'}</span>
                 </div>
-                {ticket.job_title && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Related Job</span>
-                    <span className="text-teal-400 font-medium">{ticket.job_title}</span>
-                  </div>
-                )}
               </div>
             </div>
-
-            {/* Refund/Dispute Panel */}
-            {isRefund && (
-              <div className="bg-orange-500/5 border border-orange-500/15 rounded-xl p-4">
-                <h3 className="text-sm font-bold text-orange-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <i className="ri-refund-line"></i>Refund Request
-                </h3>
-                <div className="space-y-2 text-sm">
-                  {ticket.payment_amount !== undefined && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Payment Amount</span>
-                      <span className="text-slate-200 font-medium">£{ticket.payment_amount}</span>
-                    </div>
-                  )}
-                  {ticket.requested_refund_amount !== undefined && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Requested Refund</span>
-                      <span className="text-orange-400 font-bold">£{ticket.requested_refund_amount}</span>
-                    </div>
-                  )}
-                  {ticket.refund_reason && (
-                    <div className="pt-2 border-t border-orange-500/15">
-                      <span className="text-slate-500">Reason:</span>
-                      <p className="text-slate-300 mt-1">{ticket.refund_reason}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
             {/* Description */}
             <div className="bg-[#162036] rounded-xl border border-[#1e2d4d] p-4">
@@ -298,22 +244,22 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
                   <div className="w-10 h-10 bg-[#111d35] rounded-xl flex items-center justify-center mx-auto mb-2">
                     <i className="ri-chat-off-line text-slate-600"></i>
                   </div>
-                  <p className="text-sm text-slate-500">No replies yet. You will see admin responses here.</p>
+                  <p className="text-sm text-slate-500">No replies yet. You will see support responses here.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {messages.map((msg) => {
-                    const isClient = msg.sender_type === 'client';
+                    const isGuard = msg.sender_type === 'guard';
                     return (
-                      <div key={msg.id} className={`flex ${isClient ? 'justify-end' : 'justify-start'}`}>
+                      <div key={msg.id} className={`flex ${isGuard ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                          isClient
+                          isGuard
                             ? 'bg-teal-500/10 border border-teal-500/20 text-teal-100'
                             : 'bg-[#111d35] border border-[#1e2d4d] text-slate-300'
                         }`}>
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`text-xs font-bold ${isClient ? 'text-teal-400' : 'text-violet-400'}`}>
-                              {isClient ? 'You' : msg.sender_name || 'QuickGuard Support'}
+                            <span className={`text-xs font-bold ${isGuard ? 'text-teal-400' : 'text-violet-400'}`}>
+                              {isGuard ? 'You' : msg.sender_name || 'QuickGuard Support'}
                             </span>
                             <span className="text-[10px] text-slate-600">
                               {formatDateTime(msg.created_at)}
@@ -331,11 +277,6 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
               {/* Reply Box */}
               {canReply && (
                 <div className="mt-4 pt-4 border-t border-[#1e2d4d]">
-                  {warning && (
-                    <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 mb-3 text-sm text-amber-400">
-                      {warning}
-                    </div>
-                  )}
                   {error && (
                     <div className="bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2 mb-3 text-sm text-red-400">
                       {error}

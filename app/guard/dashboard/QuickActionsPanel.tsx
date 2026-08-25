@@ -10,16 +10,20 @@ interface QuickAction {
   glowColor: string;
 }
 
+interface Props {
+  openTicketCount?: number;
+}
+
 const actions: QuickAction[] = [
   { label: 'Browse Jobs', href: '/guard/jobs', icon: 'ri-briefcase-line', color: 'text-teal-400', glowColor: 'group-hover:shadow-teal-500/20' },
   { label: 'Messages', href: '/guard/messages', icon: 'ri-message-3-line', color: 'text-blue-400', glowColor: 'group-hover:shadow-blue-500/20' },
   { label: 'Profile', href: '/guard/profile', icon: 'ri-user-settings-line', color: 'text-amber-400', glowColor: 'group-hover:shadow-amber-500/20' },
   { label: 'Earnings', href: '/guard/earnings', icon: 'ri-money-pound-circle-line', color: 'text-emerald-400', glowColor: 'group-hover:shadow-emerald-500/20' },
   { label: 'Invites', href: '/guard/job-invites', icon: 'ri-mail-send-line', color: 'text-violet-400', glowColor: 'group-hover:shadow-violet-500/20' },
-  { label: 'Support', href: '/contact', icon: 'ri-customer-service-2-line', color: 'text-slate-300', glowColor: 'group-hover:shadow-slate-500/20' },
+  { label: 'Support', href: '/guard/support', icon: 'ri-customer-service-2-line', color: 'text-slate-300', glowColor: 'group-hover:shadow-slate-500/20' },
 ];
 
-export default function QuickActionsPanel() {
+export default function QuickActionsPanel({ openTicketCount = 0 }: Props) {
   return (
     <div className="bg-[#0d1b36] rounded-2xl border border-[#1a2b4a] shadow-lg p-5">
       <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
@@ -29,20 +33,28 @@ export default function QuickActionsPanel() {
         Quick Actions
       </h3>
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-        {actions.map((action) => (
-          <Link
-            key={action.label}
-            href={action.href}
-            className={`group flex flex-col items-center gap-2 rounded-2xl border border-[#1a2b4a] bg-[#0B1933] p-3 sm:p-4 hover:border-[#2a3e5f] hover:shadow-lg ${action.glowColor} hover:-translate-y-0.5 transition-all duration-200 cursor-pointer`}
-          >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#111d35] border border-[#1a2b4a] flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-              <i className={`${action.icon} ${action.color} text-lg sm:text-xl`}></i>
-            </div>
-            <span className="text-xs font-semibold text-slate-400 group-hover:text-white transition-colors text-center leading-tight whitespace-nowrap">
-              {action.label}
-            </span>
-          </Link>
-        ))}
+        {actions.map((action) => {
+          const showBadge = action.label === 'Support' && openTicketCount > 0;
+          return (
+            <Link
+              key={action.label}
+              href={action.href}
+              className={`group relative flex flex-col items-center gap-2 rounded-2xl border border-[#1a2b4a] bg-[#0B1933] p-3 sm:p-4 hover:border-[#2a3e5f] hover:shadow-lg ${action.glowColor} hover:-translate-y-0.5 transition-all duration-200 cursor-pointer`}
+            >
+              {showBadge && (
+                <span className="absolute -top-2 -right-2 min-w-[22px] h-[22px] px-1.5 bg-red-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-red-500/40">
+                  {openTicketCount}
+                </span>
+              )}
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#111d35] border border-[#1a2b4a] flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                <i className={`${action.icon} ${action.color} text-lg sm:text-xl`}></i>
+              </div>
+              <span className="text-xs font-semibold text-slate-400 group-hover:text-white transition-colors text-center leading-tight whitespace-nowrap">
+                {action.label}
+              </span>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
