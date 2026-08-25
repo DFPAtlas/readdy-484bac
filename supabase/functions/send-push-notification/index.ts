@@ -72,7 +72,7 @@ serve(async (req) => {
       title,
       body: messageBody,
       tag: tag || "quickguard-notification",
-      icon: icon || "/quickguard_logo_192x192.png",
+      icon: icon || "https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp",
       data: { url: url || "/" },
     });
 

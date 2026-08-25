@@ -3,10 +3,18 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
+export type AdminRole = 'super_admin' | 'admin' | 'finance_admin';
+
+export const VALID_ADMIN_ROLES: readonly AdminRole[] = ['super_admin', 'admin', 'finance_admin'];
+
+function isAdminRole(value: unknown): value is AdminRole {
+  return typeof value === 'string' && (VALID_ADMIN_ROLES as readonly string[]).includes(value);
+}
+
 interface AdminAuth {
   email: string;
   name: string;
-  role: string;
+  role: AdminRole | '';
   username: string;
 }
 
@@ -43,10 +51,11 @@ export function useAdminAuth(): AdminAuth {
         .maybeSingle();
 
       if (!cancelled && data) {
+        const role = isAdminRole(data.role) ? data.role : '';
         const result: AdminAuth = {
           email: data.email || user.email || '',
           name: data.full_name || '',
-          role: data.role || '',
+          role,
           username: data.full_name || data.email || user.email || '',
         };
         cachedUserId = user.id;

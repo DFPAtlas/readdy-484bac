@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
 import QGLaunchRewardsFAQ from '@/components/QGLaunchRewardsFAQ';
 import FooterExitPopupTestIcon from '@/components/qg-rewards/FooterExitPopupTestIcon';
 
@@ -31,12 +30,11 @@ export default function QGLaunchRewardsPage() {
 
   useEffect(() => {
     async function loadSettings() {
-      const { data } = await supabase.from('qg_launch_reward_settings').select('key,value');
-      if (data) {
-        const map: any = {};
-        data.forEach((r: any) => { try { map[r.key] = JSON.parse(r.value); } catch { map[r.key] = r.value; } });
-        setSettings(map);
-      }
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/qg-public-launch-settings`);
+        const data = await res.json();
+        if (data?.settings) setSettings(data.settings);
+      } catch (_) {}
     }
     loadSettings();
   }, []);

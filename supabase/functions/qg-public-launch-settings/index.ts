@@ -2,6 +2,11 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const PUBLIC_SETTINGS_KEYS = [
+  "programme_enabled",
+  "token_value_pence_per_100",
+  "verified_guard_referral_tokens",
+  "verified_client_referral_tokens",
+  "profile_completion_bonus_tokens",
   "exit_popup_enabled",
   "exit_popup_show_on_homepage",
   "exit_popup_show_on_rewards_page",

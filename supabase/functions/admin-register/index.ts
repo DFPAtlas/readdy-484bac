@@ -1,155 +1,118 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.47.0';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const PROD_ORIGINS = ['https://quickguard.uk', 'https://www.quickguard.uk'];
+const APPROVED_ROLES = ['admin', 'super_admin'];
 
-async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.randomUUID().replace(/-/g, '');
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + salt);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return `${salt}:${hashHex}`;
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  if (PROD_ORIGINS.includes(origin)) return true;
+  if (origin === 'https://readdy.ai' || origin.endsWith('.readdy.ai')) return true;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  return false;
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+function corsHeaders(origin: string | null): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin! : PROD_ORIGINS[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const adminRegSecret = Deno.env.get('ADMIN_REGISTRATION_SECRET');
+async function requireSuperAdmin(req: Request) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const authHeader = req.headers.get('authorization') || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!token) return { error: { status: 401, message: 'Missing authentication token' } };
 
-  if (!supabaseUrl || !supabaseKey || !adminRegSecret) {
-    return new Response(
-      JSON.stringify({ error: 'Server configuration error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
+  const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+  const { data: { user }, error: userErr } = await userClient.auth.getUser();
+  if (userErr || !user) return { error: { status: 401, message: 'Invalid or expired token' } };
+
+  const serviceClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { db: { schema: 'app' } });
+  const { data: admin } = await serviceClient
+    .from('admin_users')
+    .select('id, role, is_active, full_name, email')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .eq('role', 'super_admin')
+    .maybeSingle();
+
+  if (!admin) return { error: { status: 403, message: 'Insufficient permissions' } };
+  return { user, admin, serviceClient };
+}
+
+function fail(headers: Record<string, string>, message: string, status: number) {
+  return new Response(JSON.stringify({ error: message }), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
+}
+
+Deno.serve(async (req: Request) => {
+  const origin = req.headers.get('origin');
+  const headers = corsHeaders(origin);
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+  if (req.method !== 'POST') return fail(headers, 'Method not allowed', 405);
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseKey, { db: { schema: 'app' } });
-    const body = await req.json();
-    const email = body.email;
-    const password = body.password;
-    const full_name = body.full_name || body.fullName || '';
-    const role = body.role;
+    const auth = await requireSuperAdmin(req);
+    if (auth.error) return fail(headers, auth.error.message, auth.error.status);
+    const { admin: actor, serviceClient } = auth as any;
 
-    if (!email || !password || !full_name || !role) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    let body: any;
+    try { body = await req.json(); } catch { return fail(headers, 'Invalid request body', 400); }
+
+    const email = String(body.email || '').trim().toLowerCase();
+    const full_name = String(body.full_name || body.fullName || '').trim();
+    const role = String(body.role || '').trim();
+    const password = String(body.password || '');
+
+    if (!email || !full_name || !role || !password) return fail(headers, 'Missing required fields', 400);
+    if (!APPROVED_ROLES.includes(role)) return fail(headers, 'Invalid admin role', 400);
+    if (password.length < 8) return fail(headers, 'Password must be at least 8 characters', 400);
+
+    const { data: existing } = await serviceClient.from('admin_users').select('id').eq('email', email).maybeSingle();
+    if (existing) return fail(headers, 'An admin with this email already exists', 409);
+
+    const { data: authData, error: authErr } = await serviceClient.auth.admin.createUser({ email, password, email_confirm: false });
+    if (authErr) {
+      if (/already|exists/i.test(authErr.message || '')) return fail(headers, 'An admin with this email already exists', 409);
+      return fail(headers, 'Failed to create admin account', 500);
     }
 
-    let isAuthorized = false;
-    const authHeader = req.headers.get('authorization');
-    const jwt = authHeader?.replace('Bearer ', '').trim() || '';
-
-    if (jwt && jwt !== Deno.env.get('SUPABASE_ANON_KEY')) {
-      const { data: { user }, error: userError } = await supabase.auth.getUser(jwt);
-      if (!userError && user) {
-        const { data: callerAdmin } = await supabase
-          .from('admin_users')
-          .select('id, role, is_active')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .maybeSingle();
-        if (callerAdmin && ['admin', 'super_admin'].includes(callerAdmin.role)) {
-          isAuthorized = true;
-          console.log('[AdminRegister] Authorized via admin JWT:', user.email);
-        }
-      }
-    }
-
-    if (!isAuthorized) {
-      const secretKey = body.secretKey || body.secret;
-      if (!secretKey || secretKey !== adminRegSecret) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid registration secret' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      console.log('[AdminRegister] Authorized via secret key');
-    }
-
-    const { data: existingAdmin } = await supabase
-      .from('admin_users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle();
-
-    if (existingAdmin) {
-      return new Response(
-        JSON.stringify({ error: 'Admin user with this email already exists' }),
-        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    const { error: insertErr } = await serviceClient.from('admin_users').insert({
+      user_id: authData.user.id,
       email,
-      password,
-      email_confirm: true,
+      full_name,
+      role,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    if (insertErr) {
+      await serviceClient.auth.admin.deleteUser(authData.user.id);
+      return fail(headers, 'Failed to create admin account', 500);
+    }
+
+    await serviceClient.from('admin_activity_log').insert({
+      admin_user_id: actor.id,
+      admin_username: actor.email,
+      admin_name: actor.full_name,
+      action_type: 'admin_registered',
+      action_description: `Created ${role} admin ${email}`,
+      target_type: 'admin_user',
+      target_name: email,
+      metadata: { role, target_user_id: authData.user.id },
+      created_at: new Date().toISOString(),
     });
 
-    if (authError || !authData?.user) {
-      console.error('[AdminRegister] Auth create failed:', authError?.message);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create auth user: ' + (authError?.message || 'Unknown error') }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const hashedPassword = await hashPassword(password);
-
-    const { data: newAdmin, error: insertError } = await supabase
-      .from('admin_users')
-      .insert({
-        user_id: authData.user.id,
-        email,
-        password_hash: hashedPassword,
-        full_name,
-        role,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('[AdminRegister] Admin insert failed:', insertError.message);
-      await supabase.auth.admin.deleteUser(authData.user.id);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create admin user: ' + insertError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('[AdminRegister] Created admin user:', newAdmin.id, email);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        admin: {
-          id: newAdmin.id,
-          email: newAdmin.email,
-          full_name: newAdmin.full_name,
-          role: newAdmin.role,
-        }
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error: any) {
-    console.error('[AdminRegister] Edge function error:', error.message || error);
-    return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ success: true, admin: { id: authData.user.id, email, full_name, role } }), {
+      status: 200,
+      headers: { ...headers, 'Content-Type': 'application/json' },
+    });
+  } catch {
+    return fail(headers, 'Internal server error', 500);
   }
 });

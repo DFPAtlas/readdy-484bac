@@ -21,13 +21,17 @@ export default function CompletionReviewModal({ requestId, guardName, jobTitle, 
   const [disputeReason, setDisputeReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [payoutWarning, setPayoutWarning] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
+    setSuccessMessage(null);
+    setPayoutWarning(null);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const review = action === 'approve' ? {
+      const reviewPayload = action === 'approve' ? {
         rating,
         punctuality_rating: punctuality,
         professionalism_rating: professionalism,
@@ -47,14 +51,27 @@ export default function CompletionReviewModal({ requestId, guardName, jobTitle, 
             requestId,
             action,
             disputeReason: action === 'dispute' ? disputeReason : undefined,
-            review,
+            review: reviewPayload,
           }),
         }
       );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to process');
-      onSuccess();
-      onClose();
+
+      const message = data.message || (action === 'approve' ? 'Completion approved. Payout is now eligible for finance release.' : 'Dispute submitted.');
+
+      if (data.payoutInitiated === true) {
+        setSuccessMessage(message);
+      } else if (data.payoutInitiated === false) {
+        setSuccessMessage(message);
+        setPayoutWarning(data.payoutWarning || 'Payout requires finance attention.');
+      } else {
+        setSuccessMessage(message);
+        setTimeout(() => { onSuccess(); onClose(); }, 1500);
+        return;
+      }
+
+      setTimeout(() => { onSuccess(); onClose(); }, 2000);
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
     } finally {
@@ -81,6 +98,28 @@ export default function CompletionReviewModal({ requestId, guardName, jobTitle, 
     </div>
   );
 
+  if (successMessage) {
+    return (
+      <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div className="bg-[#111d35] rounded-2xl max-w-lg w-full border border-[#1e2d4d] shadow-2xl">
+          <div className="p-8 text-center">
+            <div className="w-14 h-14 bg-emerald-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="ri-check-line text-emerald-400 text-2xl"></i>
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Done</h3>
+            <p className="text-sm text-slate-300">{successMessage}</p>
+            {payoutWarning && (
+              <div className="mt-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-sm text-amber-400">
+                <i className="ri-error-warning-line mr-1"></i>
+                {payoutWarning}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-[#111d35] rounded-2xl max-w-lg w-full border border-[#1e2d4d] shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -103,8 +142,8 @@ export default function CompletionReviewModal({ requestId, guardName, jobTitle, 
                   <i className="ri-check-double-line text-emerald-400 text-lg"></i>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-emerald-400">Approve & Release Payment</p>
-                  <p className="text-xs text-slate-500">Confirm the job was done well and release payment to the guard</p>
+                  <p className="text-sm font-semibold text-emerald-400">Approve Completion</p>
+                  <p className="text-xs text-slate-500">Confirm the job was done well and make it eligible for payment release</p>
                 </div>
               </button>
               <button
@@ -196,7 +235,7 @@ export default function CompletionReviewModal({ requestId, guardName, jobTitle, 
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : action === 'approve' ? (
                 <span className="flex items-center gap-2">
-                  <i className="ri-check-line"></i>Approve & Release
+                  <i className="ri-check-line"></i>Approve
                 </span>
               ) : (
                 <span className="flex items-center gap-2">

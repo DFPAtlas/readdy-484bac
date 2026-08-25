@@ -392,10 +392,6 @@ export default function GuardProfileModal({
             </div>
           </div>
 
-          {/* TODO: Admin verification section - shows SIA verification details from sia_verifications table if available */}
-          {/* This is a placeholder for future admin SIA verification workflow */}
-          {/* TODO: Connect to sia_verifications table to show: license_status, name_match, verification_method, verified_by, document_url */}
-
           <div className="flex gap-3 pt-4 border-t border-[#1e2d4d]">
             <button
               onClick={onClose}

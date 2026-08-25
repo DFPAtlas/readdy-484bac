@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import type { ClientJob } from '@/lib/client-types';
 import Link from 'next/link';
 import ReviewStatusBadge from '@/components/reviews/ReviewStatusBadge';
 
 interface JobDetailDrawerProps {
-  job: any;
+  job: ClientJob;
   clientId?: string | null;
   onClose: () => void;
 }

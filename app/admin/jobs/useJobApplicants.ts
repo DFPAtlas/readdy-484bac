@@ -73,8 +73,8 @@ export function useJobApplicants() {
       }));
 
       setApplicants(enriched as ApplicantRow[]);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load applicants');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load applicants');
     } finally {
       setLoading(false);
     }

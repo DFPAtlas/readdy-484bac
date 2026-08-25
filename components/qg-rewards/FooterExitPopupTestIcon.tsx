@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import { usePathname } from 'next/navigation';
 import { isQGPopupAllowedPath } from '@/lib/qgLaunchPopupRoutes';
 
@@ -13,15 +12,15 @@ export default function FooterExitPopupTestIcon() {
     let cancelled = false;
 
     async function checkSetting() {
-      const { data } = await supabase
-        .from('qg_launch_reward_settings')
-        .select('value')
-        .eq('key', 'exit_popup_test_icon_enabled')
-        .maybeSingle();
+      let enabled = false;
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/qg-public-launch-settings`);
+        const data = await res.json();
+        const val = data?.settings?.exit_popup_test_icon_enabled;
+        enabled = val === true || val === 'true';
+      } catch (_) {}
 
       if (cancelled) return;
-
-      const enabled = data?.value === 'true' || data?.value === true;
 
       if (!enabled) {
         setVisible(false);

@@ -311,7 +311,7 @@ export default function ClientProfilesPage() {
                 <ClientProfileCard
                   key={client.id}
                   client={client}
-                  onClick={setSelectedClient}
+                  onClick={(c) => setSelectedClient(c)}
                 />
               ))}
             </div>

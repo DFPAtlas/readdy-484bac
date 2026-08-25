@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { ClientJob } from '@/lib/client-types';
 
 interface EditJobModalProps {
-  job: any;
+  job: ClientJob;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -81,8 +82,8 @@ export default function EditJobModal({ job, onClose, onSuccess }: EditJobModalPr
       if (updateError) throw updateError;
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to save changes. Please try again.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save changes. Please try again.');
     } finally {
       setSaving(false);
     }

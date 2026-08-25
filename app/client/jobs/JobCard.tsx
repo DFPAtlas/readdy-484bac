@@ -6,17 +6,18 @@ import NeedsAttentionBadge, { getAttentionItems } from './NeedsAttentionBadge';
 import BookingStatusBadge from './BookingStatusBadge';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { ClientJob } from '@/lib/client-types';
 
 interface JobCardProps {
-  job: any;
+  job: ClientJob;
   paymentStatus?: string;
   markingCompleteId?: string | null;
   clientId?: string | null;
-  onOpenDetail: (job: any) => void;
-  onEdit: (job: any) => void;
-  onDuplicate: (job: any) => void;
-  onCancel: (job: any) => void;
-  onMarkComplete: (job: any) => void;
+  onOpenDetail: (job: ClientJob) => void;
+  onEdit: (job: ClientJob) => void;
+  onDuplicate: (job: ClientJob) => void;
+  onCancel: (job: ClientJob) => void;
+  onMarkComplete: (job: ClientJob) => void;
   // Bulk selection support
   selectable?: boolean;
   selected?: boolean;

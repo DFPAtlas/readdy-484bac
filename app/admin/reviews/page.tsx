@@ -7,6 +7,7 @@ import ReviewsFilters from './ReviewsFilters';
 import ReviewsTable from './ReviewsTable';
 import ReviewDetailModal from './ReviewDetailModal';
 import GuardDetailModal from '../accounts/GuardDetailModal';
+import type { Guard } from '../accounts/GuardDetailModal';
 
 interface Review {
   id: string;
@@ -49,7 +50,7 @@ export default function AdminReviewsPage() {
   const [stats, setStats] = useState<Stats>({ total: 0, avgRating: 0, published: 0, hidden: 0, fiveStar: 0 });
   const [selectedReview, setSelectedReview] = useState<Review | null>(null);
   const [guardStats, setGuardStats] = useState<GuardStats | null>(null);
-  const [selectedGuard, setSelectedGuard] = useState<any>(null);
+  const [selectedGuard, setSelectedGuard] = useState<Guard | null>(null);
   const [selectedGuardLoading, setSelectedGuardLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -199,8 +200,8 @@ export default function AdminReviewsPage() {
 
       setReviews(enriched);
       setLoading(false);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load reviews');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load reviews');
       setReviews([]);
       setTotalCount(0);
       setLoading(false);

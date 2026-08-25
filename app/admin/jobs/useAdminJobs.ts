@@ -119,8 +119,8 @@ export function useAdminJobs() {
       setJobs(json.data || []);
       setTotalCount(json.totalCount || 0);
       setStats(json.stats || { total: 0, open: 0, in_progress: 0, completed: 0, cancelled: 0, pending_apps: 0, flagged: 0 });
-    } catch (err: any) {
-      setError(err.message || 'Failed to load jobs');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load jobs');
     } finally {
       setLoading(false);
     }

@@ -1,10 +1,23 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
-};
+const PROD_ORIGINS = ['https://quickguard.uk', 'https://www.quickguard.uk'];
+
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  if (PROD_ORIGINS.includes(origin)) return true;
+  if (origin === 'https://readdy.ai' || origin.endsWith('.readdy.ai')) return true;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  return false;
+}
+
+function buildCorsHeaders(origin: string | null): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin! : PROD_ORIGINS[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+    'Vary': 'Origin',
+  };
+}
 
 function base64UrlDecode(str: string): string {
   const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
@@ -23,6 +36,8 @@ function decodeJwtPayload(jwt: string): any {
 }
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = buildCorsHeaders(origin);
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }

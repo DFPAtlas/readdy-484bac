@@ -18,7 +18,7 @@ interface BillingInfo {
   planName: string;
 }
 
-interface JobPayment {
+export interface JobPayment {
   id: string;
   date: string;
   jobTitle: string;

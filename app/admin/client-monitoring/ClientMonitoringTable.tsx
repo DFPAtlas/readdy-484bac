@@ -288,25 +288,6 @@ export default function ClientMonitoringTable({ clients, loading, onSelectClient
                           >
                             <i className="ri-message-3-line text-slate-400"></i> View Tickets
                           </Link>
-                          <div className="my-1 border-t border-slate-100"></div>
-                          <button
-                            onClick={() => {
-                              alert('Impersonation feature not yet implemented. TODO: add backend support for safe impersonation.');
-                              setActionOpen(null);
-                            }}
-                            className="w-full text-left px-4 py-2.5 text-sm text-slate-400 hover:bg-slate-50 cursor-pointer flex items-center gap-2"
-                          >
-                            <i className="ri-user-shared-line text-slate-400"></i> Impersonate (TODO)
-                          </button>
-                          <button
-                            onClick={() => {
-                              alert('Suspend feature requires backend support for account suspension. TODO: implement guard-safe suspend flow.');
-                              setActionOpen(null);
-                            }}
-                            className="w-full text-left px-4 py-2.5 text-sm text-slate-400 hover:bg-slate-50 cursor-pointer flex items-center gap-2"
-                          >
-                            <i className="ri-forbid-line text-slate-400"></i> Suspend (TODO)
-                          </button>
                         </div>
                       )}
                     </div>

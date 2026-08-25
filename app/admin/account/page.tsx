@@ -6,9 +6,16 @@ import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { supabase } from '@/lib/supabase';
 import { useAdminAuth, clearAdminAuthCache } from '@/hooks/useAdminAuth';
 
+interface AdminProfile {
+  id?: string;
+  email?: string;
+  full_name?: string | null;
+  role?: string;
+}
+
 export default function AdminAccountPage() {
   const router = useSafeRouter();
-  const [adminUser, setAdminUser] = useState<any>(null);
+  const [adminUser, setAdminUser] = useState<AdminProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [emailForm, setEmailForm] = useState({ newEmail: '', confirmEmail: '' });
@@ -31,9 +38,15 @@ export default function AdminAccountPage() {
 
   async function loadAdmin() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
 
       if (!adminAuth.email) {
+        router.push('/admin/login');
+        return;
+      }
+
+      const token = session?.access_token;
+      if (!token) {
         router.push('/admin/login');
         return;
       }
@@ -44,9 +57,9 @@ export default function AdminAccountPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${token}`,
           },
-          body: JSON.stringify({ email: adminAuth.email, action: 'get_profile' }),
+          body: JSON.stringify({ action: 'get_profile' }),
         }
       );
 
@@ -108,13 +121,21 @@ export default function AdminAccountPage() {
 
     setPasswordLoading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        setPasswordStatus({ type: 'error', message: 'Session expired. Please log in again.' });
+        setPasswordLoading(false);
+        return;
+      }
+
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/admin-change-password`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({ email: adminAuth.email, newPassword: passwordForm.newPassword }),
         }

@@ -65,7 +65,12 @@ export default function CompletionRequestsPanel() {
       );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed');
-      setToast('Payment released');
+
+      if (data.payoutInitiated) {
+        setToast(data.message || 'Payment released successfully');
+      } else {
+        setToast(data.payoutWarning || 'Completion approved but payout requires attention');
+      }
       loadRequests();
     } catch (err: any) {
       setToast(err.message || 'Failed to process');

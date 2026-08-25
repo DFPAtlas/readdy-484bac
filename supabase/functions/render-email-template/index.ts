@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
     let bodyHtml: string = template.body_html || '';
 
     const fromName = 'QuickGuard Notifications';
-    const fromEmail = 'noreply@quickguard.uk';
+    const fromEmail = `noreply@${Deno.env.get('RESEND_FROM_DOMAIN') || 'quickguard.uk'}`;
     const replyTo = 'support@quickguard.uk';
 
     subject = replaceVariables(subject, variables);

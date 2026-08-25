@@ -90,6 +90,14 @@ interface ClientDetails {
   last_name?: string | null;
 }
 
+interface GlobalPromoCounts {
+  founding: number;
+  early: number;
+  launch: number;
+  caps: { tier1: number; tier2: number; tier3: number };
+  tier3WindowEnd?: string;
+}
+
 
 
 export default function ClientDashboardPage() {
@@ -102,8 +110,8 @@ export default function ClientDashboardPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [promoStats, setPromoStats] = useState<any>(null);
-  const [globalPromoCounts, setGlobalPromoCounts] = useState<any>(null);
+  const [promoStats, setPromoStats] = useState<Record<string, unknown> | null>(null);
+  const [globalPromoCounts, setGlobalPromoCounts] = useState<GlobalPromoCounts | null>(null);
   const [actionData, setActionData] = useState<ActionData>({
     guardsAwaitingReview: 0,
     jobsAwaitingPayment: 0,
@@ -645,7 +653,7 @@ export default function ClientDashboardPage() {
           )}
 
           {jobsAwaitingPaymentList.map(job => (
-            <PaymentRequiredBanner key={job.id} jobId={job.id} jobTitle={job.job_title} amount={(job as any).agreed_amount} paymentStatus={(job as any).payment_status} />
+            <PaymentRequiredBanner key={job.id} jobId={job.id} jobTitle={job.job_title} amount={job.agreed_amount ?? undefined} paymentStatus={job.payment_status} />
           ))}
 
           <DynamicCompletionApproval clientId={clientId || ''} />

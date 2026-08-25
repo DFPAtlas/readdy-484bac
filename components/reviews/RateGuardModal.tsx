@@ -141,55 +141,45 @@ export default function RateGuardModal({
       return
     }
 
-    const { error: insertError } = await supabase.from('reviews').insert({
-      job_id: jobId,
-      guard_id: guardId,
-      client_id: userData.user.id,
-      rating: overall,
-      review_text: reviewText.trim() || null,
-      private_note: privateNote.trim() || null,
-      punctuality: punctuality || null,
-      professionalism: professionalism || null,
-      communication: communication || null,
-      appearance: appearance || null,
-      reliability: reliability || null,
-      would_hire_again: wouldHireAgain,
-      site_instructions_followed: siteInstructionsFollowed,
-      attendance_status: attendanceStatus,
-      issue_reported: reportIssue,
-      issue_category: reportIssue ? issueCategory : null,
-      issue_description: reportIssue ? issueDescription.trim() || null : null,
-      status: 'published',
-      review_status: reportIssue ? 'issue_reported' : 'reviewed',
+    const { data, error: invokeError } = await supabase.functions.invoke('create-review', {
+      body: {
+        jobId,
+        guardId,
+        rating: overall,
+        reviewText: reviewText.trim() || null,
+        privateNote: privateNote.trim() || null,
+        punctuality: punctuality || null,
+        professionalism: professionalism || null,
+        communication: communication || null,
+        appearance: appearance || null,
+        reliability: reliability || null,
+        wouldHireAgain,
+        siteInstructionsFollowed,
+        attendanceStatus,
+        issueReported: reportIssue,
+        issueCategory: reportIssue ? issueCategory : null,
+        issueDescription: reportIssue ? issueDescription.trim() || null : null,
+      },
     })
 
-    if (insertError) {
-      if (insertError.code === '23505') {
-        setError("You've already reviewed this guard for this job.")
-      } else {
-        setError('Something went wrong. Please try again.')
-      }
+    if (invokeError || (data && data.error)) {
+      let message = 'Something went wrong. Please try again.'
+      try {
+        const context = (invokeError as any)?.context
+        if (context) {
+          const parsed = typeof context === 'string' ? JSON.parse(context) : context
+          if (parsed?.error) message = parsed.error
+        } else if (data?.error) {
+          message = data.error
+        }
+      } catch {}
+      setError(
+        message.toLowerCase().includes('already reviewed')
+          ? "You've already reviewed this guard for this job."
+          : message
+      )
       setLoading(false)
       return
-    }
-
-    const { data: allReviews } = await supabase
-      .from('reviews')
-      .select('rating')
-      .eq('guard_id', guardId)
-      .eq('status', 'published')
-
-    if (allReviews && allReviews.length > 0) {
-      const total = allReviews.reduce((sum, r) => sum + (r.rating || 0), 0)
-      const average = Math.round((total / allReviews.length) * 10) / 10
-
-      await supabase
-        .from('guards')
-        .update({
-          average_rating: average,
-          total_reviews: allReviews.length,
-        })
-        .eq('id', guardId)
     }
 
     setLoading(false)

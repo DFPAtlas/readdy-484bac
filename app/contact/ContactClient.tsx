@@ -221,30 +221,6 @@ export default function ContactClient() {
                 ))}
               </div>
             </div>
-
-            <div>
-              <p className="text-sm font-semibold text-white mb-3">Follow Us</p>
-              <div className="flex gap-3">
-                {/* TODO: Replace with real social media URLs when available */}
-                {[
-                  { icon: 'ri-facebook-fill', href: '#', label: 'Facebook' },
-                  { icon: 'ri-twitter-fill', href: '#', label: 'Twitter' },
-                  { icon: 'ri-linkedin-fill', href: '#', label: 'LinkedIn' },
-                  { icon: 'ri-instagram-fill', href: '#', label: 'Instagram' },
-                ].map((s) => (
-                  <a
-                    key={s.label}
-                    href={s.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={s.label}
-                    className="w-10 h-10 flex items-center justify-center bg-[#111d35] border border-slate-700/50 hover:bg-teal-500 hover:text-slate-900 hover:border-teal-500 text-slate-400 rounded-xl transition-all duration-200 cursor-pointer"
-                  >
-                    <i className={`${s.icon} text-lg`} />
-                  </a>
-                ))}
-              </div>
-            </div>
           </div>
 
           <div className="lg:col-span-3">

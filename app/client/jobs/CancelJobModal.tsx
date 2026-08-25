@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { ClientJob } from '@/lib/client-types';
 import CancellationStatusBadge from './CancellationStatusBadge';
 import { useRouter } from 'next/navigation';
 
 interface CancelJobModalProps {
-  job: any;
+  job: ClientJob;
   clientId?: string | null;
   onClose: () => void;
   onSuccess: () => void;
@@ -144,8 +145,8 @@ export default function CancelJobModal({ job, clientId, onClose, onSuccess }: Ca
 
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to cancel job. Please try again.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel job. Please try again.');
     } finally {
       setConfirming(false);
     }

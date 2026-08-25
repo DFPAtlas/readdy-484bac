@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import MaintenanceWrapper from '@/components/MaintenanceWrapper';
 import RealtimeToast from '@/components/RealtimeToast';
-import CookieConsent from '@/components/CookieConsent';
-import QGExitIntentPopup from '@/components/qg-rewards/QGExitIntentPopup';
+
+const CookieConsent = dynamic(() => import('@/components/CookieConsent'), { ssr: false });
+const QGExitIntentPopup = dynamic(() => import('@/components/qg-rewards/QGExitIntentPopup'), { ssr: false });
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);

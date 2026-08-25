@@ -36,8 +36,13 @@ interface ProvisioningResponse {
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const EDGE_FUNCTION = `${SUPABASE_URL}/functions/v1/get-user-provisioning`;
-const REPAIR_FUNCTION = `${SUPABASE_URL}/functions/v1/provision-user-account`;
+const REPAIR_FUNCTION = `${SUPABASE_URL}/functions/v1/admin-provision-user`;
 const PAGE_SIZE = 25;
+
+async function getAccessToken(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token || '';
+}
 
 function StatusBadge({ status, positive = 'active', negative = 'inactive' }: { status: string | boolean; positive?: string; negative?: string }) {
   const s = typeof status === 'boolean' ? (status ? positive : negative) : status;
@@ -98,7 +103,7 @@ export default function UserProvisioningClient() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': `Bearer ${await getAccessToken()}`,
         },
         body: JSON.stringify({
           page: pageNum,
@@ -174,7 +179,7 @@ export default function UserProvisioningClient() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': `Bearer ${await getAccessToken()}`,
         },
         body: JSON.stringify({ userId, accountType: accountType || 'guard' }),
       });
@@ -196,7 +201,7 @@ export default function UserProvisioningClient() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': `Bearer ${await getAccessToken()}`,
         },
         body: JSON.stringify({ userId, accountType: accountType || 'guard', forceRegenerate: true }),
       });
@@ -299,7 +304,7 @@ export default function UserProvisioningClient() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': `Bearer ${await getAccessToken()}`,
         },
         body: JSON.stringify({ userId, accountType: accountType || 'guard', forceRegenerate: true }),
       });
@@ -324,7 +329,7 @@ export default function UserProvisioningClient() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': `Bearer ${await getAccessToken()}`,
         },
         body: JSON.stringify({
           page: 0,
@@ -354,7 +359,7 @@ export default function UserProvisioningClient() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+              'Authorization': `Bearer ${await getAccessToken()}`,
             },
             body: JSON.stringify({ userId: u.id, accountType: u.accountType || 'guard' }),
           });

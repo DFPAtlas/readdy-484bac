@@ -7,10 +7,13 @@ interface Guard {
   phone: string | null;
   location: string | null;
   postcode: string | null;
+  bio: string | null;
   sia_licence_number: string | null;
   sia_expiry_date: string | null;
   sia_verified: boolean | null;
+  sia_verified_at: string | null;
   verification_status: string | null;
+  verified_at: string | null;
   rating: number | null;
   total_reviews: number | null;
   total_jobs_completed: number | null;
@@ -18,11 +21,17 @@ interface Guard {
   years_experience: number | null;
   hourly_rate: number | null;
   licence_types: string[] | null;
+  certifications: string[] | null;
   profile_completed: boolean | null;
   is_active: boolean | null;
   created_at: string | null;
   profile_image_url: string | null;
   availability_status: string | null;
+  willing_to_travel: boolean | null;
+  has_transport: boolean | null;
+  max_distance_miles: number | null;
+  bank_account_verified: boolean | null;
+  rejection_reason: string | null;
   notes?: string | null;
 }
 

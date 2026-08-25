@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { ClientJob } from '@/lib/client-types';
 
 interface QuickDuplicateModalProps {
-  job: any;
+  job: ClientJob;
   clientId?: string | null;
   onClose: () => void;
   onSuccess: () => void;
@@ -105,8 +106,8 @@ export default function QuickDuplicateModal({ job, clientId, onClose, onSuccess 
 
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to duplicate job. Please try again.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to duplicate job. Please try again.');
     } finally {
       setPosting(false);
     }

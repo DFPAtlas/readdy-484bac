@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { ClientJob } from '@/lib/client-types';
 import Link from 'next/link';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
@@ -137,7 +138,7 @@ function escapeCsv(value: string | number | null | undefined): string {
   return str;
 }
 
-function buildCsvRows(jobs: any[], paymentMap: Record<string, string>): string {
+function buildCsvRows(jobs: ClientJob[], paymentMap: Record<string, string>): string {
   const headers = [
     'Job ID', 'Job Title', 'Status', 'Payment Status',
     'Venue', 'City', 'Postcode', 'Start Date', 'End Date',
@@ -172,7 +173,7 @@ export default function JobManagement() {
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<ClientJob[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [paymentMap, setPaymentMap] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('all');
@@ -189,10 +190,10 @@ export default function JobManagement() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const [selectedJob, setSelectedJob] = useState<any>(null);
-  const [cancelJob, setCancelJob] = useState<any>(null);
-  const [editJob, setEditJob] = useState<any>(null);
-  const [duplicateJob, setDuplicateJob] = useState<any>(null);
+  const [selectedJob, setSelectedJob] = useState<ClientJob | null>(null);
+  const [cancelJob, setCancelJob] = useState<ClientJob | null>(null);
+  const [editJob, setEditJob] = useState<ClientJob | null>(null);
+  const [duplicateJob, setDuplicateJob] = useState<ClientJob | null>(null);
   const [markingComplete, setMarkingComplete] = useState<string | null>(null);
   const [toast, setToast] = useState('');
   const [toastType, setToastType] = useState<'success' | 'warning'>();
@@ -448,7 +449,7 @@ export default function JobManagement() {
     }
   }, [toast]);
 
-  const handleMarkComplete = async (job: any) => {
+  const handleMarkComplete = async (job: ClientJob) => {
     setMarkingComplete(job.id);
     try {
       const { error } = await supabase

@@ -21,7 +21,7 @@ interface NotificationItem {
   is_read: boolean;
   created_at: string;
   link: string | null;
-  data: any;
+  data: { job_title?: string } | null;
   read: boolean;
 }
 

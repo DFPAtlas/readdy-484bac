@@ -374,7 +374,7 @@ export default function Header() {
           <div className="flex items-center justify-between h-20">
             <Link href="/" prefetch={false} onClick={handleLinkClick} className="flex items-center space-x-2 focus:outline-none rounded-lg">
               <img
-                src="https://quickguard.uk/quickguard_logo_120x120.png"
+                src="https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp"
                 alt="QuickGuard"
                 width={40}
                 height={40}

@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
 import { useClientPaymentCentre } from '@/hooks/useClientPaymentCentre';
+import type { JobPayment } from '@/hooks/useClientPaymentCentre';
 import { useClientGuard } from '@/hooks/useClientGuard';
 
 type TabKey = 'overview' | 'history' | 'receipts';
@@ -28,7 +29,7 @@ export default function ClientPaymentCentrePage() {
   const [companyName, setCompanyName] = useState('Client');
   const [initials, setInitials] = useState('CL');
   const [subscriptionTier, setSubscriptionTier] = useState('Free');
-  const [selectedPayment, setSelectedPayment] = useState<any>(null);
+  const [selectedPayment, setSelectedPayment] = useState<JobPayment | null>(null);
   const [showTimeline, setShowTimeline] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -71,8 +72,8 @@ export default function ClientPaymentCentrePage() {
     try {
       const url = await handleBillingPortal();
       if (url) window.open(url, '_blank');
-    } catch (err: any) {
-      setToast({ message: err.message || 'Failed to open billing portal', type: 'error' });
+    } catch (err: unknown) {
+      setToast({ message: err instanceof Error ? err.message : 'Failed to open billing portal', type: 'error' });
     }
   }, [handleBillingPortal]);
 
@@ -89,7 +90,7 @@ export default function ClientPaymentCentrePage() {
     return map[status] || 'bg-slate-500/10 text-slate-400 border-slate-500/25';
   };
 
-  const getTimeline = (payment: any) => {
+  const getTimeline = (payment: JobPayment) => {
     const steps = [
       { label: 'Job Posted', done: true, icon: 'ri-file-list-3-line' },
       { label: 'Guard Selected', done: payment.paymentStatus !== 'pending_payment', icon: 'ri-user-star-line' },

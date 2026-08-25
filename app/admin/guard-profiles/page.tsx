@@ -418,7 +418,7 @@ export default function GuardProfilesPage() {
           <>
             <div className="grid grid-cols-4 gap-5 mb-6">
               {initializedGuards.map((guard) => (
-                <GuardProfileCard key={guard.id} guard={guard} onClick={setSelectedGuard} />
+                <GuardProfileCard key={guard.id} guard={guard} onClick={(g) => setSelectedGuard(g)} />
               ))}
             </div>
             <Pagination

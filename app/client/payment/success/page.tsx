@@ -123,10 +123,10 @@ function SuccessContent() {
           setStatus('error');
           setError('Payment is taking longer than expected. Please check your payment history or contact support.');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         clearTimers();
         setStatus('error');
-        setError(err.message || 'Something went wrong confirming your payment.');
+        setError(err instanceof Error ? err.message : 'Something went wrong confirming your payment.');
       }
     };
 

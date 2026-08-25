@@ -80,6 +80,33 @@ export default function GuardHeaderCard({ guard, hasLicenceImages }: GuardHeader
                 {guard.plan_name}
               </span>
             )}
+            {guard.subscription_status && (
+              <span className={`px-3 py-1 rounded-full text-xs font-medium ring-1 ${
+                guard.subscription_status === 'active'
+                  ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30'
+                  : guard.subscription_status === 'trialing'
+                  ? 'bg-blue-500/10 text-blue-400 ring-blue-500/30'
+                  : guard.subscription_status === 'past_due'
+                  ? 'bg-red-500/10 text-red-400 ring-red-500/30'
+                  : 'bg-slate-500/10 text-slate-400 ring-slate-500/30'
+              }`}>
+                <i className={`mr-1 w-3 h-3 inline-flex items-center justify-center ${
+                  guard.subscription_status === 'active' ? 'ri-checkbox-circle-fill' :
+                  guard.subscription_status === 'trialing' ? 'ri-timer-flash-fill' :
+                  guard.subscription_status === 'past_due' ? 'ri-error-warning-fill' :
+                  'ri-information-fill'
+                }`}></i>
+                {guard.subscription_status === 'active' ? 'Active' :
+                 guard.subscription_status === 'trialing' ? 'Trial' :
+                 guard.subscription_status === 'past_due' ? 'Past Due' :
+                 guard.subscription_status}
+              </span>
+            )}
+            {!guard.plan_name && !guard.subscription_status && (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-slate-500/10 text-slate-500 ring-1 ring-slate-500/30">
+                No subscription
+              </span>
+            )}
             {guard.founding_badge && (
               <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400 ring-1 ring-yellow-500/30">
                 <i className="ri-vip-crown-line mr-1 w-3 h-3 inline-flex items-center justify-center"></i>

@@ -331,7 +331,7 @@ export default function AdminComplaintsClient() {
                 </button>
               </div>
             </div>
-            <ComplaintsTable complaints={complaints} onSelect={setSelected} />
+            <ComplaintsTable complaints={complaints} onSelect={(c) => setSelected(c)} />
           </>
         ) : null}
       </div>

@@ -61,8 +61,8 @@ export function PaymentRequiredBanner({ jobId, jobTitle, amount, paymentStatus }
       } else {
         throw new Error(data.error || 'Failed to create payment session');
       }
-    } catch (err: any) {
-      setError(err.message || 'Payment failed. Please try again.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Payment failed. Please try again.');
     } finally {
       setProcessing(false);
     }

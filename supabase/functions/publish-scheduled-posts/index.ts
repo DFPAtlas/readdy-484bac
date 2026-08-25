@@ -1,6 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 Deno.serve(async (req: Request) => {
+  const xCron = req.headers.get("x-cron-secret") || "";
+  const cronSecret = Deno.env.get("CRON_SECRET") || "";
+  if (!cronSecret || xCron !== cronSecret) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "POST only" }), {
       status: 405,

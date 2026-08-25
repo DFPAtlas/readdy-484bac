@@ -295,7 +295,7 @@ export default function AdminSubmissionsClient() {
                 </button>
               </div>
             </div>
-            <SubmissionsTable submissions={submissions} onSelect={setSelected} />
+            <SubmissionsTable submissions={submissions} onSelect={(s) => setSelected(s)} />
           </>
         )}
       </div>

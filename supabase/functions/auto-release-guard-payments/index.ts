@@ -8,9 +8,10 @@ const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY")!;
 
 serve(async (req: Request) => {
   const xCron = req.headers.get("x-cron-secret") || "";
+  const cronSecret = Deno.env.get("CRON_SECRET") || "";
 
-  if (xCron !== "qg-auto-release-72h" && xCron !== SUPABASE_SERVICE_KEY) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), {
+  if (!cronSecret || xCron !== cronSecret) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
     });

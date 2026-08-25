@@ -6,7 +6,7 @@ import { logAdminAction } from '@/lib/admin-logger';
 import ChecklistProgress from '../guard-verifications/ChecklistProgress';
 import DeleteUserModal from '@/components/admin/DeleteUserModal';
 
-interface Guard {
+export interface Guard {
   id: string;
   full_name: string;
   first_name: string | null;

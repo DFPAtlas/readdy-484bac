@@ -35,7 +35,7 @@ const quickInserts = [
   {
     label: 'Logo',
     icon: 'ri-image-2-line',
-    html: '<!-- QuickGuard Logo -->\n<img src="REPLACE_WITH_LOGO_URL" alt="QuickGuard" width="180" style="width:180px;max-width:180px;height:auto;display:block;border:0;" />',
+    html: '<!-- QuickGuard Logo -->\n<img src="https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp" alt="QuickGuard" width="180" style="width:180px;max-width:180px;height:auto;display:block;border:0;" />',
   },
   {
     label: 'Banner',

@@ -16,7 +16,7 @@ interface UnifiedPayment {
   guard_name?: string;
   client_name?: string;
   gateway?: string;
-  metadata?: any;
+  metadata?: unknown;
 }
 
 export default function AdminPaymentsPage() {
@@ -57,8 +57,8 @@ export default function AdminPaymentsPage() {
       showToast(`Backfill complete: ${backfilled} payment(s) created`, 'success');
       await fetchPayments();
       await checkMissing();
-    } catch (err: any) {
-      showToast('Backfill failed: ' + err.message, 'error');
+    } catch (err: unknown) {
+      showToast('Backfill failed: ' + (err instanceof Error ? err.message : 'Unknown error'), 'error');
     } finally {
       setBackfilling(false);
     }

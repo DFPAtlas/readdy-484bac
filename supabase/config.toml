@@ -12,3 +12,6 @@ verify_jwt = true
 
 [functions.enhanced-stripe-webhook]
 verify_jwt = false
+
+[functions.approve-job-completion]
+verify_jwt = true

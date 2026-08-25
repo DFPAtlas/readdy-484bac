@@ -3,6 +3,24 @@
 Copy this file to .env and fill in real values.
 NEVER commit .env with real secrets.
 
+## Variable classification
+
+| Variable | Scope | Safe in browser? |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | browser (Supabase project URL) | Yes |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser (publishable anon key) | Yes |
+| `NEXT_PUBLIC_SITE_URL` | browser (public site URL) | Yes |
+| `NEXT_PUBLIC_APPLE_AUTH_ENABLED` | browser (feature flag) | Yes |
+| `NEXT_PUBLIC_N8N_WEBHOOK_URL` | browser (public webhook endpoint) | Yes — but exposes the webhook URL; keep the path unguessable |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | browser (publishable maps key) | Yes |
+| `GOOGLE_GEOCODING_API_KEY` | Supabase Edge Function secret | No — move to Edge Function secrets |
+| Stripe / Resend / SMTP / service-role keys | Supabase Edge Function secrets | No — never use a `NEXT_PUBLIC_` prefix |
+
+Only variables prefixed with `NEXT_PUBLIC_` are exposed to the browser bundle.
+Every secret (Stripe, Resend, SMTP, geocoding, service role) must live in
+Supabase Edge Function secrets, never in `.env` with a public prefix.
+See `lib/EDGE_FUNCTION_SECRETS.md`.
+
 ## Supabase
 
 Found in: Supabase Dashboard → Project Settings → API

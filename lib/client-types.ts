@@ -118,6 +118,24 @@ export type JobStatus =
   | 'awaiting_client_confirmation'
   | 'payment_pending';
 
+export interface ClientJob extends Job {
+  is_featured?: boolean;
+  is_urgent?: boolean;
+  expires_at?: string | null;
+  publish_at?: string | null;
+  is_draft?: boolean;
+  cancellation_status?: string | null;
+  cancellation_reason?: string | null;
+  refund_status?: string | null;
+  site_instructions?: string | null;
+  title?: string | null;
+  agreed_amount?: number | null;
+  payment_status?: string | null;
+  safety_check?: Record<string, unknown> | null;
+  job_assignments?: Array<{ id: string; guard_id: string }> | null;
+  job_applications?: Array<{ count: number }> | null;
+}
+
 export interface JobAssignment {
   id: string;
   job_id: string;

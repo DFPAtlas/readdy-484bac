@@ -21,17 +21,17 @@ export default function HomepageHero() {
     >
       <div className="w-full max-w-7xl mx-auto px-6 md:px-8">
         <div className="flex items-center gap-2 mb-6 pt-4">
-          <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
-            <i className="ri-shield-check-line text-white text-lg" aria-hidden="true"></i>
-          </div>
+          <img
+            src="https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp"
+            alt="QuickGuard"
+            width={36}
+            height={36}
+            className="w-9 h-9 rounded-lg object-contain"
+          />
           <span className="text-xl font-bold text-white font-[family-name:var(--font-pacifico)]">QuickGuard</span>
         </div>
-        <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 bg-teal-500/15 border border-teal-400/30 text-teal-300 px-4 py-1.5 rounded-full text-sm font-medium mb-6 backdrop-blur-sm">
-            <i className="ri-shield-check-line" aria-hidden="true"></i>
-            QuickGuard — UK&apos;s #1 Security Guard Marketplace
-          </div>
 
+        <div className="max-w-2xl">
           <h1 id="hero-heading" className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-[1.1] text-white">
             Hire SIA-Licensed Guards
             <span className="block text-teal-400 mt-1">Directly. By the Shift.</span>

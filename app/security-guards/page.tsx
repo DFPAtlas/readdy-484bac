@@ -96,7 +96,7 @@ export const metadata: Metadata = {
     locale: 'en_GB',
     images: [
       {
-        url: 'https://quickguard.uk/quickguard_logo_512x512.png',
+        url: 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp',
         width: 512,
         height: 512,
         alt: 'QuickGuard - Hire SIA Licensed Security Guards Across the UK',
@@ -107,7 +107,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Hire SIA Licensed Security Guards Across the UK | QuickGuard',
     description: 'Book verified SIA-licensed security guards in every major UK city.',
-    images: ['https://quickguard.uk/quickguard_logo_512x512.png'],
+    images: ['https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp'],
   },
 };
 

@@ -361,7 +361,7 @@ export default function LeadFinderClient() {
                 </div>
               )}
             </div>
-            <LeadsTable leads={leads} onSelect={setSelected} selectedIds={selectedIds} onToggleSelect={handleToggleSelect} onToggleAll={handleToggleAll} />
+            <LeadsTable leads={leads} onSelect={(l) => setSelected(l)} selectedIds={selectedIds} onToggleSelect={handleToggleSelect} onToggleAll={handleToggleAll} />
           </>
         )}
       </div>

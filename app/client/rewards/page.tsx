@@ -15,7 +15,6 @@ export default function ClientRewardsPage() {
   const [referrals, setReferrals] = useState<any[]>([]);
   const [invites, setInvites] = useState<any[]>([]);
   const [copied, setCopied] = useState(false);
-  const [settings, setSettings] = useState<any>({});
   const [error, setError] = useState('');
   const [inviteForm, setInviteForm] = useState({ recipient_name: '', recipient_email: '', recipient_role: 'client', message_optional: '' });
   const [inviteSending, setInviteSending] = useState(false);
@@ -30,13 +29,6 @@ export default function ClientRewardsPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
-
-      const settingsRes = await supabase.from('qg_launch_reward_settings').select('key,value');
-      if (settingsRes.data) {
-        const map: any = {};
-        settingsRes.data.forEach((r: any) => { try { map[r.key] = JSON.parse(r.value); } catch { map[r.key] = r.value; } });
-        setSettings(map);
-      }
 
       const codeRes = await supabase.from('qg_referral_codes').select('code,status').eq('owner_user_id', user.id).maybeSingle();
       if (codeRes.data) {
@@ -84,7 +76,7 @@ export default function ClientRewardsPage() {
 
       const today = new Date().toISOString().slice(0, 10);
       const { data: rateData } = await supabase.from('qg_invite_rate_limits').select('invite_count').eq('user_id', user.id).eq('date', today).maybeSingle();
-      const maxDay = parseInt(settings.max_user_invites_per_day) || 25;
+      const maxDay = 25;
       setDailyRemaining(maxDay - (rateData?.invite_count || 0));
     } catch (err: any) {
       setError(err.message);
