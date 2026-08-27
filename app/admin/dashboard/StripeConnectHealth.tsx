@@ -97,12 +97,12 @@ export default function StripeConnectHealth() {
         {items.map(item => (
           <div key={item.label} className="bg-[#0B1933] rounded-lg p-3 border border-[#1a2b4a]">
             <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{item.label}</p>
-            <p className={`text-lg font-bold ${item.color} flex items-center gap-1.5`}>
-              <div className="w-4 h-4 flex items-center justify-center">
+            <span className={`text-lg font-bold ${item.color} flex items-center gap-1.5`}>
+              <span className="w-4 h-4 flex items-center justify-center">
                 <i className={item.icon}></i>
-              </div>
+              </span>
               {item.value}
-            </p>
+            </span>
           </div>
         ))}
       </div>

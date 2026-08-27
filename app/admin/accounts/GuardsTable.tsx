@@ -256,7 +256,7 @@ export default function GuardsTable({ guards, searchQuery, selectedIds, onSelect
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full text-white font-semibold text-sm flex-shrink-0">
+                      <div title={displayName} className="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full text-white font-semibold text-sm flex-shrink-0">
                         {initials}
                       </div>
                       <div className="min-w-0">

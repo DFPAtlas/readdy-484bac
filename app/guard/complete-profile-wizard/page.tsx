@@ -589,6 +589,15 @@ function GuardCompleteProfileWizardContent() {
         throw new Error(updateError.message || 'Failed to update profile');
       }
 
+      await ensureEntitlement(userId, 'guard');
+      const { error: entActivateError } = await supabase
+        .from('user_entitlements_data')
+        .update({ subscription_status: 'active', updated_at: new Date().toISOString() })
+        .eq('user_id', userId);
+      if (entActivateError) {
+        console.error('[GuardProfileWizard] Entitlement activation failed:', entActivateError.message);
+      }
+
       if (password) {
         const { error: pwdError } = await supabase.auth.updateUser({ password });
         if (pwdError) {

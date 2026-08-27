@@ -282,8 +282,6 @@ Deno.serve(async (req) => {
         plan_slug: planData.slug,
         plan_name: planData.name,
         subscription_status: 'trialing',
-        is_active: true,
-        is_free_tier: true,
         current_period_end: periodEnd.toISOString(),
         created_at: now,
         updated_at: now,

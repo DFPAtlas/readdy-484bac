@@ -101,7 +101,7 @@ export default function GuardProfileCard({ guard, onClick }: GuardProfileCardPro
       </div>
 
       <div className="relative z-20 px-5 pb-5">
-        <div className={`relative z-30 -mt-7 mb-3 w-14 h-14 flex items-center justify-center bg-gradient-to-br ${gradient} rounded-xl text-white font-bold text-lg shadow-md ring-2 ring-[#111d35]`}>
+        <div title={guard.full_name} className={`relative z-30 -mt-7 mb-3 w-14 h-14 flex items-center justify-center bg-gradient-to-br ${gradient} rounded-xl text-white font-bold text-lg shadow-md ring-2 ring-[#111d35]`}>
           {initials}
         </div>
 

@@ -287,7 +287,7 @@ export default function GuardProfileDetailModal({ guard, onClose, onUpdate, onAf
             <i className="ri-close-line text-xl"></i>
           </button>
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 flex items-center justify-center bg-white/20 rounded-xl text-2xl font-bold flex-shrink-0">
+            <div title={local.full_name} className="w-16 h-16 flex items-center justify-center bg-white/20 rounded-xl text-2xl font-bold flex-shrink-0">
               {initials}
             </div>
             <div className="min-w-0">

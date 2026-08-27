@@ -1003,36 +1003,36 @@ export default function JobsClient() {
                 <i className="ri-close-line text-xl" aria-hidden="true"></i>
               </button>
 
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-teal-500/10 border border-teal-400/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <i className="ri-shield-user-line text-3xl text-teal-400" aria-hidden="true"></i>
+              <div className="flex items-start gap-3 mb-6">
+                <div className="w-10 h-10 bg-teal-500/15 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <i className="ri-shield-user-line text-xl text-teal-400" aria-hidden="true"></i>
                 </div>
-                <h2 id="auth-modal-title" className="text-2xl font-bold text-white mb-2">
-                  Sign In Required
-                </h2>
-                <p className="text-slate-400">Please sign in to apply for this job</p>
+                <div className="flex-1">
+                  <h2 id="auth-modal-title" className="text-xl font-bold text-white mb-1">
+                    Guard account required
+                  </h2>
+                  <p className="text-sm text-slate-400">
+                    You need a security guard account to apply for jobs. Sign in or create one below.
+                  </p>
+                </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <Link
                   href="/guard/login"
-                  className="block w-full bg-teal-500 text-slate-900 text-center py-3 rounded-xl font-semibold hover:bg-teal-400 transition-all focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+                  className="block w-full bg-teal-500 text-slate-900 text-center py-3 rounded-lg font-semibold hover:bg-teal-400 transition-all whitespace-nowrap cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
                   onClick={() => setShowAuthModal(false)}
                 >
                   Sign In as Guard
                 </Link>
                 <Link
                   href="/guard/register"
-                  className="block w-full bg-white/10 text-white text-center py-3 rounded-xl font-semibold border border-white/20 hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+                  className="block w-full bg-[#162036] hover:bg-[#1a2642] text-slate-300 text-center py-3 rounded-lg font-semibold transition-colors whitespace-nowrap border border-slate-700/50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
                   onClick={() => setShowAuthModal(false)}
                 >
                   Create Guard Account
                 </Link>
               </div>
-
-              <p className="text-sm text-slate-500 text-center mt-4">
-                Don't have an account? Sign up to start applying for jobs
-              </p>
             </div>
           </div>
         </FocusTrap>

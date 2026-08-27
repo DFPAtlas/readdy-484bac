@@ -461,7 +461,7 @@ export default function GuardDetailModal({ guard, onClose, onUpdate }: GuardDeta
             <div className="w-5 h-5 flex items-center justify-center"><i className="ri-close-line text-xl"></i></div>
           </button>
           <div className="flex items-center gap-4">
-            <div className="w-20 h-20 flex items-center justify-center bg-white/15 rounded-full text-3xl font-bold ring-1 ring-white/20">
+            <div title={displayName} className="w-20 h-20 flex items-center justify-center bg-white/15 rounded-full text-3xl font-bold ring-1 ring-white/20">
               {initials}
             </div>
             <div>

@@ -96,7 +96,7 @@ export default function AdminSidebar() {
       label: 'Overview',
       items: [
         { href: '/admin/dashboard', icon: 'ri-dashboard-3-line', label: 'Dashboard' },
-        { href: '/admin/live-test-checklist', icon: 'ri-check-double-line', label: 'Launch Checklist' },
+        { href: '/admin/live-test-checklist', icon: 'ri-rocket-2-line', label: 'Launch Readiness' },
         { href: '/admin/security', icon: 'ri-shield-keyhole-line', label: 'Security' },
         { href: '/admin/system-status', icon: 'ri-heart-pulse-line', label: 'System Status' },
         { href: '/admin/activity-log', icon: 'ri-history-line', label: 'Activity Log' },

@@ -239,7 +239,7 @@ export default function UserProvisioningClient() {
   const handleActivateSubscription = async (userId: string) => {
     setRepairing(userId);
     try {
-      const { error: e1 } = await supabase.from('user_entitlements_data').upsert({ user_id: userId, subscription_status: 'active', is_active: true }, { onConflict: 'user_id' });
+      const { error: e1 } = await supabase.from('user_entitlements_data').upsert({ user_id: userId, subscription_status: 'active' }, { onConflict: 'user_id' });
       if (e1) throw e1;
       const { error: e2 } = await supabase.from('subscriptions').upsert({ user_id: userId, status: 'active' }, { onConflict: 'user_id' });
       if (e2) throw e2;
@@ -255,7 +255,7 @@ export default function UserProvisioningClient() {
   const handleSuspendUser = async (userId: string) => {
     setRepairing(userId);
     try {
-      const { error: updateErr } = await supabase.from('user_entitlements_data').update({ is_active: false, subscription_status: 'suspended' }).eq('user_id', userId);
+      const { error: updateErr } = await supabase.from('user_entitlements_data').update({ subscription_status: 'suspended' }).eq('user_id', userId);
       if (updateErr) throw updateErr;
       showToast('User suspended');
       loadUsers(page, activeSearch, accountFilter, statusFilter);
@@ -269,7 +269,7 @@ export default function UserProvisioningClient() {
   const handleReactivateUser = async (userId: string) => {
     setRepairing(userId);
     try {
-      const { error: updateErr } = await supabase.from('user_entitlements_data').update({ is_active: true, subscription_status: 'active' }).eq('user_id', userId);
+      const { error: updateErr } = await supabase.from('user_entitlements_data').update({ subscription_status: 'active' }).eq('user_id', userId);
       if (updateErr) throw updateErr;
       showToast('User reactivated');
       loadUsers(page, activeSearch, accountFilter, statusFilter);

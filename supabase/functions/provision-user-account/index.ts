@@ -32,14 +32,12 @@ async function provisionSupportRecords(supabase: any, userId: string, accountTyp
   if (!ent) {
     const { error } = await supabase.from('user_entitlements_data').insert({
       user_id: userId,
-      plan_slug: isClient ? 'client_free' : 'free',
-      plan_name: isClient ? 'Free Starter' : 'Free Tier',
+      plan_slug: isClient ? 'client_free' : 'guard_starter',
+      plan_name: 'Free Starter',
       audience: accountType,
-      features: isClient ? JSON.stringify(['client.post_job', 'client.view_guard_profiles', 'client.escrow_payments']) : '[]',
+      features: isClient ? JSON.stringify(['client.post_job', 'client.view_guard_profiles', 'client.escrow_payments']) : JSON.stringify(['guard.apply_job', 'guard.view_jobs', 'guard.create_profile', 'guard.advanced_alerts']),
       monthly_price_pence: 0,
-      subscription_status: 'incomplete',
-      is_active: false,
-      is_free_tier: true,
+      subscription_status: 'active',
       created_at: now,
       updated_at: now,
     });
@@ -77,9 +75,9 @@ async function provisionSupportRecords(supabase: any, userId: string, accountTyp
   if (!sub) {
     const { error } = await supabase.from('subscriptions').insert({
       user_id: userId,
-      status: 'incomplete',
-      plan_slug: isClient ? 'client_free' : 'free',
-      plan_name: isClient ? 'Free Starter' : 'Free Tier',
+      status: 'active',
+      plan_slug: isClient ? 'client_free' : 'guard_starter',
+      plan_name: 'Free Starter',
       billing_cycle: 'monthly',
       auto_renew: false,
       payment_failure_count: 0,

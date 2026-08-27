@@ -239,10 +239,9 @@ export async function ensureEntitlement(userId: string, audience?: 'guard' | 'cl
       audience: plan.audience,
       features: plan.features,
       monthly_price_pence: plan.monthly_price_pence,
-      subscription_status: 'free',
+      subscription_status: 'active',
       current_period_end: null,
       cancel_at_period_end: false,
-      is_free_tier: true,
       stripe_subscription_id: null,
     });
 

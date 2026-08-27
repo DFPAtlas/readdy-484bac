@@ -75,6 +75,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [canApply, setCanApply] = useState(false);
   const [blockReason, setBlockReason] = useState<string | null>(null);
+  const [blockType, setBlockType] = useState<string | null>(null);
+  const [showGuardRequired, setShowGuardRequired] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -233,18 +235,22 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     const status = guardProfile.verification_status;
     if (status !== "approved" && status !== "verified") {
       setCanApply(false);
-      setBlockReason(
-        status === "pending"
-          ? "Your guard profile is pending verification. You cannot apply until approved."
-          : status === "rejected" || status === "declined"
-          ? "Your guard profile was declined. You cannot apply for jobs."
-          : "Your guard profile is not verified. You cannot apply for jobs."
-      );
+      if (status === "pending") {
+        setBlockType("pending");
+        setBlockReason("Your guard profile is pending verification. You cannot apply until approved.");
+      } else if (status === "rejected" || status === "declined") {
+        setBlockType("declined");
+        setBlockReason("Your guard profile was declined. You cannot apply for jobs.");
+      } else {
+        setBlockType("unverified");
+        setBlockReason("Your guard profile is not verified. You cannot apply for jobs.");
+      }
       return;
     }
 
     if (job.status !== "open") {
       setCanApply(false);
+      setBlockType("closed");
       setBlockReason("This job is no longer open for applications.");
       return;
     }
@@ -252,6 +258,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     if (hasApplied) {
       setCanApply(false);
       setBlockReason(null);
+      setBlockType(null);
       return;
     }
 
@@ -263,6 +270,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       );
       if (!hasRequired) {
         setCanApply(false);
+        setBlockType("licence");
         setBlockReason(`This job requires specific SIA licence types you do not hold: ${licenceTypes.join(", ")}.`);
         return;
       }
@@ -270,6 +278,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
     setCanApply(true);
     setBlockReason(null);
+    setBlockType(null);
   }, [job, guardProfile, userType, hasApplied]);
 
   const handleApply = async () => {
@@ -490,6 +499,23 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     }
   };
 
+  const getBlockedCard = () => {
+    switch (blockType) {
+      case "pending":
+        return { icon: "ri-time-line", title: "Profile under review", actionLabel: "Check my status", actionHref: "/guard/verification-pending" };
+      case "declined":
+        return { icon: "ri-close-circle-line", title: "Profile declined", actionLabel: "Learn more", actionHref: "/guard/verification-failed" };
+      case "unverified":
+        return { icon: "ri-shield-check-line", title: "Verification required", actionLabel: "Complete my profile", actionHref: "/guard/complete-profile-wizard" };
+      case "closed":
+        return { icon: "ri-error-warning-line", title: "Job closed", actionLabel: "Browse other jobs", actionHref: "/jobs" };
+      case "licence":
+        return { icon: "ri-shield-star-line", title: "Missing SIA licence", actionLabel: "Update my licence", actionHref: "/guard/profile" };
+      default:
+        return { icon: "ri-error-warning-line", title: "Cannot apply", actionLabel: "Back to jobs", actionHref: "/jobs" };
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-GB", {
       weekday: "long",
@@ -588,6 +614,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   }
 
   const totalPay = calculateTotalPay();
+  const blockedCard = getBlockedCard();
 
   return (
     <div className="min-h-screen bg-[#0B1933]">
@@ -899,13 +926,59 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                       return as.label;
                     })()}
                   </div>
+                ) : showGuardRequired ? (
+                  <div className="mt-6 p-5 bg-teal-500/10 border border-teal-400/30 rounded-xl">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-teal-500/15 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <i className="ri-shield-user-line text-xl text-teal-400"></i>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-white mb-1">Guard account required</h4>
+                        <p className="text-sm text-slate-400 mb-4">
+                          {userType === "client"
+                            ? "You're signed in as a client. You need a security guard account to apply for jobs."
+                            : "You need a security guard account to apply for jobs. Sign in or create one below."}
+                        </p>
+                        <div className="flex flex-col gap-2">
+                          <Link
+                            href="/guard/login"
+                            className="block w-full bg-teal-500 hover:bg-teal-400 text-slate-900 text-center py-3 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer"
+                          >
+                            Sign In as Guard
+                          </Link>
+                          <Link
+                            href="/guard/register"
+                            className="block w-full bg-[#162036] hover:bg-[#1a2642] text-slate-300 text-center py-3 rounded-lg font-semibold transition-colors whitespace-nowrap border border-slate-700/50 cursor-pointer"
+                          >
+                            Create Guard Account
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : blockReason && userType === "guard" ? (
+                  <div className="mt-6 p-5 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-amber-500/15 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <i className={`${blockedCard.icon} text-xl text-amber-400`}></i>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-white mb-1">{blockedCard.title}</h4>
+                        <p className="text-sm text-slate-400 mb-4">{blockReason}</p>
+                        <Link
+                          href={blockedCard.actionHref}
+                          className="block w-full bg-teal-500 hover:bg-teal-400 text-slate-900 text-center py-3 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer"
+                        >
+                          {blockedCard.actionLabel}
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <button
                     onClick={() => {
-                      if (!user) {
-                        router.push("/guard/login");
-                      } else if (userType === "client") {
-                        setToast({ message: "Only guards can apply for jobs.", type: "error" });
+                      if (!user || userType !== "guard") {
+                        setShowGuardRequired(true);
                       } else if (!canApply) {
                         setToast({ message: blockReason || "You cannot apply for this job.", type: "error" });
                       } else {
@@ -943,12 +1016,6 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                   {linkCopied ? "Link Copied!" : "Copy Job Link"}
                 </button>
 
-                {blockReason && !hasApplied && userType === "guard" && (
-                  <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400 flex items-start gap-2">
-                    <i className="ri-error-warning-line text-lg mt-0.5"></i>
-                    <p>{blockReason}</p>
-                  </div>
-                )}
               </div>
 
               <div className="bg-[#0e1628] border border-slate-700/50 rounded-xl p-6">

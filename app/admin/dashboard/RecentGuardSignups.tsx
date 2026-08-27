@@ -116,7 +116,7 @@ export default function RecentGuardSignups({ signups, loading, error }: Props) {
                   <tr key={s.id} className="hover:bg-[#0e1a2d] transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 flex items-center justify-center bg-gradient-to-br from-sky-500 to-indigo-600 rounded-full text-white font-semibold text-xs flex-shrink-0">
+                        <div title={s.full_name} className="w-9 h-9 flex items-center justify-center bg-gradient-to-br from-sky-500 to-indigo-600 rounded-full text-white font-semibold text-xs flex-shrink-0">
                           {initials}
                         </div>
                         <span className="text-sm font-medium text-white">{s.full_name}</span>

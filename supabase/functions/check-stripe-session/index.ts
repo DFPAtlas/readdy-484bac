@@ -229,13 +229,10 @@ serve(async (req) => {
         .eq('active', true)
         .maybeSingle();
 
-      const isActiveStatus = ['trialing', 'active', 'past_due'].includes(subStatus || '');
       const entitlementPayload: any = {
         plan_slug: planId,
         plan_name: planName,
         subscription_status: subStatus,
-        is_active: isActiveStatus,
-        is_free_tier: false,
         stripe_subscription_id: stripeSub?.id || null,
         monthly_price_pence: planData?.monthly_price_pence || 0,
         current_period_end: currentPeriodEnd,

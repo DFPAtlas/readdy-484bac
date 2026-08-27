@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const corsHeaders = {
@@ -11,8 +10,9 @@ serve(async (req) => {
 
   return new Response(JSON.stringify({
     deprecated: true,
-    message: 'connect-guard-payout is deprecated. Use create-guard-payout instead. This function will be retired.',
+    gone: true,
+    message: 'connect-guard-payout has been retired. This endpoint is no longer available (HTTP 410 Gone).',
     migrateTo: 'create-guard-payout',
-    note: 'Payouts are now handled by create-guard-payout. Manual payout via create-guard-payout is available for admin use. Auto-release is handled by approve-job-completion and auto-release-guard-payments.',
-  }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    note: 'Payouts are handled by create-guard-payout (manual admin) and auto-release-guard-payments (cron). Connect onboarding is handled by create-guard-connect-account. This function performs no payouts and exposes no secrets.',
+  }), { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 });

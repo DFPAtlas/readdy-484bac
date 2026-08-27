@@ -18,44 +18,6 @@ async function sendAdminAlert(supabaseUrl: string, supabaseServiceKey: string, u
   } catch (alertErr: any) { console.error('[EnhancedWebhook] Failed to send admin alert:', alertErr.message); }
 }
 
-async function syncGuardConnectAccount(appSupabase: any, stripeAccountId: string) {
-  const { data: guard } = await appSupabase.from('guards').select('id').eq('stripe_account_id', stripeAccountId).maybeSingle();
-  if (!guard) return;
-
-  const detailsSubmitted = account.details_submitted ?? false;
-  const chargesEnabled = account.charges_enabled ?? false;
-  const payoutsEnabled = account.payouts_enabled ?? false;
-  const requirementsDue = account.requirements?.currently_due || [];
-  const restrictedReason = account.requirements?.disabled_reason || null;
-
-  let status: string;
-  if (chargesEnabled && payoutsEnabled) {
-    status = 'ready';
-  } else if (detailsSubmitted) {
-    status = 'pending';
-  } else if (requirementsDue.length > 0 || restrictedReason) {
-    status = 'restricted';
-  } else {
-    status = 'not_started';
-  }
-
-  const now = new Date().toISOString();
-  await appSupabase.from('guards').update({
-    stripe_account_status: status,
-    stripe_details_submitted: detailsSubmitted,
-    stripe_charges_enabled: chargesEnabled,
-    stripe_payouts_enabled: payoutsEnabled,
-    stripe_requirements_due: requirementsDue,
-    stripe_last_checked_at: now,
-    stripe_connect_status: status === 'ready' ? 'verified' : status === 'pending' ? 'pending' : status === 'restricted' ? 'restricted' : 'not_started',
-    stripe_connect_restricted_reason: restrictedReason,
-    ...(status === 'ready' && !guard.stripe_connect_verified_at && { stripe_connect_verified_at: now }),
-    updated_at: now,
-  }).eq('id', guard.id);
-
-  console.log(`[EnhancedWebhook] Synced guard ${guard.id} Stripe Connect status: ${status}`);
-}
-
 async function finalizeJobPayment(appSupabase: any, supabaseUrl: string, supabaseServiceKey: string, session: any) {
   const sessionId = session.id;
   const paymentIntent = session.payment_intent as string;
@@ -262,12 +224,11 @@ serve(async (req) => {
           if (accountType === 'guard') { profileUpdate.profile_completed = true; profileUpdate.onboarding_status = 'active'; await appSupabase.from('guards').update(profileUpdate).eq('user_id', userId); }
           else { profileUpdate.profile_completed = true; profileUpdate.onboarding_status = 'active'; await appSupabase.from('clients').update(profileUpdate).eq('user_id', userId); }
 
-          const isActiveStatus = subStatus === 'active' || subStatus === 'trialing';
           const { data: existingEnt } = await appSupabase.from('user_entitlements').select('user_id').eq('user_id', userId).maybeSingle();
           if (existingEnt) {
-            await appSupabase.from('user_entitlements').update({ plan_slug: planSlug, plan_name: planName, subscription_status: subStatus, is_active: isActiveStatus, is_free_tier: false, stripe_subscription_id: stripeSubId, monthly_price_pence: planAmount || 0, features: planFeatures, current_period_end: periodEnd, cancel_at_period_end: stripeSub.cancel_at_period_end || false, updated_at: new Date().toISOString() }).eq('user_id', userId);
+            await appSupabase.from('user_entitlements').update({ plan_slug: planSlug, plan_name: planName, subscription_status: subStatus, stripe_subscription_id: stripeSubId, monthly_price_pence: planAmount || 0, features: planFeatures, current_period_end: periodEnd, cancel_at_period_end: stripeSub.cancel_at_period_end || false, updated_at: new Date().toISOString() }).eq('user_id', userId);
           } else {
-            await appSupabase.from('user_entitlements').insert({ user_id: userId, plan_slug: planSlug, plan_name: planName, audience: accountType, features: planFeatures, monthly_price_pence: planAmount || 0, subscription_status: subStatus, is_active: isActiveStatus, is_free_tier: false, stripe_subscription_id: stripeSubId, current_period_end: periodEnd, cancel_at_period_end: stripeSub.cancel_at_period_end || false, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+            await appSupabase.from('user_entitlements').insert({ user_id: userId, plan_slug: planSlug, plan_name: planName, audience: accountType, features: planFeatures, monthly_price_pence: planAmount || 0, subscription_status: subStatus, stripe_subscription_id: stripeSubId, current_period_end: periodEnd, cancel_at_period_end: stripeSub.cancel_at_period_end || false, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
           }
 
           if (oldSub && oldSub.plan_slug && oldSub.plan_slug !== planSlug) {
@@ -301,9 +262,8 @@ serve(async (req) => {
           const profileUpdate: any = { subscription_status: subscription.status, updated_at: new Date().toISOString() };
           if (updateData.plan_slug) { profileUpdate.subscription_plan = updateData.plan_slug; profileUpdate.subscription_tier = updateData.plan_slug; profileUpdate.plan_slug = updateData.plan_slug; profileUpdate.plan_name = updateData.plan_name; }
           await appSupabase.from(table).update(profileUpdate).eq('user_id', subRecord.user_id);
-          const isActive = subscription.status === 'active' || subscription.status === 'trialing';
-          const entUpdate: any = { subscription_status: subscription.status, is_active: isActive, current_period_end: new Date(subscription.current_period_end * 1000).toISOString(), cancel_at_period_end: subscription.cancel_at_period_end || false, updated_at: new Date().toISOString() };
-          if (updateData.plan_slug) { entUpdate.plan_slug = updateData.plan_slug; entUpdate.plan_name = updateData.plan_name; entUpdate.monthly_price_pence = updateData.plan_amount || 0; entUpdate.is_free_tier = (updateData.plan_amount || 0) === 0; }
+          const entUpdate: any = { subscription_status: subscription.status, current_period_end: new Date(subscription.current_period_end * 1000).toISOString(), cancel_at_period_end: subscription.cancel_at_period_end || false, updated_at: new Date().toISOString() };
+          if (updateData.plan_slug) { entUpdate.plan_slug = updateData.plan_slug; entUpdate.plan_name = updateData.plan_name; entUpdate.monthly_price_pence = updateData.plan_amount || 0; }
           if (planFeatures !== null) entUpdate.features = planFeatures;
           await appSupabase.from('user_entitlements').update(entUpdate).eq('user_id', subRecord.user_id);
           if (oldSub && oldSub.plan_slug && newPlanSlug && oldSub.plan_slug !== newPlanSlug) {
@@ -343,7 +303,7 @@ serve(async (req) => {
 
           if (sub?.user_id) {
             await appSupabase.from('notifications').insert([{ user_id: sub.user_id, title: 'Payment Received', message: `Your ${sub.plan_name || 'subscription'} payment was successful.`, type: 'success', is_read: false }]);
-            await appSupabase.from('user_entitlements').update({ subscription_status: 'active', is_active: true, updated_at: new Date().toISOString() }).eq('user_id', sub.user_id);
+            await appSupabase.from('user_entitlements').update({ subscription_status: 'active', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id);
           }
         }
         break;
@@ -358,7 +318,7 @@ serve(async (req) => {
           const newStatus = newCount >= 3 ? 'canceled' : 'past_due';
           await appSupabase.from('subscriptions').update({ status: newStatus, last_payment_error: 'Payment failed', payment_failure_count: newCount, updated_at: new Date().toISOString() }).eq('stripe_subscription_id', subId);
           await appSupabase.from('notifications').insert([{ user_id: sub.user_id, title: 'Payment Failed', message: `Your ${sub.plan_name || 'subscription'} payment could not be processed. Please update your payment method.`, type: 'error', is_read: false }]);
-          await appSupabase.from('user_entitlements').update({ subscription_status: newStatus, is_active: newStatus !== 'canceled', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id);
+          await appSupabase.from('user_entitlements').update({ subscription_status: newStatus, updated_at: new Date().toISOString() }).eq('user_id', sub.user_id);
           await appSupabase.from('subscription_payments').insert({ subscription_id: sub.id, user_id: sub.user_id, stripe_payment_intent_id: invoice.payment_intent as string || null, stripe_invoice_id: invoice.id, stripe_charge_id: invoice.charge as string || null, amount: (invoice.amount_due || 0) / 100, currency: invoice.currency || 'gbp', status: 'failed', billing_reason: invoice.billing_reason || 'subscription_cycle', period_start: invoice.period_start ? new Date(invoice.period_start * 1000).toISOString() : null, period_end: invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null, failed_at: new Date().toISOString(), failure_reason: 'Payment declined', created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
         }
         break;
@@ -384,7 +344,7 @@ serve(async (req) => {
           await appSupabase.from('subscriptions').update({ status: 'cancelled', cancel_at_period_end: false, cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('stripe_subscription_id', subscription.id);
           const table = sub.account_type === 'client' ? 'clients' : 'guards';
           await appSupabase.from(table).update({ subscription_status: 'cancelled', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id);
-          await appSupabase.from('user_entitlements').update({ subscription_status: 'cancelled', is_active: false, updated_at: new Date().toISOString() }).eq('user_id', sub.user_id);
+          await appSupabase.from('user_entitlements').update({ subscription_status: 'cancelled', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id);
           await appSupabase.from('notifications').insert([{ user_id: sub.user_id, title: 'Subscription Cancelled', message: 'Your subscription has been cancelled. You can resubscribe anytime.', type: 'info', is_read: false }]);
         }
         break;

@@ -238,7 +238,6 @@ async function syncPlanToDb(
     await publicSupabase.from('clients').update(profileUpdate).eq('user_id', userId);
   }
 
-  const isActiveStatus = status === 'active' || status === 'trialing';
   const { data: existingEnt } = await publicSupabase.from('user_entitlements_data').select('user_id').eq('user_id', userId).maybeSingle();
 
   if (existingEnt) {
@@ -246,8 +245,6 @@ async function syncPlanToDb(
       plan_slug: planId,
       plan_name: planName,
       subscription_status: status,
-      is_active: isActiveStatus,
-      is_free_tier: false,
       stripe_subscription_id: stripeSubId,
       monthly_price_pence: planAmount || 0,
       features: planFeatures,
@@ -264,8 +261,6 @@ async function syncPlanToDb(
       features: planFeatures,
       monthly_price_pence: planAmount || 0,
       subscription_status: status,
-      is_active: isActiveStatus,
-      is_free_tier: false,
       stripe_subscription_id: stripeSubId,
       current_period_end: periodEnd,
       cancel_at_period_end: cancelAtPeriodEnd,

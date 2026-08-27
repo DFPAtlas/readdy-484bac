@@ -9,6 +9,7 @@ import PortalSidebar from '@/components/PortalSidebar';
 import SIALicenceImage from '@/components/SIALicenceImage';
 import ImageCropper from '@/components/ImageCropper';
 import { uploadSIALicence, uploadProfilePhoto, getProfilePhotoUrl } from '@/lib/supabase-storage';
+import { geocodePostcode } from '@/lib/geocoding';
 
 function ProfileContent() {
   const searchParams = useSearchParams();
@@ -122,25 +123,40 @@ function ProfileContent() {
         ? (Array.isArray(form.licence_types) ? form.licence_types : [form.licence_types])
         : [];
 
+      const updatePayload: Record<string, any> = {
+        full_name: form.full_name,
+        phone: form.phone,
+        date_of_birth: form.date_of_birth,
+        postcode: form.postcode,
+        sia_licence_number: form.sia_licence_number,
+        sia_expiry_date: form.sia_expiry_date,
+        licence_types: licenceTypeValue,
+        years_experience: form.years_experience,
+        bio: form.bio,
+        max_distance_miles: form.max_distance_miles !== undefined ? form.max_distance_miles : null,
+        willing_to_travel: form.willing_to_travel,
+        sia_licence_front_url: frontUrl,
+        sia_licence_back_url: backUrl,
+        sia_licence_uploaded_at: siaFrontFile ? new Date().toISOString() : form.sia_licence_uploaded_at,
+        updated_at: new Date().toISOString(),
+      };
+
+      const postcodeValue = (form.postcode || '').trim();
+      if (postcodeValue) {
+        try {
+          const geo = await geocodePostcode(postcodeValue);
+          if (geo?.latitude && geo?.longitude) {
+            updatePayload.home_latitude = geo.latitude;
+            updatePayload.home_longitude = geo.longitude;
+          }
+        } catch {
+          // geocoding is best-effort; never block profile save on it
+        }
+      }
+
       const { error } = await supabase
         .from('guards')
-        .update({
-          full_name: form.full_name,
-          phone: form.phone,
-          date_of_birth: form.date_of_birth,
-          postcode: form.postcode,
-          sia_licence_number: form.sia_licence_number,
-          sia_expiry_date: form.sia_expiry_date,
-          licence_types: licenceTypeValue,
-          years_experience: form.years_experience,
-          bio: form.bio,
-          max_distance_miles: form.max_distance_miles !== undefined ? form.max_distance_miles : null,
-          willing_to_travel: form.willing_to_travel,
-          sia_licence_front_url: frontUrl,
-          sia_licence_back_url: backUrl,
-          sia_licence_uploaded_at: siaFrontFile ? new Date().toISOString() : form.sia_licence_uploaded_at,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', profile.id);
 
       if (error) throw error;

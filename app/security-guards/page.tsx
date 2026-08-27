@@ -126,6 +126,7 @@ export default function SecurityGuardsIndex() {
         <img
           src="https://readdy.ai/api/search-image?query=Professional%20team%20of%20security%20guards%20in%20formal%20black%20uniforms%20standing%20confidently%20in%20a%20modern%20British%20city%20environment%20with%20iconic%20UK%20architecture%20silhouettes%20and%20subtle%20city%20lights%20in%20the%20background%2C%20high-end%20corporate%20photography%20style%2C%20dark%20navy%20blue%20and%20teal%20color%20palette%2C%20left%20side%20of%20image%20has%20clean%20dark%20gradient%20perfect%20for%20text%20overlay%2C%20right%20side%20features%20the%20guard%20team%20and%20British%20cityscape%2C%20cinematic%20lighting%20with%20soft%20shadows%2C%20ultra%20clean%20premium%20composition%20ensuring%20white%20text%20readability%20on%20the%20left%2C%20modern%20minimalist%20web%20design%20aesthetic%2C%20professional%20studio-quality%20lighting%2C%20simple%20background%20highlighting%20the%20subjects&width=1600&height=900&seq=hero_uk_security_index_20260503&orientation=landscape"
           alt="Professional SIA-licensed security guards across the UK"
+          title="Professional SIA-licensed security guards across the UK"
           className="sr-only"
         />
         <div className="w-full max-w-7xl mx-auto px-6 md:px-8">

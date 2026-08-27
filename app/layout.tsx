@@ -81,6 +81,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://storage.helloreaddy.io" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://readdy.ai" crossOrigin="anonymous" />
       </head>
       <body>
         <Suspense fallback={

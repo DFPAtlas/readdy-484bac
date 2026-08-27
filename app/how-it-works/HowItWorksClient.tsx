@@ -174,9 +174,11 @@ export default function HowItWorksClient() {
 
                 <div className="relative h-80 overflow-hidden">
                   <img
-                    src="https://readdy.ai/api/search-image?query=Modern%20dark-themed%20web%20application%20dashboard%20interface%20on%20a%20computer%20screen%20showing%20security%20guard%20matching%20platform%2C%20dark%20navy%20blue%20UI%20theme%20with%20data%20cards%20and%20profile%20listings%2C%20clean%20software%20screenshot%20aesthetic%2C%20professional%20SaaS%20product%20interface%20photography&width=800&height=450&seq=hiw-demo-002&orientation=landscape"
+                    src="https://readdy.ai/api/search-image?query=Modern%20dark-themed%20web%20application%20dashboard%20interface%20on%20a%20computer%20screen%20showing%20security%20guard%20matching%20platform%2C%20dark%20navy%20blue%20UI%20theme%20with%20data%20cards%20and%20profile%20listings%2C%20clean%20software%20screenshot%20aesthetic%2C%20professional%20SaaS%20product%20interface%20photography&width=640&height=360&seq=hiw-demo-002&orientation=landscape"
                     alt={`Platform demo step ${activeStep + 1}`}
                     title={`QuickGuard platform demo — step ${activeStep + 1}`}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover object-top transition-opacity duration-700"
                   />
 
@@ -343,7 +345,7 @@ export default function HowItWorksClient() {
                     src="https://readdy.ai/api/search-image?query=Professional%20British%20security%20guard%20in%20formal%20uniform%20holding%20a%20tablet%20device%20and%20smiling%2C%20modern%20office%20environment%20background%20with%20dark%20moody%20lighting%2C%20warm%20natural%20highlights%2C%20clean%20and%20friendly%20portrait%20style%20photography%2C%20high%20quality%20professional%20headshot%20aesthetic%2C%20representing%20online%20profile%20creation%2C%20dark%20navy%20blue%20color%20palette&width=600&height=350&seq=hiw-step1-002&orientation=landscape"
                     alt="Security guard creating profile"
                     title="Security guard creating a profile on QuickGuard"
-                    className="w-full h-[260px] object-cover object-top"
+                    loading="lazy" decoding="async" className="w-full h-[260px] object-cover object-top"
                   />
                 </div>
                 <figcaption className="sr-only">Guard Profile Creation Process</figcaption>
@@ -387,7 +389,7 @@ export default function HowItWorksClient() {
                     src="https://readdy.ai/api/search-image?query=British%20business%20professional%20woman%20sitting%20at%20a%20modern%20desk%20using%20a%20laptop%20computer%20to%20post%20a%20job%20online%2C%20contemporary%20office%20interior%20with%20glass%20walls%20and%20dark%20ambient%20lighting%2C%20subtle%20teal%20accent%20lights%2C%20clean%20corporate%20photography%20style%2C%20professional%20and%20approachable%20mood%2C%20dark%20navy%20blue%20color%20palette&width=600&height=350&seq=hiw-step2-002&orientation=landscape"
                     alt="Client posting a security job online"
                     title="Client posting a security job on QuickGuard"
-                    className="w-full h-[260px] object-cover object-top"
+                    loading="lazy" decoding="async" className="w-full h-[260px] object-cover object-top"
                   />
                 </div>
                 <figcaption className="sr-only">Client Job Posting Process</figcaption>
@@ -431,7 +433,7 @@ export default function HowItWorksClient() {
                     src="https://readdy.ai/api/search-image?query=Abstract%20digital%20network%20visualization%20showing%20connected%20nodes%20and%20glowing%20lines%20forming%20a%20matching%20pattern%2C%20deep%20navy%20blue%20and%20dark%20teal%20gradient%20background%2C%20futuristic%20AI%20technology%20concept%2C%20clean%20minimalist%20digital%20art%20style%2C%20representing%20intelligent%20algorithm%20matching%20security%20professionals%20with%20jobs%2C%20subtle%20purple%20and%20blue%20neon%20glow%20accents&width=600&height=350&seq=hiw-step3-002&orientation=landscape"
                     alt="AI-powered smart matching technology connecting security guards with clients"
                     title="QuickGuard AI smart matching for security jobs"
-                    className="w-full h-[260px] object-cover object-top"
+                    loading="lazy" decoding="async" className="w-full h-[260px] object-cover object-top"
                   />
                 </div>
                 <figcaption className="sr-only">AI Matching Process Visualization</figcaption>
@@ -478,7 +480,7 @@ export default function HowItWorksClient() {
                     src="https://readdy.ai/api/search-image?query=Professional%20British%20businessman%20reviewing%20documents%20on%20a%20tablet%20screen%20while%20seated%20at%20a%20conference%20table%2C%20modern%20office%20meeting%20room%20background%20with%20dark%20ambient%20lighting%20and%20subtle%20teal%20accents%2C%20corporate%20photography%20style%2C%20selective%20focus%20on%20the%20tablet%20and%20hands%2C%20clean%20aesthetic%2C%20dark%20navy%20blue%20color%20palette&width=600&height=350&seq=hiw-step4-002&orientation=landscape"
                     alt="Client reviewing and selecting security guard applications"
                     title="Client reviewing guard applications on QuickGuard"
-                    className="w-full h-[260px] object-cover object-top"
+                    loading="lazy" decoding="async" className="w-full h-[260px] object-cover object-top"
                   />
                 </div>
                 <figcaption className="sr-only">Application Review Process</figcaption>
@@ -522,7 +524,7 @@ export default function HowItWorksClient() {
                     src="https://readdy.ai/api/search-image?query=Close%20up%20of%20a%20secure%20digital%20payment%20interface%20on%20a%20smartphone%20screen%20with%20shield%20security%20icon%2C%20professional%20hands%20holding%20the%20phone%2C%20dark%20blurred%20office%20background%2C%20teal%20and%20blue%20trust%20colors%20glowing%20softly%2C%20clean%20modern%20fintech%20photography%20style%2C%20representing%20secure%20held%20job%20payment%20system%2C%20dark%20navy%20blue%20color%20palette&width=600&height=350&seq=hiw-step5-002&orientation=landscape"
                     alt="Secure payment and job completion process"
                     title="Secure held job payment on QuickGuard"
-                    className="w-full h-[260px] object-cover object-top"
+                    loading="lazy" decoding="async" className="w-full h-[260px] object-cover object-top"
                   />
                 </div>
                 <figcaption className="sr-only">Secure Payment Process</figcaption>
@@ -664,7 +666,7 @@ export default function HowItWorksClient() {
                 role: "SIA Door Supervisor · Manchester",
                 tag: "Guard",
                 tagColor: "teal",
-                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20confident%20Black%20British%20man%20in%20his%20thirties%20with%20short%20hair%2C%20wearing%20a%20navy%20blue%20polo%20shirt%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20warm%20natural%20highlights%2C%20clean%20corporate%20photography%20style&width=200&height=200&seq=hiw-avatar-007&orientation=squarish"
+                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20confident%20Black%20British%20man%20in%20his%20thirties%20with%20short%20hair%2C%20wearing%20a%20navy%20blue%20polo%20shirt%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20warm%20natural%20highlights%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-007&orientation=squarish"
               },
               {
                 text: "We needed security for a large corporate event in London on short notice. QuickGuard matched us with four verified guards within hours. The payment system is transparent and HMRC compliant — exactly what we needed.",
@@ -672,7 +674,7 @@ export default function HowItWorksClient() {
                 role: "Events Director · London",
                 tag: "Client",
                 tagColor: "blue",
-                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20British%20businesswoman%20in%20her%20forties%20with%20blonde%20hair%2C%20wearing%20a%20charcoal%20blazer%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20soft%20professional%20lighting%2C%20clean%20corporate%20photography%20style&width=200&height=200&seq=hiw-avatar-008&orientation=squarish"
+                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20British%20businesswoman%20in%20her%20forties%20with%20blonde%20hair%2C%20wearing%20a%20charcoal%20blazer%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20soft%20professional%20lighting%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-008&orientation=squarish"
               },
               {
                 text: "The earnings dashboard is brilliant. I can track every shift, see my payouts clearly, and the 5% platform fee is the lowest I've seen. I've doubled my monthly income since joining QuickGuard.",
@@ -680,7 +682,7 @@ export default function HowItWorksClient() {
                 role: "SIA Security Officer · Birmingham",
                 tag: "Guard",
                 tagColor: "teal",
-                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20South%20Asian%20British%20man%20in%20his%20thirties%20with%20neat%20dark%20hair%2C%20wearing%20a%20light%20blue%20button-up%20shirt%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20warm%20natural%20highlights%2C%20clean%20corporate%20photography%20style&width=200&height=200&seq=hiw-avatar-009&orientation=squarish"
+                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20South%20Asian%20British%20man%20in%20his%20thirties%20with%20neat%20dark%20hair%2C%20wearing%20a%20light%20blue%20button-up%20shirt%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20warm%20natural%20highlights%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-009&orientation=squarish"
               },
               {
                 text: "As a retail chain manager, I use QuickGuard regularly for weekend cover across our Leeds stores. The AI matching is genuinely impressive — it always finds guards with retail experience. Highly recommended.",
@@ -688,7 +690,7 @@ export default function HowItWorksClient() {
                 role: "Retail Operations Manager · Leeds",
                 tag: "Client",
                 tagColor: "blue",
-                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20British%20man%20in%20his%20fifties%20with%20grey%20hair%2C%20wearing%20a%20dark%20green%20sweater%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20soft%20natural%20lighting%2C%20clean%20corporate%20photography%20style&width=200&height=200&seq=hiw-avatar-010&orientation=squarish"
+                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20British%20man%20in%20his%20fifties%20with%20grey%20hair%2C%20wearing%20a%20dark%20green%20sweater%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20soft%20natural%20lighting%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-010&orientation=squarish"
               },
               {
                 text: "I was sceptical at first but the SIA licence verification gave me real confidence. The platform is easy to use, the app notifications are instant, and I've never missed a job opportunity since joining.",
@@ -696,7 +698,7 @@ export default function HowItWorksClient() {
                 role: "SIA CCTV Operator · Glasgow",
                 tag: "Guard",
                 tagColor: "teal",
-                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20Scottish%20woman%20in%20her%20thirties%20with%20auburn%20hair%2C%20wearing%20a%20white%20blouse%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20warm%20professional%20lighting%2C%20clean%20corporate%20photography%20style&width=200&height=200&seq=hiw-avatar-011&orientation=squarish"
+                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20Scottish%20woman%20in%20her%20thirties%20with%20auburn%20hair%2C%20wearing%20a%20white%20blouse%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20warm%20professional%20lighting%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-011&orientation=squarish"
               },
               {
                 text: "The held job payment system with Stripe is a game-changer. Funds are held securely until the shift is complete — it protects both sides. We've hired over 30 guards through QuickGuard and every experience has been professional.",
@@ -704,7 +706,7 @@ export default function HowItWorksClient() {
                 role: "Venue Manager · Bristol",
                 tag: "Client",
                 tagColor: "blue",
-                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20British%20Indian%20woman%20in%20her%20thirties%20with%20long%20dark%20hair%2C%20wearing%20a%20burgundy%20top%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20soft%20natural%20lighting%2C%20clean%20corporate%20photography%20style&width=200&height=200&seq=hiw-avatar-012&orientation=squarish"
+                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20British%20Indian%20woman%20in%20her%20thirties%20with%20long%20dark%20hair%2C%20wearing%20a%20burgundy%20top%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20soft%20natural%20lighting%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-012&orientation=squarish"
               }
             ].map((card, idx) => (
               <article key={idx} className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-7 flex flex-col gap-4 hover:border-slate-600 transition-all">
@@ -719,7 +721,7 @@ export default function HowItWorksClient() {
                     src={card.img}
                     alt={card.name}
                     title={`${card.name} — ${card.role}`}
-                    className="w-11 h-11 rounded-full object-cover object-top"
+                    loading="lazy" decoding="async" className="w-11 h-11 rounded-full object-cover object-top"
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-white text-sm">{card.name}</p>

@@ -1,5 +1,3 @@
-
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.47.0';
 
 function generateRandomPassword(length: number): string {
@@ -64,21 +62,20 @@ async function provisionUser(supabase: any, userId: string, accountType: string)
   const isClient = accountType === 'client';
   const { data: existingEnt } = await supabase.from('user_entitlements_data').select('user_id').eq('user_id', userId).maybeSingle();
   if (!existingEnt) {
-    await supabase.from('user_entitlements_data').insert({
+    const { error } = await supabase.from('user_entitlements_data').insert({
       user_id: userId,
-      plan_slug: isClient ? 'client_free' : 'free',
-      plan_name: isClient ? 'Free Starter' : 'Free Tier',
+      plan_slug: isClient ? 'client_free' : 'guard_starter',
+      plan_name: isClient ? 'Free Starter' : 'Free Starter',
       audience: accountType,
       features: isClient
         ? JSON.stringify(['client.post_job', 'client.view_guard_profiles', 'client.escrow_payments'])
-        : '[]',
+        : JSON.stringify(['guard.apply_job', 'guard.view_jobs', 'guard.create_profile', 'guard.advanced_alerts']),
       monthly_price_pence: 0,
-      subscription_status: 'incomplete',
-      is_active: false,
-      is_free_tier: true,
+      subscription_status: 'active',
       created_at: now,
       updated_at: now,
     });
+    if (error) console.error('[register-magic-link] Entitlement insert error:', error.message);
   }
   const { data: existingNotif } = await supabase.from('notification_preferences').select('id').eq('user_id', userId).maybeSingle();
   if (!existingNotif) {
@@ -105,9 +102,9 @@ async function provisionUser(supabase: any, userId: string, accountType: string)
   if (!existingSub) {
     await supabase.from('subscriptions').insert({
       user_id: userId,
-      status: 'incomplete',
-      plan_slug: isClient ? 'client_free' : 'free',
-      plan_name: isClient ? 'Free Starter' : 'Free Tier',
+      status: 'active',
+      plan_slug: isClient ? 'client_free' : 'guard_starter',
+      plan_name: isClient ? 'Free Starter' : 'Free Starter',
       billing_cycle: 'monthly',
       auto_renew: false,
       payment_failure_count: 0,
@@ -196,7 +193,7 @@ async function handleReferral(supabase: any, userId: string, email: string, acco
   }
 }
 
-async function sendWelcomeEmail(supabaseUrl: string, supabaseServiceKey: string, userId: string, accountType: string, userEmail: string, userName: string) {
+async function sendWelcomeEmail(supabaseUrl: string, supabaseServiceKey: string, userId: string, accountType: string, userEmail: string, userName: string): Promise<boolean> {
   try {
     const res = await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
       method: 'POST',
@@ -214,11 +211,13 @@ async function sendWelcomeEmail(supabaseUrl: string, supabaseServiceKey: string,
     if (!res.ok) {
       const errText = await res.text();
       console.error(`[register-magic-link] Welcome email send failed (${res.status}): ${errText}`);
-    } else {
-      console.log(`[register-magic-link] Welcome email sent to ${userEmail}`);
+      return false;
     }
+    console.log(`[register-magic-link] Welcome email sent to ${userEmail}`);
+    return true;
   } catch (err) {
     console.error('[register-magic-link] Failed to send welcome email:', err);
+    return false;
   }
 }
 
@@ -371,9 +370,6 @@ Deno.serve(async (req) => {
         .catch(err => console.error('[register-magic-link] Referral handling failed:', err));
     }
 
-    sendWelcomeEmail(supabaseUrl, supabaseServiceKey, userId, role, email, fullName)
-      .catch((err) => console.error('[register-magic-link] Welcome email async failure:', err));
-
     const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -381,6 +377,12 @@ Deno.serve(async (req) => {
     if (sessionError) {
       throw new Error('Failed to create session: ' + sessionError.message);
     }
+
+    const welcomeSent = await sendWelcomeEmail(supabaseUrl, supabaseServiceKey, userId, role, email, fullName);
+    if (!welcomeSent) {
+      console.error(`[register-magic-link] Welcome email did not complete for ${email}; will retry via queue/health check if configured.`);
+    }
+
     return new Response(JSON.stringify({
       success: true,
       session: sessionData.session,
@@ -397,4 +399,3 @@ Deno.serve(async (req) => {
     });
   }
 });
-

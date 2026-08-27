@@ -334,6 +334,8 @@ export default function StepLocation({ formData, errors, onChange, onNext, onBac
               style={{ border: 0 }}
               allowFullScreen
               loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              title="Location preview"
             ></iframe>
           </div>
         )}

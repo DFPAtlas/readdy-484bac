@@ -249,6 +249,13 @@ export default function ClientCompleteProfileWizard() {
 
       traceLog('profile saved successfully');
 
+      await ensureEntitlement(userId, 'client');
+      const { error: entActivateError } = await supabase
+        .from('user_entitlements_data')
+        .update({ subscription_status: 'active', updated_at: new Date().toISOString() })
+        .eq('user_id', userId);
+      if (entActivateError) traceLog('entitlement activation failed', { error: entActivateError.message });
+
       if (password) {
         const { error: pwdError } = await supabase.auth.updateUser({ password });
         if (pwdError) {
