@@ -6,54 +6,16 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-function base64UrlDecode(str: string): string {
-  const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  return atob(base64 + padding);
-}
-
-function decodeJwtPayload(jwt: string): any {
+function getAal(token: string): string | null {
   try {
-    const parts = jwt.split(".");
+    const parts = token.split(".");
     if (parts.length !== 3) return null;
-    return JSON.parse(base64UrlDecode(parts[1]));
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = "=".repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(base64 + pad)).aal || null;
   } catch {
     return null;
   }
-}
-
-async function findAdminUser(supabaseUrl: string, serviceKey: string, userId: string, email?: string | null) {
-  const supabase = createClient(supabaseUrl, serviceKey, { db: { schema: 'app' } });
-
-  const { data: appAdminUser, error: appErr } = await supabase
-    .from("admin_users")
-    .select("id, role, is_active, full_name, email")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (appAdminUser) {
-    console.log("[AdminSecurity v5] Admin found in app schema by user_id");
-    return appAdminUser;
-  }
-  if (appErr) console.error("[AdminSecurity v5] app user_id lookup error:", appErr.message);
-
-  if (email) {
-    const { data: appByEmail, error: appEmailErr } = await supabase
-      .from("admin_users")
-      .select("id, role, is_active, full_name, email")
-      .eq("email", email)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (appByEmail) {
-      console.log("[AdminSecurity v5] Admin found in app schema by email, syncing user_id");
-      await supabase.from("admin_users").update({ user_id: userId, updated_at: new Date().toISOString() }).eq("id", appByEmail.id);
-      return appByEmail;
-    }
-    if (appEmailErr) console.error("[AdminSecurity v5] app email lookup error:", appEmailErr.message);
-  }
-
-  return null;
 }
 
 Deno.serve(async (req) => {
@@ -65,10 +27,7 @@ Deno.serve(async (req) => {
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!supabaseUrl || !supabaseServiceKey) {
-    return new Response(
-      JSON.stringify({ error: "Server configuration error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Server configuration error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   try {
@@ -76,51 +35,37 @@ Deno.serve(async (req) => {
     const jwt = authHeader?.replace("Bearer ", "").trim() || "";
 
     if (!jwt || jwt === Deno.env.get("SUPABASE_ANON_KEY")) {
-      console.error("[AdminSecurity v5] Missing or anon JWT");
-      return new Response(
-        JSON.stringify({ error: "Unauthorized: Missing authentication token" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Unauthorized: Missing authentication token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const payload = decodeJwtPayload(jwt);
-    if (!payload || !payload.sub) {
-      console.error("[AdminSecurity v5] Invalid JWT payload");
-      return new Response(
-        JSON.stringify({ error: "Invalid token" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const userId = payload.sub;
-    const email = payload.email || null;
-    console.log("[AdminSecurity v5] Decoded JWT:", { userId, email });
+    if (getAal(jwt) !== "aal2") {
+      return new Response(JSON.stringify({ error: "Multi-factor authentication required" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
-    const adminUser = await findAdminUser(supabaseUrl, supabaseServiceKey, userId, email);
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("id, role, is_active, full_name, email")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
     if (!adminUser) {
-      console.error("[AdminSecurity v5] No admin record:", userId, email);
-      return new Response(
-        JSON.stringify({ error: "Forbidden: Admin access required", userId }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Forbidden: Admin access required" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (!adminUser.is_active) {
-      console.error("[AdminSecurity v5] Admin not active:", adminUser.id);
-      return new Response(
-        JSON.stringify({ error: "Forbidden: Account not active" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Forbidden: Account not active" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const validRoles = ['super_admin', 'admin', 'finance_admin'];
     if (!validRoles.includes(adminUser.role)) {
-      console.error("[AdminSecurity v5] Bad role:", adminUser.role);
-      return new Response(
-        JSON.stringify({ error: "Forbidden: Insufficient permissions" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Forbidden: Insufficient permissions" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     let body: any = {};
@@ -133,31 +78,18 @@ Deno.serve(async (req) => {
 
     if (!action || action === 'verify') {
       return new Response(
-        JSON.stringify({
-          verified: true,
-          role: adminUser.role,
-          fullName: adminUser.full_name,
-          email: adminUser.email,
-        }),
+        JSON.stringify({ verified: true, role: adminUser.role, fullName: adminUser.full_name, email: adminUser.email }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const supabaseQ = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
-
     if (action === 'dashboard_stats') {
-      const [
-        failedRes,
-        guardRes,
-        siaRes,
-        heldRes,
-        contactRes
-      ] = await Promise.all([
-        supabaseQ.from('transactions').select('id', { count: 'exact', head: true }).eq('status', 'failed'),
-        supabaseQ.from('guards').select('id', { count: 'exact', head: true }).in('verification_status', ['manual_review', 'pending_sia_check']),
-        supabaseQ.from('sia_verifications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabaseQ.from('guard_payouts').select('id', { count: 'exact', head: true }).eq('status', 'held'),
-        supabaseQ.from('contact_submissions').select('id', { count: 'exact', head: true }).eq('status', 'new'),
+      const [failedRes, guardRes, siaRes, heldRes, contactRes] = await Promise.all([
+        supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('status', 'failed'),
+        supabase.from('guards').select('id', { count: 'exact', head: true }).in('verification_status', ['manual_review', 'pending_sia_check']),
+        supabase.from('sia_verifications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('guard_payouts').select('id', { count: 'exact', head: true }).eq('status', 'held'),
+        supabase.from('contact_submissions').select('id', { count: 'exact', head: true }).eq('status', 'new'),
       ]);
 
       return new Response(
@@ -178,8 +110,8 @@ Deno.serve(async (req) => {
       todayStart.setHours(0, 0, 0, 0);
 
       const [loginRes, resetRes] = await Promise.all([
-        supabaseQ.from('admin_activity_log').select('*').in('action_type', ['login', 'login_failed', 'logout']).order('created_at', { ascending: false }).limit(50),
-        supabaseQ.from('admin_activity_log').select('*').in('action_type', ['password_reset_requested', 'password_reset_completed', 'password_reset_failed']).order('created_at', { ascending: false }).limit(50),
+        supabase.from('admin_activity_log').select('*').in('action_type', ['login', 'login_failed', 'logout']).order('created_at', { ascending: false }).limit(50),
+        supabase.from('admin_activity_log').select('*').in('action_type', ['password_reset_requested', 'password_reset_completed', 'password_reset_failed']).order('created_at', { ascending: false }).limit(50),
       ]);
 
       const logins = loginRes.data || [];
@@ -193,27 +125,15 @@ Deno.serve(async (req) => {
         JSON.stringify({
           loginEvents: logins,
           resetEvents: resets,
-          stats: {
-            loginsToday: todayLogins.length,
-            failedLogins: failedLogins.length,
-            resetsToday: todayResets.length,
-            uniqueAdmins,
-          },
+          stats: { loginsToday: todayLogins.length, failedLogins: failedLogins.length, resetsToday: todayResets.length, uniqueAdmins },
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    return new Response(
-      JSON.stringify({ error: "Unknown action" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-
+    return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error: any) {
-    console.error("[AdminSecurity v5] Crash:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    console.error("[AdminSecurity v6] Crash:", error);
+    return new Response(JSON.stringify({ error: error.message || "Internal server error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

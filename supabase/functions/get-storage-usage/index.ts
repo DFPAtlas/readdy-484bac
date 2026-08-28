@@ -19,17 +19,13 @@ function buildCorsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
-function base64UrlDecode(str: string): string {
-  const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  return atob(base64 + padding);
-}
-
-function decodeJwtPayload(jwt: string): any {
+function getAal(token: string): string | null {
   try {
-    const parts = jwt.split(".");
+    const parts = token.split(".");
     if (parts.length !== 3) return null;
-    return JSON.parse(base64UrlDecode(parts[1]));
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = "=".repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(base64 + pad)).aal || null;
   } catch {
     return null;
   }
@@ -64,67 +60,53 @@ Deno.serve(async (req: Request) => {
     const jwt = authHeader?.replace("Bearer ", "").trim() || "";
 
     if (!jwt) {
-      return new Response(JSON.stringify({ error: "Unauthorized — missing bearer token" }), {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: corsHeaders,
       });
     }
-
-    const payload = decodeJwtPayload(jwt);
-    if (!payload || !payload.sub) {
-      return new Response(JSON.stringify({ error: "Unauthorized — invalid token" }), {
-        status: 401,
-        headers: corsHeaders,
-      });
-    }
-
-    const userId = payload.sub;
-    const email = payload.email || null;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
     const appClient = createClient(supabaseUrl, serviceRoleKey, { db: { schema: "app" } });
-    const storageClient = createClient(supabaseUrl, serviceRoleKey, { db: { schema: "storage" } });
 
-    const { data: adminUser, error: adminErr } = await appClient
-      .from("admin_users")
-      .select("id, full_name, role, is_active, email")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    let admin = adminUser;
-
-    if (!admin && email) {
-      const { data: byEmail } = await appClient
-        .from("admin_users")
-        .select("id, full_name, role, is_active, email")
-        .eq("email", email)
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (byEmail) {
-        await appClient
-          .from("admin_users")
-          .update({ user_id: userId, updated_at: new Date().toISOString() })
-          .eq("id", byEmail.id);
-        admin = byEmail;
-      }
+    const { data: { user }, error: userErr } = await appClient.auth.getUser(jwt);
+    if (userErr || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: corsHeaders,
+      });
     }
 
+    if (getAal(jwt) !== "aal2") {
+      return new Response(JSON.stringify({ error: "MFA required" }), {
+        status: 403,
+        headers: corsHeaders,
+      });
+    }
+
+    const { data: admin } = await appClient
+      .from("admin_users")
+      .select("id, full_name, role, is_active, email")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
     if (!admin) {
-      return new Response(JSON.stringify({ error: "Forbidden — admin access required" }), {
+      return new Response(JSON.stringify({ error: "Admin access required" }), {
         status: 403,
         headers: corsHeaders,
       });
     }
 
     if (!admin.is_active) {
-      return new Response(JSON.stringify({ error: "Forbidden — admin account not active" }), {
+      return new Response(JSON.stringify({ error: "Admin access required" }), {
         status: 403,
         headers: corsHeaders,
       });
     }
+
+    const storageClient = createClient(supabaseUrl, serviceRoleKey, { db: { schema: "storage" } });
 
     const TARGET_BUCKETS = [
       "quickguard-email-assets",

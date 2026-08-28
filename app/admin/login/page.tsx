@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { supabase } from '@/lib/supabase';
 import { logAdminAction } from '@/lib/admin-logger';
+import { resolveAdminMfaRoute } from '@/lib/admin-mfa';
 import Link from 'next/link';
 import AdminMarketingPanel from '@/components/login/AdminMarketingPanel';
 
@@ -35,46 +36,52 @@ export default function AdminLogin() {
       });
 
       if (authError || !authData.session) {
-        setError(authError?.message || 'Invalid email or password');
+        setError('Invalid email or password');
         setLoading(false);
         return;
       }
 
-      const { data: adminCheck, error: adminErr } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        await supabase.auth.signOut();
+        setError('You do not have permission to access QuickGuard Admin');
+        setLoading(false);
+        return;
+      }
+
+      const { data: adminCheck } = await supabase
         .from('admin_users')
         .select('id, user_id, email, role, full_name, is_active')
-        .eq('user_id', authData.session.user.id)
+        .eq('user_id', user.id)
         .maybeSingle();
 
-      if (adminCheck && adminCheck.is_active && ['super_admin', 'admin', 'finance_admin'].includes(adminCheck.role)) {
+      const isValidAdmin = adminCheck && adminCheck.is_active && ['super_admin', 'admin', 'finance_admin'].includes(adminCheck.role);
+
+      if (!isValidAdmin) {
+        await supabase.auth.signOut();
+        setError('You do not have permission to access QuickGuard Admin');
+        setLoading(false);
+        return;
+      }
+
+      const mfaRoute = await resolveAdminMfaRoute();
+
+      if (mfaRoute === 'authorized') {
         router.push('/admin/dashboard');
         return;
       }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/admin-login`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authData.session.access_token}`,
-          },
-          body: JSON.stringify({ email }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        await supabase.auth.signOut();
-        const debugInfo = data.debug || {};
-        const debugMsg = debugInfo.message || '';
-        setError(`${data.error || 'You do not have admin access'}${debugMsg ? ` - ${debugMsg}` : ''}`);
-        setLoading(false);
+      if (mfaRoute === 'mfa') {
+        router.push('/admin/mfa');
+        return;
+      }
+      if (mfaRoute === 'setup') {
+        router.push('/admin/mfa/setup');
         return;
       }
 
-      router.push('/admin/dashboard');
+      await supabase.auth.signOut();
+      setError('You do not have permission to access QuickGuard Admin');
     } catch (err: any) {
       setError(err.message || 'An error occurred during login');
     } finally {

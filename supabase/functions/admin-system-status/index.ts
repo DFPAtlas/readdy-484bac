@@ -6,56 +6,16 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
-function base64UrlDecode(str: string): string {
-  const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  return atob(base64 + padding);
-}
-
-function decodeJwtPayload(jwt: string): any {
+function getAal(token: string): string | null {
   try {
-    const parts = jwt.split(".");
+    const parts = token.split(".");
     if (parts.length !== 3) return null;
-    return JSON.parse(base64UrlDecode(parts[1]));
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = "=".repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(base64 + pad)).aal || null;
   } catch {
     return null;
   }
-}
-
-async function verifyAdmin(supabaseUrl: string, serviceKey: string, jwt: string) {
-  const payload = decodeJwtPayload(jwt);
-  if (!payload || !payload.sub) return null;
-
-  const supabaseApp = createClient(supabaseUrl, serviceKey, { db: { schema: "app" } });
-
-  const { data: adminUser } = await supabaseApp
-    .from("admin_users")
-    .select("id, role, is_active")
-    .eq("user_id", payload.sub)
-    .maybeSingle();
-
-  if (adminUser && adminUser.is_active) {
-    const validRoles = ["super_admin", "admin", "finance_admin"];
-    if (validRoles.includes(adminUser.role)) return adminUser;
-  }
-
-  if (payload.email) {
-    const { data: byEmail } = await supabaseApp
-      .from("admin_users")
-      .select("id, role, is_active")
-      .eq("email", payload.email)
-      .eq("is_active", true)
-      .maybeSingle();
-    if (byEmail) {
-      const validRoles = ["super_admin", "admin", "finance_admin"];
-      if (validRoles.includes(byEmail.role)) {
-        await supabaseApp.from("admin_users").update({ user_id: payload.sub, updated_at: new Date().toISOString() }).eq("id", byEmail.id);
-        return byEmail;
-      }
-    }
-  }
-
-  return null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -77,15 +37,52 @@ Deno.serve(async (req: Request) => {
   const jwt = authHeader?.replace("Bearer ", "").trim() || "";
 
   if (!jwt) {
-    return new Response(JSON.stringify({ error: "Unauthorized: Missing authentication token" }), {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  const adminUser = await verifyAdmin(supabaseUrl, serviceKey, jwt);
+  const supabaseAuth = createClient(supabaseUrl, serviceKey, { db: { schema: "app" } });
+
+  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(jwt);
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  if (getAal(jwt) !== "aal2") {
+    return new Response(JSON.stringify({ error: "MFA required" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { data: adminUser } = await supabaseAuth
+    .from("admin_users")
+    .select("id, role, is_active")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
   if (!adminUser) {
-    return new Response(JSON.stringify({ error: "Forbidden: Admin access required" }), {
+    return new Response(JSON.stringify({ error: "Admin access required" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  if (!adminUser.is_active) {
+    return new Response(JSON.stringify({ error: "Admin access required" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const validRoles = ["super_admin", "admin", "finance_admin"];
+  if (!validRoles.includes(adminUser.role)) {
+    return new Response(JSON.stringify({ error: "Admin access required" }), {
       status: 403,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -176,7 +173,6 @@ Deno.serve(async (req: Request) => {
   });
 
   // --- Payment pipeline (app schema) ---
-  // First discover all actual payment_status values in use
   let pipelineCounts: Record<string, number> = {};
   try {
     const { data: statusRows, error: statusErr } = await app
@@ -194,7 +190,6 @@ Deno.serve(async (req: Request) => {
     schemaErrors.push(`Payment pipeline exception: ${e.message}`);
   }
 
-  // Stuck assignments based on actual data
   let stuckFundedOver24h = 0;
   let stuckAwaitingOver72h = 0;
   let pendingPayoutsCount = 0;
@@ -207,23 +202,19 @@ Deno.serve(async (req: Request) => {
     if (!allErr && allAssignments) {
       for (const a of allAssignments) {
         const ps = a.payment_status;
-        // Stuck: pending assignments older than 24h (not yet paid)
         if (ps === "pending") {
           const assignedDate = a.assigned_at ? new Date(a.assigned_at) : null;
           if (assignedDate && assignedDate < new Date(Date.now() - 24 * 60 * 60 * 1000)) {
             stuckFundedOver24h++;
           }
-          // Completed but still pending after 72h
           if (a.completed_at) {
             const completedDate = new Date(a.completed_at);
             if (completedDate < new Date(Date.now() - 72 * 60 * 60 * 1000)) {
               stuckAwaitingOver72h++;
             }
           }
-          // All pending count as pending payouts
           pendingPayoutsCount++;
         }
-        // Failed: payment_date set but payment_status not "paid"
         if (ps === "failed" || (a.payment_date && ps !== "paid" && ps !== "pending")) {
           failedPayoutsCount++;
         }
@@ -233,7 +224,6 @@ Deno.serve(async (req: Request) => {
     schemaErrors.push(`Stuck assignment query failed: ${e.message}`);
   }
 
-  // Total unreleased value (pending assignments)
   let totalUnreleasedClient = 0;
   try {
     const { data: unreleasedData, error: unreleasedErr } = await app
@@ -249,7 +239,6 @@ Deno.serve(async (req: Request) => {
     schemaErrors.push(`Unreleased value exception: ${e.message}`);
   }
 
-  // Total guard payout pending
   let totalGuardPayoutPending = 0;
   try {
     const { data: payoutData, error: payoutErr } = await app
@@ -313,7 +302,7 @@ Deno.serve(async (req: Request) => {
     schemaErrors.push(`Cron exception: ${e.message}`);
   }
 
-  // --- Cleanup status (public schema — where cleanup_log data lives) ---
+  // --- Cleanup status (public schema) ---
   let cleanupStatus = "healthy";
   let lastCleanupRun = null;
   let lastCleanupFailure = null;

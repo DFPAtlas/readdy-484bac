@@ -1,13 +1,10 @@
-import { useCallback, useRef, useMemo, useEffect } from 'react';
+import { useCallback, useRef, useMemo } from 'react';
 import { useRouter as useNextRouter } from 'next/navigation';
 
 export function useSafeRouter() {
   const router = useNextRouter();
   const routerRef = useRef(router);
-
-  useEffect(() => {
-    routerRef.current = router;
-  }, [router]);
+  routerRef.current = router;
 
   const safePush = useCallback(
     (href: string) => {

@@ -10,7 +10,7 @@ const TIMEOUT_DURATION = 8 * 60 * 60 * 1000;
 const WARNING_BEFORE = 5 * 60 * 1000;
 const WARNING_AT = TIMEOUT_DURATION - WARNING_BEFORE;
 
-const NO_SIDEBAR_PATHS = ['/admin/login', '/admin/setup', '/admin/register'];
+const NO_SIDEBAR_PATHS = ['/admin/login', '/admin/setup', '/admin/register', '/admin/mfa', '/admin/mfa/setup'];
 
 export default function AdminSessionTimeout() {
   const router = useSafeRouter();

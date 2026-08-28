@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
@@ -15,18 +14,16 @@ function getCorsHeaders(req: Request) {
   return headers;
 }
 
-function base64UrlDecode(str: string): string {
-  const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-  const padding = '='.repeat((4 - (base64.length % 4)) % 4);
-  return atob(base64 + padding);
-}
-
-function decodeJwtPayload(jwt: string): any {
+function getAal(token: string): string | null {
   try {
-    const parts = jwt.split('.');
+    const parts = token.split('.');
     if (parts.length !== 3) return null;
-    return JSON.parse(base64UrlDecode(parts[1]));
-  } catch { return null; }
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = '='.repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(base64 + pad)).aal || null;
+  } catch {
+    return null;
+  }
 }
 
 const DISPOSABLE_DOMAINS = [
@@ -55,31 +52,41 @@ Deno.serve(async function(req) {
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...headers, 'Content-Type': 'application/json' }
       });
     }
 
-    const jwtToken = authHeader.replace('Bearer ', '');
-    const payload = decodeJwtPayload(jwtToken);
-
-    if (!payload?.sub) {
-      return new Response(JSON.stringify({ error: 'Invalid authentication' }), {
+    const jwtToken = authHeader.replace('Bearer ', '').trim();
+    if (!jwtToken) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...headers, 'Content-Type': 'application/json' }
       });
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
 
-    const { data: adminUser } = await supabase.from('admin_users').select('id, role, is_active').eq('user_id', payload.sub).maybeSingle();
+    const { data: userData, error: userError } = await supabase.auth.getUser(jwtToken);
+    if (userError || !userData?.user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...headers, 'Content-Type': 'application/json' }
+      });
+    }
 
-    if (!adminUser) {
-      const { data: emailAdmin } = await supabase.from('admin_users').select('id, role, is_active').eq('email', payload.email).eq('is_active', true).maybeSingle();
-      if (!emailAdmin) {
-        return new Response(JSON.stringify({ error: 'Admin access required' }), {
-          status: 403, headers: { ...headers, 'Content-Type': 'application/json' }
-        });
-      }
+    if (getAal(jwtToken) !== 'aal2') {
+      return new Response(JSON.stringify({ error: 'MFA required' }), {
+        status: 403, headers: { ...headers, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const verifiedUser = userData.user;
+
+    const { data: adminUser } = await supabase.from('admin_users').select('id, role, is_active').eq('user_id', verifiedUser.id).maybeSingle();
+
+    if (!adminUser || !adminUser.is_active) {
+      return new Response(JSON.stringify({ error: 'Admin access required' }), {
+        status: 403, headers: { ...headers, 'Content-Type': 'application/json' }
+      });
     }
 
     const body = await req.json();
@@ -102,7 +109,7 @@ Deno.serve(async function(req) {
         }
 
         const { data: campaign, error } = await supabase.from('qg_launch_campaigns').insert({
-          created_by: payload.sub,
+          created_by: verifiedUser.id,
           name,
           description: description || null,
           target_role: target_role || 'mixed',
@@ -293,7 +300,7 @@ Deno.serve(async function(req) {
             : 'https://quickguard.uk/qg-launch-rewards';
 
           const { data: invite } = await supabase.from('qg_launch_invites').insert({
-            sender_user_id: payload.sub,
+            sender_user_id: verifiedUser.id,
             sender_role: 'admin',
             recipient_email: emailLower,
             recipient_role: campaign.target_role === 'mixed' ? 'unknown' : campaign.target_role,
@@ -368,7 +375,7 @@ Deno.serve(async function(req) {
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[qg-launch-campaign-admin] Error:', message);
-    return new Response(JSON.stringify({ error: message }), {
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500, headers: { ...headers, 'Content-Type': 'application/json' }
     });
   }

@@ -20,6 +20,18 @@ function corsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
+function getAal(token: string): string | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = '='.repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(base64 + pad)).aal || null;
+  } catch {
+    return null;
+  }
+}
+
 async function requireSuperAdmin(req: Request) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const authHeader = req.headers.get('authorization') || '';
@@ -32,6 +44,8 @@ async function requireSuperAdmin(req: Request) {
   });
   const { data: { user }, error: userErr } = await userClient.auth.getUser();
   if (userErr || !user) return { error: { status: 401, message: 'Invalid or expired token' } };
+
+  if (getAal(token) !== 'aal2') return { error: { status: 403, message: 'Multi-factor authentication required' } };
 
   const serviceClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { db: { schema: 'app' } });
   const { data: admin } = await serviceClient
@@ -83,17 +97,10 @@ Deno.serve(async (req: Request) => {
         await serviceClient.from('guards').update({ updated_at: now }).eq('user_id', userId);
       } else {
         const { error } = await serviceClient.from('guards').insert({
-          user_id: userId,
-          email: '',
-          full_name: '',
-          profile_completed: false,
-          subscription_status: 'incomplete',
-          verification_status: 'manual_review',
-          sia_verified: false,
-          is_active: false,
-          onboarding_status: 'provisioned',
-          created_at: now,
-          updated_at: now,
+          user_id: userId, email: '', full_name: '', profile_completed: false,
+          subscription_status: 'incomplete', verification_status: 'manual_review',
+          sia_verified: false, is_active: false, onboarding_status: 'provisioned',
+          created_at: now, updated_at: now,
         });
         results.push({ step: 'profile', status: error ? 'error' : 'created' });
       }
@@ -104,16 +111,9 @@ Deno.serve(async (req: Request) => {
         await serviceClient.from('clients').update({ updated_at: now }).eq('user_id', userId);
       } else {
         const { error } = await serviceClient.from('clients').insert({
-          user_id: userId,
-          email: '',
-          contact_name: '',
-          profile_completed: false,
-          subscription_status: 'incomplete',
-          verification_status: 'pending',
-          is_active: true,
-          onboarding_status: 'provisioned',
-          created_at: now,
-          updated_at: now,
+          user_id: userId, email: '', contact_name: '', profile_completed: false,
+          subscription_status: 'incomplete', verification_status: 'pending',
+          is_active: true, onboarding_status: 'provisioned', created_at: now, updated_at: now,
         });
         results.push({ step: 'profile', status: error ? 'error' : 'created' });
       }
@@ -123,15 +123,10 @@ Deno.serve(async (req: Request) => {
     const { data: ent } = await serviceClient.from('user_entitlements_data').select('user_id').eq('user_id', userId).maybeSingle();
     if (!ent) {
       const { error } = await serviceClient.from('user_entitlements_data').insert({
-        user_id: userId,
-        plan_slug: isClient ? 'client_free' : 'guard_starter',
-        plan_name: 'Free Starter',
+        user_id: userId, plan_slug: isClient ? 'client_free' : 'guard_starter', plan_name: 'Free Starter',
         audience: accountType,
         features: isClient ? JSON.stringify(['client.post_job', 'client.view_guard_profiles', 'client.escrow_payments']) : JSON.stringify(['guard.apply_job', 'guard.view_jobs', 'guard.create_profile', 'guard.advanced_alerts']),
-        monthly_price_pence: 0,
-        subscription_status: 'active',
-        created_at: now,
-        updated_at: now,
+        monthly_price_pence: 0, subscription_status: 'active', created_at: now, updated_at: now,
       });
       results.push({ step: 'entitlements', status: error ? 'error' : 'created' });
     } else {
@@ -141,22 +136,10 @@ Deno.serve(async (req: Request) => {
     const { data: notif } = await serviceClient.from('notification_preferences').select('id').eq('user_id', userId).maybeSingle();
     if (!notif) {
       const { error } = await serviceClient.from('notification_preferences').insert({
-        user_id: userId,
-        job_matches: true,
-        application_updates: true,
-        payment_notifications: true,
-        messages: true,
-        sia_reminders: true,
-        email_frequency: 'daily',
-        new_applicants: true,
-        guard_confirmations: true,
-        job_reminders: true,
-        support_tickets: true,
-        payment_updates: true,
-        in_app_alerts: true,
-        sms_notifications: false,
-        created_at: now,
-        updated_at: now,
+        user_id: userId, job_matches: true, application_updates: true, payment_notifications: true,
+        messages: true, sia_reminders: true, email_frequency: 'daily', new_applicants: true,
+        guard_confirmations: true, job_reminders: true, support_tickets: true, payment_updates: true,
+        in_app_alerts: true, sms_notifications: false, created_at: now, updated_at: now,
       });
       results.push({ step: 'notification_preferences', status: error ? 'error' : 'created' });
     } else {
@@ -166,16 +149,9 @@ Deno.serve(async (req: Request) => {
     const { data: sub } = await serviceClient.from('subscriptions').select('id').eq('user_id', userId).maybeSingle();
     if (!sub) {
       const { error } = await serviceClient.from('subscriptions').insert({
-        user_id: userId,
-        status: 'active',
-        plan_slug: isClient ? 'client_free' : 'guard_starter',
-        plan_name: 'Free Starter',
-        billing_cycle: 'monthly',
-        auto_renew: false,
-        payment_failure_count: 0,
-        account_type: accountType,
-        created_at: now,
-        updated_at: now,
+        user_id: userId, status: 'active', plan_slug: isClient ? 'client_free' : 'guard_starter',
+        plan_name: 'Free Starter', billing_cycle: 'monthly', auto_renew: false,
+        payment_failure_count: 0, account_type: accountType, created_at: now, updated_at: now,
       });
       results.push({ step: 'subscription', status: error ? 'error' : 'created' });
     } else {
@@ -183,22 +159,14 @@ Deno.serve(async (req: Request) => {
     }
 
     await serviceClient.from('admin_activity_log').insert({
-      admin_user_id: actor.id,
-      admin_username: actor.email,
-      admin_name: actor.full_name,
-      action_type: 'admin_provision_user',
-      action_description: `Provisioned ${accountType} account`,
-      target_type: accountType,
-      target_name: userId,
-      metadata: { target_user_id: userId, accountType, results },
-      created_at: now,
+      admin_user_id: actor.id, admin_username: actor.email, admin_name: actor.full_name,
+      action_type: 'admin_provision_user', action_description: `Provisioned ${accountType} account`,
+      target_type: accountType, target_name: userId,
+      metadata: { target_user_id: userId, accountType, results }, created_at: now,
     });
 
     const hasErrors = results.some((r) => r.status === 'error');
-    return new Response(JSON.stringify({ success: !hasErrors, results }), {
-      status: 200,
-      headers: { ...headers, 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify({ success: !hasErrors, results }), { status: 200, headers: { ...headers, 'Content-Type': 'application/json' } });
   } catch {
     return fail(headers, 'Internal server error', 500);
   }

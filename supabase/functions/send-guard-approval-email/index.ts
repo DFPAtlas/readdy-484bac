@@ -7,17 +7,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
 };
 
-function base64UrlDecode(str: string): string {
-  const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-  const padding = '='.repeat((4 - (base64.length % 4)) % 4);
-  return atob(base64 + padding);
-}
-
-function decodeJwtPayload(jwt: string): any {
+function getAal(token: string): string | null {
   try {
-    const parts = jwt.split('.');
+    const parts = token.split('.');
     if (parts.length !== 3) return null;
-    return JSON.parse(base64UrlDecode(parts[1]));
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = '='.repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(base64 + pad)).aal || null;
   } catch {
     return null;
   }
@@ -34,7 +30,7 @@ serve(async (req) => {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
     return new Response(
-      JSON.stringify({ error: 'Missing authorization header' }),
+      JSON.stringify({ error: 'Unauthorized' }),
       { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
@@ -46,63 +42,78 @@ serve(async (req) => {
 
     if (!jwt || jwt === Deno.env.get('SUPABASE_ANON_KEY')) {
       return new Response(
-        JSON.stringify({ error: 'Missing authentication token' }),
+        JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const payload = decodeJwtPayload(jwt);
-    if (!payload || !payload.sub) {
+    const supabaseAuth = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
+    const { data: userData, error: userError } = await supabaseAuth.auth.getUser(jwt);
+    if (userError || !userData?.user) {
       return new Response(
-        JSON.stringify({ error: 'Invalid token' }),
+        JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const userId = payload.sub;
-    const email = payload.email || null;
+    if (getAal(jwt) !== 'aal2') {
+      return new Response(
+        JSON.stringify({ error: 'MFA required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
-
-    const { data: adminUser } = await supabase
+    const { data: adminUser } = await supabaseAuth
       .from('admin_users')
       .select('id, is_active')
-      .eq('user_id', userId)
+      .eq('user_id', userData.user.id)
       .maybeSingle();
 
     if (!adminUser || !adminUser.is_active) {
-      if (email) {
-        const { data: adminByEmail } = await supabase
-          .from('admin_users')
-          .select('id, is_active')
-          .eq('email', email)
-          .eq('is_active', true)
-          .maybeSingle();
-
-        if (!adminByEmail) {
-          return new Response(
-            JSON.stringify({ error: 'Admin access required' }),
-            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      } else {
-        return new Response(
-          JSON.stringify({ error: 'Admin access required' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      return new Response(
+        JSON.stringify({ error: 'Admin access required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
   }
 
   try {
     const { guardEmail, guardName, guardFirstName, guardLastName, approved, rejectionReason, unconfirmedSections, guardId } = await req.json();
-    const displayName = guardName || (guardFirstName && guardLastName ? `${guardFirstName} ${guardLastName}` : 'Guard');
 
-    if (!guardEmail || !displayName || approved === undefined) {
+    let email = guardEmail;
+    let displayName = guardName || (guardFirstName && guardLastName ? `${guardFirstName} ${guardLastName}` : 'Guard');
+    let relatedUserId: string | null = guardId || null;
+
+    if (guardId) {
+      const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
+      const { data: byId } = await supabase
+        .from('guards')
+        .select('id, user_id, email, full_name, first_name, last_name')
+        .eq('id', guardId)
+        .maybeSingle();
+
+      let guardRecord = byId;
+      if (!guardRecord) {
+        const { data: byUserId } = await supabase
+          .from('guards')
+          .select('id, user_id, email, full_name, first_name, last_name')
+          .eq('user_id', guardId)
+          .maybeSingle();
+        guardRecord = byUserId;
+      }
+
+      if (guardRecord) {
+        email = guardRecord.email || email;
+        displayName = guardRecord.full_name || (guardRecord.first_name && guardRecord.last_name ? `${guardRecord.first_name} ${guardRecord.last_name}` : displayName);
+        relatedUserId = guardRecord.user_id || relatedUserId;
+      }
+    }
+
+    if (!email || !displayName || approved === undefined) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    if (guardId) {
+    if (relatedUserId) {
       const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
       const templateLookup = approved ? 'guard_approval' : 'guard_rejection';
       const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -111,7 +122,7 @@ serve(async (req) => {
         .from('email_send_log')
         .select('id')
         .eq('template', templateLookup)
-        .eq('related_user_id', guardId)
+        .eq('related_user_id', relatedUserId)
         .eq('status', 'sent')
         .gte('sent_at', cutoff)
         .maybeSingle();
@@ -143,17 +154,17 @@ serve(async (req) => {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
       body: JSON.stringify({
         template_slug: templateSlug,
-        to: guardEmail,
+        to: email,
         variables,
         from: 'QuickGuard <info@quickguard.uk>',
-        related_user_id: guardId || null,
+        related_user_id: relatedUserId,
       }),
     });
 
     if (!renderRes.ok) {
       const errText = await renderRes.text();
       console.error('render-email-template error:', errText);
-      return new Response(JSON.stringify({ error: 'Failed to render email', details: errText }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Failed to render email' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const renderData = await renderRes.json();
@@ -161,6 +172,6 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error sending email:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error', message: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

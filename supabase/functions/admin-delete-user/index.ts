@@ -9,6 +9,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function getAal(token: string): string | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = "=".repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(base64 + pad)).aal || null;
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -47,6 +59,13 @@ serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: "Not authenticated" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (getAal(token) !== "aal2") {
+      return new Response(
+        JSON.stringify({ error: "Multi-factor authentication required" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -128,19 +147,10 @@ serve(async (req: Request) => {
       financialRowsAnonymised: { table: string; rowCount: number }[];
       totalRows: number;
       totalFiles: number;
-    } = {
-      tables: [],
-      storageFiles: [],
-      financialRowsAnonymised: [],
-      totalRows: 0,
-      totalFiles: 0,
-    };
+    } = { tables: [], storageFiles: [], financialRowsAnonymised: [], totalRows: 0, totalFiles: 0 };
 
     async function countRows(table: string, column: string, value: string): Promise<number> {
-      const { count } = await adminClient
-        .from(table)
-        .select("*", { count: "exact", head: true })
-        .eq(column, value);
+      const { count } = await adminClient.from(table).select("*", { count: "exact", head: true }).eq(column, value);
       return count || 0;
     }
 
@@ -148,19 +158,14 @@ serve(async (req: Request) => {
       const files: string[] = [];
       for (const searchPath of searchPaths) {
         try {
-          const { data } = await adminClient.storage.from(bucket).list(searchPath, {
-            limit: 1000,
-            offset: 0,
-          });
+          const { data } = await adminClient.storage.from(bucket).list(searchPath, { limit: 1000, offset: 0 });
           if (data) {
             for (const f of data) {
               const fullPath = searchPath ? `${searchPath}/${f.name}` : f.name;
               files.push(`${bucket}/${fullPath}`);
             }
           }
-        } catch (_) {
-          // bucket or path may not exist
-        }
+        } catch (_) {}
       }
       return files;
     }
@@ -223,9 +228,7 @@ serve(async (req: Request) => {
     const tablesToDelete = user_type === "guard" ? guardTablesToDelete : clientTablesToDelete;
 
     for (const entry of tablesToDelete) {
-      const idToUse = ["sender_id", "receiver_id", "user_id"].includes(entry.column)
-        ? targetUserId
-        : targetRecord.id;
+      const idToUse = ["sender_id", "receiver_id", "user_id"].includes(entry.column) ? targetUserId : targetRecord.id;
       const cnt = await countRows(entry.table, entry.column, idToUse);
       if (cnt > 0) {
         summary.tables.push({ name: entry.table, rowCount: cnt });
@@ -246,15 +249,10 @@ serve(async (req: Request) => {
     for (const entry of financialTables) {
       const idToUse = entry.column === "user_id" ? targetUserId : targetRecord.id;
       const cnt = await countRows(entry.table, entry.column, idToUse);
-      if (cnt > 0) {
-        summary.financialRowsAnonymised.push({ table: entry.table, rowCount: cnt });
-      }
+      if (cnt > 0) summary.financialRowsAnonymised.push({ table: entry.table, rowCount: cnt });
     }
 
-    const { count: userCount } = await adminClient
-      .from("users")
-      .select("*", { count: "exact", head: true })
-      .eq("id", targetUserId);
+    const { count: userCount } = await adminClient.from("users").select("*", { count: "exact", head: true }).eq("id", targetUserId);
     if (userCount && userCount > 0) {
       summary.tables.push({ name: "users", rowCount: userCount });
       summary.totalRows += userCount;
@@ -280,12 +278,7 @@ serve(async (req: Request) => {
         target_type: user_type,
         target_name: targetRecord.email || targetRecord.full_name || targetRecord.contact_name || "unknown",
         ip_address: clientIp,
-        metadata: {
-          user_id: targetRecord.id,
-          target_user_id: targetUserId,
-          reason,
-          summary,
-        },
+        metadata: { user_id: targetRecord.id, target_user_id: targetUserId, reason, summary },
       };
       await adminClient.from("admin_activity_log").insert(auditEntry);
 
@@ -316,18 +309,13 @@ serve(async (req: Request) => {
 
     for (const entry of tablesToDelete) {
       try {
-        const idToUse = ["sender_id", "receiver_id", "user_id"].includes(entry.column)
-          ? targetUserId
-          : targetRecord.id;
-        const { error } = await adminClient
-          .from(entry.table)
-          .delete()
-          .eq(entry.column, idToUse);
+        const idToUse = ["sender_id", "receiver_id", "user_id"].includes(entry.column) ? targetUserId : targetRecord.id;
+        const { error } = await adminClient.from(entry.table).delete().eq(entry.column, idToUse);
         if (error) {
           failedItems.push(`${entry.table} (${entry.column}=${idToUse}): ${error.message}`);
         } else {
           deletedTables.push(entry.table);
-          deletionResult[entry.table] = summary.tables.find(t => t.name === entry.table)?.rowCount || 0;
+          deletionResult[entry.table] = summary.tables.find((t) => t.name === entry.table)?.rowCount || 0;
         }
       } catch (e: any) {
         failedItems.push(`${entry.table}: ${e.message}`);
@@ -345,20 +333,14 @@ serve(async (req: Request) => {
     for (const entry of financialTables) {
       try {
         const idToUse = entry.column === "user_id" ? targetUserId : targetRecord.id;
-        const { data: rows } = await adminClient
-          .from(entry.table)
-          .select("id")
-          .eq(entry.column, idToUse);
+        const { data: rows } = await adminClient.from(entry.table).select("id").eq(entry.column, idToUse);
         if (rows && rows.length > 0) {
           const updatePayload: any = { user_email_anonymised: anonymisedEmail };
           if (entry.table === "subscriptions") {
             updatePayload.status = "deleted";
             updatePayload.cancel_at_period_end = true;
           }
-          await adminClient
-            .from(entry.table)
-            .update(updatePayload)
-            .eq(entry.column, idToUse);
+          await adminClient.from(entry.table).update(updatePayload).eq(entry.column, idToUse);
           retainedResult[entry.table] = rows.length;
         }
       } catch (e: any) {
@@ -367,20 +349,14 @@ serve(async (req: Request) => {
     }
 
     const deletedFiles: string[] = [];
-    const failedFiles: string[] = [];
     for (const filePath of summary.storageFiles) {
       try {
         const [bucket, ...pathParts] = filePath.split("/");
         const path = pathParts.join("/");
         const { error } = await adminClient.storage.from(bucket).remove([path]);
-        if (error) {
-          failedFiles.push(filePath);
-          failedItems.push(`storage ${filePath}: ${error.message}`);
-        } else {
-          deletedFiles.push(filePath);
-        }
+        if (error) failedItems.push(`storage ${filePath}: ${error.message}`);
+        else deletedFiles.push(filePath);
       } catch (e: any) {
-        failedFiles.push(filePath);
         failedItems.push(`storage ${filePath}: ${e.message}`);
       }
     }

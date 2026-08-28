@@ -21,6 +21,18 @@ function corsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
+function getAal(token: string): string | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = '='.repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(base64 + pad)).aal || null;
+  } catch {
+    return null;
+  }
+}
+
 function fail(headers: Record<string, string>, message: string, status: number) {
   return new Response(JSON.stringify({ error: message }), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
 }
@@ -29,14 +41,16 @@ async function requireSuperAdmin(req: Request) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const authHeader = req.headers.get('authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-  if (!token) return { error: { status: 401, message: 'Missing authentication token' } };
+  if (!token) return { error: { status: 401, message: 'Unauthorized' } };
 
   const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
   const { data: { user }, error: userErr } = await userClient.auth.getUser();
-  if (userErr || !user) return { error: { status: 401, message: 'Invalid or expired token' } };
+  if (userErr || !user) return { error: { status: 401, message: 'Unauthorized' } };
+
+  if (getAal(token) !== 'aal2') return { error: { status: 403, message: 'MFA required' } };
 
   const serviceClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { db: { schema: 'app' } });
   const { data: admin } = await serviceClient
@@ -47,7 +61,7 @@ async function requireSuperAdmin(req: Request) {
     .eq('role', 'super_admin')
     .maybeSingle();
 
-  if (!admin) return { error: { status: 403, message: 'Insufficient permissions' } };
+  if (!admin) return { error: { status: 403, message: 'Admin access required' } };
   return { user, admin, serviceClient };
 }
 

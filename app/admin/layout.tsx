@@ -8,8 +8,9 @@ import AdminSessionTimeout from '@/components/AdminSessionTimeout';
 import AdminSessionHeartbeat from '@/components/AdminSessionHeartbeat';
 import { supabase } from '@/lib/supabase';
 import { clearAdminAuthCache } from '@/hooks/useAdminAuth';
+import { resolveAdminMfaRoute } from '@/lib/admin-mfa';
 
-const NO_SIDEBAR_PATHS = ['/admin/login', '/admin/setup', '/admin/register'];
+const NO_SIDEBAR_PATHS = ['/admin/login', '/admin/setup', '/admin/register', '/admin/mfa', '/admin/mfa/setup'];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -52,6 +53,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (cancelled) return;
 
         if (adminCheck && adminCheck.is_active && ['super_admin', 'admin', 'finance_admin'].includes(adminCheck.role)) {
+          const mfaRoute = await resolveAdminMfaRoute();
+          if (mfaRoute === 'mfa') {
+            setLoading(false);
+            router.push('/admin/mfa');
+            return;
+          }
+          if (mfaRoute === 'setup') {
+            setLoading(false);
+            router.push('/admin/mfa/setup');
+            return;
+          }
+          if (mfaRoute !== 'authorized') {
+            await supabase.auth.signOut();
+            clearAdminAuthCache();
+            if (typeof window !== 'undefined') {
+              localStorage.clear();
+              sessionStorage.clear();
+            }
+            setLoading(false);
+            router.push('/admin/login');
+            return;
+          }
           setIsAuthorized(true);
           setAdminUser({ id: adminCheck.id, email: adminCheck.email });
           setLoading(false);
@@ -102,6 +125,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         const validRoles = ['super_admin', 'admin', 'finance_admin'];
         if (!validRoles.includes(data.role)) {
+          await supabase.auth.signOut();
+          clearAdminAuthCache();
+          if (typeof window !== 'undefined') {
+            localStorage.clear();
+            sessionStorage.clear();
+          }
+          setLoading(false);
+          router.push('/admin/login');
+          return;
+        }
+
+        const mfaRoute = await resolveAdminMfaRoute();
+        if (mfaRoute === 'mfa') {
+          setLoading(false);
+          router.push('/admin/mfa');
+          return;
+        }
+        if (mfaRoute === 'setup') {
+          setLoading(false);
+          router.push('/admin/mfa/setup');
+          return;
+        }
+        if (mfaRoute !== 'authorized') {
           await supabase.auth.signOut();
           clearAdminAuthCache();
           if (typeof window !== 'undefined') {

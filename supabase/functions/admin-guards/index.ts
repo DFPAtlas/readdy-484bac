@@ -5,6 +5,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function getAal(token: string): string | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = '='.repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(base64 + pad)).aal || null;
+  } catch {
+    return null;
+  }
+}
+
 async function computeStats(supabase: any) {
   const [totalRes, siaRes, approvedRes, pendingRes, earningsRes] = await Promise.all([
     supabase.from('guards').select('*', { count: 'exact', head: true }),
@@ -66,27 +78,39 @@ Deno.serve(async (req) => {
     });
 
     const authHeader = req.headers.get('Authorization');
-    let adminCheck = null;
-
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      if (token.length > 40) {
-        const { data: { user } } = await supabase.auth.getUser(token);
-        if (user) {
-          const { data: jwtMatch } = await supabase
-            .from('admin_users')
-            .select('id, email, full_name')
-            .eq('user_id', user.id)
-            .eq('is_active', true)
-            .maybeSingle();
-          adminCheck = jwtMatch;
-        }
-      }
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user } } = await supabase.auth.getUser(token);
+    if (!user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (getAal(token) !== 'aal2') {
+      return new Response(
+        JSON.stringify({ error: 'MFA required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: adminCheck } = await supabase
+      .from('admin_users')
+      .select('id, email, full_name')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle();
 
     if (!adminCheck) {
       return new Response(
-        JSON.stringify({ error: 'Forbidden: admin access required' }),
+        JSON.stringify({ error: 'Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

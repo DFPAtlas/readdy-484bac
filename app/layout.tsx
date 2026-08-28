@@ -82,6 +82,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://storage.helloreaddy.io" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://readdy.ai" crossOrigin="anonymous" />
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-GYTYP412SF"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-GYTYP412SF');`,
+          }}
+        />
       </head>
       <body>
         <Suspense fallback={
