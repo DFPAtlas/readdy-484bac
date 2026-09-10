@@ -20,6 +20,8 @@ const JOB_STATUS_MAP: Record<string, { label: string; variant: BadgeVariant }> =
   awaiting_client_approval: { label: 'Awaiting Approval', variant: 'warning' },
   payout_approved: { label: 'Payout Pending', variant: 'warning' },
   paid_out: { label: 'Paid Out', variant: 'success' },
+  review_pending: { label: 'Review Pending', variant: 'warning' },
+  closed: { label: 'Closed', variant: 'neutral' },
   in_progress: { label: 'Active', variant: 'success' },
   active: { label: 'Active', variant: 'success' },
   confirmed: { label: 'Confirmed', variant: 'success' },

@@ -80,14 +80,10 @@ export default function AssignedGuardsSection({
   const loadGuardReviews = async () => {
     setLoadingReviews(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const { data: reviews } = await supabase
         .from('reviews')
         .select('*')
-        .eq('job_id', jobId)
-        .eq('client_id', user.id);
+        .eq('job_id', jobId);
 
       const map: Record<string, GuardReview> = {};
       (reviews || []).forEach((r) => {

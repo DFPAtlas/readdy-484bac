@@ -244,6 +244,7 @@ export default function AdminReviewsPage() {
   }
 
   async function handleToggleStatus(id: string, currentStatus: string) {
+    const review = reviews.find((r) => r.id === id);
     const newStatus = currentStatus === 'published' ? 'hidden' : 'published';
     const { error: updateError } = await supabase.from('reviews').update({ status: newStatus }).eq('id', id);
     if (updateError) {
@@ -252,6 +253,22 @@ export default function AdminReviewsPage() {
     }
     setReviews((prev) => prev.map((r) => r.id === id ? { ...r, status: newStatus } : r));
     if (selectedReview?.id === id) setSelectedReview((prev) => prev ? { ...prev, status: newStatus } : null);
+
+    if (review?.guard_id) {
+      const { data: remaining } = await supabase
+        .from('reviews')
+        .select('rating')
+        .eq('guard_id', review.guard_id)
+        .eq('status', 'published');
+
+      const count = remaining?.length || 0;
+      const avg = count > 0
+        ? parseFloat((remaining!.reduce((sum, r) => sum + (r.rating || 0), 0) / count).toFixed(1))
+        : 0;
+
+      await supabase.from('guards').update({ rating: avg, total_reviews: count }).eq('id', review.guard_id);
+    }
+
     fetchStats();
     showToast(`Review ${newStatus === 'published' ? 'published' : 'hidden'} successfully.`, 'success');
   }

@@ -149,12 +149,12 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     };
   }, [jobId]);
 
-  const fetchGuardReviews = async (userId: string) => {
+  const fetchGuardReviews = async (clientIdValue: string) => {
     const { data } = await supabase
       .from('reviews')
       .select('id, guard_id, rating, review_text, review_status, issue_reported')
       .eq('job_id', jobId)
-      .eq('client_id', userId);
+      .eq('client_id', clientIdValue);
 
     const map: Record<string, GuardReview> = {};
     (data || []).forEach((r) => {
@@ -234,7 +234,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       const timelineEvents = buildTimeline(jobData, assignmentsData.data || [], activityData.data || []);
       setTimeline(timelineEvents);
 
-      await fetchGuardReviews(user.id);
+      await fetchGuardReviews(client.id);
     } catch {
     } finally {
       setLoading(false);
@@ -452,7 +452,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   };
 
   const handleReviewSuccess = async () => {
-    await fetchGuardReviews(currentUserId);
+    await fetchGuardReviews(clientId);
   };
 
   const handleMessageGuard = (guardId: string, guardName: string, guardUserId: string) => {
@@ -542,7 +542,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   ];
 
   const isCompleted = job.status === 'completed';
-  const isPaidOut = job.status === 'paid_out';
+  const isReviewable = job.status === 'paid_out' || job.status === 'review_pending' || job.status === 'closed';
   const unreviewedGuards = assignedGuards.filter((a) => a.guards?.id && !guardReviews[a.guards.id]);
   const reviewedGuards = assignedGuards.filter((a) => a.guards?.id && guardReviews[a.guards.id]);
 
@@ -648,7 +648,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                 Mark as Complete
               </button>
             )}
-            {isPaidOut && unreviewedGuards.length > 0 && (
+            {isReviewable && unreviewedGuards.length > 0 && (
               <button
                 onClick={() => {
                   const firstUnreviewed = unreviewedGuards[0];
@@ -662,7 +662,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                 {unreviewedGuards.length > 1 ? `Review ${unreviewedGuards.length} Guards` : 'Leave a Review'}
               </button>
             )}
-            {isPaidOut && unreviewedGuards.length === 0 && reviewedGuards.length > 0 && (
+            {isReviewable && unreviewedGuards.length === 0 && reviewedGuards.length > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500/10 border border-emerald-500/25 rounded-xl">
                 <i className="ri-check-double-line text-emerald-400"></i>
                 <span className="text-xs font-semibold text-emerald-400 whitespace-nowrap">All reviewed</span>
@@ -798,7 +798,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
           {activeTab === 'guards' && (
             <AssignedGuardsSection
               guards={assignedGuards}
-              isCompleted={isPaidOut}
+              isCompleted={isReviewable}
               jobId={jobId}
               onLeaveReview={handleOpenReviewModal}
               onMessageGuard={handleMessageGuard}

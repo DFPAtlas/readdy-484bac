@@ -105,18 +105,19 @@ serve(async (req: Request) => {
 
   const { data: assignment } = await supabase
     .from("job_assignments")
-    .select("id")
+    .select("id, status, payment_status")
     .eq("job_id", jobId)
     .eq("guard_id", guardId)
     .maybeSingle();
 
   if (!assignment) return json(400, { error: "This guard was not assigned to this job" });
+  if (assignment.status !== "completed") return json(400, { error: "This guard has not completed the job yet" });
+  if (assignment.payment_status !== "paid_out") return json(400, { error: "This guard's payout has not completed yet" });
 
   const { data: existing } = await supabase
     .from("reviews")
     .select("id")
-    .eq("job_id", jobId)
-    .eq("client_id", client.id)
+    .eq("assignment_id", assignment.id)
     .maybeSingle();
 
   if (existing) return json(409, { error: "You have already reviewed this guard for this job" });
@@ -126,6 +127,7 @@ serve(async (req: Request) => {
     job_id: jobId,
     guard_id: guardId,
     client_id: client.id,
+    assignment_id: assignment.id,
     rating,
     review_text: reviewText,
     private_note: privateNote,
@@ -153,5 +155,45 @@ serve(async (req: Request) => {
     return json(500, { error: "Unable to submit review" });
   }
 
-  return json(200, { success: true, message: "Review submitted for moderation" });
+  const { data: ratingRows } = await supabase
+    .from("reviews")
+    .select("rating")
+    .eq("guard_id", guardId)
+    .eq("status", "published");
+
+  const published = ratingRows || [];
+  const totalReviews = published.length;
+  const avgRating = totalReviews > 0
+    ? Math.round((published.reduce((s, r) => s + (r.rating || 0), 0) / totalReviews) * 10) / 10
+    : 0;
+
+  await supabase
+    .from("guards")
+    .update({ rating: avgRating, total_reviews: totalReviews, updated_at: now })
+    .eq("id", guardId);
+
+  const { data: allAssignments } = await supabase
+    .from("job_assignments")
+    .select("id, payment_status")
+    .eq("job_id", jobId);
+
+  const requiredIds = (allAssignments || [])
+    .filter((a) => a.payment_status === "paid_out")
+    .map((a) => a.id);
+
+  const { data: jobReviews } = await supabase
+    .from("reviews")
+    .select("assignment_id")
+    .eq("job_id", jobId);
+
+  const reviewedIds = new Set((jobReviews || []).map((r) => r.assignment_id).filter(Boolean));
+  const allReviewed = requiredIds.length > 0 && requiredIds.every((id) => reviewedIds.has(id));
+
+  const nextStatus = allReviewed ? "closed" : "review_pending";
+  await supabase
+    .from("jobs")
+    .update({ status: nextStatus, updated_at: now })
+    .eq("id", jobId);
+
+  return json(200, { success: true, message: "Review submitted for moderation", job_status: nextStatus });
 });
