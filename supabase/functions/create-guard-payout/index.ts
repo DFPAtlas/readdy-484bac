@@ -465,7 +465,7 @@ async function validatePayoutEligibility(assignment: AssignmentRecord): Promise<
   }
 
   if (assignment.payment_status === 'payout_processing') {
-    return;
+    throw { status: 409, message: 'Payout currently processing' };
   }
 
   if (assignment.payment_status === 'payout_pending') {
