@@ -135,7 +135,7 @@ export default function CompletionApprovalPanel({ clientId }: Props) {
                     className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-colors cursor-pointer whitespace-nowrap"
                   >
                     <i className="ri-check-double-line"></i>
-                    Approve & Release
+                    Approve
                   </button>
                   <button
                     onClick={() => setSelectedRequest(req)}
@@ -164,7 +164,7 @@ export default function CompletionApprovalPanel({ clientId }: Props) {
           guardName={selectedRequest.guards?.full_name || 'Guard'}
           jobTitle={selectedRequest.jobs?.job_title || 'Job'}
           onSuccess={() => {
-            setToast('Completion processed successfully');
+            setToast('Completion approved — payout pending');
             loadRequests();
           }}
           onClose={() => setSelectedRequest(null)}

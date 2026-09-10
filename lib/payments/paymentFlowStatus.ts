@@ -31,7 +31,7 @@ const STAGE1_COMPLETE = ['paid', 'succeeded', 'complete', 'completed', 'funded']
 const STAGE1_PENDING = ['pending', 'processing', 'payment_pending', 'awaiting_payment'];
 const STAGE1_FAILED = ['failed', 'cancelled', 'refunded'];
 
-const STAGE2_COMPLETE = ['approved', 'confirmed', 'client_released', 'released'];
+const STAGE2_COMPLETE = ['approved', 'confirmed', 'client_released', 'released', 'payout_pending'];
 const STAGE2_PENDING = ['awaiting_client_release', 'pending'];
 const STAGE2_FAILED = ['disputed'];
 
@@ -93,8 +93,8 @@ export function getPaymentFlowStatus(data: FlowSourceData): PaymentFlowStatus {
         ? 'complete'
         : data.jobDisputed || data.completionRequestClientDisputedAt
           ? 'failed'
-          : (data.assignmentPaymentStatus === 'awaiting_client_release' || data.assignmentPaymentStatus === 'client_released'
-            ? (data.assignmentPaymentStatus === 'client_released' ? 'complete' : 'pending')
+          : (data.assignmentPaymentStatus === 'awaiting_client_release' || data.assignmentPaymentStatus === 'client_released' || data.assignmentPaymentStatus === 'payout_pending'
+            ? (data.assignmentPaymentStatus === 'awaiting_client_release' ? 'pending' : 'complete')
             : 'not_started');
 
   const stage3Stat = data.payoutStatus
@@ -128,8 +128,8 @@ export function getPaymentFlowStatus(data: FlowSourceData): PaymentFlowStatus {
   };
 
   const stage2Tooltips: Record<FlowStage, string> = {
-    complete: 'Client has confirmed the job and released payment.',
-    pending: 'Job is complete; waiting for client to release payment.',
+    complete: 'Client approved completion. Payout is now pending.',
+    pending: 'Job is complete; waiting for client approval.',
     failed: 'Client has disputed or payment release was blocked.',
     not_started: 'Job has not been completed yet.',
   };
@@ -152,7 +152,7 @@ export function getPaymentFlowStatus(data: FlowSourceData): PaymentFlowStatus {
     },
     client_released: {
       status: stage2Stat,
-      label: 'Client Released',
+      label: 'Client Approved',
       timestamp: data.completionRequestClientApprovedAt || data.assignmentPayoutReleasedAt || null,
       tooltip: stage2Tooltips[stage2Stat],
     },

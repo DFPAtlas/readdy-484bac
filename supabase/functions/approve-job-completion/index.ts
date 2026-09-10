@@ -52,8 +52,8 @@ interface CompletionRequest {
 interface ClientRecord { id: string; user_id: string; }
 interface AdminRecord { id: string; role: string; is_active: boolean; }
 interface GuardRecord { id: string; user_id: string; full_name: string | null; }
-interface JobRecord { id: string; client_id: string; job_title: string | null; }
-interface AssignmentRecord { id: string; }
+interface JobRecord { id: string; client_id: string; job_title: string | null; status: string | null; payment_status: string | null; disputed: boolean | null; }
+interface AssignmentRecord { id: string; status: string | null; payment_status: string | null; }
 
 serve(async (req: Request) => {
   const origin = req.headers.get('Origin');
@@ -75,7 +75,6 @@ serve(async (req: Request) => {
   const requestId = typeof body.requestId === 'string' ? body.requestId.trim() : '';
   const action = typeof body.action === 'string' ? body.action.trim() : '';
   const disputeReasonRaw = typeof body.disputeReason === 'string' ? body.disputeReason.trim() : '';
-  const review = body.review as Record<string, unknown> | undefined;
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!UUID_RE.test(requestId)) return corsResponse(origin, 400, { error: 'Invalid request ID' });
@@ -131,7 +130,7 @@ serve(async (req: Request) => {
   }
 
   const { data: jobRecord, error: jobErr } = await supabase
-    .from('jobs').select('id, client_id, job_title').eq('id', request.job_id).maybeSingle();
+    .from('jobs').select('id, client_id, job_title, status, payment_status, disputed').eq('id', request.job_id).maybeSingle();
   if (jobErr) { safeLog('job load error', jobErr.message); return corsResponse(origin, 500, { error: 'Unable to process request' }); }
   if (!jobRecord) return corsResponse(origin, 400, { error: 'Associated job not found' });
 
@@ -143,7 +142,7 @@ serve(async (req: Request) => {
   }
 
   const { data: assignmentRecord, error: assignErr } = await supabase
-    .from('job_assignments').select('id').eq('job_id', request.job_id).eq('guard_id', request.guard_id).maybeSingle();
+    .from('job_assignments').select('id, status, payment_status').eq('job_id', request.job_id).eq('guard_id', request.guard_id).maybeSingle();
   if (assignErr) { safeLog('assignment load error', assignErr.message); return corsResponse(origin, 500, { error: 'Unable to process request' }); }
   if (!assignmentRecord) return corsResponse(origin, 404, { error: 'Assignment not found' });
 
@@ -176,6 +175,21 @@ serve(async (req: Request) => {
   if (isClientAction) {
     const expectedPrevStatus = 'pending';
 
+    if (action === 'approve') {
+      if (assignment.status !== 'completed') {
+        return corsResponse(origin, 409, { error: 'The guard has not completed this job yet' });
+      }
+      if (job.status !== 'awaiting_client_approval') {
+        return corsResponse(origin, 409, { error: 'This job is not awaiting completion approval' });
+      }
+      if (job.payment_status !== 'funded' || assignment.payment_status !== 'funded') {
+        return corsResponse(origin, 409, { error: 'This job must be funded before completion approval' });
+      }
+      if (job.disputed) {
+        return corsResponse(origin, 409, { error: 'This job has an open dispute and cannot be approved' });
+      }
+    }
+
     const { data: updatedReq, error: updateReqErr } = await supabase
       .from('job_completion_requests')
       .update(
@@ -193,56 +207,28 @@ serve(async (req: Request) => {
 
     if (action === 'approve') {
       const { error: assignUpdErr } = await supabase
-        .from('job_assignments').update({ payment_status: 'client_released', updated_at: now }).eq('id', assignment.id);
+        .from('job_assignments').update({ payment_status: 'payout_pending', updated_at: now }).eq('id', assignment.id);
       if (assignUpdErr) { safeLog('assignment update error', assignUpdErr.message); return corsResponse(origin, 500, { error: 'Unable to process request' }); }
 
       const { error: jobUpdErr } = await supabase
-        .from('jobs').update({ completion_status: 'confirmed_by_client', updated_at: now }).eq('id', request.job_id);
-      if (jobUpdErr) safeLog('job update error', jobUpdErr.message);
-
-      const clientRec = client as ClientRecord;
+        .from('jobs').update({ status: 'payout_approved', updated_at: now }).eq('id', request.job_id);
+      if (jobUpdErr) { safeLog('job update error', jobUpdErr.message); return corsResponse(origin, 500, { error: 'Unable to process request' }); }
 
       await supabase.from('payment_audit_logs').insert({
         event_type: 'client_approved_completion', job_id: request.job_id, guard_id: request.guard_id, client_id: request.client_id,
-        from_status: 'pending', to_status: 'client_released', changed_by: user.id, changed_by_role: 'client',
-        reason: 'Client approved completion — payout now eligible for finance release', created_at: now,
+        from_status: 'funded', to_status: 'payout_pending', changed_by: user.id, changed_by_role: 'client',
+        reason: 'Client approved completion — payout pending', created_at: now,
       }).catch((e: unknown) => { safeLog('approve audit log error', e instanceof Error ? e.message : 'unknown'); });
 
       if (guard.user_id) {
         await supabase.from('notifications').insert({
-          user_id: guard.user_id, user_type: 'guard', title: 'Completion Approved',
-          message: `Completion for "${jobTitle}" has been approved. Your payout is now ready for finance release.`,
+          user_id: guard.user_id, user_type: 'guard', title: 'Client Approved',
+          message: `Client approved — payout pending for "${jobTitle}".`,
           type: 'success', is_read: false, link: '/guard/dashboard#earnings', data: { job_id: request.job_id }, created_at: now,
         }).catch((e: unknown) => { safeLog('approve notification error', e instanceof Error ? e.message : 'unknown'); });
       }
 
-      if (review) {
-        const ratingVal = typeof review.rating === 'number' ? Math.round(review.rating) : 0;
-        const punctVal = typeof review.punctuality_rating === 'number' ? Math.round(review.punctuality_rating) : 0;
-        const profVal = typeof review.professionalism_rating === 'number' ? Math.round(review.professionalism_rating) : 0;
-        const commVal = typeof review.communication_rating === 'number' ? Math.round(review.communication_rating) : 0;
-        const commentText = typeof review.comment === 'string' ? review.comment.trim().slice(0, 500) : '';
-        const validRating = (v: number) => v >= 1 && v <= 5;
-
-        if (validRating(ratingVal) || validRating(punctVal) || validRating(profVal) || validRating(commVal)) {
-          const reviewInsert: Record<string, unknown> = {
-            job_id: request.job_id, guard_id: request.guard_id, client_id: request.client_id, status: 'published', created_at: now,
-          };
-          if (validRating(ratingVal)) reviewInsert.rating = ratingVal;
-          if (validRating(punctVal)) reviewInsert.punctuality = punctVal;
-          if (validRating(profVal)) reviewInsert.professionalism = profVal;
-          if (validRating(commVal)) reviewInsert.communication = commVal;
-          if (commentText) reviewInsert.review_text = commentText;
-
-          const { error: reviewErr } = await supabase.from('reviews').insert(reviewInsert);
-          if (reviewErr) {
-            if (reviewErr.code === '23505') safeLog('duplicate review prevented', request.job_id, request.client_id);
-            else safeLog('review insert error', reviewErr.message);
-          }
-        }
-      }
-
-      return corsResponse(origin, 200, { success: true, message: 'Completion approved. Payout is now eligible for finance release.' });
+      return corsResponse(origin, 200, { success: true, message: 'Completion approved — payout pending' });
     }
 
     if (action === 'dispute') {
@@ -256,8 +242,6 @@ serve(async (req: Request) => {
         .from('jobs').update({ payment_status: 'disputed', disputed: true, disputed_at: now, disputed_reason: reason, updated_at: now })
         .eq('id', request.job_id);
       if (jobUpdErr) { safeLog('dispute job update error', jobUpdErr.message); return corsResponse(origin, 500, { error: 'Unable to process request' }); }
-
-      const clientRec = client as ClientRecord;
 
       await supabase.from('payment_audit_logs').insert({
         event_type: 'client_disputed_completion', job_id: request.job_id, guard_id: request.guard_id, client_id: request.client_id,

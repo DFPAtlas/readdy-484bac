@@ -13,31 +13,17 @@ interface Props {
 
 export default function CompletionReviewModal({ requestId, guardName, jobTitle, onSuccess, onClose }: Props) {
   const [action, setAction] = useState<'approve' | 'dispute' | null>(null);
-  const [rating, setRating] = useState(0);
-  const [punctuality, setPunctuality] = useState(0);
-  const [professionalism, setProfessionalism] = useState(0);
-  const [communication, setCommunication] = useState(0);
-  const [comment, setComment] = useState('');
   const [disputeReason, setDisputeReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [payoutWarning, setPayoutWarning] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
-    setPayoutWarning(null);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const reviewPayload = action === 'approve' ? {
-        rating,
-        punctuality_rating: punctuality,
-        professionalism_rating: professionalism,
-        communication_rating: communication,
-        comment,
-      } : undefined;
 
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/approve-job-completion`,
@@ -51,26 +37,15 @@ export default function CompletionReviewModal({ requestId, guardName, jobTitle, 
             requestId,
             action,
             disputeReason: action === 'dispute' ? disputeReason : undefined,
-            review: reviewPayload,
           }),
         }
       );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to process');
 
-      const message = data.message || (action === 'approve' ? 'Completion approved. Payout is now eligible for finance release.' : 'Dispute submitted.');
+      const message = data.message || (action === 'approve' ? 'Completion approved — payout pending' : 'Dispute submitted.');
 
-      if (data.payoutInitiated === true) {
-        setSuccessMessage(message);
-      } else if (data.payoutInitiated === false) {
-        setSuccessMessage(message);
-        setPayoutWarning(data.payoutWarning || 'Payout requires finance attention.');
-      } else {
-        setSuccessMessage(message);
-        setTimeout(() => { onSuccess(); onClose(); }, 1500);
-        return;
-      }
-
+      setSuccessMessage(message);
       setTimeout(() => { onSuccess(); onClose(); }, 2000);
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
@@ -78,25 +53,6 @@ export default function CompletionReviewModal({ requestId, guardName, jobTitle, 
       setLoading(false);
     }
   };
-
-  const StarRating = ({ value, onChange, label }: { value: number; onChange: (v: number) => void; label: string }) => (
-    <div className="mb-4">
-      <p className="text-sm text-slate-300 mb-2">{label}</p>
-      <div className="flex items-center gap-1">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            key={n}
-            onClick={() => onChange(n)}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
-              n <= value ? 'text-amber-400' : 'text-slate-600'
-            }`}
-          >
-            <i className="ri-star-fill text-lg"></i>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 
   if (successMessage) {
     return (
@@ -108,12 +64,6 @@ export default function CompletionReviewModal({ requestId, guardName, jobTitle, 
             </div>
             <h3 className="text-lg font-bold text-white mb-2">Done</h3>
             <p className="text-sm text-slate-300">{successMessage}</p>
-            {payoutWarning && (
-              <div className="mt-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-sm text-amber-400">
-                <i className="ri-error-warning-line mr-1"></i>
-                {payoutWarning}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -143,7 +93,7 @@ export default function CompletionReviewModal({ requestId, guardName, jobTitle, 
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-emerald-400">Approve Completion</p>
-                  <p className="text-xs text-slate-500">Confirm the job was done well and make it eligible for payment release</p>
+                  <p className="text-xs text-slate-500">Confirm the job was done well and move it to payout pending</p>
                 </div>
               </button>
               <button
@@ -161,23 +111,10 @@ export default function CompletionReviewModal({ requestId, guardName, jobTitle, 
             </div>
           ) : action === 'approve' ? (
             <div>
-              <p className="text-sm text-slate-300 mb-4">Leave optional feedback for {guardName}:</p>
-              <StarRating value={rating} onChange={setRating} label="Overall Rating" />
-              <StarRating value={punctuality} onChange={setPunctuality} label="Punctuality" />
-              <StarRating value={professionalism} onChange={setProfessionalism} label="Professionalism" />
-              <StarRating value={communication} onChange={setCommunication} label="Communication" />
-              <div className="mb-4">
-                <p className="text-sm text-slate-300 mb-2">Comment (optional)</p>
-                <textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  maxLength={500}
-                  rows={3}
-                  className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl text-white text-sm focus:ring-2 focus:ring-teal-500 placeholder:text-slate-500 resize-none"
-                  placeholder="How did the guard perform?"
-                />
-                <p className="text-xs text-slate-500 mt-1">{comment.length}/500</p>
-              </div>
+              <p className="text-sm text-slate-300 mb-4">
+                You&apos;re approving that <span className="text-teal-400">{guardName}</span> completed this job.
+                Payment will move to <span className="text-emerald-400">payout pending</span> — it will not be released yet.
+              </p>
             </div>
           ) : (
             <div>
