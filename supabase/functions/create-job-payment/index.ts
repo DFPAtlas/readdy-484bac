@@ -187,10 +187,17 @@ serve(async (req) => {
       );
     }
 
-    if (jobData.status === 'cancelled' || jobData.status === 'completed') {
+    if (jobData.status !== 'awaiting_payment') {
       return new Response(
-        JSON.stringify({ error: 'This job cannot be paid at this time' }),
+        JSON.stringify({ error: 'This job is not ready for payment' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    if (jobData.payment_status === 'funded' || jobData.payment_status === 'refunded' || jobData.payment_status === 'succeeded' || jobData.payment_status === 'completed') {
+      return new Response(
+        JSON.stringify({ error: 'Payment already completed for this job' }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -246,7 +253,8 @@ serve(async (req) => {
     const { data: assignments, error: assignErr } = await supabaseService
       .from('job_assignments')
       .select('id, guard_id, agreed_hourly_rate, agreed_hours, gross_guard_amount, guards(user_id, full_name, hourly_rate)')
-      .eq('job_id', jobId);
+      .eq('job_id', jobId)
+      .in('status', ['selected', 'awaiting_payment']);
 
     if (assignErr) {
       console.error('[create-job-payment] Assignment load error:', assignErr.message);
@@ -258,7 +266,7 @@ serve(async (req) => {
 
     if (!assignments || assignments.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'No guards assigned to this job' }),
+        JSON.stringify({ error: 'No selected guards to pay for this job' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -386,7 +394,7 @@ serve(async (req) => {
         quantity: 1,
       }],
       success_url: `${appUrl}/client/payment/success?session_id={CHECKOUT_SESSION_ID}&job_id=${jobId}`,
-      cancel_url: `${appUrl}/client/jobs/${jobId}/payment`,
+      cancel_url: `${appUrl}/client/jobs/${jobId}/payment?cancelled=1`,
       client_reference_id: clientData.id,
       metadata: {
         jobId,
@@ -444,7 +452,7 @@ serve(async (req) => {
           client_total_amount: update.client_total_amount,
           guard_net_payout: update.guard_net_payout,
           currency: 'GBP',
-          payment_status: 'payment_pending',
+          payment_status: 'processing',
           updated_at: nowIso,
         })
         .eq('id', update.id);
@@ -465,7 +473,7 @@ serve(async (req) => {
         agreed_amount: totalGrossGuardGbp,
         platform_fee: totalPlatformFeeGbp,
         guard_payout_amount: totalGuardNetGbp,
-        payment_status: 'payment_pending',
+        payment_status: 'processing',
         currency: 'GBP',
         stripe_fee_estimate: totalStripeFeeGbp,
         stripe_fee_payer: stripeConfig.stripeFeePayer,
@@ -480,7 +488,7 @@ serve(async (req) => {
       for (const update of assignmentUpdates) {
         await supabaseService
           .from('job_assignments')
-          .update({ payment_status: null, updated_at: nowIso })
+          .update({ payment_status: 'pending', updated_at: nowIso })
           .eq('id', update.id);
       }
       try { await stripe.checkout.sessions.expire(session.id); } catch {}

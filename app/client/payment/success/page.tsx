@@ -27,12 +27,14 @@ interface JobSummary {
   end_date: string;
   start_time: string;
   end_time: string;
+  status: string;
+  payment_status: string | null;
 }
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [status, setStatus] = useState<'loading' | 'paid' | 'failed' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'paid' | 'failed' | 'error' | 'confirming'>('loading');
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [job, setJob] = useState<JobSummary | null>(null);
   const [error, setError] = useState('');
@@ -61,7 +63,7 @@ function SuccessContent() {
       try {
         const { data, error } = await supabase
           .from('jobs')
-          .select('job_title, venue_name, venue_city, start_date, end_date, start_time, end_time')
+          .select('job_title, venue_name, venue_city, start_date, end_date, start_time, end_time, status, payment_status')
           .eq('id', jobId)
           .maybeSingle();
         if (!error && data) setJob(data as JobSummary);
@@ -105,8 +107,28 @@ function SuccessContent() {
           txn.payment_status === 'failed';
 
         if (isPaid) {
-          setStatus('paid');
-          clearTimers();
+          const { data: jobState } = await supabase
+            .from('jobs')
+            .select('status, payment_status')
+            .eq('id', jobId)
+            .maybeSingle();
+          const bookingConfirmed =
+            jobState?.status === 'funded' ||
+            jobState?.status === 'confirmed' ||
+            jobState?.payment_status === 'funded';
+          if (bookingConfirmed) {
+            setStatus('paid');
+            clearTimers();
+            return;
+          }
+          setStatus('confirming');
+          attempts++;
+          setPollCount(attempts);
+          if (attempts >= 20) {
+            clearTimers();
+            setStatus('error');
+            setError('Payment was received but booking confirmation is still processing. Please check your booking status in a moment.');
+          }
           return;
         }
 
@@ -172,6 +194,23 @@ function SuccessContent() {
           <p className="text-slate-400 text-sm">This usually takes a few seconds.</p>
           {pollCount > 0 && (
             <p className="text-slate-500 text-xs mt-3">Retry {pollCount}/20</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'confirming') {
+    return (
+      <div className="min-h-screen bg-[#0B1933] flex items-center justify-center px-6">
+        <div className="text-center max-w-md mx-auto">
+          <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
+          <h1 className="text-2xl font-bold text-white mb-2">Payment is being confirmed</h1>
+          <p className="text-slate-400 text-sm">
+            Your payment was received. We&apos;re finalising your booking — this usually takes a few seconds.
+          </p>
+          {pollCount > 0 && (
+            <p className="text-slate-500 text-xs mt-3">Checking {pollCount}/20</p>
           )}
         </div>
       </div>

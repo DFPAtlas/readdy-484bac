@@ -37,7 +37,7 @@ export default function PaymentActions({
 }: Props) {
   return (
     <div className="space-y-3">
-      {(paymentStatus === "pending_payment" || paymentStatus === "not_required") && (
+      {(paymentStatus === "pending_payment" || paymentStatus === "not_required" || paymentStatus === "processing") && (
         <button
           onClick={onPayNow}
           disabled={processing || !agreedToTerms}
@@ -50,12 +50,12 @@ export default function PaymentActions({
           {processing ? (
             <>
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              Processing...
+              Creating secure payment...
             </>
           ) : (
             <>
               <i className="ri-secure-payment-line"></i>
-              {paymentMethod === "card" ? `Pay £${totalAmount}` : "Request Invoice"}
+              {paymentMethod === "card" ? `Pay & Confirm Booking (${totalAmount})` : "Request Invoice"}
             </>
           )}
         </button>

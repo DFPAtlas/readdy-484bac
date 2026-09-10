@@ -44,13 +44,15 @@ async function finalizeJobPayment(appSupabase: any, supabaseUrl: string, supabas
 
   await appSupabase.from('jobs').update({
     payment_status: 'funded',
+    status: 'funded',
     updated_at: now,
   }).eq('id', jobId);
 
   await appSupabase.from('job_assignments').update({
     payment_status: 'funded',
+    status: 'confirmed',
     updated_at: now,
-  }).eq('job_id', jobId);
+  }).eq('job_id', jobId).in('status', ['selected', 'awaiting_payment']);
 
   if (transaction.client_id) {
     await appSupabase.from('notifications').insert([{ user_id: transaction.client_id, title: 'Payment Received — Job Funded', message: `Your payment of £${Number(transaction.amount || 0).toFixed(2)} has been processed and is held by QuickGuard. Guards have been notified and can now check in.`, type: 'success', related_id: jobId, is_read: false }]);

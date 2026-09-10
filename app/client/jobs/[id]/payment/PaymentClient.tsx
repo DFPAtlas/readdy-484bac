@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import JobSummaryCard from './JobSummaryCard';
-import AssignedGuardsSection from '../AssignedGuardsSection';
+import SelectedGuardsPaymentSummary from './SelectedGuardsPaymentSummary';
 import CostBreakdown from './CostBreakdown';
 import InvoicePreview from './InvoicePreview';
 import PaymentStatusBadge from './PaymentStatusBadge';
@@ -34,6 +34,7 @@ interface Job {
   number_of_guards: number;
   hourly_rate: number;
   status: string;
+  payment_status?: string | null;
   total_cost?: number;
   clients: {
     id: string;
@@ -44,7 +45,12 @@ interface Job {
   job_assignments: Array<{
     id: string;
     guard_id: string;
-    payment_amount: number;
+    status: string;
+    payment_status: string | null;
+    agreed_hourly_rate: number | null;
+    agreed_hours: number | null;
+    gross_guard_amount: number | null;
+    currency: string | null;
     guards: {
       id: string;
       full_name: string;
@@ -52,6 +58,8 @@ interface Job {
       hourly_rate: number;
       rating: number;
       sia_verified: boolean;
+      sia_licence_number: string | null;
+      licence_types: string[] | null;
     };
   }>;
 }
@@ -126,14 +134,14 @@ interface FeeBreakdown {
 }
 
 function getPaymentStatus(job: Job & { payment_status?: string | null }, transaction: Transaction | null): string {
-  if (transaction?.refunded) return "refunded";
+  if (transaction?.refunded || job.payment_status === 'refunded') return "refunded";
   if (transaction?.status === "disputed" || transaction?.payment_status === "disputed") return "disputed";
   if (transaction?.status === "completed" || transaction?.payment_status === "completed" || transaction?.status === "succeeded" || transaction?.payment_status === "succeeded") return "paid";
-  if (job.payment_status === 'funded') return "funded";
-  if (transaction?.status === "failed" || transaction?.payment_status === "failed") return "failed";
-  if (transaction?.status === "pending" || transaction?.payment_status === "pending" || transaction?.status === "processing" || transaction?.payment_status === "processing") return "processing";
+  if (job.payment_status === 'funded' || job.status === 'funded') return "funded";
+  if (transaction?.status === "failed" || transaction?.payment_status === "failed" || job.payment_status === 'failed' || job.payment_status === 'payment_failed') return "failed";
+  if (transaction?.status === "pending" || transaction?.payment_status === "pending" || transaction?.status === "processing" || transaction?.payment_status === "processing" || job.payment_status === 'processing') return "processing";
   if (transaction?.status === "invoice_sent" || transaction?.payment_status === "invoice_sent") return "invoice_sent";
-  if (job.status === "awaiting_payment" || job.payment_status === 'payment_pending') return "pending_payment";
+  if (job.status === "awaiting_payment" || job.payment_status === 'pending' || job.payment_status === 'payment_pending') return "pending_payment";
   if (job.status === "paid") return "paid";
   return "not_required";
 }
@@ -158,6 +166,8 @@ function formatTime(timeStr?: string) {
 
 export default function PaymentClient({ jobId }: { jobId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const cancelled = searchParams.get('cancelled') === '1';
   const { loading: authLoading, allowed } = useClientGuard();
   const { checking, blocked } = useRouteGuard();
   const [loading, setLoading] = useState(true);
@@ -221,14 +231,21 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
           job_assignments (
             id,
             guard_id,
-            payment_amount,
+            status,
+            payment_status,
+            agreed_hourly_rate,
+            agreed_hours,
+            gross_guard_amount,
+            currency,
             guards (
               id,
               full_name,
               profile_image_url,
               hourly_rate,
               rating,
-              sia_verified
+              sia_verified,
+              sia_licence_number,
+              licence_types
             )
           )
         `)
@@ -581,6 +598,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
 
   const costs = calculateCosts();
   const paymentStatus = getPaymentStatus(job, transaction);
+  const canPay = paymentStatus === "pending_payment" || paymentStatus === "not_required" || paymentStatus === "failed" || paymentStatus === "processing";
   const hasReceipt = !!transaction?.receipt_url;
   const hasInvoice = !!transaction?.invoice_url;
   const receiptUrl = transaction?.receipt_url || null;
@@ -689,6 +707,22 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
             </div>
           )}
 
+          {cancelled && (
+            <div className="bg-amber-500/10 rounded-xl border border-amber-500/25 p-5 mb-6">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-amber-500/15 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <i className="ri-error-warning-line text-amber-400 text-xl"></i>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-amber-400">Payment was not completed</p>
+                  <p className="text-sm text-amber-300 mt-1">
+                    Your selected guard(s) are still reserved provisionally. You can retry payment safely — nothing has been cancelled or reassigned.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Payment Success Banner */}
           {(paymentStatus === "paid" || paymentStatus === "invoice_sent") && job.status !== 'awaiting_client_confirmation' && job.status !== 'confirmed' && job.status !== 'in_progress' && job.status !== 'completed' && (
             <div className="bg-emerald-500/10 rounded-xl border border-emerald-500/25 p-5 mb-6">
@@ -746,7 +780,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
               />
 
               <JobSummaryCard job={job} hours={costs.hours || 0} />
-              <AssignedGuardsSection guards={guards} hourlyRate={job.hourly_rate} hours={costs.hours || 0} />
+              <SelectedGuardsPaymentSummary assignments={job.job_assignments || []} />
 
               {/* Receipt Display for Paid / Refunded */}
               {(paymentStatus === "paid" || paymentStatus === "refunded" || paymentStatus === "invoice_sent") && (
@@ -763,7 +797,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
               )}
 
               {/* Payment Method Selection */}
-              {(paymentStatus === "pending_payment" || paymentStatus === "not_required" || paymentStatus === "failed") && (
+              {canPay && (
                 <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-6">
                   <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                     <i className="ri-bank-card-line text-teal-400"></i>
@@ -823,7 +857,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
               )}
 
               {/* Tax Disclaimer */}
-              {(paymentStatus === "pending_payment" || paymentStatus === "not_required" || paymentStatus === "failed") && (
+              {canPay && (
                 <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-6">
                   <TaxDisclaimerCheckbox
                     userType="client"
@@ -835,7 +869,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
               )}
 
               {/* Terms Checkbox */}
-              {(paymentStatus === "pending_payment" || paymentStatus === "not_required" || paymentStatus === "failed") && (
+              {canPay && (
                 <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-6">
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
