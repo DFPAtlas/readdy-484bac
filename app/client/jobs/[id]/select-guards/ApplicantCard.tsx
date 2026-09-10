@@ -100,8 +100,7 @@ function StatusBadge({
     assignmentStatus === "awaiting_payment" ||
     assignmentStatus === "selected" ||
     assignmentStatus === "pending" ||
-    appStatus?.status === "selected" ||
-    appStatus?.status === "accepted"
+    appStatus?.status === "selected"
   ) {
     return (
       <span className="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full text-xs font-medium border border-blue-500/25">
@@ -116,7 +115,7 @@ function StatusBadge({
       </span>
     );
   }
-  if (appStatus?.status === "rejected" || appStatus?.status === "declined") {
+  if (appStatus?.status === "rejected") {
     return (
       <span className="bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium border border-red-500/25">
         <i className="ri-close-circle-line mr-0.5"></i>Declined
@@ -177,7 +176,7 @@ export default function ApplicantCard({
   guardsSelected,
 }: Props) {
   const canSelect = !isSelected && guardsSelected < guardsRequired;
-  const isRejected = applicationStatus?.status === "rejected" || applicationStatus?.status === "declined";
+  const isRejected = applicationStatus?.status === "rejected";
 
   const complianceData: GuardComplianceData = {
     id: guard.id,
