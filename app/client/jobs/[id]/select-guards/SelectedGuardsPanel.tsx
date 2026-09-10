@@ -107,10 +107,8 @@ export default function SelectedGuardsPanel({
                     )}
                     <span className="text-xs text-blue-400">
                       {g.confirmation_status === "confirmed"
-                        ? "Confirmed"
-                        : g.confirmation_status === "pending"
-                        ? "Pending"
-                        : "Awaiting"}
+                        ? "Booking Confirmed"
+                        : "Awaiting Client Payment"}
                     </span>
                   </div>
                 </div>
@@ -137,8 +135,8 @@ export default function SelectedGuardsPanel({
               onClick={onProceedToPayment}
               className="w-full bg-teal-500 text-white py-2.5 rounded-lg hover:bg-teal-600 transition-colors text-sm font-medium cursor-pointer whitespace-nowrap mt-2"
             >
-              <i className="ri-check-double-line mr-1.5"></i>
-              Proceed to Payment
+              <i className="ri-arrow-right-line mr-1.5"></i>
+              Continue to Payment
             </button>
           </div>
         )}

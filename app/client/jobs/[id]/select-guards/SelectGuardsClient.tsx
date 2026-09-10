@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useClientGuard } from "@/hooks/useClientGuard";
@@ -131,6 +132,25 @@ function getJobLicenceTypes(job: Job | null): string[] | null {
   return null;
 }
 
+function mapSelectionError(message: string): string {
+  const m = (message || "").toLowerCase();
+  if (m.includes("not_authenticated")) return "Please sign in again.";
+  if (m.includes("client_not_found")) return "Client account not found.";
+  if (m.includes("job_not_owned")) return "Job not found or you do not own it.";
+  if (m.includes("job_already_paid")) return "This job has already been paid. Selection is no longer available.";
+  if (m.includes("not_an_applicant")) return "One of the selected guards did not apply to this job.";
+  if (m.includes("guard_not_found")) return "A selected guard could not be found.";
+  if (m.includes("guard_inactive")) return "A selected guard is no longer active.";
+  if (m.includes("profile_incomplete")) return "A selected guard has an incomplete profile.";
+  if (m.includes("guard_not_verified")) return "A selected guard is not yet verified.";
+  if (m.includes("sia_not_verified")) return "A selected guard is not SIA verified.";
+  if (m.includes("sia_expired")) return "A selected guard's SIA licence has expired.";
+  if (m.includes("licence_mismatch")) return "A selected guard's licence does not match the job requirements.";
+  if (m.includes("duplicate_assignment")) return "A selected guard is already assigned to this job.";
+  if (m.includes("no_selections")) return "No guards were selected.";
+  return "Unable to complete selection. Please try again.";
+}
+
 const defaultFilters = {
   siaLicence: "",
   distance: "",
@@ -238,7 +258,6 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
   const [selectedGuardIds, setSelectedGuardIds] = useState<Set<string>>(new Set());
   const [shortlistedIds, setShortlistedIds] = useState<Set<string>>(new Set());
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
-  const [showAllGuards, setShowAllGuards] = useState(false);
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
   const [showCompareModal, setShowCompareModal] = useState(false);
 
@@ -313,12 +332,16 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
         .select("guard_id, status, cover_message, applied_at, shortlisted")
         .eq("job_id", jobId);
 
-      const { data: allVerifiedGuards } = await supabase
-        .from("guards")
-        .select("id, user_id, full_name, email, phone, profile_image_url, rating, total_reviews, total_jobs_completed, hourly_rate, years_experience, sia_verified, sia_expiry_date, sia_licence_number, licence_types, specializations, location, postcode, bio, has_transport, availability_status, languages, home_latitude, home_longitude, sia_licence_front_url, sia_licence_back_url, profile_completed, verification_status, certifications, sia_verified_at")
-        .in('verification_status', ['approved', 'verified'])
-        .eq("is_active", true)
-        .order("rating", { ascending: false });
+      const appliedGuardIds = (applications || []).map((a) => a.guard_id).filter(Boolean);
+
+      const { data: applicantGuards } = appliedGuardIds.length > 0
+        ? await supabase
+            .from("guards")
+            .select("id, user_id, full_name, email, phone, profile_image_url, rating, total_reviews, total_jobs_completed, hourly_rate, years_experience, sia_verified, sia_expiry_date, sia_licence_number, licence_types, specializations, location, postcode, bio, has_transport, availability_status, languages, home_latitude, home_longitude, sia_licence_front_url, sia_licence_back_url, profile_completed, verification_status, certifications, sia_verified_at")
+            .in("id", appliedGuardIds)
+            .eq("is_active", true)
+            .order("rating", { ascending: false })
+        : { data: [] };
 
       const { data: existingAssignments } = await supabase
         .from("job_assignments")
@@ -353,8 +376,8 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
       setSelectedGuardIds(selectedSet);
       setShortlistedIds(shortlistedSet);
 
-      if (allVerifiedGuards) {
-        const enrichedGuards: Guard[] = allVerifiedGuards.map((g) => {
+      if (applicantGuards) {
+        const enrichedGuards: Guard[] = applicantGuards.map((g) => {
           const app = statusMap[g.id];
           let dist: number | null = null;
           if (jobData.latitude && jobData.longitude && g.home_latitude && g.home_longitude) {
@@ -456,20 +479,20 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
       ...prev,
       [guardId]: {
         ...(prev[guardId] || { shortlisted: false, cover_message: null, applied_at: null }),
-        status: "declined",
+        status: "rejected",
       },
     }));
 
     try {
       await supabase
         .from("job_applications")
-        .update({ status: "declined", reviewed_at: new Date().toISOString() })
+        .update({ status: "rejected", reviewed_at: new Date().toISOString() })
         .eq("job_id", jobId)
         .eq("guard_id", guardId);
-      setToast("Guard declined");
+      setToast("Guard rejected");
       setTimeout(() => setToast(""), 3000);
     } catch (e) {
-      console.error("Failed to decline guard:", e);
+      console.error("Failed to reject guard:", e);
     }
   };
 
@@ -574,14 +597,14 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
     for (const gid of ids) {
       await supabase
         .from("job_applications")
-        .update({ status: "declined", reviewed_at: new Date().toISOString() })
+        .update({ status: "rejected", reviewed_at: new Date().toISOString() })
         .eq("job_id", jobId)
         .eq("guard_id", gid);
     }
     setApplicantStatuses((prev) => {
       const next = { ...prev };
       ids.forEach((id) => {
-        next[id] = { ...(next[id] || { shortlisted: false, cover_message: null, applied_at: null }), status: "declined" };
+        next[id] = { ...(next[id] || { shortlisted: false, cover_message: null, applied_at: null }), status: "rejected" };
       });
       return next;
     });
@@ -742,126 +765,61 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
       const days = Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24)) + 1);
       const agreedHours = hoursPerGuard * days;
 
-      const assignmentsData = selectedArray.map((guardId) => {
+      const selections = selectedArray.map((guardId) => {
         const guard = allGuards.find((g) => g.id === guardId);
         const guardHourlyRate = guard?.hourly_rate || job.hourly_rate;
         const grossGuardAmount = guardHourlyRate * agreedHours;
         return {
-          job_id: job.id,
           guard_id: guardId,
-          status: "pending",
-          assigned_at: new Date().toISOString(),
           agreed_hourly_rate: guardHourlyRate,
           agreed_hours: agreedHours,
           gross_guard_amount: grossGuardAmount,
-          currency: 'GBP',
         };
       });
 
-      const { error: assignError } = await supabase.from("job_assignments").upsert(
-        assignmentsData,
-        { onConflict: 'job_id,guard_id', ignoreDuplicates: false }
-      );
-      if (assignError) throw assignError;
+      const { error } = await supabase.rpc("select_job_guards", {
+        p_job_id: job.id,
+        p_selections: selections,
+      });
 
-      for (const guardId of selectedArray) {
-        await supabase
-          .from("job_applications")
-          .update({ status: "accepted", reviewed_at: new Date().toISOString() })
-          .eq("job_id", job.id)
-          .eq("guard_id", guardId);
-      }
-
-      const declinedGuardIds = allGuards
-        .filter((g) => !selectedGuardIds.has(g.id) && g.applied_at)
-        .map((g) => g.id);
-
-      if (declinedGuardIds.length > 0) {
-        for (const guardId of declinedGuardIds) {
-          await supabase
-            .from("job_applications")
-            .update({ status: "declined", reviewed_at: new Date().toISOString() })
-            .eq("job_id", job.id)
-            .eq("guard_id", guardId);
-        }
-
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token || '';
-
-        for (const guardId of declinedGuardIds) {
-          const guard = allGuards.find((g) => g.id === guardId);
-          if (!guard) continue;
-          try {
-            await fetch(`${supabaseUrl}/functions/v1/send-application-status-email`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                guard_id: guardId,
-                guard_email: guard.email || '',
-                guard_name: guard.full_name || '',
-                guard_user_id: guard.user_id || '',
-                job_id: job.id,
-                job_title: job.job_title,
-                client_name: companyName,
-                status: 'declined',
-                job_date: job.start_date,
-                job_time: `${job.start_time} - ${job.end_time}`,
-                location: job.venue_city,
-                hourly_rate: job.hourly_rate,
-              }),
-            });
-          } catch (emailErr) {
-            console.error('Failed to send rejection email to guard', guardId, emailErr);
-          }
-        }
-      }
-
-      await supabase
-        .from("jobs")
-        .update({ status: "awaiting_payment", updated_at: new Date().toISOString() })
-        .eq("id", job.id);
+      if (error) throw error;
 
       for (const guardId of selectedArray) {
         const guard = allGuards.find((g) => g.id === guardId);
-        if (!guard) continue;
+        if (!guard?.user_id) continue;
 
         try {
-          if (guard.user_id) {
-            await supabase.from('notifications').insert({
-              user_id: guard.user_id,
-              user_type: 'guard',
-              type: 'job_selected',
-              title: "You've Been Selected!",
-              message: `A client has selected you for "${job.job_title}" at ${job.venue_city}. Confirm payment to lock in your shift.`,
-              link: `/guard/dashboard`,
-              is_read: false,
-            });
+          await supabase.from('notifications').insert({
+            user_id: guard.user_id,
+            user_type: 'guard',
+            type: 'job_selected',
+            title: "You've Been Selected!",
+            message: `A client has provisionally selected you for "${job.job_title}" at ${job.venue_city}. Your booking will be confirmed once the client completes payment.`,
+            link: `/guard/dashboard`,
+            is_read: false,
+          });
 
-            await sendPushToUser(guard.user_id, "guard", {
-              title: "You've Been Selected!",
-              body: `Client selected you for "${job.job_title}" at ${job.venue_city}. Complete payment to confirm.`,
-              url: "/guard/dashboard",
-              tag: "quickguard-selected",
-            });
-          }
+          await sendPushToUser(guard.user_id, "guard", {
+            title: "You've Been Selected!",
+            body: `You've been provisionally selected for "${job.job_title}" at ${job.venue_city}. Booking confirms after client payment.`,
+            url: "/guard/dashboard",
+            tag: "quickguard-selected",
+          });
         } catch (e) {
           console.error("Failed to send selection notification:", e);
         }
       }
 
       setShowConfirmModal(false);
-      setSuccessMessage(`${selectedGuardIds.size} guard${selectedGuardIds.size > 1 ? "s" : ""} successfully assigned!`);
+      setSuccessMessage(`${selectedArray.length} guard${selectedArray.length > 1 ? "s" : ""} selected — awaiting payment`);
 
       setTimeout(() => {
         router.push(`/client/jobs/${job.id}/payment`);
       }, 2000);
     } catch (error) {
-      console.error("Error confirming guards:", error);
-      setToast("Failed to assign guards. Please try again.");
+      console.error("Error selecting guards:", error);
+      const raw = (error as { message?: string })?.message || "";
+      setToast(mapSelectionError(raw));
       setTimeout(() => setToast(""), 4000);
     } finally {
       setConfirming(false);
@@ -887,9 +845,7 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
 
   const compareGuards = allGuards.filter((g) => compareIds.has(g.id));
 
-  const displayGuards = showAllGuards ? allGuards : allGuards.filter(
-    (g) => g.applied_at !== null || shortlistedIds.has(g.id) || selectedGuardIds.has(g.id)
-  );
+  const displayGuards = allGuards;
 
   const filteredGuards = displayGuards.filter((g) => {
     const guardData: GuardComplianceData = {
@@ -1319,80 +1275,21 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
                 processing={bulkProcessing}
               />
 
-              {!showAllGuards && applicantCount > 0 && (
-                <div className="bg-teal-500/10 border border-teal-500/25 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-teal-500/15 rounded-full flex items-center justify-center">
-                        <i className="ri-user-star-line text-teal-400 text-xl"></i>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-teal-400">
-                          {applicantCount} guard{applicantCount !== 1 ? "s" : ""} applied to this job
-                        </p>
-                        <p className="text-xs text-teal-500">Browse all verified guards to find more candidates</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setShowAllGuards(true)}
-                      className="bg-teal-500 text-white px-4 py-2 rounded-lg hover:bg-teal-600 transition-colors text-sm font-medium cursor-pointer whitespace-nowrap"
-                    >
-                      <i className="ri-search-line mr-1.5"></i>
-                      Browse All Guards
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {showAllGuards && (
-                <div className="bg-violet-500/10 border border-violet-500/25 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-violet-500/15 rounded-full flex items-center justify-center">
-                        <i className="ri-team-line text-violet-400 text-xl"></i>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-violet-400">
-                          Showing all verified guards ({filteredGuards.length} total)
-                        </p>
-                        <p className="text-xs text-violet-500">Guards who applied are shown first</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setShowAllGuards(false)}
-                      className="bg-[#162036] text-violet-400 border border-violet-500/25 px-4 py-2 rounded-lg hover:bg-violet-500/10 transition-colors text-sm font-medium cursor-pointer whitespace-nowrap"
-                    >
-                      <i className="ri-arrow-left-line mr-1.5"></i>
-                      Show Applicants Only
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {filteredGuards.length === 0 ? (
                 <div className="bg-[#111d35] rounded-xl shadow-sm border border-[#1e2d4d] p-12 text-center">
                   <div className="w-20 h-20 bg-[#162036] rounded-full flex items-center justify-center mx-auto mb-4 border border-[#1e2d4d]">
                     <i className="ri-user-search-line text-4xl text-slate-500"></i>
                   </div>
                   <h3 className="text-xl font-semibold text-slate-200 mb-2">
-                    {applicantCount === 0 && !showAllGuards
+                    {applicantCount === 0
                       ? "No applicants yet"
                       : "No guards match your filters"}
                   </h3>
                   <p className="text-slate-500 mb-6">
-                    {applicantCount === 0 && !showAllGuards
+                    {applicantCount === 0
                       ? "Guards will appear here once they apply for this job."
                       : "Try adjusting your search or filter criteria."}
                   </p>
-                  {applicantCount === 0 && !showAllGuards && (
-                    <button
-                      onClick={() => setShowAllGuards(true)}
-                      className="bg-teal-500 text-white px-6 py-3 rounded-lg hover:bg-teal-600 transition-colors font-medium cursor-pointer whitespace-nowrap"
-                    >
-                      <i className="ri-search-line mr-2"></i>
-                      Browse All Verified Guards
-                    </button>
-                  )}
                 </div>
               ) : (
                 <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 gap-5" : "space-y-4"}>

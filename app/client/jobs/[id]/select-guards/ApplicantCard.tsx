@@ -91,14 +91,21 @@ function StatusBadge({
   if (assignmentStatus === "confirmed") {
     return (
       <span className="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full text-xs font-medium border border-emerald-500/25">
-        <i className="ri-checkbox-circle-line mr-0.5"></i>Confirmed
+        <i className="ri-checkbox-circle-line mr-0.5"></i>Booking Confirmed
       </span>
     );
   }
-  if (isSelected || assignmentStatus === "pending") {
+  if (
+    isSelected ||
+    assignmentStatus === "awaiting_payment" ||
+    assignmentStatus === "selected" ||
+    assignmentStatus === "pending" ||
+    appStatus?.status === "selected" ||
+    appStatus?.status === "accepted"
+  ) {
     return (
       <span className="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full text-xs font-medium border border-blue-500/25">
-        <i className="ri-time-line mr-0.5"></i>Awaiting Confirmation
+        <i className="ri-time-line mr-0.5"></i>Selected — Awaiting Client Payment
       </span>
     );
   }
@@ -113,13 +120,6 @@ function StatusBadge({
     return (
       <span className="bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium border border-red-500/25">
         <i className="ri-close-circle-line mr-0.5"></i>Declined
-      </span>
-    );
-  }
-  if (appStatus?.status === "accepted") {
-    return (
-      <span className="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full text-xs font-medium border border-blue-500/25">
-        <i className="ri-time-line mr-0.5"></i>Awaiting Confirmation
       </span>
     );
   }

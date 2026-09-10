@@ -153,7 +153,7 @@ export default function ConfirmSelectionModal({
 
           <p className="text-xs text-slate-500 mb-6">
             <i className="ri-information-line mr-1"></i>
-            By confirming, selected guards will be notified and assigned to this job. You will be redirected to the payment page to complete payment and confirm the guards.
+            Selected guards will be provisionally reserved for this job. Your booking is only confirmed after you complete payment. You will be redirected to payment next.
           </p>
 
           <div className="flex gap-3">
@@ -171,12 +171,12 @@ export default function ConfirmSelectionModal({
               {confirming ? (
                 <span className="flex items-center justify-center gap-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Confirming...
+                  Selecting...
                 </span>
               ) : (
                 <>
-                  <i className="ri-check-double-line mr-1.5"></i>
-                  Confirm Selection
+                  <i className="ri-arrow-right-line mr-1.5"></i>
+                  Continue to Payment
                 </>
               )}
             </button>
