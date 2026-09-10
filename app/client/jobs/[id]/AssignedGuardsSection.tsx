@@ -53,6 +53,7 @@ interface GuardReview {
 interface AssignedGuardsSectionProps {
   guards: Assignment[];
   isCompleted?: boolean;
+  isReviewable?: boolean;
   jobId?: string;
   onLeaveReview?: (guardId: string, guardName: string) => void;
   onMessageGuard?: (guardId: string, guardName: string, guardUserId: string) => void;
@@ -62,6 +63,7 @@ interface AssignedGuardsSectionProps {
 export default function AssignedGuardsSection({
   guards,
   isCompleted = false,
+  isReviewable = false,
   jobId,
   onLeaveReview,
   onMessageGuard,
@@ -134,7 +136,7 @@ export default function AssignedGuardsSection({
           Assigned Guards
           <span className="ml-1 bg-teal-500/15 text-teal-400 text-xs font-bold px-2 py-0.5 rounded-full">{guards.length}</span>
         </h2>
-        {isCompleted && reviewedCount < guards.length && (
+        {isReviewable && reviewedCount < guards.length && (
           <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full whitespace-nowrap">
             {unreviewedCount} awaiting review
           </span>
@@ -150,7 +152,7 @@ export default function AssignedGuardsSection({
         )}
       </div>
 
-      {isCompleted && reviewedCount < guards.length && (
+      {isReviewable && reviewedCount < guards.length && (
         <div className="mb-4 bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-3 flex items-center gap-3">
           <div className="w-8 h-8 flex items-center justify-center bg-amber-500/15 rounded-lg shrink-0">
             <i className="ri-star-line text-amber-400 text-lg"></i>
@@ -391,25 +393,24 @@ export default function AssignedGuardsSection({
                     Call
                   </a>
                 )}
-                {isCompleted && g?.id && (
-                  review ? (
-                    <div className="flex items-center gap-2 ml-auto">
-                      <ReviewStatusBadge
-                        status={review.review_status || 'reviewed'}
-                        rating={review.rating}
-                        issueReported={review.issue_reported}
-                        compact
-                      />
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => onLeaveReview?.(g.id, guardName)}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ml-auto"
-                    >
-                      <i className="ri-star-line"></i>
-                      Leave a Review
-                    </button>
-                  )
+                {isCompleted && g?.id && review && (
+                  <div className="flex items-center gap-2 ml-auto">
+                    <ReviewStatusBadge
+                      status={review.review_status || 'reviewed'}
+                      rating={review.rating}
+                      issueReported={review.issue_reported}
+                      compact
+                    />
+                  </div>
+                )}
+                {isReviewable && g?.id && !review && (
+                  <button
+                    onClick={() => onLeaveReview?.(g.id, guardName)}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ml-auto"
+                  >
+                    <i className="ri-star-line"></i>
+                    Leave a Review
+                  </button>
                 )}
               </div>
             </div>

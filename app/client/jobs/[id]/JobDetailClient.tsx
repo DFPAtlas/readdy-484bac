@@ -542,7 +542,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   ];
 
   const isCompleted = job.status === 'completed';
-  const isReviewable = job.status === 'paid_out' || job.status === 'review_pending' || job.status === 'closed';
+  const isReviewable = job.status === 'paid_out' || job.status === 'review_pending';
+  const isClosed = job.status === 'closed';
   const unreviewedGuards = assignedGuards.filter((a) => a.guards?.id && !guardReviews[a.guards.id]);
   const reviewedGuards = assignedGuards.filter((a) => a.guards?.id && guardReviews[a.guards.id]);
 
@@ -798,7 +799,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
           {activeTab === 'guards' && (
             <AssignedGuardsSection
               guards={assignedGuards}
-              isCompleted={isReviewable}
+              isCompleted={isReviewable || isClosed}
+              isReviewable={isReviewable}
               jobId={jobId}
               onLeaveReview={handleOpenReviewModal}
               onMessageGuard={handleMessageGuard}
