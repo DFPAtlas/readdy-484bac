@@ -37,7 +37,7 @@ export default function PaymentActions({
 }: Props) {
   return (
     <div className="space-y-3">
-      {(paymentStatus === "pending_payment" || paymentStatus === "not_required" || paymentStatus === "processing") && (
+      {(paymentStatus === "pending_payment" || paymentStatus === "not_required") && (
         <button
           onClick={onPayNow}
           disabled={processing || !agreedToTerms}

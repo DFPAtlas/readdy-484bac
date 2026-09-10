@@ -194,6 +194,15 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
     loadPaymentData();
   }, [jobId]);
 
+  useEffect(() => {
+    if (loading || !job) return;
+    if (getPaymentStatus(job, transaction) !== "processing") return;
+    const interval = setInterval(() => {
+      loadPaymentData();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [job, transaction, loading]);
+
   const loadPaymentData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -598,7 +607,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
 
   const costs = calculateCosts();
   const paymentStatus = getPaymentStatus(job, transaction);
-  const canPay = paymentStatus === "pending_payment" || paymentStatus === "not_required" || paymentStatus === "failed" || paymentStatus === "processing";
+  const canPay = paymentStatus === "pending_payment" || paymentStatus === "not_required" || paymentStatus === "failed";
   const hasReceipt = !!transaction?.receipt_url;
   const hasInvoice = !!transaction?.invoice_url;
   const receiptUrl = transaction?.receipt_url || null;
@@ -702,6 +711,23 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
                     <i className="ri-file-shield-line"></i>
                     Go to Booking Confirmation
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Processing Banner */}
+          {paymentStatus === "processing" && (
+            <div className="bg-blue-500/10 rounded-xl border border-blue-500/25 p-5 mb-6">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-blue-500/15 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <i className="ri-loader-4-line text-blue-400 text-xl animate-spin"></i>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-blue-400">Payment is being confirmed</p>
+                  <p className="text-sm text-blue-300 mt-1">
+                    We are verifying your payment with Stripe. This usually takes a few moments — please don't close this page or start another payment.
+                  </p>
                 </div>
               </div>
             </div>
