@@ -10,6 +10,7 @@ const statusConfig: Record<string, { bg: string; text: string; border: string; i
   awaiting_guard_selection: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/25', icon: 'ri-user-search-line', label: 'Awaiting Guard Selection' },
   awaiting_payment: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/25', icon: 'ri-secure-payment-line', label: 'Awaiting Payment' },
   awaiting_client_confirmation: { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/25', icon: 'ri-file-shield-line', label: 'Awaiting Client Confirmation' },
+  awaiting_client_approval: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/25', icon: 'ri-hourglass-line', label: 'Awaiting Client Approval' },
   confirmed: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/25', icon: 'ri-checkbox-circle-line', label: 'Confirmed' },
   in_progress: { bg: 'bg-teal-500/10', text: 'text-teal-400', border: 'border-teal-500/25', icon: 'ri-pulse-line', label: 'Active' },
   active: { bg: 'bg-teal-500/10', text: 'text-teal-400', border: 'border-teal-500/25', icon: 'ri-pulse-line', label: 'Active' },

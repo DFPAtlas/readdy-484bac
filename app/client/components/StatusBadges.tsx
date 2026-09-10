@@ -17,6 +17,7 @@ const JOB_STATUS_MAP: Record<string, { label: string; variant: BadgeVariant }> =
   awaiting_guard_selection: { label: 'Applications Open', variant: 'violet' },
   awaiting_payment: { label: 'Awaiting Payment', variant: 'warning' },
   awaiting_client_confirmation: { label: 'Confirm Booking', variant: 'violet' },
+  awaiting_client_approval: { label: 'Awaiting Approval', variant: 'warning' },
   in_progress: { label: 'Active', variant: 'success' },
   active: { label: 'Active', variant: 'success' },
   confirmed: { label: 'Confirmed', variant: 'success' },

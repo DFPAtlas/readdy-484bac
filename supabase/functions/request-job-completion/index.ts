@@ -84,28 +84,14 @@ serve(async (req) => {
 
   await supabase.from('job_assignments').update({
     status: 'completed',
-    payment_status: 'awaiting_client_release',
     completed_at: now,
     updated_at: now,
   }).eq('id', assignmentId);
 
   await supabase.from('jobs').update({
-    status: 'awaiting_client_confirmation',
-    payment_status: 'awaiting_client_release',
+    status: 'awaiting_client_approval',
     updated_at: now,
   }).eq('id', jobId);
-
-  await supabase.from('payment_audit_logs').insert({
-    job_id: jobId,
-    assignment_id: assignmentId,
-    guard_id: guard.id,
-    client_id: job.client_id,
-    from_status: 'funded',
-    to_status: 'awaiting_client_release',
-    changed_by: user.id,
-    changed_by_role: 'guard',
-    reason: 'Guard marked job complete — awaiting client release',
-  });
 
   try {
     const { data: guardData } = await supabase.from('guards').select('full_name').eq('id', guard.id).maybeSingle();
