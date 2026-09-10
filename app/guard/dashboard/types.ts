@@ -46,6 +46,11 @@ export interface JobAssignment {
   payment_amount: number | null;
   payment_status: string | null;
   assigned_at: string;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
+  attendance_status?: string | null;
+  issue_reported?: boolean;
+  replacement_requested?: boolean;
   jobs: NestedJob;
 }
 
@@ -98,4 +103,10 @@ export interface ShiftItem {
   hourly_rate: number;
   client_name: string;
   job_id: string;
+  payment_status?: string | null;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
+  attendance_status?: string | null;
+  issue_reported?: boolean;
+  replacement_requested?: boolean;
 }

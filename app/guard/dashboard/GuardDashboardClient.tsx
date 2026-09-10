@@ -343,6 +343,11 @@ export default function GuardDashboardClient() {
           payment_amount,
           payment_status,
           assigned_at,
+          check_in_time,
+          check_out_time,
+          attendance_status,
+          issue_reported,
+          replacement_requested,
           jobs!inner (
             id,
             job_title,
@@ -739,41 +744,56 @@ export default function GuardDashboardClient() {
   const handleCheckIn = async (assignmentId: string) => {
     if (isAdmin || !guard) return;
     try {
-      const { error } = await supabase
-        .from('job_assignments')
-        .update({
-          status: 'in_progress',
-          attendance_status: 'checked_in',
-          check_in_time: new Date().toISOString(),
-        })
-        .eq('id', assignmentId)
-        .eq('guard_id', guard.id);
-      if (error) throw error;
+      const assignment = assignments.find(a => a.id === assignmentId);
+      const jobId = (assignment?.jobs as any)?.id;
+      if (!jobId) { showGuardToast('Could not find this shift. Please refresh.'); return; }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/guard-shift-attendance`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionData.session?.access_token ?? ''}`,
+          },
+          body: JSON.stringify({ action: 'check_in', assignmentId, jobId }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to check in');
       await loadJobAssignments(guardUserId!, isAdmin);
       showGuardToast('Checked in successfully!');
-    } catch {
-      showGuardToast('Failed to check in. Please try again.');
+    } catch (err: any) {
+      showGuardToast(err.message || 'Failed to check in. Please try again.');
     }
   };
 
   const handleCheckOut = async (assignmentId: string) => {
     if (isAdmin || !guard) return;
     try {
-      const { error } = await supabase
-        .from('job_assignments')
-        .update({
-          status: 'completed',
-          attendance_status: 'checked_out',
-          check_out_time: new Date().toISOString(),
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', assignmentId)
-        .eq('guard_id', guard.id);
-      if (error) throw error;
+      const assignment = assignments.find(a => a.id === assignmentId);
+      const jobId = (assignment?.jobs as any)?.id;
+      if (!jobId) { showGuardToast('Could not find this shift. Please refresh.'); return; }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/guard-shift-attendance`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionData.session?.access_token ?? ''}`,
+          },
+          body: JSON.stringify({ action: 'check_out', assignmentId, jobId }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to check out');
       await loadJobAssignments(guardUserId!, isAdmin);
       showGuardToast('Checked out successfully!');
-    } catch {
-      showGuardToast('Failed to check out. Please try again.');
+    } catch (err: any) {
+      showGuardToast(err.message || 'Failed to check out. Please try again.');
     }
   };
 
@@ -814,7 +834,12 @@ export default function GuardDashboardClient() {
         hourly_rate: (a.jobs as any)?.hourly_rate || 0,
         client_name: '',
         job_id: (a.jobs as any)?.id || '',
-        payment_status: (a.jobs as any)?.payment_status || null,
+        payment_status: a.payment_status || (a.jobs as any)?.payment_status || null,
+        check_in_time: a.check_in_time || null,
+        check_out_time: a.check_out_time || null,
+        attendance_status: a.attendance_status || null,
+        issue_reported: a.issue_reported || false,
+        replacement_requested: a.replacement_requested || false,
       } as any));
     return [...appShifts, ...assignShifts]
       .sort((a, b) => a.start_date.localeCompare(b.start_date))

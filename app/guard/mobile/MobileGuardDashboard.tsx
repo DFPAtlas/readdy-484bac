@@ -45,6 +45,8 @@ interface JobAssignment {
   payment_amount: number | null;
   payment_status: string | null;
   assigned_at: string;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
   jobs: {
     id: string;
     job_title: string;
@@ -191,7 +193,7 @@ export default function MobileGuardDashboard() {
 
     const { data: assignmentsData } = await supabase
       .from('job_assignments')
-      .select('id, status, payment_amount, payment_status, assigned_at, jobs!inner (id, job_title, location, postcode, start_date, start_time, end_time, hourly_rate)')
+      .select('id, status, payment_amount, payment_status, assigned_at, check_in_time, check_out_time, jobs!inner (id, job_title, location, postcode, start_date, start_time, end_time, hourly_rate)')
       .eq('guard_id', guardData.id)
       .in('status', ['confirmed', 'in_progress', 'accepted'])
       .order('assigned_at', { ascending: false });
@@ -329,19 +331,53 @@ export default function MobileGuardDashboard() {
 
   const handleCheckIn = async (assignmentId: string) => {
     try {
-      await supabase.from('job_assignments').update({ status: 'in_progress', checked_in_at: new Date().toISOString() }).eq('id', assignmentId);
+      const assignment = assignments.find(a => a.id === assignmentId);
+      const jobId = (assignment?.jobs as any)?.id;
+      if (!jobId) { alert('Could not find this shift. Please refresh.'); return; }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/guard-shift-attendance`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionData.session?.access_token ?? ''}`,
+          },
+          body: JSON.stringify({ action: 'check_in', assignmentId, jobId }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to check in');
       await loadDashboardData();
-    } catch {
-      alert('Failed to check in. Please try again.');
+    } catch (err: any) {
+      alert(err.message || 'Failed to check in. Please try again.');
     }
   };
 
   const handleCheckOut = async (assignmentId: string) => {
     try {
-      await supabase.from('job_assignments').update({ status: 'completed', checked_out_at: new Date().toISOString() }).eq('id', assignmentId);
+      const assignment = assignments.find(a => a.id === assignmentId);
+      const jobId = (assignment?.jobs as any)?.id;
+      if (!jobId) { alert('Could not find this shift. Please refresh.'); return; }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/guard-shift-attendance`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionData.session?.access_token ?? ''}`,
+          },
+          body: JSON.stringify({ action: 'check_out', assignmentId, jobId }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to check out');
       await loadDashboardData();
-    } catch {
-      alert('Failed to check out. Please try again.');
+    } catch (err: any) {
+      alert(err.message || 'Failed to check out. Please try again.');
     }
   };
 
@@ -736,13 +772,18 @@ export default function MobileGuardDashboard() {
                           Check In
                         </button>
                       )}
-                      {job.status === 'in_progress' && (
+                      {job.status === 'in_progress' && !job.check_out_time && (
                         <button
                           onClick={() => handleCheckOut(job.id)}
                           className="w-full bg-emerald-500 text-slate-900 text-xs font-semibold py-2 rounded-lg cursor-pointer whitespace-nowrap active:scale-[0.98] transition-transform"
                         >
                           Check Out
                         </button>
+                      )}
+                      {job.status === 'in_progress' && job.check_out_time && (
+                        <span className="w-full block bg-emerald-500/10 text-emerald-400 text-xs font-semibold py-2 rounded-lg border border-emerald-500/20 text-center whitespace-nowrap">
+                          <i className="ri-check-double-line mr-1"></i>Checked Out — Awaiting Approval
+                        </span>
                       )}
                     </div>
                   ))}
@@ -926,13 +967,18 @@ export default function MobileGuardDashboard() {
                         Check In Now
                       </button>
                     )}
-                    {isToday && isInProgress && (
+                    {isToday && isInProgress && !assignment.check_out_time && (
                       <button
                         onClick={() => handleCheckOut(assignment.id)}
                         className="w-full bg-emerald-500 text-slate-900 text-xs font-semibold py-2.5 rounded-lg cursor-pointer whitespace-nowrap active:scale-[0.98] transition-transform"
                       >
                         Check Out
                       </button>
+                    )}
+                    {isToday && isInProgress && assignment.check_out_time && (
+                      <span className="w-full block bg-emerald-500/10 text-emerald-400 text-xs font-semibold py-2.5 rounded-lg border border-emerald-500/20 text-center whitespace-nowrap">
+                        <i className="ri-check-double-line mr-1"></i>Checked Out — Awaiting Approval
+                      </span>
                     )}
                     {!isToday && (
                       <div className="flex gap-2">

@@ -19,7 +19,7 @@ serve(async (req) => {
 
   const { data: assignment } = await supabase
     .from('job_assignments')
-    .select('id, job_id, guard_id, status, payment_status')
+    .select('id, job_id, guard_id, status, payment_status, check_in_time, check_out_time, issue_reported, replacement_requested')
     .eq('id', assignmentId)
     .eq('guard_id', guard.id)
     .maybeSingle();
@@ -29,11 +29,27 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: 'You must check in before marking complete' }), { status: 400 });
   }
 
-  const { data: job } = await supabase.from('jobs').select('payment_status, client_id, job_title').eq('id', jobId).maybeSingle();
+  if (!assignment.check_in_time) {
+    return new Response(JSON.stringify({ error: 'You must check in before marking complete' }), { status: 400 });
+  }
+
+  if (!assignment.check_out_time) {
+    return new Response(JSON.stringify({ error: 'You must check out before marking complete' }), { status: 400 });
+  }
+
+  if (assignment.issue_reported || assignment.replacement_requested) {
+    return new Response(JSON.stringify({ error: 'An issue or replacement request is open for this shift. Please resolve it before marking complete.' }), { status: 409 });
+  }
+
+  const { data: job } = await supabase.from('jobs').select('payment_status, client_id, job_title, disputed').eq('id', jobId).maybeSingle();
   if (!job) return new Response(JSON.stringify({ error: 'Job not found' }), { status: 404 });
 
   if (job.payment_status !== 'funded') {
     return new Response(JSON.stringify({ error: 'Job must be funded before marking complete' }), { status: 400 });
+  }
+
+  if (job.disputed) {
+    return new Response(JSON.stringify({ error: 'This job has an open dispute and cannot be marked complete.' }), { status: 409 });
   }
 
   const now = new Date().toISOString();
@@ -70,7 +86,6 @@ serve(async (req) => {
     status: 'completed',
     payment_status: 'awaiting_client_release',
     completed_at: now,
-    check_out_time: now,
     updated_at: now,
   }).eq('id', assignmentId);
 

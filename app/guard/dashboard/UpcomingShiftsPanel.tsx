@@ -18,7 +18,10 @@ function getShiftAction(shift: ShiftItem) {
   const isToday = shift.start_date === today;
   if (shift.source === 'application') return { label: 'Confirm', action: 'confirm', variant: 'emerald' };
   if (shift.status === 'confirmed' && isToday) return { label: 'Check In', action: 'checkin', variant: 'teal' };
-  if (shift.status === 'in_progress') return { label: 'Check Out', action: 'checkout', variant: 'amber' };
+  if (shift.status === 'in_progress') {
+    if (shift.check_in_time && shift.check_out_time) return { label: 'Mark Complete', action: 'complete', variant: 'emerald' };
+    return { label: 'Check Out', action: 'checkout', variant: 'amber' };
+  }
   if (shift.status === 'completed') return { label: 'Awaiting Approval', action: 'awaiting', variant: 'slate' };
   return { label: 'View Shift', action: 'view', variant: 'slate' };
 }
@@ -106,7 +109,11 @@ export default function UpcomingShiftsPanel({ shifts, onConfirm, onCheckIn, onCh
                   {action.action === 'checkout' && (
                     <button onClick={() => onCheckOut(shift.id)} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shadow-lg transition-all ${variantClasses.amber}`}>Check Out</button>
                   )}
-                  {action.action === 'checkout' && onMarkComplete && (
+                  {action.action === 'complete' && onMarkComplete && (shift.issue_reported || shift.replacement_requested ? (
+                    <span className="px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap bg-red-500/10 text-red-400 border border-red-500/20">
+                      <i className="ri-alert-line mr-1"></i>Issue Open
+                    </span>
+                  ) : (
                     <button
                       onClick={() => onMarkComplete(shift.id, shift.job_id)}
                       disabled={markingJobId === shift.id}
@@ -118,7 +125,7 @@ export default function UpcomingShiftsPanel({ shifts, onConfirm, onCheckIn, onCh
                         'Mark Complete'
                       )}
                     </button>
-                  )}
+                  ))}
                   {action.action === 'awaiting' && (
                     <span className="px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap bg-amber-500/10 text-amber-400 border border-amber-500/20">
                       <i className="ri-time-line mr-1"></i>Pending Approval
