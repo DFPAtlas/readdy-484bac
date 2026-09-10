@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { computeBookingConfirmation } from '@/lib/payments/bookingConfirmationState';
 
 interface Transaction {
   id: string;
@@ -31,144 +32,145 @@ interface JobSummary {
   payment_status: string | null;
 }
 
+interface AssignmentSummary {
+  id: string;
+  status: string;
+  payment_status: string | null;
+}
+
+type PageStatus = 'loading' | 'paid' | 'failed' | 'confirming' | 'reconciling' | 'error';
+
+const MAX_POLLS = 15;
+const POLL_MS = 5000;
+
 function SuccessContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const [status, setStatus] = useState<'loading' | 'paid' | 'failed' | 'error' | 'confirming'>('loading');
+  const [status, setStatus] = useState<PageStatus>('loading');
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [job, setJob] = useState<JobSummary | null>(null);
+  const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
   const [error, setError] = useState('');
   const [pollCount, setPollCount] = useState(0);
 
-  const sessionId = searchParams.get('session_id');
   const jobId = searchParams.get('job_id');
+  const sessionId = searchParams.get('session_id');
+
+  const loadData = useCallback(async () => {
+    if (!jobId) return null;
+
+    const { data: jobData } = await supabase
+      .from('jobs')
+      .select('job_title, venue_name, venue_city, start_date, end_date, start_time, end_time, status, payment_status')
+      .eq('id', jobId)
+      .maybeSingle();
+
+    const { data: assignmentData } = await supabase
+      .from('job_assignments')
+      .select('id, status, payment_status')
+      .eq('job_id', jobId);
+
+    let txnData: Transaction | null = null;
+    if (sessionId) {
+      const { data: match } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('job_id', jobId)
+        .eq('stripe_session_id', sessionId)
+        .maybeSingle();
+      if (match) txnData = match as Transaction;
+    }
+    if (!txnData) {
+      const { data: latest } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('job_id', jobId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latest) txnData = latest as Transaction;
+    }
+
+    return { jobData, assignmentData, txnData };
+  }, [jobId, sessionId]);
+
+  const deriveStatus = useCallback(
+    (jobData: JobSummary | null, assignmentData: AssignmentSummary[], txnData: Transaction | null): PageStatus => {
+      if (!jobData) return 'error';
+
+      if (txnData?.status === 'failed' || txnData?.payment_status === 'failed' || jobData.payment_status === 'failed') {
+        return 'failed';
+      }
+
+      const confirmation = computeBookingConfirmation(
+        { status: jobData.status, payment_status: jobData.payment_status },
+        assignmentData
+      );
+
+      if (confirmation === 'confirmed') return 'paid';
+      if (confirmation === 'reconciling') return 'reconciling';
+      return 'confirming';
+    },
+    []
+  );
 
   useEffect(() => {
-    if (!sessionId || !jobId) {
+    if (!jobId) {
       setStatus('error');
-      setError('Missing session or job information in URL.');
+      setError('Missing job information in URL.');
       return;
     }
 
     let attempts = 0;
     let intervalId: ReturnType<typeof setInterval> | null = null;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    const clearTimers = () => {
-      if (intervalId) clearInterval(intervalId);
-      if (timeoutId) clearTimeout(timeoutId);
-    };
+    const refresh = async () => {
+      const result = await loadData();
+      if (!result) return;
 
-    const loadJob = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('jobs')
-          .select('job_title, venue_name, venue_city, start_date, end_date, start_time, end_time, status, payment_status')
-          .eq('id', jobId)
-          .maybeSingle();
-        if (!error && data) setJob(data as JobSummary);
-      } catch {}
-    };
-
-    const checkTransaction = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('job_id', jobId)
-          .eq('stripe_session_id', sessionId)
-          .maybeSingle();
-
-        if (error) throw new Error(error.message);
-
-        if (!data) {
-          attempts++;
-          setPollCount(attempts);
-          if (attempts >= 20) {
-            clearTimers();
-            setStatus('error');
-            setError('Payment confirmation not found. Please check your payment history or contact support.');
-          }
-          return;
-        }
-
-        const txn = data as Transaction;
-        setTransaction(txn);
-
-        const isPaid =
-          txn.status === 'completed' ||
-          txn.status === 'succeeded' ||
-          txn.payment_status === 'completed' ||
-          txn.payment_status === 'succeeded' ||
-          txn.payment_status === 'funded';
-
-        const isFailed =
-          txn.status === 'failed' ||
-          txn.payment_status === 'failed';
-
-        if (isPaid) {
-          const { data: jobState } = await supabase
-            .from('jobs')
-            .select('status, payment_status')
-            .eq('id', jobId)
-            .maybeSingle();
-          const bookingConfirmed =
-            jobState?.status === 'funded' ||
-            jobState?.status === 'confirmed' ||
-            jobState?.payment_status === 'funded';
-          if (bookingConfirmed) {
-            setStatus('paid');
-            clearTimers();
-            return;
-          }
-          setStatus('confirming');
-          attempts++;
-          setPollCount(attempts);
-          if (attempts >= 20) {
-            clearTimers();
-            setStatus('error');
-            setError('Payment was received but booking confirmation is still processing. Please check your booking status in a moment.');
-          }
-          return;
-        }
-
-        if (isFailed) {
-          setStatus('failed');
-          clearTimers();
-          return;
-        }
-
-        attempts++;
-        setPollCount(attempts);
-        if (attempts >= 20) {
-          clearTimers();
-          setStatus('error');
-          setError('Payment is taking longer than expected. Please check your payment history or contact support.');
-        }
-      } catch (err: unknown) {
-        clearTimers();
+      const { jobData, assignmentData, txnData } = result;
+      if (!jobData) {
         setStatus('error');
-        setError(err instanceof Error ? err.message : 'Something went wrong confirming your payment.');
+        setError('Job not found.');
+        return;
+      }
+
+      setJob(jobData as JobSummary);
+      setAssignments((assignmentData || []) as AssignmentSummary[]);
+      if (txnData) setTransaction(txnData as Transaction);
+
+      const next = deriveStatus(jobData as JobSummary, (assignmentData || []) as AssignmentSummary[], txnData as Transaction | null);
+      setStatus(next);
+
+      attempts++;
+      setPollCount(attempts);
+
+      if (next === 'paid' || next === 'failed' || next === 'error') {
+        if (intervalId) clearInterval(intervalId);
+        intervalId = null;
+      } else if (attempts >= MAX_POLLS) {
+        if (intervalId) clearInterval(intervalId);
+        intervalId = null;
       }
     };
 
-    loadJob();
-    checkTransaction();
-
+    refresh();
     intervalId = setInterval(() => {
-      checkTransaction();
-    }, 2500);
+      if (attempts >= MAX_POLLS) {
+        if (intervalId) clearInterval(intervalId);
+        intervalId = null;
+        return;
+      }
+      refresh();
+    }, POLL_MS);
 
-    return () => clearTimers();
-  }, [sessionId, jobId]);
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [jobId, loadData, deriveStatus]);
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
+    return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
   const formatTime = (timeStr?: string) => {
@@ -192,26 +194,46 @@ function SuccessContent() {
           <div className="w-16 h-16 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
           <h2 className="text-xl font-semibold text-white mb-2">Confirming your payment...</h2>
           <p className="text-slate-400 text-sm">This usually takes a few seconds.</p>
-          {pollCount > 0 && (
-            <p className="text-slate-500 text-xs mt-3">Retry {pollCount}/20</p>
-          )}
         </div>
       </div>
     );
   }
 
-  if (status === 'confirming') {
+  if (status === 'confirming' || status === 'reconciling') {
+    const isReconciling = status === 'reconciling';
+    const iconClass = isReconciling ? 'border-amber-400' : 'border-amber-400';
+    const title = isReconciling ? 'Booking status is being reconciled' : 'Payment received — confirming your booking';
+    const desc = isReconciling
+      ? 'Your payment was received but the booking state is still settling. This usually resolves within a few seconds.'
+      : 'Your payment was received. We are finalising your booking with the secure payment provider — this usually takes a few seconds.';
+
     return (
       <div className="min-h-screen bg-[#0B1933] flex items-center justify-center px-6">
         <div className="text-center max-w-md mx-auto">
-          <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-white mb-2">Payment is being confirmed</h1>
-          <p className="text-slate-400 text-sm">
-            Your payment was received. We&apos;re finalising your booking — this usually takes a few seconds.
+          <div className={`w-16 h-16 border-4 ${iconClass} border-t-transparent rounded-full animate-spin mx-auto mb-6`} />
+          <h1 className="text-2xl font-bold text-white mb-2">{title}</h1>
+          <p className="text-slate-400 text-sm">{desc}</p>
+          <p className="text-slate-500 text-xs mt-3">Checking {pollCount}/{MAX_POLLS}</p>
+          <button
+            onClick={() => {
+              setPollCount(0);
+              window.location.reload();
+            }}
+            className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-teal-500 text-white rounded-xl font-semibold hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <i className="ri-refresh-line w-5 h-5 flex items-center justify-center" />
+            Refresh Status
+          </button>
+          <p className="text-slate-500 text-xs mt-4">
+            If this stays pending, your payment may still be processing. You can safely return to the job — you will not be charged twice.
           </p>
-          {pollCount > 0 && (
-            <p className="text-slate-500 text-xs mt-3">Checking {pollCount}/20</p>
-          )}
+          <Link
+            href={jobId ? `/client/jobs/${jobId}` : '/client/jobs'}
+            className="mt-3 inline-flex items-center gap-2 text-teal-400 hover:text-teal-300 text-sm font-medium transition-colors"
+          >
+            <i className="ri-arrow-left-line w-5 h-5 flex items-center justify-center" />
+            Back to Job
+          </Link>
         </div>
       </div>
     );
@@ -258,9 +280,7 @@ function SuccessContent() {
           <p className="text-slate-400 mb-2">
             {transaction?.failure_reason || 'Your payment could not be processed.'}
           </p>
-          <p className="text-slate-500 text-sm mb-6">
-            You can retry the payment or contact support for help.
-          </p>
+          <p className="text-slate-500 text-sm mb-6">Your selected guards remain provisionally reserved. You can retry safely.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href={jobId ? `/client/jobs/${jobId}/payment` : '/client/jobs'}
@@ -289,10 +309,8 @@ function SuccessContent() {
           <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-400/20">
             <i className="ri-check-line text-4xl text-emerald-400 w-8 h-8 flex items-center justify-center" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Payment Successful</h1>
-          <p className="text-slate-400">
-            Your payment has been received and your booking is confirmed.
-          </p>
+          <h1 className="text-3xl font-bold text-white mb-2">Booking Confirmed</h1>
+          <p className="text-slate-400">Your payment has been received and your booking is confirmed.</p>
         </div>
 
         <div className="bg-[#111d35] rounded-2xl border border-slate-700/50 p-6 mb-6">
@@ -303,9 +321,7 @@ function SuccessContent() {
           <div className="space-y-3">
             <div className="flex items-start justify-between">
               <span className="text-slate-400 text-sm">Job</span>
-              <span className="text-white text-sm font-medium text-right">
-                {job?.job_title || 'Job Payment'}
-              </span>
+              <span className="text-white text-sm font-medium text-right">{job?.job_title || 'Job Payment'}</span>
             </div>
             <div className="flex items-start justify-between">
               <span className="text-slate-400 text-sm">Location</span>
@@ -323,9 +339,7 @@ function SuccessContent() {
             </div>
             <div className="flex items-start justify-between">
               <span className="text-slate-400 text-sm">Time</span>
-              <span className="text-white text-sm">
-                {formatTime(job?.start_time)} - {formatTime(job?.end_time)}
-              </span>
+              <span className="text-white text-sm">{formatTime(job?.start_time)} - {formatTime(job?.end_time)}</span>
             </div>
             <div className="border-t border-slate-700/50 pt-3 mt-3">
               <div className="flex items-start justify-between">
@@ -360,20 +374,8 @@ function SuccessContent() {
             <span className="text-slate-400 text-sm">Date</span>
             <span className="text-slate-300 text-sm">
               {transaction?.completed_at
-                ? new Date(transaction.completed_at).toLocaleString('en-GB', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : new Date(transaction?.created_at || '').toLocaleString('en-GB', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                ? new Date(transaction.completed_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                : new Date(transaction?.created_at || '').toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
         </div>

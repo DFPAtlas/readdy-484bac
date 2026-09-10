@@ -44,7 +44,7 @@ async function finalizeJobPayment(appSupabase: any, supabaseUrl: string, supabas
 
   await appSupabase.from('jobs').update({
     payment_status: 'funded',
-    status: 'funded',
+    status: 'confirmed',
     updated_at: now,
   }).eq('id', jobId);
 

@@ -356,7 +356,7 @@ export default function GuardDashboardClient() {
           )
         `)
         .eq('guard_id', guardData.id)
-        .in('status', ['confirmed', 'in_progress', 'pending'])
+        .in('status', ['confirmed', 'in_progress', 'pending', 'awaiting_payment', 'selected'])
         .order('assigned_at', { ascending: false });
       if (error) throw error;
       const all = data || [];
@@ -801,7 +801,7 @@ export default function GuardDashboardClient() {
         job_id: (a.jobs as any)?.id || '',
       }));
     const assignShifts: ShiftItem[] = assignments
-      .filter(a => a.status === 'confirmed' || a.status === 'in_progress' || a.status === 'pending')
+      .filter(a => ['confirmed', 'in_progress', 'pending', 'awaiting_payment', 'selected'].includes(a.status))
       .map(a => ({
         id: a.id,
         source: 'assignment',
@@ -872,6 +872,8 @@ export default function GuardDashboardClient() {
       confirmed: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25',
       in_progress: 'bg-blue-500/15 text-blue-400 border border-blue-500/25',
       completed: 'bg-slate-500/15 text-slate-400 border border-slate-500/25',
+      awaiting_payment: 'bg-amber-500/15 text-amber-400 border border-amber-500/25',
+      selected: 'bg-amber-500/15 text-amber-400 border border-amber-500/25',
     };
     return styles[status] || 'bg-slate-500/15 text-slate-400 border border-slate-500/25';
   };

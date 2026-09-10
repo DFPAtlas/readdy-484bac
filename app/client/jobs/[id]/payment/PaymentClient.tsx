@@ -17,6 +17,7 @@ import ReceiptDisplay from './ReceiptDisplay';
 import PaymentHistoryMini from './PaymentHistoryMini';
 import { useClientGuard } from '@/hooks/useClientGuard';
 import { useRouteGuard } from '@/hooks/useRouteGuard';
+import { computeBookingConfirmation } from '@/lib/payments/bookingConfirmationState';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import ContextualHelpCard from '@/app/client/help/ContextualHelpCard';
 import TaxDisclaimerCheckbox from '@/components/TaxDisclaimerCheckbox';
@@ -541,24 +542,8 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
     }
   };
 
-  const handleProceedToConfirmation = async () => {
-    if (!job) return;
-    try {
-      const { error } = await supabase
-        .from('jobs')
-        .update({
-          status: 'awaiting_client_confirmation',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', jobId);
-
-      if (error) throw error;
-
-      router.push(`/client/jobs/${jobId}/confirmation`);
-    } catch (e) {
-      console.error('Failed to update status:', e);
-      router.push(`/client/jobs/${jobId}/confirmation`);
-    }
+  const handleProceedToConfirmation = () => {
+    router.push(`/client/jobs/${jobId}/confirmation`);
   };
 
   if (loading || authLoading || !allowed || checking) {
@@ -607,6 +592,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
 
   const costs = calculateCosts();
   const paymentStatus = getPaymentStatus(job, transaction);
+  const bookingConfirmation = computeBookingConfirmation(job, job.job_assignments || []);
   const canPay = paymentStatus === "pending_payment" || paymentStatus === "not_required" || paymentStatus === "failed";
   const hasReceipt = !!transaction?.receipt_url;
   const hasInvoice = !!transaction?.invoice_url;
@@ -692,25 +678,42 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
             </div>
           </div>
 
-          {/* Funded Banner */}
-          {paymentStatus === "funded" && (
+          {/* Booking Confirmed Banner */}
+          {bookingConfirmation === "confirmed" && (
             <div className="bg-emerald-500/10 rounded-xl border border-emerald-500/25 p-5 mb-6">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-emerald-500/15 rounded-lg flex items-center justify-center flex-shrink-0">
                   <i className="ri-shield-check-fill text-emerald-400 text-xl"></i>
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-emerald-400">Job Funded — Guards Are Confirmed</p>
+                  <p className="text-sm font-semibold text-emerald-400">Booking Confirmed</p>
                   <p className="text-sm text-emerald-300 mt-1">
-                    Payment received. The funds are held securely and guards have been notified. They can now check in when the shift starts.
+                    Payment received and your booking is confirmed. Guards have been notified and can now check in when the shift starts.
                   </p>
                   <button
                     onClick={handleProceedToConfirmation}
                     className="mt-3 flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-colors cursor-pointer whitespace-nowrap"
                   >
                     <i className="ri-file-shield-line"></i>
-                    Go to Booking Confirmation
+                    View Booking Confirmation
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Reconciling Banner */}
+          {bookingConfirmation === "reconciling" && (
+            <div className="bg-amber-500/10 rounded-xl border border-amber-500/25 p-5 mb-6">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-amber-500/15 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <i className="ri-loader-4-line text-amber-400 text-xl animate-spin"></i>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-amber-400">Booking status is being reconciled</p>
+                  <p className="text-sm text-amber-300 mt-1">
+                    Your payment has been received, but the booking state is still settling. This usually resolves within a few moments — please refresh shortly.
+                  </p>
                 </div>
               </div>
             </div>

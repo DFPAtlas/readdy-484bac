@@ -10,7 +10,6 @@ import BookingStatusBadge from '../../BookingStatusBadge';
 import ConfirmationBlockers from './ConfirmationBlockers';
 import BookingReceiptModal from './BookingReceiptModal';
 import { useClientGuard } from '@/hooks/useClientGuard';
-import { sendPushToUser } from '@/lib/push-notifications';
 
 interface Guard {
   id: string;
@@ -90,8 +89,6 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
   const [termsCancellation, setTermsCancellation] = useState(false);
   const [termsSite, setTermsSite] = useState(false);
   const [termsPayment, setTermsPayment] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [confirmError, setConfirmError] = useState('');
   const [showReceipt, setShowReceipt] = useState(false);
   const [bookingRef, setBookingRef] = useState('');
   const [confirmedAt, setConfirmedAt] = useState('');
@@ -199,84 +196,6 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
     loadData();
   }, [jobId]);
 
-  const generateBookingRef = () => {
-    const date = new Date();
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `QG-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}-${random}`;
-  };
-
-  const handleConfirm = async () => {
-    if (!job) return;
-    setConfirming(true);
-    setConfirmError('');
-
-    try {
-      const ref = job.booking_reference || generateBookingRef();
-      const now = new Date().toISOString();
-
-      const { error: updateError } = await supabase
-        .from('jobs')
-        .update({
-          status: 'confirmed',
-          terms_accepted: true,
-          terms_accepted_at: now,
-          booking_reference: ref,
-          client_confirmed: true,
-          client_confirmed_at: now,
-          updated_at: now,
-        })
-        .eq('id', jobId)
-        .eq('client_id', clientId);
-
-      if (updateError) throw updateError;
-
-      setBookingRef(ref);
-      setConfirmedAt(now);
-      setShowReceipt(true);
-      setJob((prev: any) => prev ? {
-        ...prev,
-        status: 'confirmed',
-        terms_accepted: true,
-        terms_accepted_at: now,
-        booking_reference: ref,
-        client_confirmed: true,
-        client_confirmed_at: now,
-      } : null);
-
-      await supabase.from('notifications').insert({
-        user_id: authUserId,
-        user_type: 'client',
-        type: 'booking_confirmed',
-        title: 'Booking Confirmed',
-        message: `Your booking "${job.job_title}" has been confirmed. Reference: ${ref}`,
-        link: `/client/jobs/${jobId}`,
-        is_read: false,
-      });
-
-      for (const a of assignments) {
-        if (a.guards?.user_id) {
-          try {
-            await sendPushToUser(a.guards.user_id, 'guard', {
-              title: 'Booking Confirmed',
-              body: `Client has confirmed "${job.job_title}". Please arrive on time.`,
-              url: '/guard/dashboard',
-              tag: 'quickguard-confirmed',
-            });
-          } catch (e) {
-            console.error('Failed to send confirmation push:', e);
-          }
-        }
-      }
-
-      setToast('Booking confirmed successfully!');
-      setTimeout(() => setToast(''), 4000);
-    } catch (e: any) {
-      setConfirmError(e.message || 'Failed to confirm booking. Please try again.');
-    } finally {
-      setConfirming(false);
-    }
-  };
-
   const handleDispute = async () => {
     if (!job) return;
     try {
@@ -342,8 +261,6 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
   if (!job?.venue_address_line1) blockers.push({ icon: 'ri-map-pin-line', text: 'Site address is missing' });
   if (!job?.start_time || !job?.end_time) blockers.push({ icon: 'ri-time-line', text: 'Shift times are not set' });
   if (assignments.some(a => !a.guards?.sia_verified)) blockers.push({ icon: 'ri-shield-flash-line', text: 'Selected guard has a critical compliance issue (SIA not verified)' });
-
-  const canConfirm = blockers.length === 0 && !isConfirmed && !isDisputed && !isCancelled;
 
   if (loading || authLoading || !allowed) {
     return (
@@ -769,52 +686,21 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
               <div className="bg-[#111d35] rounded-2xl border border-[#1e2d4d] shadow-sm p-6">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-200">
-                      {canConfirm ? 'Ready to confirm?' : 'Action required before confirming'}
-                    </p>
+                    <p className="text-sm font-semibold text-slate-200">Booking not yet confirmed</p>
                     <p className="text-xs text-slate-500 mt-1">
-                      {canConfirm
-                        ? 'All requirements are met. Click the button below to confirm your booking.'
-                        : `Please resolve the ${blockers.length} blocker${blockers.length !== 1 ? 's' : ''} above.`}
+                      Your booking is confirmed automatically once payment has been received and processed. If this is taking longer than expected, please refresh this page or contact support.
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handleDispute}
-                      disabled={confirming}
-                      className="flex items-center gap-2 px-4 py-2.5 border border-orange-500/25 text-orange-400 rounded-xl text-sm font-semibold hover:bg-orange-500/10 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2.5 border border-orange-500/25 text-orange-400 rounded-xl text-sm font-semibold hover:bg-orange-500/10 transition-colors cursor-pointer whitespace-nowrap"
                     >
                       <i className="ri-shield-flash-line"></i>
                       Dispute
                     </button>
-                    <button
-                      onClick={handleConfirm}
-                      disabled={!canConfirm || confirming}
-                      className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap disabled:opacity-60 ${
-                        canConfirm
-                          ? 'bg-teal-500 text-white hover:bg-teal-600'
-                          : 'bg-[#162036] text-slate-600 cursor-not-allowed'
-                      }`}
-                    >
-                      {confirming ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Confirming...
-                        </>
-                      ) : (
-                        <>
-                          <i className="ri-checkbox-circle-line"></i>
-                          Confirm Booking
-                        </>
-                      )}
-                    </button>
                   </div>
                 </div>
-                {confirmError && (
-                  <div className="mt-4 px-4 py-3 bg-red-500/10 border border-red-500/25 rounded-xl text-sm text-red-400">
-                    {confirmError}
-                  </div>
-                )}
               </div>
             )}
 

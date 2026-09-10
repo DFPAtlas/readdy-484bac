@@ -23,6 +23,20 @@ export default function FundedBadge({ paymentStatus, size = 'sm' }: FundedBadgeP
       border: 'border-amber-500/25',
       icon: 'ri-time-line',
     },
+    awaiting_payment: {
+      label: 'Awaiting Payment',
+      bg: 'bg-amber-500/15',
+      text: 'text-amber-400',
+      border: 'border-amber-500/25',
+      icon: 'ri-time-line',
+    },
+    pending: {
+      label: 'Awaiting Payment',
+      bg: 'bg-amber-500/15',
+      text: 'text-amber-400',
+      border: 'border-amber-500/25',
+      icon: 'ri-time-line',
+    },
     unpaid: {
       label: 'Unpaid',
       bg: 'bg-slate-500/15',

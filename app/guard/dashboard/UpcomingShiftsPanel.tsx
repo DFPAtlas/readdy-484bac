@@ -62,14 +62,15 @@ export default function UpcomingShiftsPanel({ shifts, onConfirm, onCheckIn, onCh
         <div className="space-y-3">
           {shifts.map(shift => {
             const action = getShiftAction(shift);
+            const isProvisional = shift.status === 'awaiting_payment' || shift.status === 'selected';
             const isFunded = (shift as any).payment_status === 'funded';
             const isAwaitingPayment = (shift as any).payment_status === 'payment_pending' || (shift as any).payment_status === 'unpaid';
             return (
-              <div key={shift.id} className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border transition-all hover:shadow-md ${isFunded ? 'bg-emerald-500/5 border-emerald-500/15' : isAwaitingPayment ? 'bg-amber-500/5 border-amber-500/15' : 'bg-[#0B1933] border-[#1a2b4a]'}`}>
+              <div key={shift.id} className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border transition-all hover:shadow-md ${isFunded ? 'bg-emerald-500/5 border-emerald-500/15' : (isProvisional || isAwaitingPayment) ? 'bg-amber-500/5 border-amber-500/15' : 'bg-[#0B1933] border-[#1a2b4a]'}`}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1.5">
                     <p className="text-sm font-semibold text-white truncate">{shift.job_title}</p>
-                    <FundedBadge paymentStatus={(shift as any).payment_status} />
+                    <FundedBadge paymentStatus={isProvisional ? 'awaiting_payment' : (shift as any).payment_status} />
                   </div>
                   <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
                     <span className="flex items-center gap-1"><i className="ri-map-pin-line text-slate-600"></i>{shift.location}</span>
@@ -81,7 +82,12 @@ export default function UpcomingShiftsPanel({ shifts, onConfirm, onCheckIn, onCh
                       <i className="ri-building-line text-slate-600"></i>{shift.client_name}
                     </p>
                   )}
-                  {isAwaitingPayment && (
+                  {isProvisional && (
+                    <p className="text-xs text-amber-400 mt-1.5 flex items-center gap-1">
+                      <i className="ri-time-line"></i>Selected — Awaiting Client Payment
+                    </p>
+                  )}
+                  {!isProvisional && isAwaitingPayment && (
                     <p className="text-xs text-amber-400 mt-1.5 flex items-center gap-1">
                       <i className="ri-time-line"></i>Waiting for client payment to confirm
                     </p>
