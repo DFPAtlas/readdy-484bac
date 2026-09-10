@@ -216,7 +216,7 @@ export default function GuardJobHistoryClient() {
       if (paymentFilter === 'funded') {
         result = result.filter((j) => j.payment_status === 'funded');
       } else if (paymentFilter === 'paid') {
-        result = result.filter((j) => j.payment_status === 'paid');
+        result = result.filter((j) => j.payment_status === 'paid' || j.payment_status === 'paid_out');
       } else if (paymentFilter === 'pending') {
         result = result.filter((j) => j.payment_status === 'pending');
       } else if (paymentFilter === 'released') {
@@ -269,8 +269,14 @@ export default function GuardJobHistoryClient() {
   };
 
   const getPaymentBadge = (job: HistoryJob) => {
-    if (job.payout_released || job.payout?.status === 'paid') {
+    if (job.payout_released || job.payout?.status === 'paid' || job.payout?.status === 'completed' || job.payout?.status === 'paid_out') {
       return { label: 'Released', class: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' };
+    }
+    if (job.payment_status === 'paid_out') {
+      return { label: 'Paid Out', class: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' };
+    }
+    if (job.payment_status === 'payout_pending') {
+      return { label: 'Payout Pending', class: 'bg-amber-500/15 text-amber-400 border border-amber-500/25' };
     }
     if (job.payment_status === 'funded') {
       return { label: 'Funded', class: 'bg-teal-500/15 text-teal-400 border border-teal-500/25' };

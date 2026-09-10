@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
@@ -8,7 +7,7 @@ const CORS_ALLOWLIST = [
   'https://www.quickguard.uk',
 ];
 
-const IDEMPOTENCY_VERSION = 'v1';
+const IDEMPOTENCY_VERSION = 'v2';
 
 function getAllowedOrigin(origin: string | null): string {
   if (origin && CORS_ALLOWLIST.includes(origin)) return origin;
@@ -170,6 +169,11 @@ serve(async (req: Request) => {
         now,
       });
     }
+
+    await markProcessing(supabase, {
+      assignmentId: validated.assignmentId,
+      now,
+    });
 
     const transfer = await createStripeTransfer(stripe, supabase, {
       netAmountPence: netPence,
@@ -440,11 +444,8 @@ async function loadJob(
     throw { status: 400, message: 'Assignment not eligible for payout' };
   }
 
-  const validCompletion = job.completion_status === 'confirmed_by_client'
-    || job.completion_status === 'completed';
-
-  if (!validCompletion) {
-    throw { status: 400, message: 'Job completion has not been confirmed by the client' };
+  if (job.status !== 'payout_approved') {
+    throw { status: 400, message: 'Job completion has not been approved by the client' };
   }
 
   if (job.disputed) {
@@ -455,14 +456,8 @@ async function loadJob(
 }
 
 async function validatePayoutEligibility(assignment: AssignmentRecord): Promise<void> {
-  const releaseReadyStatuses = ['client_released'];
-
-  if (!assignment.payment_status) {
-    throw { status: 400, message: 'Assignment not eligible for payout' };
-  }
-
-  if (releaseReadyStatuses.includes(assignment.payment_status)) {
-    return;
+  if (assignment.status !== 'completed') {
+    throw { status: 400, message: 'Assignment is not completed' };
   }
 
   if (assignment.payment_status === 'paid' || assignment.payment_status === 'paid_out' || assignment.payment_status === 'completed') {
@@ -470,19 +465,11 @@ async function validatePayoutEligibility(assignment: AssignmentRecord): Promise<
   }
 
   if (assignment.payment_status === 'payout_processing') {
-    throw { status: 409, message: 'Payout currently processing' };
+    return;
   }
 
-  const rejectedStatuses = [
-    'payment_pending',
-    'awaiting_client_release',
-    'failed',
-    'cancelled',
-    'refunded',
-  ];
-
-  if (rejectedStatuses.includes(assignment.payment_status)) {
-    throw { status: 400, message: 'Assignment not eligible for payout' };
+  if (assignment.payment_status === 'payout_pending') {
+    return;
   }
 
   throw { status: 400, message: 'Assignment not eligible for payout' };
@@ -704,6 +691,20 @@ async function createPayoutRecord(
   return record as PayoutRecord;
 }
 
+async function markProcessing(
+  supabase: ReturnType<typeof createClient>,
+  params: {
+    assignmentId: string;
+    now: string;
+  },
+): Promise<void> {
+  await supabase
+    .from('job_assignments')
+    .update({ payment_status: 'payout_processing', updated_at: params.now })
+    .eq('id', params.assignmentId)
+    .eq('status', 'completed');
+}
+
 async function createStripeTransfer(
   stripe: Stripe,
   supabase: ReturnType<typeof createClient>,
@@ -748,6 +749,14 @@ async function createStripeTransfer(
         updated_at: new Date().toISOString(),
       })
       .eq('id', params.payoutRecordId)
+      .catch(() => {});
+
+    await supabase.from('job_assignments')
+      .update({
+        payment_status: 'payout_pending',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', params.assignmentId)
       .catch(() => {});
 
     await supabase.from('payment_audit_logs').insert({
@@ -829,7 +838,7 @@ async function completePayout(
   const { error: assignErr } = await supabase
     .from('job_assignments')
     .update({
-      payment_status: 'paid',
+      payment_status: 'paid_out',
       stripe_transfer_id: params.transferId,
       payout_released: true,
       payout_released_at: params.now,
@@ -893,7 +902,7 @@ async function completePayout(
       if (allPaid) {
         const { error: jobErr } = await supabase
           .from('jobs')
-          .update({ payment_status: 'paid', updated_at: params.now })
+          .update({ status: 'paid_out', payment_status: 'paid_out', updated_at: params.now })
           .eq('id', params.jobId);
 
         if (jobErr) {

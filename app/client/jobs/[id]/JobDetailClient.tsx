@@ -542,6 +542,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   ];
 
   const isCompleted = job.status === 'completed';
+  const isPaidOut = job.status === 'paid_out';
   const unreviewedGuards = assignedGuards.filter((a) => a.guards?.id && !guardReviews[a.guards.id]);
   const reviewedGuards = assignedGuards.filter((a) => a.guards?.id && guardReviews[a.guards.id]);
 
@@ -647,7 +648,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                 Mark as Complete
               </button>
             )}
-            {isCompleted && unreviewedGuards.length > 0 && (
+            {isPaidOut && unreviewedGuards.length > 0 && (
               <button
                 onClick={() => {
                   const firstUnreviewed = unreviewedGuards[0];
@@ -661,7 +662,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                 {unreviewedGuards.length > 1 ? `Review ${unreviewedGuards.length} Guards` : 'Leave a Review'}
               </button>
             )}
-            {isCompleted && unreviewedGuards.length === 0 && reviewedGuards.length > 0 && (
+            {isPaidOut && unreviewedGuards.length === 0 && reviewedGuards.length > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500/10 border border-emerald-500/25 rounded-xl">
                 <i className="ri-check-double-line text-emerald-400"></i>
                 <span className="text-xs font-semibold text-emerald-400 whitespace-nowrap">All reviewed</span>
@@ -797,7 +798,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
           {activeTab === 'guards' && (
             <AssignedGuardsSection
               guards={assignedGuards}
-              isCompleted={isCompleted}
+              isCompleted={isPaidOut}
               jobId={jobId}
               onLeaveReview={handleOpenReviewModal}
               onMessageGuard={handleMessageGuard}

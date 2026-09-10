@@ -91,7 +91,7 @@ export default function PendingReleaseTable() {
 
       const { data: job } = await supabase
         .from('jobs')
-        .select('completion_status')
+        .select('status')
         .eq('id', jobId)
         .maybeSingle();
 
@@ -111,7 +111,7 @@ export default function PendingReleaseTable() {
       const result: PayoutCheckResult = {
         clientPaymentCompleted: !!transaction,
         jobCompleted: !!job,
-        clientConfirmedCompletion: job?.completion_status === 'confirmed_by_client' || job?.completion_status === 'completed',
+        clientConfirmedCompletion: job?.status === 'payout_approved',
         guardHasStripeConnect: !!guard?.stripe_account_id,
         payoutAlreadyPaid: existingPayout?.status === 'completed' || existingPayout?.status === 'paid_out' || existingPayout?.status === 'processing',
         existingPayoutStatus: existingPayout?.status || null,
@@ -459,7 +459,7 @@ export default function PendingReleaseTable() {
                 {[
                   { label: 'Client payment completed', pass: payoutChecks.clientPaymentCompleted },
                   { label: 'Job completed', pass: payoutChecks.jobCompleted },
-                  { label: 'Client confirmed completion', pass: payoutChecks.clientConfirmedCompletion },
+                  { label: 'Client approved completion', pass: payoutChecks.clientConfirmedCompletion },
                   { label: 'Guard has Stripe Connect', pass: payoutChecks.guardHasStripeConnect },
                   { label: 'Not already paid out', pass: !payoutChecks.payoutAlreadyPaid },
                 ].map((check, i) => (

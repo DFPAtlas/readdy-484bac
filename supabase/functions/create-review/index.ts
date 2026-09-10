@@ -101,7 +101,7 @@ serve(async (req: Request) => {
 
   if (!job) return json(400, { error: "Job not found" });
   if (job.client_id !== client.id) return json(403, { error: "You are not authorised to review this job" });
-  if (job.status !== "completed") return json(400, { error: "This job is not eligible for review yet" });
+  if (job.status !== "paid_out") return json(400, { error: "This job is not eligible for review yet" });
 
   const { data: assignment } = await supabase
     .from("job_assignments")

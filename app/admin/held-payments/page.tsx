@@ -28,7 +28,7 @@ type SortDir = 'asc' | 'desc';
 const PAGE_SIZE = 10;
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  client_released: { label: 'Ready to Release', color: 'bg-emerald-500/10 text-emerald-400' },
+  payout_pending: { label: 'Ready to Release', color: 'bg-emerald-500/10 text-emerald-400' },
   pending: { label: 'Awaiting Client', color: 'bg-amber-500/10 text-amber-400' },
   held: { label: 'Held', color: 'bg-orange-500/10 text-orange-400' },
 };
@@ -75,7 +75,7 @@ export default function AdminHeldPayments() {
         .from('job_assignments')
         .select('id, job_id, guard_id, status, payment_status, payment_amount, completed_at, assigned_at')
         .eq('status', 'completed')
-        .or('payment_status.eq.pending,payment_status.eq.held,payment_status.eq.client_released,payment_status.is.null')
+        .or('payment_status.eq.pending,payment_status.eq.held,payment_status.eq.payout_pending,payment_status.is.null')
         .order('completed_at', { ascending: false });
 
       if (assignmentsError) throw new Error(assignmentsError.message);
@@ -256,9 +256,9 @@ export default function AdminHeldPayments() {
     }
 
     if (statusFilter === 'ready') {
-      filtered = filtered.filter(p => p.payment_status === 'client_released');
+      filtered = filtered.filter(p => p.payment_status === 'payout_pending');
     } else if (statusFilter === 'awaiting') {
-      filtered = filtered.filter(p => p.payment_status !== 'client_released');
+      filtered = filtered.filter(p => p.payment_status !== 'payout_pending');
     }
 
     if (daysFilter !== 'all') {
@@ -287,10 +287,10 @@ export default function AdminHeldPayments() {
 
   const totalHeld = allPayments.reduce((sum, p) => sum + (Number(p.payment_amount) || 0), 0);
   const totalFiltered = filteredPayments.reduce((sum, p) => sum + (Number(p.payment_amount) || 0), 0);
-  const readyCount = allPayments.filter(p => p.payment_status === 'client_released').length;
-  const awaitingCount = allPayments.filter(p => p.payment_status !== 'client_released').length;
+  const readyCount = allPayments.filter(p => p.payment_status === 'payout_pending').length;
+  const awaitingCount = allPayments.filter(p => p.payment_status !== 'payout_pending').length;
 
-  const canRelease = (p: HeldPayment) => p.payment_status === 'client_released';
+  const canRelease = (p: HeldPayment) => p.payment_status === 'payout_pending';
 
   return (
     <div className="min-h-screen bg-[#0B1933]">
