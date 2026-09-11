@@ -436,25 +436,35 @@ serve(async (req) => {
           break;
         }
 
-        const transferStatus = transfer.status as string;
-        const isSettled = transferStatus === 'paid' || transferStatus === 'complete' || transferStatus === 'settled';
+        if (transfer.reversed === true) {
+          console.log(`[EnhancedWebhook] transfer.updated: transfer ${transferId} is reversed, deferring to transfer.reversed`);
+          await appSupabase.from('payment_audit_logs').insert({ event_type: 'transfer.updated.reversed', stripe_event_id: transfer.id, reference_type: 'guard_payout', reference_id: assignment.id, details: JSON.stringify({ transfer_id: transferId, assignment_id: assignment.id, reversed: true }), created_at: now }).catch(() => {});
+          break;
+        }
 
-        if (!isSettled) {
-          await appSupabase.from('payment_audit_logs').insert({ event_type: 'transfer.updated.pending', stripe_event_id: transfer.id, reference_type: 'guard_payout', reference_id: assignment.id, details: JSON.stringify({ transfer_id: transferId, assignment_id: assignment.id, transfer_status: transferStatus }), created_at: now }).catch(() => {});
+        let stripeTransfer: any = null;
+        try {
+          stripeTransfer = await stripe.transfers.retrieve(transferId);
+        } catch (retrieveErr: any) {
+          console.error(`[EnhancedWebhook] transfer.updated: failed to retrieve transfer ${transferId}: ${retrieveErr.message}`);
+        }
+
+        if (!stripeTransfer || stripeTransfer.reversed === true) {
+          await appSupabase.from('payment_audit_logs').insert({ event_type: 'transfer.updated.pending', stripe_event_id: transfer.id, reference_type: 'guard_payout', reference_id: assignment.id, details: JSON.stringify({ transfer_id: transferId, assignment_id: assignment.id, transfer_status: transfer.status, exists: !!stripeTransfer }), created_at: now }).catch(() => {});
           break;
         }
 
         if (assignment.payment_status === 'paid_out') {
           console.log(`[EnhancedWebhook] transfer.updated: assignment ${assignment.id} already paid_out, idempotent skip`);
-          await appSupabase.from('payment_audit_logs').insert({ event_type: 'transfer.updated.idempotent', stripe_event_id: transfer.id, reference_type: 'guard_payout', reference_id: assignment.id, details: JSON.stringify({ transfer_id: transferId, assignment_id: assignment.id, already_paid: true, transfer_status: transferStatus }), created_at: now }).catch(() => {});
+          await appSupabase.from('payment_audit_logs').insert({ event_type: 'transfer.updated.idempotent', stripe_event_id: transfer.id, reference_type: 'guard_payout', reference_id: assignment.id, details: JSON.stringify({ transfer_id: transferId, assignment_id: assignment.id, already_paid: true, transfer_status: stripeTransfer.status }), created_at: now }).catch(() => {});
           break;
         }
 
-        await appSupabase.from('guard_payouts').update({ stripe_transfer_id: transferId, stripe_transfer_status: transferStatus, status: 'paid_out', completed_date: now, updated_at: now, transfer_webhook_updated_at: now }).eq('assignment_id', assignment.id);
+        await appSupabase.from('guard_payouts').update({ stripe_transfer_id: transferId, stripe_transfer_status: stripeTransfer.status || 'paid', status: 'paid_out', completed_date: now, updated_at: now, transfer_webhook_updated_at: now }).eq('assignment_id', assignment.id);
         await appSupabase.from('job_assignments').update({ payment_status: 'paid_out', payout_released: true, payout_released_at: now, updated_at: now }).eq('id', assignment.id);
         if (assignment.job_id) await finalizeJobAfterPayout(appSupabase, assignment.job_id);
         if (assignment.guard_id) await notifyGuardPayout(appSupabase, assignment.guard_id, assignment.job_id, assignment.id, transferId);
-        await appSupabase.from('payment_audit_logs').insert({ event_type: 'transfer.updated', stripe_event_id: transfer.id, reference_type: 'guard_payout', reference_id: assignment.id, details: JSON.stringify({ transfer_id: transferId, amount: transfer.amount, currency: transfer.currency, transfer_status: transferStatus, guard_id: assignment.guard_id, job_id: assignment.job_id, assignment_id: assignment.id }), created_at: now });
+        await appSupabase.from('payment_audit_logs').insert({ event_type: 'transfer.updated', stripe_event_id: transfer.id, reference_type: 'guard_payout', reference_id: assignment.id, details: JSON.stringify({ transfer_id: transferId, amount: transfer.amount, currency: transfer.currency, transfer_status: stripeTransfer.status, guard_id: assignment.guard_id, job_id: assignment.job_id, assignment_id: assignment.id }), created_at: now });
         break;
       }
 
