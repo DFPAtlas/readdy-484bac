@@ -69,7 +69,7 @@ serve(async (req) => {
       try {
         stripeSub = await stripe.subscriptions.retrieve(subRecord.stripe_subscription_id);
       } catch (e) {
-        console.warn('Stripe subscription retrieve failed:', e.message);
+        console.warn('Stripe subscription retrieve failed:', e instanceof Error ? e.message : String(e));
         stripeSub = null;
       }
     }
@@ -112,7 +112,12 @@ serve(async (req) => {
       .eq('active', true)
       .maybeSingle();
 
-    const profileUpdate = {
+    const profileUpdate: {
+      subscription_status: string | null;
+      updated_at: string;
+      plan_slug?: string;
+      plan_name?: string;
+    } = {
       subscription_status: subStatus,
       updated_at: new Date().toISOString(),
     };
@@ -209,7 +214,7 @@ serve(async (req) => {
   } catch (err) {
     console.error('update-after-payment error:', err);
     return new Response(
-      JSON.stringify({ error: err.message || 'Internal server error' }),
+      JSON.stringify({ error: err instanceof Error ? err.message : 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
