@@ -42,6 +42,8 @@ async function finalizeJobPayment(appSupabase: any, supabaseUrl: string, supabas
   const jobId = transaction.job_id;
   const now = new Date().toISOString();
 
+  const { data: fundedAssignments } = await appSupabase.from('job_assignments').select('guard_id').eq('job_id', jobId).in('status', ['selected', 'awaiting_payment']);
+
   await appSupabase.from('jobs').update({
     payment_status: 'funded',
     status: 'confirmed',
@@ -55,10 +57,10 @@ async function finalizeJobPayment(appSupabase: any, supabaseUrl: string, supabas
   }).eq('job_id', jobId).in('status', ['selected', 'awaiting_payment']);
 
   if (transaction.client_id) {
-    await appSupabase.from('notifications').insert([{ user_id: transaction.client_id, title: 'Payment Received — Job Funded', message: `Your payment of £${Number(transaction.amount || 0).toFixed(2)} has been processed and is held by QuickGuard. Guards have been notified and can now check in.`, type: 'success', related_id: jobId, is_read: false }]);
+    await appSupabase.from('notifications').insert([{ user_id: transaction.client_id, title: 'Payment Received — Job Funded', message: `Your payment of £${Number(transaction.amount || 0).toFixed(2)} has been processed. Guards have been notified and can now check in.`, type: 'success', related_id: jobId, is_read: false }]);
   }
 
-  const { data: assignments } = await appSupabase.from('job_assignments').select('guard_id').eq('job_id', jobId);
+  const assignments = fundedAssignments;
   const { data: job } = await appSupabase.from('jobs').select('job_title, venue_name, venue_city, start_date, start_time, end_time, hourly_rate, client_id').eq('id', jobId).maybeSingle();
   let clientName = 'the client';
   if (job?.client_id) {
@@ -70,7 +72,7 @@ async function finalizeJobPayment(appSupabase: any, supabaseUrl: string, supabas
     for (const assignment of assignments) {
       const { data: guard } = await appSupabase.from('guards').select('user_id, email, full_name').eq('id', assignment.guard_id).maybeSingle();
       if (guard?.user_id) {
-        await appSupabase.from('notifications').insert([{ user_id: guard.user_id, user_type: 'guard', title: 'Booking Funded', message: `Your booking for "${job?.job_title || 'Job'}" at ${job?.venue_city || 'location'} has been funded. Payment is held by QuickGuard until completion is confirmed.`, type: 'booking_confirmed', related_id: jobId, link: '/guard/dashboard', is_read: false }]);
+        await appSupabase.from('notifications').insert([{ user_id: guard.user_id, user_type: 'guard', title: 'Booking Funded', message: `Your booking for "${job?.job_title || 'Job'}" at ${job?.venue_city || 'location'} has been funded. Payout becomes eligible after job completion and client approval.`, type: 'booking_confirmed', related_id: jobId, link: '/guard/dashboard', is_read: false }]);
       }
       if (guard?.email) {
         try {
@@ -169,11 +171,12 @@ serve(async (req) => {
         const detailsSubmitted = account.details_submitted ?? false;
         const chargesEnabled = account.charges_enabled ?? false;
         const payoutsEnabled = account.payouts_enabled ?? false;
+        const transfersActive = account.capabilities?.transfers === 'active';
         const requirementsDue = account.requirements?.currently_due || [];
         const restrictedReason = account.requirements?.disabled_reason || null;
 
         let status: string;
-        if (chargesEnabled && payoutsEnabled) {
+        if (detailsSubmitted && payoutsEnabled && transfersActive && requirementsDue.length === 0) {
           status = 'ready';
         } else if (detailsSubmitted) {
           status = 'pending';
@@ -202,7 +205,7 @@ serve(async (req) => {
             updatePayload.stripe_connect_verified_at = now;
           }
           await appSupabase.from('guards').update(updatePayload).eq('id', guard.id);
-          console.log(`[EnhancedWebhook] account.updated: guard=${guard.id} status=${status} details=${detailsSubmitted} charges=${chargesEnabled} payouts=${payoutsEnabled}`);
+          console.log(`[EnhancedWebhook] account.updated: guard=${guard.id} status=${status} details=${detailsSubmitted} charges=${chargesEnabled} payouts=${payoutsEnabled} transfers=${transfersActive}`);
         } else {
           console.log(`[EnhancedWebhook] account.updated: No guard found for stripe_account_id=${stripeAccountId}`);
         }
@@ -212,7 +215,7 @@ serve(async (req) => {
           stripe_event_id: event.id,
           reference_type: 'guard',
           reference_id: guard?.id || stripeAccountId,
-          details: JSON.stringify({ stripe_account_id: stripeAccountId, status, details_submitted: detailsSubmitted, charges_enabled: chargesEnabled, payouts_enabled: payoutsEnabled, requirements_due: requirementsDue, restricted_reason: restrictedReason }),
+          details: JSON.stringify({ stripe_account_id: stripeAccountId, status, details_submitted: detailsSubmitted, charges_enabled: chargesEnabled, payouts_enabled: payoutsEnabled, transfers_active: transfersActive, requirements_due: requirementsDue, restricted_reason: restrictedReason }),
           created_at: now,
         });
         break;

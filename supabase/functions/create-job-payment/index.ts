@@ -19,7 +19,7 @@ async function getSubscriptionAwareFee(
   supabaseService: any,
   userId: string,
   role: 'client' | 'guard',
-): Promise<{ feePercent: number; feeFixed: number; isSubscribed: boolean; planSlug: string | null }> {
+): Promise<{ feePercent: number; feeFixedPence: number; isSubscribed: boolean; planSlug: string | null }> {
   const { data: sub, error: subErr } = await supabaseService
     .from('subscriptions')
     .select('plan_slug, status')
@@ -33,7 +33,7 @@ async function getSubscriptionAwareFee(
   }
 
   if (sub) {
-    return { feePercent: 0, feeFixed: 0, isSubscribed: true, planSlug: sub.plan_slug };
+    return { feePercent: 0, feeFixedPence: 0, isSubscribed: true, planSlug: sub.plan_slug };
   }
 
   const table = role === 'client' ? 'clients' : 'guards';
@@ -53,7 +53,7 @@ async function getSubscriptionAwareFee(
 
   return {
     feePercent: rules?.platform_fee_percent ? Number(rules.platform_fee_percent) : 0,
-    feeFixed: rules?.platform_fee_fixed_pence ? Number(rules.platform_fee_fixed_pence) : 0,
+    feeFixedPence: rules?.platform_fee_fixed_pence ? Number(rules.platform_fee_fixed_pence) : 0,
     isSubscribed: false,
     planSlug,
   };
@@ -299,7 +299,7 @@ serve(async (req) => {
       }
     }
 
-    const effectiveFeeFixedPence = feeResult.feeFixed * 100;
+    const effectiveFeeFixedPence = feeResult.feeFixedPence;
 
     let totalGrossGuardPence = 0;
     let totalPlatformFeePence = 0;
@@ -326,7 +326,7 @@ serve(async (req) => {
       const guardUserId = assignment.guards?.user_id || null;
       const guardFeeResult = guardUserId
         ? await getSubscriptionAwareFee(supabaseService, guardUserId, 'guard')
-        : { feePercent: 10, feeFixed: 0, isSubscribed: false, planSlug: 'guard-starter' };
+        : { feePercent: 10, feeFixedPence: 0, isSubscribed: false, planSlug: 'guard-starter' };
 
       const guardServiceFeePence = Math.round(grossGuardPence * (guardFeeResult.feePercent / 100));
       const guardNetPence = grossGuardPence - guardServiceFeePence;

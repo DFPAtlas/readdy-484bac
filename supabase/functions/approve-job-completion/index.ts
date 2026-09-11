@@ -279,23 +279,23 @@ serve(async (req: Request) => {
     if (!updatedReq) return corsResponse(origin, 409, { error: 'Completion request has already been processed' });
 
     const { error: assignUpdErr } = await supabase
-      .from('job_assignments').update({ payment_status: 'client_released', updated_at: now }).eq('id', assignment.id);
+      .from('job_assignments').update({ payment_status: 'payout_pending', updated_at: now }).eq('id', assignment.id);
     if (assignUpdErr) { safeLog('admin assign update error', assignUpdErr.message); return corsResponse(origin, 500, { error: 'Unable to process request' }); }
 
     const { error: jobUpdErr } = await supabase
-      .from('jobs').update({ completion_status: 'confirmed_by_admin', updated_at: now }).eq('id', request.job_id);
+      .from('jobs').update({ status: 'payout_approved', disputed: false, updated_at: now }).eq('id', request.job_id);
     if (jobUpdErr) safeLog('admin job update error', jobUpdErr.message);
 
     await supabase.from('payment_audit_logs').insert({
       event_type: 'admin_approved_completion', job_id: request.job_id, guard_id: request.guard_id, client_id: request.client_id,
-      from_status: 'disputed', to_status: 'client_released', changed_by: user.id, changed_by_role: adminRec.role,
-      reason: 'Admin approved disputed completion and released payment', created_at: now,
+      from_status: 'disputed', to_status: 'payout_pending', changed_by: user.id, changed_by_role: adminRec.role,
+      reason: 'Admin approved disputed completion — payout pending', created_at: now,
     }).catch((e: unknown) => { safeLog('admin audit log error', e instanceof Error ? e.message : 'unknown'); });
 
     if (guard.user_id) {
       await supabase.from('notifications').insert({
-        user_id: guard.user_id, user_type: 'guard', title: 'Payment Released by Admin',
-        message: `An admin has approved completion for "${jobTitle}" and payment has been released.`,
+        user_id: guard.user_id, user_type: 'guard', title: 'Completion Approved by Admin',
+        message: `An admin approved completion for this job. Your payout is now pending.`,
         type: 'success', is_read: false, link: '/guard/dashboard#earnings', data: { job_id: request.job_id }, created_at: now,
       }).catch((e: unknown) => { safeLog('admin notification error', e instanceof Error ? e.message : 'unknown'); });
     }
@@ -334,7 +334,7 @@ serve(async (req: Request) => {
 
     const response: Record<string, unknown> = {
       success: true,
-      message: 'Completion approved and payment released',
+      message: 'Completion approved — payout pending',
       payoutInitiated: payoutSuccess,
     };
     if (payoutMessage) response.payoutWarning = payoutMessage;
