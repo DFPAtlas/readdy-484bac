@@ -13,6 +13,9 @@ const statusConfig: Record<string, { label: string; bg: string; text: string; ri
   pending: { label: 'Pending', bg: 'bg-purple-500/10', text: 'text-purple-400', ring: 'ring-purple-500/20', icon: 'ri-time-line' },
   awaiting_payment: { label: 'Awaiting Payment', bg: 'bg-orange-500/10', text: 'text-orange-400', ring: 'ring-orange-500/20', icon: 'ri-money-pound-circle-line' },
   awaiting_guard_selection: { label: 'Awaiting Selection', bg: 'bg-pink-500/10', text: 'text-pink-400', ring: 'ring-pink-500/20', icon: 'ri-user-search-line' },
+  review_pending: { label: 'Review Pending', bg: 'bg-indigo-500/10', text: 'text-indigo-400', ring: 'ring-indigo-500/20', icon: 'ri-star-line' },
+  review_submitted: { label: 'Review Submitted', bg: 'bg-teal-500/10', text: 'text-teal-400', ring: 'ring-teal-500/20', icon: 'ri-star-half-line' },
+  closed: { label: 'Closed', bg: 'bg-emerald-500/10', text: 'text-emerald-400', ring: 'ring-emerald-500/20', icon: 'ri-lock-line' },
 };
 
 const urgencyConfig: Record<string, { label: string; bg: string; text: string; icon: string }> = {

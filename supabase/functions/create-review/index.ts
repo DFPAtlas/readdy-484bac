@@ -101,7 +101,9 @@ serve(async (req: Request) => {
 
   if (!job) return json(400, { error: "Job not found" });
   if (job.client_id !== client.id) return json(403, { error: "You are not authorised to review this job" });
-  if (job.status !== "paid_out") return json(400, { error: "This job is not eligible for review yet" });
+  if (job.status !== "paid_out" && job.status !== "review_pending") {
+    return json(400, { error: "This job is not eligible for review yet" });
+  }
 
   const { data: assignment } = await supabase
     .from("job_assignments")
@@ -174,11 +176,11 @@ serve(async (req: Request) => {
 
   const { data: allAssignments } = await supabase
     .from("job_assignments")
-    .select("id, payment_status")
+    .select("id, payment_status, status")
     .eq("job_id", jobId);
 
   const requiredIds = (allAssignments || [])
-    .filter((a) => a.payment_status === "paid_out")
+    .filter((a) => a.payment_status === "paid_out" && a.status === "completed")
     .map((a) => a.id);
 
   const { data: jobReviews } = await supabase

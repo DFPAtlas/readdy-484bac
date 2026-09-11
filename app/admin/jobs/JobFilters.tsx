@@ -90,6 +90,7 @@ export default function JobFilters({
             <option value="pending">Pending</option>
             <option value="awaiting_payment">Awaiting Payment</option>
             <option value="awaiting_guard_selection">Awaiting Selection</option>
+            <option value="review_pending">Review Pending</option>
             <option value="flagged">Flagged</option>
           </select>
           <div className="w-4 h-4 flex items-center justify-center absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
