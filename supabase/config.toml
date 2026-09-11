@@ -24,3 +24,6 @@ verify_jwt = false
 
 [functions.dfp-support-message-bridge]
 verify_jwt = true
+
+[functions.update-after-payment]
+verify_jwt = true
