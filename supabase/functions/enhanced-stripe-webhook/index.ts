@@ -364,7 +364,7 @@ serve(async (req) => {
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice;
         const subId = invoice.subscription as string;
-        const { data: sub } = await appSupabase.from('subscriptions').select('user_id, payment_failure_count, plan_name').eq('stripe_subscription_id', subId).maybeSingle();
+        const { data: sub } = await appSupabase.from('subscriptions').select('user_id, payment_failure_count, plan_name, id').eq('stripe_subscription_id', subId).maybeSingle();
         if (sub) {
           const newCount = (sub.payment_failure_count || 0) + 1;
           const newStatus = newCount >= 3 ? 'canceled' : 'past_due';
@@ -452,6 +452,15 @@ serve(async (req) => {
         const assignment = await resolvePayoutAssignment(appSupabase, transferId, metadataAssignmentId);
         if (!assignment) {
           console.log(`[EnhancedWebhook] transfer.failed: no assignment for transfer ${transferId}`);
+          break;
+        }
+
+        const { data: payoutRecord } = await appSupabase.from('guard_payouts').select('status').eq('assignment_id', assignment.id).maybeSingle();
+        const payoutAlreadyCompleted = payoutRecord && (payoutRecord.status === 'paid_out' || payoutRecord.status === 'completed');
+
+        if (assignment.payment_status === 'paid_out' || payoutAlreadyCompleted) {
+          console.log(`[EnhancedWebhook] transfer.failed: assignment ${assignment.id} already completed, idempotent skip`);
+          await appSupabase.from('payment_audit_logs').insert({ event_type: 'transfer.failed.idempotent', stripe_event_id: transfer.id, reference_type: 'guard_payout', reference_id: assignment.id, details: JSON.stringify({ transfer_id: transferId, assignment_id: assignment.id, already_completed: true, failure_reason: failureReason }), created_at: now }).catch(() => {});
           break;
         }
 
