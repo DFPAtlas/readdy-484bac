@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
@@ -84,6 +83,7 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const n8nWebhookUrl = Deno.env.get("N8N_SIA_CHECK_WEBHOOK_URL");
+  const n8nApiKey = Deno.env.get("N8N_SIA_CHECK_API_KEY");
 
   if (!supabaseUrl || !supabaseServiceKey) {
     return new Response(
@@ -215,7 +215,7 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
     const checkedBy = isAdminTrigger ? "admin" : isSelfTrigger ? "self" : "system";
-    const webhookConfigured = !!n8nWebhookUrl;
+    const webhookConfigured = !!n8nWebhookUrl && !!n8nApiKey;
 
     await supabase.from("admin_activity_log").insert({
       action_type: "sia_check_performed",
@@ -242,23 +242,25 @@ Deno.serve(async (req) => {
       updated_at: now,
     }).eq("id", guard_id);
 
-    if (!n8nWebhookUrl) {
-      console.log("WARNING: N8N_SIA_CHECK_WEBHOOK_URL is not configured. Falling back to manual_review.");
+    if (!n8nWebhookUrl || !n8nApiKey) {
+      const missingConfig = !n8nWebhookUrl ? "N8N_SIA_CHECK_WEBHOOK_URL" : "N8N_SIA_CHECK_API_KEY";
+      const reason = !n8nWebhookUrl ? "webhook_missing" : "auth_key_missing";
+      console.log(`WARNING: ${missingConfig} is not configured. Falling back to manual_review.`);
 
       await supabase.from("guards").update({
         verification_status: "manual_review",
         is_active: false,
         dashboard_access: false,
-        sia_check_status: "webhook_missing",
+        sia_check_status: reason,
         updated_at: new Date().toISOString(),
       }).eq("id", guard_id);
 
       await supabase.from("admin_activity_log").insert({
         action_type: "sia_check_fallback",
-        action_description: `SIA check webhook NOT CONFIGURED for guard: ${guard.full_name}. Set to manual review.`,
+        action_description: `SIA check ${missingConfig} NOT CONFIGURED for guard: ${guard.full_name}. Set to manual review.`,
         target_type: "guard",
         target_name: guard.full_name,
-        metadata: { guardId: guard_id, reason: "webhook_missing" },
+        metadata: { guardId: guard_id, reason },
         created_at: new Date().toISOString(),
       }).catch(() => {});
 
@@ -267,10 +269,10 @@ Deno.serve(async (req) => {
         user_id: guard.user_id,
         sia_licence_number,
         status: "manual_review",
-        result: "webhook_missing",
+        result: reason,
         webhook_configured: false,
         webhook_response_code: null,
-        error_message: "N8N_SIA_CHECK_WEBHOOK_URL is not configured",
+        error_message: `${missingConfig} is not configured`,
         checked_at: now,
         checked_by: checkedBy,
       });
@@ -278,16 +280,16 @@ Deno.serve(async (req) => {
       await createAdminNotification(
         supabase,
         "SIA Webhook Missing - Manual Review Required",
-        `Guard ${guard.full_name} (${guard.sia_licence_number}) requires manual SIA verification. The N8N webhook is not configured.`,
-        { guard_id, reason: "webhook_missing", sia_licence_number }
+        `Guard ${guard.full_name} (${guard.sia_licence_number}) requires manual SIA verification. ${missingConfig} is not configured.`,
+        { guard_id, reason, sia_licence_number }
       );
 
       return new Response(
         JSON.stringify({
           guard_id,
           verification_status: "manual_review",
-          sia_check_status: "webhook_missing",
-          message: "SIA check webhook not configured. Your application requires manual admin review.",
+          sia_check_status: reason,
+          message: "SIA check configuration is incomplete. Your application requires manual admin review.",
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -303,7 +305,10 @@ Deno.serve(async (req) => {
 
       const n8nResponse = await fetch(n8nWebhookUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${n8nApiKey}`,
+        },
         body: JSON.stringify({
           guard_id,
           sia_licence_number,
@@ -318,6 +323,9 @@ Deno.serve(async (req) => {
       if (n8nResponse.ok) {
         n8nResult = await n8nResponse.json();
         console.log("n8n response:", JSON.stringify(n8nResult));
+      } else if (n8nResponse.status === 401 || n8nResponse.status === 403) {
+        webhookErrorMessage = `n8n webhook rejected authentication (status ${n8nResponse.status})`;
+        console.error(webhookErrorMessage);
       } else {
         webhookErrorMessage = `n8n webhook returned status ${n8nResponse.status}`;
         console.error(webhookErrorMessage);
@@ -478,7 +486,7 @@ Deno.serve(async (req) => {
     await supabase.from("guard_verification_audit").insert({
       guard_id,
       action: "sia_check_failed",
-      raw_result_json: { error: "n8n webhook returned no result", sia_licence_number },
+      raw_result_json: { error: webhookErrorMessage || "n8n webhook returned no result", sia_licence_number },
       created_at: now,
     }).catch(() => {});
 
@@ -490,7 +498,7 @@ Deno.serve(async (req) => {
       result: "no_result",
       webhook_configured: true,
       webhook_response_code: webhookResponseCode,
-      error_message: "n8n webhook returned no parseable result",
+      error_message: webhookErrorMessage || "n8n webhook returned no parseable result",
       checked_at: now,
       checked_by: checkedBy,
     });
