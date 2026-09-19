@@ -64,6 +64,11 @@ serve(async (req: Request) => {
     return corsResponse(origin, 500, { error: 'Server configuration error' });
   }
 
+  const authHeader = req.headers.get('Authorization');
+  if (authHeader !== `Bearer ${supabaseServiceKey}`) {
+    return corsResponse(origin, 403, { error: 'Forbidden' });
+  }
+
   try {
     const { clientEmail, clientName, jobTitle, jobId, venue, startDate, startTime, numberOfGuards, hourlyRate }: EmailRequest = await req.json();
 
