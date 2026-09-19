@@ -198,7 +198,7 @@ export default function AttendancePanel({ job, assignments, clientId, onMessageG
 
       {/* Summary */}
       <AttendanceSummary
-        assignments={assignments}
+        assignments={assignments as any}
         guardsRequired={job.number_of_guards || 0}
         jobStatus={job.status}
         jobStartDate={job.start_date}
@@ -260,7 +260,7 @@ export default function AttendancePanel({ job, assignments, clientId, onMessageG
             {assignments.map(assignment => (
               <GuardAttendanceCard
                 key={assignment.id}
-                assignment={assignment}
+                assignment={assignment as any}
                 jobStartTime={job.start_time}
                 jobEndTime={job.end_time}
                 jobStartDate={job.start_date}
