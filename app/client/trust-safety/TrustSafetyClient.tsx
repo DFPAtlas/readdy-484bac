@@ -344,7 +344,7 @@ export default function TrustSafetyClient() {
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">Emergency Contacts</h2>
               </div>
               <EmergencyContactsPanel
-                jobs={jobs}
+                jobs={jobs as any}
                 clientId={client?.id || ''}
                 onSaveJobContact={handleSaveJobContact}
               />
@@ -357,7 +357,7 @@ export default function TrustSafetyClient() {
                 <i className="ri-error-warning-line text-orange-400 text-lg" />
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">Compliance Warnings</h2>
               </div>
-              <ComplianceWarnings jobs={jobs} assignments={assignments} />
+              <ComplianceWarnings jobs={jobs as any} assignments={assignments} />
             </div>
           )}
 
