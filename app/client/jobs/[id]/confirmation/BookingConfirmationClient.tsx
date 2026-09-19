@@ -147,10 +147,31 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
 
       const { data: assignmentsData } = await supabase
         .from('job_assignments')
-        .select('*, guards(id, full_name, profile_photo_url, sia_licence_number, sia_verified, average_rating, total_reviews, phone, user_id)')
+        .select('*')
         .eq('job_id', jobId);
 
-      setAssignments(assignmentsData || []);
+      const rawAssignments = assignmentsData || [];
+      const assignedGuardIds = [...new Set(rawAssignments.map((a: any) => a.guard_id).filter(Boolean))];
+      const guardMap: Record<string, any> = {};
+
+      if (assignedGuardIds.length > 0) {
+        const { data: safeGuardProfiles } = await supabase
+          .from('client_applicant_profiles')
+          .select('id:guard_id, user_id:guard_user_id, full_name, profile_photo_url:profile_image_url, sia_licence_number, sia_verified, average_rating:rating, total_reviews')
+          .eq('job_id', jobId)
+          .in('guard_id', assignedGuardIds);
+
+        (safeGuardProfiles || []).forEach((g: any) => {
+          guardMap[g.id] = { ...g, phone: null };
+        });
+      }
+
+      const hydratedAssignments = rawAssignments.map((a: any) => ({
+        ...a,
+        guards: guardMap[a.guard_id] || null,
+      }));
+
+      setAssignments(hydratedAssignments);
 
       const { data: txData } = await supabase
         .from('transactions')
