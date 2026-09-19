@@ -28,6 +28,7 @@ interface Assignment {
   guard_id: string;
   status: string;
   guard_confirmed_at: string | null;
+  assigned_at: string | null;
   guards: Guard;
 }
 
@@ -53,6 +54,7 @@ interface Job {
   client_confirmed_at: string | null;
   created_at: string;
   updated_at: string;
+  applications_count: number;
   risk_level: string | null;
   sia_licence_required: boolean;
   uniform_required: boolean;
