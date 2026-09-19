@@ -98,16 +98,33 @@ export default function ClientReviewsPage() {
       if (jobIds.length > 0) {
         const { data: assignments } = await supabase
           .from('job_assignments')
-          .select('job_id, guard_id, guards(id, full_name, profile_photo_url)')
+          .select('job_id, guard_id')
           .in('job_id', jobIds);
 
         // Security: scope reviews to current user as client (not auth.uid() as client_id)
         const { data: reviewsData } = await supabase
           .from('reviews')
-          .select('*, guards(full_name, profile_photo_url), jobs(job_title, start_date)')
+          .select('*, jobs(job_title, start_date)')
           .eq('client_id', client.id)
           .in('job_id', jobIds)
           .order('created_at', { ascending: false });
+
+        const guardIds = [...new Set([
+          ...(assignments || []).map((a: any) => a.guard_id),
+          ...(reviewsData || []).map((r: any) => r.guard_id),
+        ].filter(Boolean))];
+
+        const guardMap: Record<string, any> = {};
+        if (guardIds.length > 0) {
+          const { data: guardProfiles } = await supabase
+            .from('guard_public_profiles')
+            .select('id, full_name, profile_photo_url:profile_image_url')
+            .in('id', guardIds);
+
+          (guardProfiles || []).forEach((g: any) => {
+            guardMap[g.id] = g;
+          });
+        }
 
         const typedReviews: ReviewItem[] = (reviewsData || []).map((r: any) => ({
           id: r.id,
@@ -127,7 +144,7 @@ export default function ClientReviewsPage() {
           attendance_status: r.attendance_status,
           site_instructions_followed: r.site_instructions_followed,
           created_at: r.created_at,
-          guards: r.guards,
+          guards: guardMap[r.guard_id] || null,
           jobs: r.jobs,
         }));
 
@@ -145,8 +162,8 @@ export default function ClientReviewsPage() {
               job_title: job?.job_title || 'Unknown Job',
               start_date: job?.start_date || '',
               guard_id: a.guard_id,
-              guard_name: a.guards?.full_name || 'Unknown Guard',
-              profile_photo_url: a.guards?.profile_photo_url,
+              guard_name: guardMap[a.guard_id]?.full_name || 'Unknown Guard',
+              profile_photo_url: guardMap[a.guard_id]?.profile_photo_url,
             });
           }
         });
