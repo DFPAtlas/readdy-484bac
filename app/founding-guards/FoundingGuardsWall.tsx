@@ -22,7 +22,7 @@ export default function FoundingGuardsWall() {
     async function load() {
       setLoading(true);
       const { data } = await supabase
-        .from('guards')
+        .from('guard_public_profiles')
         .select('id, full_name, signup_number, promo_tier, profile_image_url, location')
         .in('promo_tier', ['founding', 'early', 'launch'])
         .eq('verification_status', 'approved')
