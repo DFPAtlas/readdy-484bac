@@ -8,7 +8,6 @@ interface Guard {
   id: string;
   full_name: string;
   profile_photo_url?: string;
-  sia_licence_number?: string;
   phone?: string;
   user_id?: string;
   sia_verified?: boolean;
@@ -65,27 +64,30 @@ export default function ReplacementGuardSuggestions({
     try {
       const { data: applicants } = await supabase
         .from('job_applications')
-        .select('guards(id, full_name, profile_photo_url, sia_licence_number, sia_verified, average_rating, total_reviews, total_jobs_completed, years_experience, location)')
+.select('guard_id')
         .eq('job_id', jobId)
         .not('guard_id', 'in', `(${currentGuardIds.join(',') || '00000000-0000-0000-0000-000000000000'})`)
         .limit(3);
 
-      (applicants || []).forEach((a: any) => {
-        if (a.guards && !results.find(g => g.id === a.guards.id)) {
-          results.push({
-            ...a.guards,
-            reason: 'Previously shortlisted',
-            availability: 'Applied before',
-          });
-        }
-      });
+      const applicantIds = (applicants || []).map((a: any) => a.guard_id).filter(Boolean);
+      if (applicantIds.length > 0) {
+        const { data: applicantProfiles } = await supabase
+          .from('guard_public_profiles')
+          .select('id, full_name, profile_photo_url:profile_image_url, sia_verified, average_rating:rating, total_reviews, total_jobs_completed, years_experience, location')
+          .in('id', applicantIds);
+        (applicantProfiles || []).forEach((g: any) => {
+          if (!results.find(r => r.id === g.id)) {
+            results.push({ ...g, reason: 'Previously shortlisted', availability: 'Applied before' });
+          }
+        });
+      }
     } catch {}
 
     // 2. Guards who worked this site before
     try {
       const { data: pastAssignments } = await supabase
         .from('job_assignments')
-        .select('guards(id, full_name, profile_photo_url, sia_licence_number, sia_verified, average_rating, total_reviews, total_jobs_completed, years_experience, location)')
+.select('guard_id')
         .eq('job_id', jobId)
         .limit(5);
 
@@ -122,10 +124,9 @@ export default function ReplacementGuardSuggestions({
     // 3. Similar available guards nearby
     try {
       let query = supabase
-        .from('guards')
-        .select('id, full_name, profile_photo_url, sia_licence_number, sia_verified, average_rating, total_reviews, total_jobs_completed, years_experience, location')
+.from('guard_public_profiles')
+        .select('id, full_name, profile_photo_url:profile_image_url, sia_verified, average_rating:rating, total_reviews, total_jobs_completed, years_experience, location')
         .eq('sia_verified', true)
-        .eq('is_active', true)
         .not('id', 'in', `(${currentGuardIds.join(',') || '00000000-0000-0000-0000-000000000000'})`)
         .order('average_rating', { ascending: false })
         .limit(3);
