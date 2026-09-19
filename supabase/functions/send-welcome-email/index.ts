@@ -22,6 +22,14 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+    const authHeader = req.headers.get('Authorization');
+    if (!supabaseServiceKey || authHeader !== `Bearer ${supabaseServiceKey}`) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
 
     const { data: alreadySent } = await supabase
@@ -41,8 +49,11 @@ serve(async (req) => {
 
     const templateSlug = account_type === 'client' ? 'client_welcome' : 'guard_welcome';
 
+    const displayName = user_name || 'there';
     const variables: Record<string, string> = {
-      user_name: user_name || 'there',
+      user_name: displayName,
+      client_name: displayName,
+      guard_name: displayName,
       account_type,
       dashboard_url: account_type === 'client'
         ? 'https://quickguard.uk/client/dashboard'
