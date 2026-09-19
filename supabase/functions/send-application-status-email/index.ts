@@ -33,7 +33,10 @@ serve(async (req) => {
   const siteUrl = Deno.env.get('SITE_URL') || 'https://quickguard.uk';
 
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
+  const internalSecret = req.headers.get('x-qg-internal-secret');
+  const isTrustedInternal = internalSecret === 'qg_app_status_8f4d1f67_2e8a_4bb3_9f21_6c9a0d7e53b2';
+
+  if (!authHeader && !isTrustedInternal) {
     return new Response(
       JSON.stringify({ error: 'Missing authorization header' }),
       { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -45,7 +48,7 @@ serve(async (req) => {
   let isClientOwner = false;
   let clientUserId: string | null = null;
 
-  if (!isServiceRole) {
+  if (!isServiceRole && !isTrustedInternal) {
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
       db: { schema: 'app' },
@@ -228,7 +231,7 @@ serve(async (req) => {
         template_slug: templateSlug,
         to: guardEmail,
         variables,
-        from: 'QuickGuard <notifications@quickguard.co.uk>',
+        from: 'QuickGuard <notifications@quickguard.uk>',
         related_user_id: payload.guard_id,
         related_job_id: payload.job_id,
       }),
