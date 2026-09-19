@@ -240,6 +240,23 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    const normalizedRole = String(role).trim().toLowerCase();
+    if (!['client', 'guard'].includes(normalizedRole)) {
+      return new Response(JSON.stringify({ error: 'Invalid role' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return new Response(JSON.stringify({ error: 'Valid email is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
@@ -261,14 +278,16 @@ Deno.serve(async (req) => {
     const password = generateRandomPassword(32);
     const fullName = `${first_name || ''} ${last_name || ''}`.trim();
     const { data: userData, error: userError } = await supabase.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       password,
       email_confirm: true,
       user_metadata: {
-        role,
         first_name: first_name || '',
         last_name: last_name || '',
-        email,
+        email: normalizedEmail,
+      },
+      app_metadata: {
+        account_type: normalizedRole,
       },
     });
     if (userError) {
@@ -281,7 +300,7 @@ Deno.serve(async (req) => {
       throw new Error('Failed to create user: ' + userError.message);
     }
     const userId = userData.user.id;
-    if (role === 'client') {
+    if (normalizedRole === 'client') {
       const clientRecord: any = {
         user_id: userId,
         email,
@@ -312,7 +331,7 @@ Deno.serve(async (req) => {
       };
       await supabase.from('clients').upsert(clientRecord, { onConflict: 'user_id' });
       await provisionUser(supabase, userId, 'client');
-    } else if (role === 'guard') {
+    } else if (normalizedRole === 'guard') {
       const guardRecord: any = {
         user_id: userId,
         email,
@@ -353,7 +372,7 @@ Deno.serve(async (req) => {
       await provisionUser(supabase, userId, 'guard');
     }
 
-    handlePreAccountLinking(supabase, userId, email)
+    handlePreAccountLinking(supabase, userId, normalizedEmail)
       .then((linkResult) => {
         if (linkResult?.linked) {
           console.log(`[register-magic-link] Pre-account tokens linked: ${linkResult.pending_tokens} pending`);
@@ -366,7 +385,7 @@ Deno.serve(async (req) => {
         .then(h => Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,'0')).join(''));
       const uaHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(userAgent.slice(0, 100)))
         .then(h => Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,'0')).join(''));
-      handleReferral(supabase, userId, email, role, referral_code, ipHash, uaHash)
+      handleReferral(supabase, userId, normalizedEmail, normalizedRole, referral_code, ipHash, uaHash)
         .catch(err => console.error('[register-magic-link] Referral handling failed:', err));
     }
 
