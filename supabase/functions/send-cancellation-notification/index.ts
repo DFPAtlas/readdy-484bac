@@ -15,6 +15,14 @@ serve(async (req) => {
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const siteUrl = Deno.env.get('SITE_URL') || 'https://quickguard.uk';
 
+  const authHeader = req.headers.get('Authorization');
+  if (!supabaseServiceKey || authHeader !== `Bearer ${supabaseServiceKey}`) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
@@ -69,7 +77,7 @@ serve(async (req) => {
       const rres = await fetch(`${supabaseUrl}/functions/v1/render-email-template`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
-        body: JSON.stringify({ template_slug: 'job_cancelled_client', to: clientEmail, variables: cvars, from: 'QuickGuard <notifications@quickguard.co.uk>' }),
+        body: JSON.stringify({ template_slug: 'job_cancelled_client', to: clientEmail, variables: cvars, from: 'QuickGuard <notifications@quickguard.uk>' }),
       });
 
       if (rres.ok) {
@@ -97,7 +105,7 @@ serve(async (req) => {
       const rres = await fetch(`${supabaseUrl}/functions/v1/render-email-template`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
-        body: JSON.stringify({ template_slug: 'job_cancelled_guard', to: guardEmail, variables: gvars, from: 'QuickGuard <notifications@quickguard.co.uk>' }),
+        body: JSON.stringify({ template_slug: 'job_cancelled_guard', to: guardEmail, variables: gvars, from: 'QuickGuard <notifications@quickguard.uk>' }),
       });
 
       if (rres.ok) {
