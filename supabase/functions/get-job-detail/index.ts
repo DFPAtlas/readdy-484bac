@@ -38,9 +38,30 @@ serve(async (req) => {
       );
     }
 
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const authClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: authError } = await authClient.auth.getUser(token);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      supabaseUrl,
+      supabaseServiceKey,
       { db: { schema: 'app' } }
     );
 
@@ -76,11 +97,7 @@ serve(async (req) => {
         created_at,
         clients (
           id,
-          company_name,
-          email,
-          first_name,
-          last_name,
-          phone
+          company_name
         )
       `)
       .eq("id", jobId)
@@ -101,8 +118,51 @@ serve(async (req) => {
       );
     }
 
+    const [{ data: clientProfile }, { data: guardProfile }] = await Promise.all([
+      supabaseAdmin.from("clients").select("id").eq("user_id", user.id).maybeSingle(),
+      supabaseAdmin.from("guards").select("id, verification_status, is_active").eq("user_id", user.id).maybeSingle(),
+    ]);
+
+    const isOwnerClient = !!clientProfile && clientProfile.id === job.client_id;
+    const isEligibleGuard = !!guardProfile &&
+      guardProfile.is_active === true &&
+      ['verified', 'approved'].includes(guardProfile.verification_status || '');
+
+    if (!isOwnerClient && !isEligibleGuard) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    if (isEligibleGuard && !['open', 'awaiting_guard_selection'].includes(job.status)) {
+      const { data: existingApplication } = await supabaseAdmin
+        .from("job_applications")
+        .select("id")
+        .eq("job_id", job.id)
+        .eq("guard_id", guardProfile.id)
+        .maybeSingle();
+      const { data: existingAssignment } = await supabaseAdmin
+        .from("job_assignments")
+        .select("id")
+        .eq("job_id", job.id)
+        .eq("guard_id", guardProfile.id)
+        .maybeSingle();
+
+      if (!existingApplication && !existingAssignment) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    const safeJob = {
+      ...job,
+      venue_address_line1: isOwnerClient ? job.venue_address_line1 : null,
+      venue_address_line2: isOwnerClient ? job.venue_address_line2 : null,
+    };
+
     return new Response(
-      JSON.stringify({ job }),
+      JSON.stringify({ job: safeJob }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
