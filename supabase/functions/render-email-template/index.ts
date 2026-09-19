@@ -38,6 +38,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    const authHeader = req.headers.get('Authorization');
+    if (!supabaseKey || authHeader !== `Bearer ${supabaseKey}`) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey, { db: { schema: 'app' } });
 
     const body: RenderRequest = await req.json();
@@ -86,7 +94,7 @@ Deno.serve(async (req) => {
     let bodyHtml: string = template.body_html || '';
 
     const fromName = 'QuickGuard Notifications';
-    const fromEmail = `noreply@${Deno.env.get('RESEND_FROM_DOMAIN') || 'quickguard.uk'}`;
+    const fromEmail = 'noreply@quickguard.uk';
     const replyTo = 'support@quickguard.uk';
 
     subject = replaceVariables(subject, variables);
@@ -98,7 +106,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const senderFrom = from || `${fromName} <${fromEmail}>`;
+    let senderFrom = from || `${fromName} <${fromEmail}>`;
+    if (!/@quickguard\.uk(?:>|$)/i.test(senderFrom)) {
+      senderFrom = `${fromName} <${fromEmail}>`;
+    }
     const senderReplyTo = reply_to || replyTo;
 
     const emailPayload: Record<string, unknown> = {
