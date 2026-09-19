@@ -2,6 +2,12 @@
 
 import { useState } from 'react';
 
+interface Guard {
+  id: string;
+  full_name?: string | null;
+  profile_photo_url?: string | null;
+}
+
 interface Assignment {
   id: string;
   guards: Guard;
