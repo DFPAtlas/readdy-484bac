@@ -13,7 +13,7 @@ export interface GuardApplicationLimit {
 }
 
 export async function checkGuardApplicationLimit(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<any, any, any, any, any>,
   guardId: string
 ): Promise<GuardApplicationLimit> {
   try {
@@ -54,7 +54,7 @@ export async function checkGuardApplicationLimit(
 }
 
 export async function recordGuardApplication(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<any, any, any, any, any>,
   userId: string
 ): Promise<GuardApplicationLimit> {
   try {
@@ -85,7 +85,7 @@ export async function recordGuardApplication(
 }
 
 export async function checkClientJobLimit(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<any, any, any, any, any>,
   userId: string
 ): Promise<{
   allowed: boolean;
@@ -126,7 +126,7 @@ export async function checkClientJobLimit(
 }
 
 export async function recordClientJobPost(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<any, any, any, any, any>,
   userId: string
 ): Promise<{
   allowed: boolean;
