@@ -200,7 +200,15 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
           return;
         }
 
-        setJob(jobData || null);
+        const normalizedJob = jobData
+          ? {
+              ...jobData,
+              clients: Array.isArray((jobData as any).clients)
+                ? ((jobData as any).clients[0] || null)
+                : (jobData as any).clients,
+            } as Job
+          : null;
+        setJob(normalizedJob);
       } catch (error) {
         if (cancelled) return;
         console.error("Error fetching job details:", error);
