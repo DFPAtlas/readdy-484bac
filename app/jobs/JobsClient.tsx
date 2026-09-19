@@ -182,7 +182,7 @@ export default function JobsClient() {
         throw error;
       }
 
-      const jobList = (data as Job[]) || [];
+      const jobList = ((data || []) as unknown) as Job[];
       setJobs(jobList);
 
       if (jobList.length > 0) {
@@ -1040,7 +1040,19 @@ export default function JobsClient() {
 
       <Footer />
 
-      {filteredJobs.length > 0 && <JobListSchema jobs={filteredJobs} />}
+      {filteredJobs.length > 0 && <JobListSchema jobs={filteredJobs.map((j) => ({
+        id: j.id,
+        title: j.job_title,
+        description: j.job_description || null,
+        location: j.venue_city || 'UK',
+        postcode: j.venue_postcode || null,
+        hourly_rate: j.hourly_rate,
+        start_date: j.start_date,
+        end_date: j.end_date || null,
+        created_at: j.created_at,
+        sia_licence_required: j.sia_licence_required,
+        clients: Array.isArray(j.clients) ? j.clients[0] : j.clients,
+      }))} />}
       <BackToTop />
 
       <div
