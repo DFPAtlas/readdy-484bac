@@ -208,11 +208,29 @@ serve(async (req: Request) => {
     if (action === 'approve') {
       const { error: assignUpdErr } = await supabase
         .from('job_assignments').update({ payment_status: 'payout_pending', updated_at: now }).eq('id', assignment.id);
-      if (assignUpdErr) { safeLog('assignment update error', assignUpdErr.message); return corsResponse(origin, 500, { error: 'Unable to process request' }); }
+      if (assignUpdErr) {
+        safeLog('assignment update error', assignUpdErr.message);
+        await supabase.from('job_completion_requests')
+          .update({ status: 'pending', client_approved_at: null, updated_at: now })
+          .eq('id', requestId)
+          .eq('status', 'approved');
+        return corsResponse(origin, 500, { error: 'Unable to process request' });
+      }
 
       const { error: jobUpdErr } = await supabase
         .from('jobs').update({ status: 'payout_approved', updated_at: now }).eq('id', request.job_id);
-      if (jobUpdErr) { safeLog('job update error', jobUpdErr.message); return corsResponse(origin, 500, { error: 'Unable to process request' }); }
+      if (jobUpdErr) {
+        safeLog('job update error', jobUpdErr.message);
+        await supabase.from('job_assignments')
+          .update({ payment_status: 'funded', updated_at: now })
+          .eq('id', assignment.id)
+          .eq('payment_status', 'payout_pending');
+        await supabase.from('job_completion_requests')
+          .update({ status: 'pending', client_approved_at: null, updated_at: now })
+          .eq('id', requestId)
+          .eq('status', 'approved');
+        return corsResponse(origin, 500, { error: 'Unable to process request' });
+      }
 
       await supabase.from('payment_audit_logs').insert({
         event_type: 'client_approved_completion', job_id: request.job_id, guard_id: request.guard_id, client_id: request.client_id,
@@ -220,15 +238,69 @@ serve(async (req: Request) => {
         reason: 'Client approved completion — payout pending', created_at: now,
       }).catch((e: unknown) => { safeLog('approve audit log error', e instanceof Error ? e.message : 'unknown'); });
 
+      let payoutInitiated = false;
+      let payoutWarning: string | null = null;
+      try {
+        const payoutRes = await fetch(`${supabaseUrl}/functions/v1/create-guard-payout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            assignmentId: assignment.id,
+            jobId: request.job_id,
+            internalApprovalSource: 'client_completion_approved',
+            approvedByUserId: user.id,
+          }),
+        });
+
+        if (payoutRes.ok) {
+          payoutInitiated = true;
+        } else {
+          const errText = await payoutRes.text().catch(() => 'unknown');
+          safeLog('client-approved payout invocation failed', payoutRes.status, errText.slice(0, 300));
+          payoutWarning = 'Completion approved, but payout could not be initiated automatically and requires finance attention.';
+          await supabase.from('payment_audit_logs').insert({
+            event_type: 'client_approve_payout_invocation_failed',
+            reference_type: 'job_completion_request',
+            reference_id: requestId,
+            details: {
+              assignment_id: assignment.id,
+              job_id: request.job_id,
+              guard_id: request.guard_id,
+              payout_status_code: payoutRes.status,
+              error_preview: errText.slice(0, 500),
+            },
+            changed_by: user.id,
+            changed_by_role: 'client',
+            created_at: now,
+          }).catch((e: unknown) => { safeLog('client payout failure audit error', e instanceof Error ? e.message : 'unknown'); });
+        }
+      } catch (fetchErr: unknown) {
+        const errMsg = fetchErr instanceof Error ? fetchErr.message : 'Unknown fetch error';
+        safeLog('client-approved payout fetch exception', errMsg);
+        payoutWarning = 'Completion approved, but payout service could not be reached and requires finance attention.';
+      }
+
       if (guard.user_id) {
         await supabase.from('notifications').insert({
           user_id: guard.user_id, user_type: 'guard', title: 'Client Approved',
-          message: `Client approved — payout pending for "${jobTitle}".`,
+          message: payoutInitiated
+            ? `Client approved — payout initiated for "${jobTitle}".`
+            : `Client approved — payout pending for "${jobTitle}".`,
           type: 'success', is_read: false, link: '/guard/dashboard#earnings', data: { job_id: request.job_id }, created_at: now,
         }).catch((e: unknown) => { safeLog('approve notification error', e instanceof Error ? e.message : 'unknown'); });
       }
 
-      return corsResponse(origin, 200, { success: true, message: 'Completion approved — payout pending' });
+      const response: Record<string, unknown> = {
+        success: true,
+        message: payoutInitiated ? 'Completion approved — payout initiated' : 'Completion approved — payout pending',
+        payoutInitiated,
+      };
+      if (payoutWarning) response.payoutWarning = payoutWarning;
+
+      return corsResponse(origin, 200, response);
     }
 
     if (action === 'dispute') {
