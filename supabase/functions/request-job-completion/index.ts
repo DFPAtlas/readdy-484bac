@@ -25,6 +25,10 @@ serve(async (req) => {
     .maybeSingle();
   if (!assignment) return new Response(JSON.stringify({ error: 'Assignment not found' }), { status: 404 });
 
+  if (assignment.job_id !== jobId) {
+    return new Response(JSON.stringify({ error: 'Assignment does not belong to this job' }), { status: 403 });
+  }
+
   if (assignment.status !== 'in_progress') {
     return new Response(JSON.stringify({ error: 'You must check in before marking complete' }), { status: 400 });
   }
@@ -82,16 +86,31 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: insertError.message }), { status: 500 });
   }
 
-  await supabase.from('job_assignments').update({
+  const { error: assignmentUpdateError } = await supabase.from('job_assignments').update({
     status: 'completed',
     completed_at: now,
     updated_at: now,
-  }).eq('id', assignmentId);
+  }).eq('id', assignmentId).eq('job_id', jobId).eq('guard_id', guard.id);
 
-  await supabase.from('jobs').update({
+  if (assignmentUpdateError) {
+    await supabase.from('job_completion_requests').delete().eq('id', request.id);
+    return new Response(JSON.stringify({ error: 'Failed to update assignment completion state' }), { status: 500 });
+  }
+
+  const { error: jobUpdateError } = await supabase.from('jobs').update({
     status: 'awaiting_client_approval',
     updated_at: now,
   }).eq('id', jobId);
+
+  if (jobUpdateError) {
+    await supabase.from('job_assignments').update({
+      status: 'in_progress',
+      completed_at: null,
+      updated_at: now,
+    }).eq('id', assignmentId).eq('job_id', jobId).eq('guard_id', guard.id);
+    await supabase.from('job_completion_requests').delete().eq('id', request.id);
+    return new Response(JSON.stringify({ error: 'Failed to update job completion state' }), { status: 500 });
+  }
 
   try {
     const { data: guardData } = await supabase.from('guards').select('full_name').eq('id', guard.id).maybeSingle();
