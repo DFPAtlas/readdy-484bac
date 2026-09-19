@@ -217,7 +217,7 @@ export default function JobManagement() {
   const buildJobQuery = useCallback(() => {
     let query = supabase
       .from('jobs')
-      .select('*, job_assignments(id, guards(id, full_name))', { count: 'exact' })
+      .select('*, job_assignments(id, guard_id)', { count: 'exact' })
       .eq('client_id', clientId)
       .eq('is_deleted', false);
 
@@ -340,7 +340,7 @@ export default function JobManagement() {
       const q = searchQuery.trim();
       let query = supabase
         .from('jobs')
-        .select('*, job_assignments(id, guards(id, full_name))')
+        .select('*, job_assignments(id, guard_id)')
         .eq('client_id', clientId)
         .eq('is_deleted', false);
 
