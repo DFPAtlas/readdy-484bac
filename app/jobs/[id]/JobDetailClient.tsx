@@ -294,98 +294,24 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
     setApplying(true);
     try {
-      const { error: applicationError } = await supabase
-        .from("job_applications")
-        .insert({
-          job_id: jobId,
-          guard_id: guardProfile.id,
-          cover_letter: applyMessage || null,
-          cover_message: applyMessage || null,
-          status: "pending",
-          applied_at: new Date().toISOString(),
-        });
+      const { data, error } = await supabase.functions.invoke("apply-to-job", {
+        body: {
+          guardId: guardProfile.id,
+          jobId,
+          coverMessage: applyMessage || "",
+        },
+      });
 
-      if (applicationError) {
-        if (applicationError.code === "23505") {
+      if (error) {
+        const message = (data as any)?.error || error.message || "Unable to submit application";
+        if ((data as any)?.alreadyApplied) {
           setHasApplied(true);
           setApplicationStatus("pending");
           setCanApply(false);
           setToast({ message: "You have already applied for this job.", type: "info" });
-          setApplying(false);
           return;
         }
-        throw applicationError;
-      }
-
-      try {
-        const { data: jobData } = await supabase
-          .from("jobs")
-          .select("*")
-          .eq("id", jobId)
-          .maybeSingle();
-
-        const { data: guardData } = await supabase
-          .from("guards")
-          .select("full_name, email, phone, years_experience, sia_licence_number")
-          .eq("id", guardProfile.id)
-          .maybeSingle();
-
-        if (jobData && guardData) {
-          const client = (jobData as any).clients;
-          await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-job-application-email`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-            },
-            body: JSON.stringify({
-              clientEmail: client?.email,
-              clientName: client?.company_name || `${client?.first_name} ${client?.last_name}`,
-              guardName: `${guardData.full_name}`,
-              jobTitle: jobData.job_title,
-              jobVenue: (jobData as any).venue_name || "",
-              jobDate: jobData.start_date ? new Date(jobData.start_date).toLocaleDateString("en-GB", {
-                weekday: "long", day: "numeric", month: "long", year: "numeric"
-              }) : "",
-              guardPhone: guardData.phone,
-              guardEmail: guardData.email,
-              guardExperience: guardData.years_experience || 0,
-              siaLicense: guardData.sia_licence_number,
-              coverLetter: applyMessage
-            })
-          });
-        }
-      } catch (emailError) {
-        console.error("Email notification failed:", emailError);
-      }
-
-      try {
-        const { data: clientRow } = await supabase
-          .from("clients")
-          .select("user_id")
-          .eq("id", job?.client_id || "")
-          .maybeSingle();
-
-        if (clientRow?.user_id && job) {
-          await supabase.from("notifications").insert({
-            user_id: clientRow.user_id,
-            user_type: "client",
-            type: "job_application",
-            title: "New Application Received",
-            message: `${guardProfile?.full_name || "A guard"} applied for "${job.job_title}". Review and select guards.`,
-            link: `/client/jobs/${jobId}/select-guards`,
-            is_read: false,
-          });
-
-          await sendPushToUser(clientRow.user_id, "client", {
-            title: "New Application Received",
-            body: `${guardProfile?.full_name || "A guard"} applied for "${job.job_title}". Review and select guards.`,
-            url: `/client/jobs/${jobId}/select-guards`,
-            tag: "quickguard-application",
-          });
-        }
-      } catch (notifyError) {
-        console.error("Notification failed:", notifyError);
+        throw new Error(message);
       }
 
       setShowApplyModal(false);
@@ -394,7 +320,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       setCanApply(false);
       setToast({ message: "Application submitted successfully! The client has been notified.", type: "success" });
     } catch (error: any) {
-      setToast({ message: "Error submitting application: " + error.message, type: "error" });
+      setToast({ message: "Error submitting application: " + (error?.message || "Unknown error"), type: "error" });
     } finally {
       setApplying(false);
     }
