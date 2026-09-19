@@ -107,7 +107,7 @@ export async function getJobApplications(jobIds: string[]): Promise<{ applicatio
   if (jobIds.length === 0) return { applications: [], error: null };
   const { data, error } = await supabase
     .from('job_applications')
-    .select('*, guards(id, full_name, rating, sia_licence_number, years_experience, profile_image_url)')
+    .select('*')
     .in('job_id', jobIds);
 
   if (error) return { applications: [], error: error.message };
@@ -121,8 +121,8 @@ export async function getJobApplications(jobIds: string[]): Promise<{ applicatio
 export async function getGuardsByIds(guardIds: string[]): Promise<{ guards: Guard[]; error: string | null }> {
   if (guardIds.length === 0) return { guards: [], error: null };
   const { data, error } = await supabase
-    .from('guards')
-    .select('id, full_name, sia_licence_number, rating, total_reviews, years_experience, location, profile_image_url, sia_expiry_date, sia_verified, is_active, verification_status, user_id, phone, email, postcode')
+    .from('guard_public_profiles')
+    .select('id, full_name, rating, total_reviews, years_experience, location, profile_image_url, sia_verified, verification_status, postcode:postcode_area')
     .in('id', guardIds);
 
   if (error) return { guards: [], error: error.message };
@@ -131,10 +131,9 @@ export async function getGuardsByIds(guardIds: string[]): Promise<{ guards: Guar
 
 export async function getRecommendedGuards(limit = 5): Promise<{ guards: Guard[]; error: string | null }> {
   const { data, error } = await supabase
-    .from('guards')
-    .select('id, full_name, sia_licence_number, rating, total_reviews, years_experience, location, profile_image_url')
+    .from('guard_public_profiles')
+    .select('id, full_name, rating, total_reviews, years_experience, location, profile_image_url')
     .eq('sia_verified', true)
-    .eq('is_active', true)
     .order('rating', { ascending: false })
     .limit(limit);
 
@@ -448,7 +447,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
 
   if (guardIds.length > 0) {
     const { count: expCount } = await supabase
-      .from('guards')
+      .from('guard_public_profiles')
       .select('*', { count: 'exact', head: true })
       .in('id', guardIds)
       .lte('sia_expiry_date', in30d.toISOString().split('T')[0])
