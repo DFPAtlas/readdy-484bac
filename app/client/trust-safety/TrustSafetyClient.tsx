@@ -53,8 +53,49 @@ export default function TrustSafetyClient() {
       const jobIds = jobs.map((j) => j.id);
       const { data } = await supabase
         .from('job_assignments')
-        .select('id, job_id, guard_id, status, guards(id, full_name, sia_licence_number, sia_verified, sia_expiry_date, sia_licence_type)')
+        .select('id, job_id, guard_id, status')
         .in('job_id', jobIds);
+
+      const guardIds = [...new Set((data || []).map((a: any) => a.guard_id).filter(Boolean))];
+      const guardMap: Record<string, any> = {};
+
+      if (guardIds.length > 0) {
+        const { data: safeProfiles } = await supabase
+          .from('guard_public_profiles')
+          .select('id, full_name, sia_verified, licence_types')
+          .in('id', guardIds);
+
+        const { data: applicantCompliance } = await supabase
+          .from('client_applicant_profiles')
+          .select('guard_id, job_id, sia_licence_number, sia_expiry_date, licence_types')
+          .in('job_id', jobIds)
+          .in('guard_id', guardIds);
+
+        const complianceByJobGuard: Record<string, any> = {};
+        (applicantCompliance || []).forEach((g: any) => {
+          complianceByJobGuard[`${g.job_id}-${g.guard_id}`] = g;
+        });
+
+        (safeProfiles || []).forEach((g: any) => {
+          guardMap[g.id] = g;
+        });
+
+        (data || []).forEach((a: any) => {
+          const safe = guardMap[a.guard_id] || null;
+          const compliance = complianceByJobGuard[`${a.job_id}-${a.guard_id}`] || null;
+          a.guards = safe
+            ? {
+                id: safe.id,
+                full_name: safe.full_name,
+                sia_licence_number: compliance?.sia_licence_number || null,
+                sia_verified: !!safe.sia_verified,
+                sia_expiry_date: compliance?.sia_expiry_date || null,
+                sia_licence_type: compliance?.licence_types?.[0] || safe.licence_types?.[0] || null,
+              }
+            : null;
+        });
+      }
+
       const map: Record<string, GuardAssignment[]> = {};
       (data || []).forEach((a: any) => {
         if (!map[a.job_id]) map[a.job_id] = [];
