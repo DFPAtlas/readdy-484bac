@@ -73,7 +73,7 @@ export default function ComplianceWarnings({ jobs, assignments }: ComplianceWarn
 
   jobs.forEach((job) => {
     const isSoon = job.start_date && new Date(job.start_date) <= in48h && new Date(job.start_date) >= now;
-    const sc = job.safety_check || {};
+    const sc: Partial<NonNullable<JobWithSafety['safety_check']>> = job.safety_check || {};
     const jobAssignments = assignments[job.id] || [];
 
     if (!job.safety_check) {
