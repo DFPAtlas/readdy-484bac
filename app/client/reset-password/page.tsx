@@ -50,7 +50,7 @@ function ResetPasswordFormContent() {
             }
 
             if (accessToken) {
-              const { data: setData, error: setError } = await supabase.auth.setSession({
+              const { data: setData, error: sessionError } = await supabase.auth.setSession({
                 access_token: accessToken,
                 refresh_token: refreshToken || "",
               });
@@ -59,8 +59,8 @@ function ResetPasswordFormContent() {
                 setSessionLoading(false);
                 return;
               }
-              if (setError) {
-                setError(setError.message);
+              if (sessionError) {
+                setError(sessionError.message);
                 setSessionLoading(false);
                 return;
               }
