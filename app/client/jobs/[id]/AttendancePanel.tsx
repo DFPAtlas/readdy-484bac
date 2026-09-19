@@ -10,7 +10,27 @@ import ReplacementRequestModal from './ReplacementRequestModal';
 import ReplacementGuardSuggestions from './ReplacementGuardSuggestions';
 import ReplacementStatusTracker from './ReplacementStatusTracker';
 
-// ... existing code ...
+interface Guard {
+  id: string;
+  full_name?: string | null;
+  user_id?: string | null;
+  profile_photo_url?: string | null;
+}
+
+interface Assignment {
+  id: string;
+  guard_id?: string | null;
+  status?: string | null;
+  attendance_status?: string | null;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
+  late_minutes?: number | null;
+  issue_reported?: boolean | null;
+  issue_type?: string | null;
+  issue_notes?: string | null;
+  replacement_requested?: boolean | null;
+  guards?: Guard | null;
+}
 
 interface AttendancePanelProps {
   job: any;
