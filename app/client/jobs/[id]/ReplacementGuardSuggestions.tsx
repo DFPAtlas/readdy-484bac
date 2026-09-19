@@ -64,7 +64,7 @@ export default function ReplacementGuardSuggestions({
     try {
       const { data: applicants } = await supabase
         .from('job_applications')
-.select('guard_id')
+        .select('guard_id')
         .eq('job_id', jobId)
         .not('guard_id', 'in', `(${currentGuardIds.join(',') || '00000000-0000-0000-0000-000000000000'})`)
         .limit(3);
@@ -91,7 +91,7 @@ export default function ReplacementGuardSuggestions({
         .eq('job_id', jobId)
         .limit(5);
 
-      const siteGuardIds = (pastAssignments || []).map((a: any) => a.guards?.id).filter(Boolean);
+      const siteGuardIds = (pastAssignments || []).map((a: any) => a.guard_id).filter(Boolean);
       if (siteGuardIds.length > 0) {
         const { data: otherSiteJobs } = await supabase
           .from('jobs')
@@ -103,20 +103,28 @@ export default function ReplacementGuardSuggestions({
         if (otherSiteJobs && otherSiteJobs.length > 0) {
           const { data: otherAssignments } = await supabase
             .from('job_assignments')
-            .select('guards(id, full_name, profile_photo_url, sia_licence_number, sia_verified, average_rating, total_reviews, total_jobs_completed, years_experience, location)')
+            .select('guard_id')
             .in('job_id', otherSiteJobs.map(j => j.id))
             .not('guard_id', 'in', `(${currentGuardIds.join(',') || '00000000-0000-0000-0000-000000000000'})`)
-            .limit(3);
+            .limit(10);
 
-          (otherAssignments || []).forEach((a: any) => {
-            if (a.guards && !results.find(g => g.id === a.guards.id)) {
-              results.push({
-                ...a.guards,
-                reason: 'Worked your site before',
-                availability: 'Familiar with site',
-              });
-            }
-          });
+          const historicalGuardIds = [...new Set((otherAssignments || []).map((a: any) => a.guard_id).filter(Boolean))].slice(0, 3);
+          if (historicalGuardIds.length > 0) {
+            const { data: historicalProfiles } = await supabase
+              .from('guard_public_profiles')
+              .select('id, full_name, profile_photo_url:profile_image_url, sia_verified, average_rating:rating, total_reviews, total_jobs_completed, years_experience, location')
+              .in('id', historicalGuardIds);
+
+            (historicalProfiles || []).forEach((g: any) => {
+              if (!results.find(r => r.id === g.id)) {
+                results.push({
+                  ...g,
+                  reason: 'Worked your site before',
+                  availability: 'Familiar with site',
+                });
+              }
+            });
+          }
         }
       }
     } catch {}
@@ -128,11 +136,11 @@ export default function ReplacementGuardSuggestions({
         .select('id, full_name, profile_photo_url:profile_image_url, sia_verified, average_rating:rating, total_reviews, total_jobs_completed, years_experience, location')
         .eq('sia_verified', true)
         .not('id', 'in', `(${currentGuardIds.join(',') || '00000000-0000-0000-0000-000000000000'})`)
-        .order('average_rating', { ascending: false })
+        .order('rating', { ascending: false })
         .limit(3);
 
       if (requiredLicenceType) {
-        query = query.ilike('licence_types', `%${requiredLicenceType}%`);
+        query = query.contains('licence_types', [requiredLicenceType]);
       }
 
       const { data: nearbyGuards } = await query;
