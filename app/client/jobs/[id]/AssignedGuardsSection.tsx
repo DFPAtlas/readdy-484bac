@@ -33,6 +33,12 @@ interface Assignment {
   guards: Guard;
   created_at: string;
   status?: string;
+  attendance_status?: string | null;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
+  late_minutes?: number | null;
+  issue_reported?: boolean | null;
+  replacement_requested?: boolean | null;
 }
 
 interface GuardReview {
