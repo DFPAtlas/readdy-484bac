@@ -336,10 +336,10 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
 
       const { data: applicantGuards } = appliedGuardIds.length > 0
         ? await supabase
-            .from("guards")
-            .select("id, user_id, full_name, email, phone, profile_image_url, rating, total_reviews, total_jobs_completed, hourly_rate, years_experience, sia_verified, sia_expiry_date, sia_licence_number, licence_types, specializations, location, postcode, bio, has_transport, availability_status, languages, home_latitude, home_longitude, sia_licence_front_url, sia_licence_back_url, profile_completed, verification_status, certifications, sia_verified_at")
-            .in("id", appliedGuardIds)
-            .eq("is_active", true)
+            .from("client_applicant_profiles")
+            .select("id:guard_id, user_id:guard_user_id, full_name, profile_image_url, rating, total_reviews, total_jobs_completed, hourly_rate, years_experience, sia_verified, sia_expiry_date, sia_licence_number, licence_types, location, postcode:postcode_area, bio, has_transport, availability_status, profile_completed, verification_status, certifications, sia_verified_at")
+            .eq("job_id", jobId)
+            .in("guard_id", appliedGuardIds)
             .order("rating", { ascending: false })
         : { data: [] };
 
@@ -379,15 +379,17 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
       if (applicantGuards) {
         const enrichedGuards: Guard[] = applicantGuards.map((g) => {
           const app = statusMap[g.id];
-          let dist: number | null = null;
-          if (jobData.latitude && jobData.longitude && g.home_latitude && g.home_longitude) {
-            dist = haversine(jobData.latitude, jobData.longitude, g.home_latitude, g.home_longitude);
-          }
           return {
             ...g,
+            email: null,
+            phone: null,
+            specializations: null,
+            languages: null,
+            sia_licence_front_url: null,
+            sia_licence_back_url: null,
             cover_message: app?.cover_message || null,
             applied_at: app?.applied_at || null,
-            distance_km: dist,
+            distance_km: null,
           };
         });
 
