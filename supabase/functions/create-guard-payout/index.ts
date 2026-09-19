@@ -34,7 +34,7 @@ function safeLog(...args: unknown[]) {
 interface ValidatedRequest {
   assignmentId: string;
   jobId: string | null;
-  adminUserId: string;
+  adminUserId: string | null;
   adminRole: string;
   adminEmail: string;
 }
@@ -300,6 +300,41 @@ async function authenticateAndValidate(
   const authHeader = req.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     throw { status: 401, message: 'Authentication required' };
+  }
+
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  if (serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`) {
+    let internalBody: Record<string, unknown>;
+    try {
+      internalBody = await req.json();
+    } catch {
+      throw { status: 400, message: 'Invalid request body' };
+    }
+
+    const assignmentId = typeof internalBody.assignmentId === 'string' && internalBody.assignmentId.trim()
+      ? internalBody.assignmentId.trim()
+      : null;
+    const jobId = typeof internalBody.jobId === 'string' && internalBody.jobId.trim()
+      ? internalBody.jobId.trim()
+      : null;
+    const approvalSource = typeof internalBody.internalApprovalSource === 'string'
+      ? internalBody.internalApprovalSource
+      : '';
+    const approvedByUserId = typeof internalBody.approvedByUserId === 'string' && internalBody.approvedByUserId.trim()
+      ? internalBody.approvedByUserId.trim()
+      : null;
+
+    if (!assignmentId || approvalSource !== 'client_completion_approved' || !approvedByUserId) {
+      throw { status: 403, message: 'Trusted internal payout approval required' };
+    }
+
+    return {
+      assignmentId,
+      jobId,
+      adminUserId: approvedByUserId,
+      adminRole: 'client_approved_internal',
+      adminEmail: '',
+    };
   }
 
   const token = authHeader.replace('Bearer ', '');
@@ -662,7 +697,7 @@ async function createPayoutRecord(
     feeDeducted: number;
     netAmount: number;
     idempotencyKey: string;
-    adminUserId: string;
+    adminUserId: string | null;
     now: string;
   },
 ): Promise<PayoutRecord> {
