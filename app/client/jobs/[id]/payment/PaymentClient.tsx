@@ -25,7 +25,9 @@ import TaxDisclaimerCheckbox from '@/components/TaxDisclaimerCheckbox';
 interface Job {
   id: string;
   job_title: string;
+  security_type: string;
   venue_name: string;
+  venue_address_line1: string;
   venue_city: string;
   venue_postcode: string;
   start_date: string;
@@ -37,6 +39,8 @@ interface Job {
   status: string;
   payment_status?: string | null;
   total_cost?: number;
+  tax_disclaimer_accepted?: boolean | null;
+  tax_disclaimer_accepted_at?: string | null;
   clients: {
     id: string;
     company_name: string;
@@ -114,7 +118,7 @@ interface PaymentHistoryItem {
   jobTitle: string;
   amount: string;
   status: string;
-  receiptUrl: string | null;
+  receiptUrl?: string | null;
 }
 
 interface FeeBreakdown {
