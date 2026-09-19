@@ -138,16 +138,40 @@ serve(async (req) => {
     }
 
     const guardStatus = verificationStatus === 'verified' ? 'approved' : verificationStatus === 'rejected' ? 'rejected' : 'pending';
+    const guardSiaVerified = verificationStatus === 'verified';
+    const guardUpdate: Record<string, unknown> = {
+      verification_status: guardStatus,
+      sia_verified: guardSiaVerified,
+      sia_verified_at: guardSiaVerified ? payload.verified_at : null,
+      sia_expiry_date: payload.expiry_date || null,
+      sia_checked_at: payload.verified_at,
+      sia_check_status: payload.license_status,
+      sia_verification_details: {
+        verified: payload.verified,
+        license_status: payload.license_status,
+        name_match: payload.name_match,
+        expiry_date: payload.expiry_date,
+        sectors: payload.sectors || [],
+        details: payload.details,
+        verified_at: payload.verified_at,
+      },
+      updated_at: payload.verified_at,
+    };
+
+    if (payload.sectors && payload.sectors.length > 0) {
+      guardUpdate.licence_types = payload.sectors;
+    }
+
     const { error: guardUpdateError } = await supabase
       .from('guards')
-      .update({
-        verification_status: guardStatus,
-        updated_at: payload.verified_at,
-      })
+      .update(guardUpdate)
       .eq('user_id', payload.user_id);
 
     if (guardUpdateError) {
-      console.error('Failed to update guards table:', guardUpdateError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to update guard SIA status', details: guardUpdateError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     await supabase.from('notifications').insert({
