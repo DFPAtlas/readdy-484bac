@@ -254,7 +254,7 @@ export default function TrustSafetyClient() {
                       {counts.complianceWarnings}
                     </span>
                   </div>
-                  <ComplianceWarnings jobs={jobs} assignments={assignments} />
+                  <ComplianceWarnings jobs={jobs as any} assignments={assignments} />
                 </div>
               )}
 
@@ -319,7 +319,7 @@ export default function TrustSafetyClient() {
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">Job Safety Checklist</h2>
               </div>
               <JobSafetyChecklist
-                jobs={jobs}
+                jobs={jobs as any}
                 onToggle={handleToggle}
                 onChangeRisk={handleChangeRisk}
                 onChangeLoneWorker={handleChangeLoneWorker}
@@ -333,7 +333,7 @@ export default function TrustSafetyClient() {
                 <i className="ri-door-open-line text-teal-400 text-lg" />
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">Site Instructions</h2>
               </div>
-              <SiteInstructionsPanel jobs={jobs} onSave={handleSaveSiteInstructions} />
+              <SiteInstructionsPanel jobs={jobs as any} onSave={handleSaveSiteInstructions} />
             </div>
           )}
 
