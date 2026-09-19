@@ -196,7 +196,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       const [assignmentsData, cancellationData, refundData, transactionData, activityData] = await Promise.all([
         supabase
           .from('job_assignments')
-          .select('*, guards(id, user_id, full_name, profile_photo_url, sia_licence_number, phone, sia_verified, sia_expiry_date, licence_types, sia_licence_front_url, sia_licence_back_url, profile_completed, verification_status, certifications, sia_verified_at, average_rating, total_reviews, total_jobs_completed)')
+          .select('*')
           .eq('job_id', jobId),
         supabase
           .schema('app')
@@ -226,12 +226,38 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
           .limit(50),
       ]);
 
-      setAssignedGuards(assignmentsData.data || []);
+      const rawAssignments = assignmentsData.data || [];
+      const assignedGuardIds = [...new Set(rawAssignments.map((a: any) => a.guard_id).filter(Boolean))];
+      const guardMap: Record<string, any> = {};
+
+      if (assignedGuardIds.length > 0) {
+        const { data: safeGuardProfiles } = await supabase
+          .from('client_applicant_profiles')
+          .select('id:guard_id, user_id:guard_user_id, full_name, profile_photo_url:profile_image_url, sia_licence_number, sia_verified, sia_expiry_date, licence_types, profile_completed, verification_status, certifications, sia_verified_at, average_rating:rating, total_reviews, total_jobs_completed')
+          .eq('job_id', jobId)
+          .in('guard_id', assignedGuardIds);
+
+        (safeGuardProfiles || []).forEach((g: any) => {
+          guardMap[g.id] = {
+            ...g,
+            phone: null,
+            sia_licence_front_url: null,
+            sia_licence_back_url: null,
+          };
+        });
+      }
+
+      const hydratedAssignments = rawAssignments.map((a: any) => ({
+        ...a,
+        guards: guardMap[a.guard_id] || null,
+      }));
+
+      setAssignedGuards(hydratedAssignments);
       setCancellation(cancellationData.data || null);
       setRefundRequests(refundData.data || []);
       setTransaction(transactionData.data || null);
 
-      const timelineEvents = buildTimeline(jobData, assignmentsData.data || [], activityData.data || []);
+      const timelineEvents = buildTimeline(jobData, hydratedAssignments, activityData.data || []);
       setTimeline(timelineEvents);
 
       await fetchGuardReviews(client.id);
@@ -245,66 +271,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     setMarkingComplete(true);
     setCompleteError('');
     try {
-      const { error: jobError } = await supabase
-        .from('jobs')
-        .update({ status: 'completed', updated_at: new Date().toISOString() })
-        .eq('id', jobId);
-
-      if (jobError) throw jobError;
-
-      const guardId = assignedGuards[0]?.guards?.id;
-      const guardUserId = assignedGuards[0]?.guards?.user_id;
-
-      if (guardId) {
-        const { data: guardData } = await supabase
-          .from('guards')
-          .select('total_jobs_completed')
-          .eq('id', guardId)
-          .maybeSingle();
-
-        const current = guardData?.total_jobs_completed ?? 0;
-        await supabase
-          .from('guards')
-          .update({ total_jobs_completed: current + 1 })
-          .eq('id', guardId);
-      }
-
-      if (guardUserId) {
-        await supabase.from('notifications').insert({
-          user_id: guardUserId,
-          user_type: 'guard',
-          type: 'job_completed',
-          title: 'Job Marked as Complete',
-          message: `"${job.job_title}" has been marked as complete by the client. You may now receive a review.`,
-          link: `/guard/dashboard`,
-          is_read: false,
-        });
-
-        try {
-          await sendPushToUser(guardUserId, 'guard', {
-            title: 'Job Marked as Complete',
-            body: `"${job.job_title}" has been marked as complete by the client. You may now receive a review.`,
-            url: `/guard/dashboard`,
-            tag: 'quickguard-complete',
-          });
-        } catch (e) {
-          console.error('Failed to send complete push:', e);
-        }
-      }
-
-      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-job-completed-guard-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({ job_id: jobId }),
-      }).catch(() => {});
-
-      setJob((prev: any) => ({ ...prev, status: 'completed' }));
+      setCompleteError('The guard must check out and submit a completion request before the client can approve completion and release payout.');
       setShowCompleteConfirm(false);
-    } catch {
-      setCompleteError('Something went wrong. Please try again.');
     } finally {
       setMarkingComplete(false);
     }
