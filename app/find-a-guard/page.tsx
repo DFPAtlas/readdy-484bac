@@ -10,13 +10,13 @@ interface Guard {
   id: string;
   full_name: string;
   profile_image_url: string | null;
-  sia_licence_number: string;
   sia_verified: boolean;
   rating: number | null;
   total_reviews: number;
   hourly_rate: number;
   location: string;
-  postcode: string;
+  city: string | null;
+  postcode_area: string | null;
   licence_types: string[];
   years_experience: number;
   willing_to_travel: boolean;
@@ -84,9 +84,8 @@ function FindGuardContent() {
   const fetchGuards = async () => {
     setLoading(true);
     let query = supabase
-      .from('guards')
-      .select('id, full_name, profile_image_url, sia_licence_number, sia_verified, rating, total_reviews, hourly_rate, location, postcode, licence_types, years_experience, willing_to_travel, has_transport, bio, accepts_direct_bookings, preferred_venue_categories')
-      .eq('is_active', true)
+      .from('guard_public_profiles')
+      .select('id, full_name, profile_image_url, sia_verified, rating, total_reviews, hourly_rate, location, city, postcode_area, licence_types, years_experience, willing_to_travel, has_transport, bio, accepts_direct_bookings, preferred_venue_categories')
       .eq('verification_status', 'verified')
       .eq('accepts_direct_bookings', true)
       .order('rating', { ascending: false });
@@ -100,9 +99,9 @@ function FindGuardContent() {
     if (licenseFilter && !g.licence_types?.some(l => l.toLowerCase().replace(/\s/g, '_').includes(licenseFilter))) return false;
     if (venueFilter && !g.preferred_venue_categories?.some(v => v === venueFilter)) return false;
     if ((g.rating || 0) < minRating) return false;
-    if (postcode && g.postcode) {
+    if (postcode && g.postcode_area) {
       const pc = postcode.trim().toUpperCase().replace(/\s/g, '');
-      const gpc = g.postcode.trim().toUpperCase().replace(/\s/g, '');
+      const gpc = g.postcode_area.trim().toUpperCase().replace(/\s/g, '');
       if (!gpc.startsWith(pc.slice(0, 2))) return false;
     }
     return true;
@@ -229,7 +228,7 @@ function FindGuardContent() {
                         </div>
                         <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
                           <i className="ri-map-pin-line"></i>
-                          {guard.location || guard.postcode || 'UK'}
+                          {guard.location || guard.city || guard.postcode_area || 'UK'}
                         </p>
                       </div>
                     </div>
