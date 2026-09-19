@@ -98,7 +98,56 @@ serve(async (req) => {
       });
     }
 
-    const addressParts = [formData.addressLine1, formData.city, formData.postcode, 'UK'].filter(Boolean);
+    const title = String(formData.jobTitle || '').trim();
+    const description = String(formData.jobDescription || '').trim();
+    const venue = String(formData.venue || '').trim();
+    const addressLine1 = String(formData.addressLine1 || '').trim();
+    const city = String(formData.city || '').trim();
+    const postcode = String(formData.postcode || '').trim();
+    const securityType = String(formData.securityType || '').trim();
+    const contactName = String(formData.contactName || '').trim();
+    const contactEmail = String(formData.contactEmail || '').trim().toLowerCase();
+    const guardCount = Number.parseInt(String(formData.numberOfGuards || ''), 10);
+    const dayCount = Number.parseInt(String(formData.numberOfDays || ''), 10);
+    const hourlyRate = Number.parseFloat(String(formData.hourlyRate || ''));
+    const startDate = formData.startDate ? new Date(`${formData.startDate}T00:00:00`) : null;
+    const endDate = formData.endDate ? new Date(`${formData.endDate}T00:00:00`) : startDate;
+    const publishAt = formData.publishAt ? new Date(formData.publishAt) : null;
+    const expiresAt = formData.expiresAt ? new Date(formData.expiresAt) : null;
+
+    const validationErrors: string[] = [];
+    if (title.length < 3 || title.length > 160) validationErrors.push('Job title must be between 3 and 160 characters');
+    if (description.length < 10) validationErrors.push('Job description must be at least 10 characters');
+    if (!securityType) validationErrors.push('Security type is required');
+    if (!venue) validationErrors.push('Venue is required');
+    if (!addressLine1 || !city || !postcode) validationErrors.push('A complete job location is required');
+    if (!Number.isInteger(guardCount) || guardCount < 1 || guardCount > 100) validationErrors.push('Number of guards must be between 1 and 100');
+    if (!Number.isInteger(dayCount) || dayCount < 1 || dayCount > 365) validationErrors.push('Number of days must be between 1 and 365');
+    if (!Number.isFinite(hourlyRate) || hourlyRate <= 0 || hourlyRate > 1000) validationErrors.push('Hourly rate must be greater than 0');
+    if (!startDate || Number.isNaN(startDate.getTime())) validationErrors.push('Valid start date is required');
+    if (!endDate || Number.isNaN(endDate.getTime())) validationErrors.push('Valid end date is required');
+    if (startDate && endDate && endDate < startDate) validationErrors.push('End date cannot be before start date');
+    if (!formData.startTime || !formData.endTime) validationErrors.push('Start and end times are required');
+    if (!contactName) validationErrors.push('Contact name is required');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) validationErrors.push('Valid contact email is required');
+    if (publishAt && Number.isNaN(publishAt.getTime())) validationErrors.push('Invalid publish date');
+    if (expiresAt && Number.isNaN(expiresAt.getTime())) validationErrors.push('Invalid expiry date');
+    if (publishAt && expiresAt && expiresAt <= publishAt) validationErrors.push('Expiry must be after publish time');
+    if (formData.siaLicenceRequired === 'yes' && (!Array.isArray(formData.specificLicences) || formData.specificLicences.length === 0)) {
+      validationErrors.push('At least one required SIA licence type must be selected');
+    }
+
+    if (validationErrors.length > 0) {
+      return new Response(JSON.stringify({
+        error: 'validation',
+        message: 'Please correct the job details before publishing.',
+        details: validationErrors,
+      }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const addressParts = [addressLine1, city, postcode, 'UK'].filter(Boolean);
     const fullAddress = addressParts.join(', ');
 
     let geo: { latitude: number; longitude: number } | null = null;
@@ -133,21 +182,21 @@ serve(async (req) => {
 
     const jobPayload = {
       client_id: clientId,
-      job_title: (formData.jobTitle || '').trim(),
-      security_type: formData.securityType || '',
-      job_description: (formData.jobDescription || '').trim(),
-      venue_name: (formData.venue || '').trim(),
-      venue_address_line1: (formData.addressLine1 || '').trim(),
+      job_title: title,
+      security_type: securityType,
+      job_description: description,
+      venue_name: venue,
+      venue_address_line1: addressLine1,
       venue_address_line2: (formData.addressLine2 || '').trim() || null,
-      venue_city: (formData.city || '').trim(),
-      venue_postcode: (formData.postcode || '').trim(),
-      number_of_guards: parseInt(formData.numberOfGuards) || 1,
-      number_of_days: parseInt(formData.numberOfDays) || 1,
+      venue_city: city,
+      venue_postcode: postcode,
+      number_of_guards: guardCount,
+      number_of_days: dayCount,
       start_date: formData.startDate,
       end_date: formData.endDate || formData.startDate,
       start_time: formatTimeForJob(formData.startTime),
       end_time: formatTimeForJob(formData.endTime),
-      hourly_rate: parseFloat(formData.hourlyRate) || 0,
+      hourly_rate: hourlyRate,
       sia_licence_required: formData.siaLicenceRequired === 'yes',
       required_licence_types: formData.specificLicences?.length > 0 ? formData.specificLicences : null,
       uniform_required: formData.uniformRequired === 'yes',
@@ -157,9 +206,9 @@ serve(async (req) => {
       special_instructions: (formData.specialInstructions || '').trim() || null,
       additional_requirements: (formData.additionalRequirements || '').trim() || null,
       urgency: formData.urgency || 'standard',
-      contact_name: formData.contactName || '',
+      contact_name: contactName,
       contact_phone: formData.contactPhone || '',
-      contact_email: formData.contactEmail || '',
+      contact_email: contactEmail,
       status: formData.publishAt && new Date(formData.publishAt) > new Date() ? 'draft' : 'open',
       latitude: geo?.latitude ?? null,
       longitude: geo?.longitude ?? null,
@@ -237,7 +286,7 @@ serve(async (req) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
         },
         body: JSON.stringify({
           clientEmail: formData.contactEmail,
@@ -255,17 +304,19 @@ serve(async (req) => {
       warnings.push('email_failed');
     }
 
-    try {
-      await fetch(`${supabaseUrl}/functions/v1/notify-matching-guards`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ jobId }),
-      });
-    } catch {
-      warnings.push('notification_failed');
+    if (jobPayload.status === 'open') {
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/notify-matching-guards`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ jobId }),
+        });
+      } catch {
+        warnings.push('notification_failed');
+      }
     }
 
     return new Response(JSON.stringify({
