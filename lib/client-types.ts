@@ -101,6 +101,9 @@ export interface Job {
   is_recurring: boolean;
   saved_site_id: string | null;
   geocoded_at: string | null;
+  payment_status?: string | null;
+  agreed_amount?: number | null;
+  postcode?: string | null;
 }
 
 export type JobStatus =
