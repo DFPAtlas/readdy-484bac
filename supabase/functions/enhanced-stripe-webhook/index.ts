@@ -29,32 +29,81 @@ async function finalizeJobPayment(appSupabase: any, supabaseUrl: string, supabas
     return;
   }
 
-  await appSupabase.from('transactions').update({
-    status: 'completed',
-    stripe_payment_intent: paymentIntent,
-    payment_status: 'completed',
-    completed_at: new Date().toISOString(),
-  }).eq('stripe_session_id', sessionId);
+  const { data: transaction, error: txLookupError } = await appSupabase
+    .from('transactions')
+    .select('id, job_id, client_id, amount')
+    .eq('stripe_session_id', sessionId)
+    .maybeSingle();
 
-  const { data: transaction } = await appSupabase.from('transactions').select('job_id, client_id, amount').eq('stripe_session_id', sessionId).maybeSingle();
-  if (!transaction?.job_id) { console.error('[EnhancedWebhook] No job_id found for session:', sessionId); return; }
+  if (txLookupError || !transaction?.job_id) {
+    throw new Error(`Job payment transaction missing for session ${sessionId}`);
+  }
 
   const jobId = transaction.job_id;
   const now = new Date().toISOString();
 
-  const { data: fundedAssignments } = await appSupabase.from('job_assignments').select('guard_id').eq('job_id', jobId).in('status', ['selected', 'awaiting_payment']);
+  const { data: fundedAssignments, error: assignmentLookupError } = await appSupabase
+    .from('job_assignments')
+    .select('id, guard_id')
+    .eq('job_id', jobId)
+    .in('status', ['selected', 'awaiting_payment']);
 
-  await appSupabase.from('jobs').update({
+  if (assignmentLookupError || !fundedAssignments || fundedAssignments.length === 0) {
+    throw new Error(`No payable assignments found for funded job ${jobId}`);
+  }
+
+  const { error: jobUpdateError } = await appSupabase.from('jobs').update({
     payment_status: 'funded',
     status: 'confirmed',
     updated_at: now,
   }).eq('id', jobId);
 
-  await appSupabase.from('job_assignments').update({
+  if (jobUpdateError) {
+    throw new Error(`Failed to mark job funded: ${jobUpdateError.message}`);
+  }
+
+  const { error: assignmentUpdateError } = await appSupabase.from('job_assignments').update({
     payment_status: 'funded',
     status: 'confirmed',
+    funded_at: now,
+    confirmed_at: now,
     updated_at: now,
   }).eq('job_id', jobId).in('status', ['selected', 'awaiting_payment']);
+
+  if (assignmentUpdateError) {
+    await appSupabase.from('jobs').update({
+      payment_status: 'processing',
+      status: 'awaiting_payment',
+      updated_at: now,
+    }).eq('id', jobId);
+    throw new Error(`Failed to mark assignments funded: ${assignmentUpdateError.message}`);
+  }
+
+  const { error: txUpdateError } = await appSupabase.from('transactions').update({
+    status: 'completed',
+    stripe_payment_intent: paymentIntent,
+    payment_status: 'completed',
+    completed_at: now,
+    updated_at: now,
+  }).eq('id', transaction.id);
+
+  if (txUpdateError) {
+    await appSupabase.from('job_assignments').update({
+      payment_status: 'processing',
+      status: 'selected',
+      funded_at: null,
+      confirmed_at: null,
+      updated_at: now,
+    }).eq('job_id', jobId).eq('payment_status', 'funded');
+
+    await appSupabase.from('jobs').update({
+      payment_status: 'processing',
+      status: 'awaiting_payment',
+      updated_at: now,
+    }).eq('id', jobId);
+
+    throw new Error(`Failed to finalize transaction: ${txUpdateError.message}`);
+  }
 
   if (transaction.client_id) {
     await appSupabase.from('notifications').insert([{ user_id: transaction.client_id, title: 'Payment Received — Job Funded', message: `Your payment of £${Number(transaction.amount || 0).toFixed(2)} has been processed. Guards have been notified and can now check in.`, type: 'success', related_id: jobId, is_read: false }]);
@@ -421,13 +470,60 @@ serve(async (req) => {
 
         const alreadyPaid = assignment.payment_status === 'paid_out';
 
-        await appSupabase.from('job_assignments').update({ stripe_transfer_id: transferId, payment_status: 'paid_out', payout_released: true, payout_released_at: now, updated_at: now }).eq('id', assignment.id);
-        await appSupabase.from('guard_payouts').update({ stripe_transfer_id: transferId, stripe_transfer_status: 'paid', status: 'paid_out', completed_date: now, updated_at: now, transfer_webhook_updated_at: now }).eq('assignment_id', assignment.id);
+        const { error: assignmentPaidError } = await appSupabase.from('job_assignments').update({
+          stripe_transfer_id: transferId,
+          payment_status: 'paid_out',
+          payout_released: true,
+          payout_released_at: now,
+          updated_at: now,
+        }).eq('id', assignment.id);
+
+        if (assignmentPaidError) {
+          throw new Error(`Failed to record assignment transfer: ${assignmentPaidError.message}`);
+        }
+
+        const { error: payoutPaidError } = await appSupabase.from('guard_payouts').update({
+          stripe_transfer_id: transferId,
+          stripe_transfer_status: 'created',
+          status: 'paid_out',
+          completed_date: now,
+          updated_at: now,
+          transfer_webhook_updated_at: now,
+        }).eq('assignment_id', assignment.id);
+
+        if (payoutPaidError) {
+          await appSupabase.from('job_assignments').update({
+            payment_status: 'payout_processing',
+            payout_released: false,
+            payout_released_at: null,
+            updated_at: now,
+          }).eq('id', assignment.id);
+          throw new Error(`Failed to record payout transfer: ${payoutPaidError.message}`);
+        }
 
         if (assignment.job_id) await finalizeJobAfterPayout(appSupabase, assignment.job_id);
-        if (assignment.guard_id && !alreadyPaid) await notifyGuardPayout(appSupabase, assignment.guard_id, assignment.job_id, assignment.id, transferId);
+        if (assignment.guard_id && !alreadyPaid) {
+          await notifyGuardPayout(appSupabase, assignment.guard_id, assignment.job_id, assignment.id, transferId);
+        }
 
-        await appSupabase.from('payment_audit_logs').insert({ event_type: 'transfer.created', stripe_event_id: transfer.id, reference_type: 'guard_payout', reference_id: assignment.id, details: JSON.stringify({ transfer_id: transferId, amount: transfer.amount, currency: transfer.currency, guard_id: guardId, job_id: jobId, assignment_id: assignment.id, payout_released: true }), created_at: now });
+        await appSupabase.from('payment_audit_logs').insert({
+          event_type: 'transfer.created',
+          stripe_event_id: event.id,
+          reference_type: 'guard_payout',
+          reference_id: assignment.id,
+          details: JSON.stringify({
+            transfer_id: transferId,
+            amount: transfer.amount,
+            currency: transfer.currency,
+            guard_id: guardId,
+            job_id: jobId,
+            assignment_id: assignment.id,
+            payout_released: true,
+            release_destination: 'stripe_connected_account',
+          }),
+          created_at: now,
+        });
+
         break;
       }
 
@@ -461,22 +557,70 @@ serve(async (req) => {
           break;
         }
 
-        const { data: payoutRecord } = await appSupabase.from('guard_payouts').select('status').eq('assignment_id', assignment.id).maybeSingle();
-        const safelyFinalised = assignment.payment_status === 'paid_out' || (payoutRecord && (payoutRecord.status === 'paid_out' || payoutRecord.status === 'completed'));
+        const { data: payoutRecord } = await appSupabase
+          .from('guard_payouts')
+          .select('status')
+          .eq('assignment_id', assignment.id)
+          .maybeSingle();
 
-        if (safelyFinalised) {
-          console.log(`[EnhancedWebhook] transfer.reversed: assignment ${assignment.id} already finalised, refusing to downgrade`);
-          await appSupabase.from('payment_audit_logs').insert({ event_type: 'transfer.reversed.idempotent', stripe_event_id: transfer.id, reference_type: 'guard_payout', reference_id: assignment.id, details: JSON.stringify({ transfer_id: transferId, assignment_id: assignment.id, already_finalised: true, reversal_reason: reversalReason, needs_reconciliation: true }), created_at: now }).catch(() => {});
-          break;
+        const wasFinalised =
+          assignment.payment_status === 'paid_out' ||
+          !!(payoutRecord && (payoutRecord.status === 'paid_out' || payoutRecord.status === 'completed'));
+
+        const { error: payoutReverseError } = await appSupabase.from('guard_payouts').update({
+          stripe_transfer_id: transferId,
+          stripe_transfer_status: 'reversed',
+          status: 'failed',
+          failure_reason: reversalReason,
+          failure_category: 'stripe_transfer_reversed',
+          updated_at: now,
+          transfer_webhook_updated_at: now,
+        }).eq('assignment_id', assignment.id);
+
+        if (payoutReverseError) {
+          throw new Error(`Failed to record reversed transfer: ${payoutReverseError.message}`);
         }
 
-        await appSupabase.from('guard_payouts').update({ stripe_transfer_id: transferId, stripe_transfer_status: 'reversed', status: 'failed', failure_reason: reversalReason, failure_category: 'stripe_transfer_reversed', updated_at: now, transfer_webhook_updated_at: now }).eq('assignment_id', assignment.id);
+        const { error: assignmentReverseError } = await appSupabase.from('job_assignments').update({
+          payment_status: 'payout_pending',
+          payout_released: false,
+          payout_released_at: null,
+          updated_at: now,
+        }).eq('id', assignment.id);
 
-        if (assignment.payment_status !== 'payout_pending' && assignment.payment_status !== 'paid_out') {
-          await appSupabase.from('job_assignments').update({ payment_status: 'payout_pending', updated_at: now }).eq('id', assignment.id);
+        if (assignmentReverseError) {
+          throw new Error(`Failed to restore assignment payout state: ${assignmentReverseError.message}`);
         }
 
-        await appSupabase.from('payment_audit_logs').insert({ event_type: 'transfer.reversed', stripe_event_id: transfer.id, reference_type: 'guard_payout', reference_id: assignment.id, details: JSON.stringify({ transfer_id: transferId, guard_id: assignment.guard_id, job_id: assignment.job_id, assignment_id: assignment.id, reversal_reason: reversalReason }), created_at: now });
+        if (assignment.job_id) {
+          const { error: jobReverseError } = await appSupabase.from('jobs').update({
+            status: 'payout_approved',
+            payment_status: 'funded',
+            updated_at: now,
+          }).eq('id', assignment.job_id);
+
+          if (jobReverseError) {
+            throw new Error(`Failed to restore job payout state: ${jobReverseError.message}`);
+          }
+        }
+
+        await appSupabase.from('payment_audit_logs').insert({
+          event_type: 'transfer.reversed',
+          stripe_event_id: event.id,
+          reference_type: 'guard_payout',
+          reference_id: assignment.id,
+          details: JSON.stringify({
+            transfer_id: transferId,
+            guard_id: assignment.guard_id,
+            job_id: assignment.job_id,
+            assignment_id: assignment.id,
+            reversal_reason: reversalReason,
+            was_finalised_before_reversal: wasFinalised,
+            requires_finance_attention: true,
+          }),
+          created_at: now,
+        });
+
         break;
       }
 
