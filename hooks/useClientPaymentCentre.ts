@@ -131,7 +131,7 @@ export function useClientPaymentCentre() {
           const guardIds = [...new Set(assignments.map((a: any) => a.guard_id).filter(Boolean))];
           if (guardIds.length > 0) {
             const { data: guardsData } = await supabase
-              .from('guards')
+              .from('guard_public_profiles')
               .select('id, full_name')
               .in('id', guardIds as string[]);
             if (guardsData) {
