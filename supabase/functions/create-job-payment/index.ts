@@ -564,8 +564,9 @@ serve(async (req) => {
       breakdown: breakdownResponse,
     };
 
+    let txWriteError: any = null;
     if (existingTx) {
-      await supabaseService
+      const { error } = await supabaseService
         .from('transactions')
         .update({
           status: 'pending',
@@ -578,8 +579,9 @@ serve(async (req) => {
           metadata: txMetadata,
         })
         .eq('id', existingTx.id);
+      txWriteError = error;
     } else {
-      await supabaseService
+      const { error } = await supabaseService
         .from('transactions')
         .insert({
           job_id: jobId,
@@ -593,6 +595,26 @@ serve(async (req) => {
           metadata: txMetadata,
           created_at: nowIso,
         });
+      txWriteError = error;
+    }
+
+    if (txWriteError) {
+      console.error('[create-job-payment] Transaction persistence failed:', txWriteError.message);
+      for (const update of assignmentUpdates) {
+        await supabaseService
+          .from('job_assignments')
+          .update({ payment_status: 'pending', updated_at: nowIso })
+          .eq('id', update.id);
+      }
+      await supabaseService
+        .from('jobs')
+        .update({ payment_status: 'pending', updated_at: nowIso })
+        .eq('id', jobId);
+      try { await stripe.checkout.sessions.expire(session.id); } catch {}
+      return new Response(
+        JSON.stringify({ error: 'Unable to create payment checkout' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     return new Response(
