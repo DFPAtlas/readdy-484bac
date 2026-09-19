@@ -79,7 +79,7 @@ serve(async (req) => {
 
     const { data: guardData, error: guardError } = await supabaseClient
       .from("guards")
-      .select("id, user_id, created_at, verification_status, licence_types, sia_licence_number, sia_expiry_date, is_active")
+      .select("id, user_id, created_at, verification_status, licence_types, sia_licence_number, sia_expiry_date, sia_verified, is_active")
       .eq("id", guardId)
       .maybeSingle();
 
@@ -92,11 +92,11 @@ serve(async (req) => {
 
     const { data: adminData } = await supabaseClient
       .from("admin_users")
-      .select("id")
+      .select("id, is_active")
       .eq("user_id", authUserId)
       .maybeSingle();
 
-    const isAdmin = !!adminData;
+    const isAdmin = !!adminData?.is_active;
 
     if (!isAdmin && guardData.user_id !== authUserId) {
       return new Response(JSON.stringify({ error: "Forbidden: You can only apply as yourself" }), {
@@ -159,6 +159,22 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (!isAdmin && jobData.sia_licence_required) {
+      if (!guardData.sia_verified || !guardData.sia_licence_number) {
+        return new Response(JSON.stringify({ error: "A verified SIA licence is required for this job" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!guardData.sia_expiry_date) {
+        return new Response(JSON.stringify({ error: "Your SIA licence expiry date is missing" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     if (jobData.sia_licence_required && jobData.required_licence_types && jobData.required_licence_types.length > 0) {
