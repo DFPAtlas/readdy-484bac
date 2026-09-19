@@ -206,7 +206,7 @@ export default function GuardAttendanceCard({
       <div className="flex items-center gap-2 pt-2 border-t border-[#1e2d4d] flex-wrap">
         {g?.user_id && (
           <button
-            onClick={() => onMessageGuard?.(g.id, g.full_name || 'Guard', g.user_id)}
+            onClick={() => onMessageGuard?.(g.id, g.full_name || 'Guard', g.user_id as string)}
             className="flex items-center gap-1.5 text-xs font-semibold text-teal-400 hover:text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
           >
             <i className="ri-message-3-line"></i>
