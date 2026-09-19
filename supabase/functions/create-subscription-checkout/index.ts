@@ -294,11 +294,11 @@ serve(async (req) => {
     const body = await req.json();
     console.log('[create-subscription-checkout] Request body:', JSON.stringify(body));
 
-    const { userId, accountType, planId, userEmail, billingCycle, siteUrl: bodySiteUrl } = body;
+    const { userId: requestedUserId, accountType: requestedAccountType, planId, userEmail: requestedEmail, billingCycle, siteUrl: bodySiteUrl } = body;
 
-    if (!userId || !accountType || !planId) {
+    if (!planId) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: userId, accountType, planId' }),
+        JSON.stringify({ error: 'Missing required field: planId' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -306,9 +306,52 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const token = authHeader.slice(7);
+    const authClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const userId = user.id;
+    if (requestedUserId && requestedUserId !== userId) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     const publicSupabase = createClient(supabaseUrl, supabaseServiceKey, {
       db: { schema: 'app' }
     });
+
+    const [{ data: guardProfile }, { data: clientProfile }] = await Promise.all([
+      publicSupabase.from('guards').select('id,email').eq('user_id', userId).maybeSingle(),
+      publicSupabase.from('clients').select('id,email').eq('user_id', userId).maybeSingle(),
+    ]);
+    const accountType = guardProfile ? 'guard' : clientProfile ? 'client' : null;
+    if (!accountType) {
+      return new Response(JSON.stringify({ error: 'QuickGuard profile not found' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    if (requestedAccountType && requestedAccountType !== accountType) {
+      return new Response(JSON.stringify({ error: 'Account type mismatch' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    const userEmail = user.email || guardProfile?.email || clientProfile?.email || requestedEmail;
 
     const { priceId, error: priceError } = await getPriceId(publicSupabase, planId, billingCycle || 'monthly');
     if (!priceId || priceError) {
