@@ -76,7 +76,7 @@ serve(async (req) => {
         template_slug: 'job_application',
         to: client_email,
         variables,
-        from: 'QuickGuard <notifications@quickguard.co.uk>',
+        from: 'QuickGuard <notifications@quickguard.uk>',
         related_user_id: guard_id || null,
         related_job_id: job_id || null,
       }),
