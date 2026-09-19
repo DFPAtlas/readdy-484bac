@@ -163,9 +163,9 @@ serve(async (req) => {
 
     let query = adminSupabase
       .from('guards')
-      .select('id, full_name, email, location, user_id, preferred_venue_categories, home_latitude, home_longitude, max_distance_miles, willing_to_travel, default_search_radius_km')
+      .select('id, full_name, email, location, user_id, preferred_venue_categories, home_latitude, home_longitude, max_distance_miles, willing_to_travel, default_search_radius_km, sia_verified, sia_licence_number, sia_expiry_date, licence_types')
       .eq('is_active', true)
-      .eq('verification_status', 'approved')
+      .in('verification_status', ['approved', 'verified'])
       .eq('profile_completed', true);
 
     if (isDirectBooking) {
@@ -186,6 +186,43 @@ serve(async (req) => {
     }
 
     let guardsToNotify = matchingGuards;
+
+    if (job.sia_licence_required) {
+      const now = new Date();
+      guardsToNotify = guardsToNotify.filter((g) => {
+        if (!g.sia_verified || !g.sia_licence_number || !g.sia_expiry_date) return false;
+        const expiry = new Date(g.sia_expiry_date);
+        if (Number.isNaN(expiry.getTime()) || expiry < now) return false;
+        return true;
+      });
+    }
+
+    const PLAN_ACCESS: Record<string, number> = {
+      guard_starter: 0,
+      'guard-basic': 1,
+      'guard-pro': 2,
+      'guard-elite': 3,
+    };
+    const JOB_LEVEL: Record<string, number> = {
+      basic: 0,
+      professional: 1,
+      premium: 2,
+      elite: 3,
+    };
+    const jobAccessLevel = job.job_access_level || 'basic';
+    const requiredLevel = JOB_LEVEL[jobAccessLevel] ?? 0;
+
+    const eligibleByPlan: any[] = [];
+    for (const g of guardsToNotify) {
+      const { data: entitlement } = await adminSupabase
+        .from('user_entitlements_data')
+        .select('plan_slug')
+        .eq('user_id', g.user_id)
+        .maybeSingle();
+      const guardLevel = entitlement?.plan_slug ? (PLAN_ACCESS[entitlement.plan_slug] ?? 0) : -1;
+      if (guardLevel >= requiredLevel) eligibleByPlan.push(g);
+    }
+    guardsToNotify = eligibleByPlan;
 
     if (isDirectBooking && job.venue_category) {
       guardsToNotify = guardsToNotify.filter((g) => {
