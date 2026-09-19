@@ -52,6 +52,7 @@ interface JobWithSafety {
   required_license_type: string | null;
   assigned_count: number;
   applications_count: number;
+  payment_status: string | null;
   safety_check?: SafetyCheck;
 }
 
