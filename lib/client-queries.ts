@@ -89,7 +89,7 @@ export async function getClientJobs(
 
   const { data, error } = await query;
   if (error) return { jobs: [], error: error.message };
-  return { jobs: (data || []) as Job[], error: null };
+  return { jobs: (data || []) as unknown as Job[], error: null };
 }
 
 export async function getJobAssignments(jobIds: string[]): Promise<{ assignments: JobAssignment[]; error: string | null }> {
@@ -343,14 +343,14 @@ export async function getClientDashboardStats(clientId: string, userId: string):
   // Fetch jobs in one query
   const { data: jobsData, error: jobsError } = await supabase
     .from('jobs')
-    .select('id, status, start_date, start_time, created_at, updated_at, applications_count, assigned_count, hourly_rate, number_of_guards, risk_level, emergency_contact_name, emergency_contact_phone, sia_licence_required, lone_worker_flag, job_title, venue_city, postcode, payment_status, agreed_amount')
+    .select('id, status, start_date, start_time, created_at, updated_at, applications_count, assigned_count, hourly_rate, number_of_guards, risk_level, emergency_contact_name, emergency_contact_phone, sia_licence_required, lone_worker_flag, job_title, venue_city, venue_postcode, payment_status, agreed_amount')
     .eq('client_id', clientId)
     .eq('is_deleted', false)
     .order('created_at', { ascending: false });
 
   if (jobsError) return { stats: { total_jobs: 0, active_jobs: 0, completed_jobs: 0, pending_payments: 0 }, actionData: {}, error: jobsError.message };
 
-  const jobs = (jobsData || []) as Job[];
+  const jobs = (jobsData || []).map((j: any) => ({ ...j, postcode: j.venue_postcode })) as unknown as Job[];
   const jobIds = jobs.map(j => j.id);
 
   const stats: JobStat = {
