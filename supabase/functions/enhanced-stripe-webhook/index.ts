@@ -7,6 +7,61 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
 };
 
+const STALE_CLAIM_MINUTES = 10;
+
+async function acquireStripeEventClaim(appSupabase: any, event: { id: string; type: string }): Promise<{ acquired: boolean; token: string | null }> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const attemptToken = crypto.randomUUID();
+    const attemptNow = new Date().toISOString();
+    const { error: claimError } = await appSupabase
+      .from('processed_events')
+      .insert({ id: event.id, event_type: event.type, status: 'processing', claimed_at: attemptNow, claim_token: attemptToken, processed_at: attemptNow });
+
+    if (!claimError) return { acquired: true, token: attemptToken };
+    if (claimError.code !== '23505') throw new Error(`Failed to claim event ${event.id}: ${claimError.message}`);
+
+    const { data: existing, error: readError } = await appSupabase
+      .from('processed_events')
+      .select('status, claimed_at, claim_token')
+      .eq('id', event.id)
+      .maybeSingle();
+
+    if (readError) throw new Error(`Failed to inspect claim for event ${event.id}: ${readError.message}`);
+    if (!existing) continue;
+
+    if (existing.status === 'completed') {
+      console.log(`[EnhancedWebhook] Event ${event.id} already completed, idempotent`);
+      return { acquired: false, token: null };
+    }
+
+    const claimedAtMs = existing.claimed_at ? Date.parse(existing.claimed_at) : 0;
+    const staleThresholdMs = Date.now() - STALE_CLAIM_MINUTES * 60_000;
+    if (claimedAtMs && claimedAtMs > staleThresholdMs) {
+      console.log(`[EnhancedWebhook] Event ${event.id} is in-flight (fresh processing claim), idempotent`);
+      return { acquired: false, token: null };
+    }
+
+    const takeoverToken = crypto.randomUUID();
+    const takeoverNow = new Date().toISOString();
+    const { data: takenOver, error: takeoverError } = await appSupabase
+      .from('processed_events')
+      .update({ claim_token: takeoverToken, claimed_at: takeoverNow })
+      .eq('id', event.id)
+      .eq('status', 'processing')
+      .eq('claim_token', existing.claim_token)
+      .select('id');
+
+    if (takeoverError) throw new Error(`Failed to recover stale claim for event ${event.id}: ${takeoverError.message}`);
+    if (takenOver && takenOver.length > 0) {
+      console.log(`[EnhancedWebhook] Recovered abandoned processing claim for event ${event.id}`);
+      return { acquired: true, token: takeoverToken };
+    }
+    console.log(`[EnhancedWebhook] Lost stale-claim takeover race for event ${event.id}, idempotent`);
+    return { acquired: false, token: null };
+  }
+  return { acquired: false, token: null };
+}
+
 async function logPlanChange(appSupabase: any, userId: string, oldPlanSlug: string | null, newPlanSlug: string, oldPlanName: string | null, newPlanName: string, accountType: string, changeSource: string, prorationApplied: boolean, stripeSubId: string | null) {
   if (!oldPlanSlug || oldPlanSlug === newPlanSlug) return;
   await appSupabase.from('plan_change_history').insert({ user_id: userId, old_plan_slug: oldPlanSlug, new_plan_slug: newPlanSlug, old_plan_name: oldPlanName, new_plan_name: newPlanName, account_type: accountType, changed_by: 'system', change_source: changeSource, proration_applied: prorationApplied, stripe_subscription_id: stripeSubId });
@@ -201,15 +256,21 @@ serve(async (req) => {
   const signature = req.headers.get('stripe-signature');
   if (!signature) return new Response(JSON.stringify({ error: 'No signature' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
+  let heldClaimId: string | null = null;
+  let heldClaimToken: string | null = null;
+  let preserveClaimOnError = false;
+
   try {
     const body = await req.text();
     const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
     console.log(`[EnhancedWebhook] Received event: ${event.type} (${event.id})`);
 
-    const { data: already } = await appSupabase.from('processed_events').select('id').eq('id', event.id).maybeSingle();
-    if (already) {
+    const claim = await acquireStripeEventClaim(appSupabase, { id: event.id, type: event.type });
+    if (!claim.acquired || !claim.token) {
       return new Response(JSON.stringify({ received: true, idempotent: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
+    heldClaimId = event.id;
+    heldClaimToken = claim.token;
 
     switch (event.type) {
       case 'account.updated': {
@@ -671,10 +732,45 @@ serve(async (req) => {
       }
     }
 
-    await appSupabase.from('processed_events').insert({ id: event.id, event_type: event.type, processed_at: new Date().toISOString() });
+    const { data: completedRows, error: completeError } = await appSupabase
+      .from('processed_events')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', heldClaimId)
+      .eq('claim_token', heldClaimToken)
+      .select('id');
+
+    if (completeError || !completedRows || completedRows.length === 0) {
+      preserveClaimOnError = true;
+      throw new Error(`Payment-integrity error: failed to finalize processed_events claim for ${event.id}${completeError ? ` (${completeError.message})` : ''}`);
+    }
+
+    heldClaimId = null;
+    heldClaimToken = null;
+
     return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
   } catch (error: any) {
     console.error('[EnhancedWebhook] ERROR:', error);
+    if (heldClaimId && heldClaimToken) {
+      if (preserveClaimOnError) {
+        console.error(`[EnhancedWebhook] Claim ${heldClaimId} intentionally left in 'processing' (completion marker failed) to prevent duplicate re-execution; Stripe receives non-2xx`);
+      } else {
+        const { data: releasedRows, error: releaseError } = await appSupabase
+          .from('processed_events')
+          .delete()
+          .eq('id', heldClaimId)
+          .eq('claim_token', heldClaimToken)
+          .select('id');
+        if (releaseError) {
+          console.error(`[EnhancedWebhook] Failed to release processed_events claim ${heldClaimId}: ${releaseError.message}`);
+        } else if (!releasedRows || releasedRows.length === 0) {
+          console.error(`[EnhancedWebhook] Claim ${heldClaimId} no longer owned by this invocation; nothing released`);
+        } else {
+          console.log(`[EnhancedWebhook] Released processed_events claim ${heldClaimId} so Stripe can retry`);
+        }
+      }
+      heldClaimId = null;
+      heldClaimToken = null;
+    }
     return new Response(JSON.stringify({ error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 });
   }
 });
