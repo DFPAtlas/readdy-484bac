@@ -25,6 +25,7 @@ Deno.serve(async (req: Request) => {
     "fn_cleanup_email_queue",
     "fn_cleanup_notifications",
     "fn_cleanup_processed_stripe_events",
+    "fn_cleanup_processed_events",
   ];
 
   const results: Record<string, { status: string; error?: string }> = {};
