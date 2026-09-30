@@ -591,8 +591,10 @@ serve(async (req) => {
           payment_method: 'stripe',
           status: 'pending',
           stripe_session_id: session.id,
-          description: `Payment for job: ${jobData.job_title}`,
-          metadata: txMetadata,
+          metadata: {
+            ...txMetadata,
+            job_title: jobData.job_title,
+          },
           created_at: nowIso,
         });
       txWriteError = error;

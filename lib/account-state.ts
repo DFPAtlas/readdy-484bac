@@ -137,7 +137,7 @@ export async function resolveAccountState(): Promise<QuickGuardAccountState> {
       } else if (guardData?.is_active === false) {
         accountStatus = 'disabled'
         requiredNextStep = '/guard/account-status?reason=disabled'
-      } else if (subData?.status === 'suspended' || subData?.status === 'cancelled') {
+      } else if (subData?.status === 'suspended') {
         accountStatus = 'suspended'
         requiredNextStep = '/guard/account-status?reason=suspended'
       } else if (!onboardingComplete) {
@@ -172,7 +172,7 @@ export async function resolveAccountState(): Promise<QuickGuardAccountState> {
       } else if (clientData?.is_active === false || clientData?.is_suspended === true) {
         accountStatus = 'suspended'
         requiredNextStep = '/client/account-status?reason=suspended'
-      } else if (subData?.status === 'suspended' || subData?.status === 'cancelled') {
+      } else if (subData?.status === 'suspended') {
         accountStatus = 'suspended'
         requiredNextStep = '/client/account-status?reason=suspended'
       } else if (!onboardingComplete) {
