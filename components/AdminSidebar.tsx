@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -16,12 +17,30 @@ interface BadgeCounts {
   contactSubmissions: number;
 }
 
+interface NavItem {
+  href: string;
+  icon: string;
+  label: string;
+  badge?: ReactNode;
+}
+
+interface NavGroup {
+  label: string;
+  icon: string;
+  items: NavItem[];
+}
+
 export default function AdminSidebar() {
   const pathname = usePathname();
   const router = useSafeRouter();
+  const adminUser = useAdminAuth();
+
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    Overview: true,
+    People: true,
+  });
   const [badges, setBadges] = useState<BadgeCounts>({
     failedPayments: 0,
     guardVerifications: 0,
@@ -31,26 +50,17 @@ export default function AdminSidebar() {
     contactSubmissions: 0,
   });
 
-  const adminUser = useAdminAuth();
-
   useEffect(() => {
     async function loadBadges() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
-        await supabase.auth.setSession({
-          access_token: session.access_token,
-          refresh_token: session.refresh_token || '',
-        });
-
         const { data, error } = await supabase.functions.invoke('admin-security', {
           body: { action: 'dashboard_stats' },
         });
 
-        if (error) {
-          return;
-        }
+        if (error) return;
 
         setBadges({
           failedPayments: data.failedPayments ?? 0,
@@ -60,13 +70,12 @@ export default function AdminSidebar() {
           complaints: data.complaints ?? 0,
           contactSubmissions: data.contactSubmissions ?? 0,
         });
-      } catch (err) {
-        // silently fail
+      } catch {
+        // Sidebar badges are non-critical.
       }
     }
 
     loadBadges();
-
     const interval = setInterval(loadBadges, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -77,13 +86,15 @@ export default function AdminSidebar() {
     router.push('/admin/login');
   };
 
-  const isActive = (href: string) => pathname === href;
+  const isActive = (href: string) =>
+    pathname === href || (href !== '/admin/dashboard' && pathname.startsWith(`${href}/`));
 
   const Badge = ({ count, color = 'red' }: { count: number; color?: 'red' | 'yellow' }) => {
     if (count === 0) return null;
     const cls = color === 'red'
       ? 'bg-red-500 text-white'
       : 'bg-amber-400 text-slate-900';
+
     return (
       <span className={`ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full leading-none ${cls}`}>
         {count > 99 ? '99+' : count}
@@ -91,95 +102,130 @@ export default function AdminSidebar() {
     );
   };
 
-  const mainGroups = [
+  const groups = useMemo<NavGroup[]>(() => [
     {
       label: 'Overview',
+      icon: 'ri-dashboard-3-line',
       items: [
         { href: '/admin/dashboard', icon: 'ri-dashboard-3-line', label: 'Dashboard' },
-        { href: '/admin/live-test-checklist', icon: 'ri-rocket-2-line', label: 'Launch Readiness' },
-        { href: '/admin/security', icon: 'ri-shield-keyhole-line', label: 'Security' },
-        { href: '/admin/system-status', icon: 'ri-heart-pulse-line', label: 'System Status' },
-        { href: '/admin/activity-log', icon: 'ri-history-line', label: 'Activity Log' },
+        { href: '/admin/activity-log', icon: 'ri-history-line', label: 'Activity' },
+        { href: '/admin/live-test-checklist', icon: 'ri-flask-line', label: 'Launch & UAT' },
       ],
     },
     {
-      label: 'Users',
+      label: 'People',
+      icon: 'ri-team-line',
       items: [
-        { href: '/admin/user-provisioning', icon: 'ri-user-settings-line', label: 'User Provisioning' },
-        { href: '/company/dashboard', icon: 'ri-building-2-line', label: 'Company Portal' },
-        { href: '/admin/accounts', icon: 'ri-team-line', label: 'Client & Guard Mgmt' },
-        { href: '/admin/client-monitoring', icon: 'ri-dashboard-line', label: 'Client Monitoring' },
-        { href: '/admin/client-profiles', icon: 'ri-building-4-line', label: 'Client Profiles' },
-        { href: '/admin/guard-profiles', icon: 'ri-shield-user-line', label: 'Guard Profiles' },
-        { href: '/admin/guard-verifications', icon: 'ri-shield-check-line', label: 'Guard Verifications', badge: <Badge count={badges.guardVerifications} color="yellow" /> },
-        { href: '/admin/add-guard', icon: 'ri-user-add-line', label: 'Add Guard' },
-        { href: '/admin/sia-verifications', icon: 'ri-id-card-line', label: 'SIA Verifications', badge: <Badge count={badges.siaVerifications} color="yellow" /> },
-        { href: '/admin/reviews', icon: 'ri-star-line', label: 'Guard Reviews' },
-        { href: '/admin/qg-launch-rewards', icon: 'ri-token-swap-line', label: 'QG Launch Rewards' },
+        { href: '/admin/accounts', icon: 'ri-team-line', label: 'Accounts' },
+        {
+          href: '/admin/guard-verifications',
+          icon: 'ri-shield-check-line',
+          label: 'Verifications',
+          badge: <Badge count={badges.guardVerifications + badges.siaVerifications} color="yellow" />,
+        },
+        { href: '/admin/reviews', icon: 'ri-star-line', label: 'Reviews' },
+        { href: '/admin/user-provisioning', icon: 'ri-user-settings-line', label: 'Provisioning' },
       ],
     },
     {
       label: 'Jobs',
+      icon: 'ri-briefcase-line',
       items: [
-        { href: '/admin/jobs', icon: 'ri-briefcase-line', label: 'All Jobs' },
+        { href: '/admin/jobs', icon: 'ri-briefcase-line', label: 'Jobs & Bookings' },
       ],
     },
     {
       label: 'Payments',
+      icon: 'ri-money-pound-circle-line',
       items: [
-        { href: '/admin/payments-jobs', icon: 'ri-money-pound-circle-line', label: 'Payments & Jobs' },
-        { href: '/admin/payments', icon: 'ri-secure-payment-line', label: 'All Payments' },
-        { href: '/admin/payment-management', icon: 'ri-bank-card-line', label: 'Payment Settings' },
-        { href: '/admin/platform-finances', icon: 'ri-pie-chart-line', label: 'Platform Finances' },
-        { href: '/admin/failed-payments', icon: 'ri-error-warning-line', label: 'Failed Payments', badge: <Badge count={badges.failedPayments} color="red" /> },
-        { href: '/admin/held-payments', icon: 'ri-lock-2-line', label: 'Held Payments', badge: <Badge count={badges.heldPayments} color="yellow" /> },
-      ],
-    },
-  ];
-
-  const moreGroups = [
-    {
-      label: 'Portals',
-      items: [
-        { href: '/admin/wizard-fields', icon: 'ri-layout-masonry-line', label: 'Portal Editor' },
-        { href: '/client/dashboard', icon: 'ri-building-2-line', label: 'Client Portal' },
-        { href: '/guard/dashboard', icon: 'ri-shield-user-line', label: 'Guard Portal' },
+        { href: '/admin/payments', icon: 'ri-secure-payment-line', label: 'Payments' },
+        { href: '/admin/platform-finances', icon: 'ri-pie-chart-line', label: 'Finance' },
+        {
+          href: '/admin/failed-payments',
+          icon: 'ri-error-warning-line',
+          label: 'Exceptions',
+          badge: <Badge count={badges.failedPayments + badges.heldPayments} color="red" />,
+        },
       ],
     },
     {
       label: 'Subscriptions',
+      icon: 'ri-bank-card-line',
       items: [
-        { href: '/admin/plan-fee-rules', icon: 'ri-settings-3-line', label: 'Plan & Fee Rules' },
-        { href: '/admin/plan-change-history', icon: 'ri-history-line', label: 'Plan Change History' },
+        { href: '/admin/subscription-management', icon: 'ri-bank-card-line', label: 'Subscriptions' },
+        { href: '/admin/plan-fee-rules', icon: 'ri-settings-3-line', label: 'Plans & Fees' },
         { href: '/admin/subscription-analytics', icon: 'ri-bar-chart-line', label: 'Analytics' },
-        { href: '/admin/subscription-tracking', icon: 'ri-radar-line', label: 'Tracking' },
-        { href: '/admin/revenue-forecast', icon: 'ri-line-chart-line', label: 'Revenue Forecast' },
-        { href: '/admin/subscription-management', icon: 'ri-bank-card-line', label: 'Subscription Mgmt' },
       ],
     },
     {
-      label: 'Content',
+      label: 'Support',
+      icon: 'ri-customer-service-2-line',
       items: [
-        { href: '/admin/announcements', icon: 'ri-megaphone-line', label: 'Announcements' },
-        { href: '/admin/email-templates', icon: 'ri-mail-settings-line', label: 'Email Templates' },
-        { href: '/admin/email-health', icon: 'ri-mail-check-line', label: 'Email Health' },
-        { href: '/admin/social-media-content', icon: 'ri-share-line', label: 'Social Media' },
-        { href: '/admin/accessibility-feedback', icon: 'ri-wheelchair-line', label: 'Accessibility' },
-        { href: '/admin/contact-submissions', icon: 'ri-mail-send-line', label: 'Contact Submissions', badge: <Badge count={badges.contactSubmissions} color="yellow" /> },
-        { href: '/admin/lead-finder', icon: 'ri-radar-line', label: 'Lead Finder' },
-        { href: '/admin/leads', icon: 'ri-user-search-line', label: 'Leads' },
-        { href: '/admin/complaints', icon: 'ri-feedback-line', label: 'Complaints', badge: <Badge count={badges.complaints} color="red" /> },
+        { href: '/admin/support-tickets', icon: 'ri-customer-service-2-line', label: 'Support' },
+        {
+          href: '/admin/complaints',
+          icon: 'ri-feedback-line',
+          label: 'Complaints',
+          badge: <Badge count={badges.complaints} color="red" />,
+        },
       ],
     },
-  ];
+    {
+      label: 'Communications',
+      icon: 'ri-megaphone-line',
+      items: [
+        { href: '/admin/announcements', icon: 'ri-megaphone-line', label: 'Announcements' },
+        { href: '/admin/email-health', icon: 'ri-mail-check-line', label: 'Email Centre' },
+        {
+          href: '/admin/contact-submissions',
+          icon: 'ri-mail-send-line',
+          label: 'Contact Inbox',
+          badge: <Badge count={badges.contactSubmissions} color="yellow" />,
+        },
+      ],
+    },
+    {
+      label: 'Growth',
+      icon: 'ri-line-chart-line',
+      items: [
+        { href: '/admin/leads', icon: 'ri-user-search-line', label: 'Leads' },
+        { href: '/admin/promo-tiers', icon: 'ri-price-tag-3-line', label: 'Promotions' },
+        { href: '/admin/qg-launch-rewards', icon: 'ri-token-swap-line', label: 'Launch Rewards' },
+      ],
+    },
+    {
+      label: 'System',
+      icon: 'ri-settings-4-line',
+      items: [
+        { href: '/admin/system-status', icon: 'ri-heart-pulse-line', label: 'System Health' },
+        { href: '/admin/security', icon: 'ri-shield-keyhole-line', label: 'Security' },
+        { href: '/admin/stripe-sync', icon: 'ri-bank-card-2-line', label: 'Stripe' },
+        { href: '/admin/agents', icon: 'ri-robot-2-line', label: 'Agents' },
+        { href: '/admin/wizard-fields', icon: 'ri-layout-masonry-line', label: 'Portal Config' },
+        { href: '/admin/settings', icon: 'ri-settings-3-line', label: 'Settings' },
+      ],
+    },
+  ], [badges]);
 
-  const moreBadgeCount = badges.contactSubmissions + badges.complaints;
+  useEffect(() => {
+    const activeGroup = groups.find(group => group.items.some(item => isActive(item.href)));
+    if (!activeGroup) return;
+    setOpenGroups(prev => ({ ...prev, [activeGroup.label]: true }));
+  }, [pathname, groups]);
+
+  const toggleGroup = (label: string) => {
+    setOpenGroups(prev => ({ ...prev, [label]: !prev[label] }));
+  };
 
   const sidebarContent = (
     <>
       <div className={`flex items-center justify-between px-5 py-5 ${collapsed ? 'justify-center px-3 py-4' : ''}`}>
         {!collapsed && (
-          <Link href="/admin/dashboard" prefetch={false} className="text-2xl font-[family-name:var(--font-pacifico)] text-white whitespace-nowrap tracking-tight">
+          <Link
+            href="/admin/dashboard"
+            prefetch={false}
+            className="text-2xl font-[family-name:var(--font-pacifico)] text-white whitespace-nowrap tracking-tight"
+          >
             QuickGuard
           </Link>
         )}
@@ -192,159 +238,94 @@ export default function AdminSidebar() {
         </button>
       </div>
 
-      <nav data-sidebar-scroll className="flex-1 overflow-y-auto py-2 px-3 space-y-5">
-        {mainGroups.map((group) => (
-          <div key={group.label}>
-            {!collapsed && (
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-1.5">
-                {group.label}
-              </p>
-            )}
-            <ul className="space-y-0.5">
-              {group.items.map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    prefetch={false}
-                    title={collapsed ? item.label : undefined}
-                    onClick={() => setMobileOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer whitespace-nowrap outline-none ${
-                      isActive(item.href)
-                        ? 'bg-teal-500/10 text-teal-400 shadow-sm ring-1 ring-teal-500/20'
-                        : 'text-slate-400 hover:bg-[#1a2b4a] hover:text-white'
-                    } ${collapsed ? 'justify-center' : ''}`}
-                  >
-                    <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 relative">
-                      <i className={`${item.icon} text-base ${isActive(item.href) ? 'text-teal-400' : ''}`}></i>
-                      {collapsed && 'badge' in item && item.badge && (
-                        <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#0B1933]"></span>
-                      )}
-                    </div>
-                    {!collapsed && <span className="flex-1">{item.label}</span>}
-                    {!collapsed && 'badge' in item && item.badge}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+      <nav data-sidebar-scroll className="flex-1 overflow-y-auto py-2 px-3 space-y-1.5">
+        {groups.map((group) => {
+          const groupActive = group.items.some(item => isActive(item.href));
+          const open = openGroups[group.label] || groupActive;
 
-        {/* More toggle */}
-        <div>
-          <button
-            onClick={() => setMoreOpen(!moreOpen)}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer whitespace-nowrap w-full ${
-              moreOpen
-                ? 'text-teal-400 bg-teal-500/5'
-                : 'text-slate-400 hover:bg-[#1a2b4a] hover:text-white'
-            } ${collapsed ? 'justify-center' : ''}`}
-          >
-            <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 relative">
-              <i className="ri-more-2-line text-base"></i>
-              {collapsed && moreBadgeCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#0B1933]"></span>
+          if (collapsed) {
+            const primary = group.items[0];
+            return (
+              <Link
+                key={group.label}
+                href={primary.href}
+                prefetch={false}
+                title={group.label}
+                onClick={() => setMobileOpen(false)}
+                className={`flex items-center justify-center px-3 py-2.5 rounded-xl transition-all cursor-pointer outline-none ${groupActive
+                  ? 'bg-teal-500/10 text-teal-400 shadow-sm ring-1 ring-teal-500/20'
+                  : 'text-slate-400 hover:bg-[#1a2b4a] hover:text-white'}`}
+              >
+                <div className="w-5 h-5 flex items-center justify-center">
+                  <i className={`${group.icon} text-base`}></i>
+                </div>
+              </Link>
+            );
+          }
+
+          return (
+            <div key={group.label} className="rounded-xl">
+              <button
+                onClick={() => toggleGroup(group.label)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${groupActive
+                  ? 'text-teal-300 bg-teal-500/5'
+                  : 'text-slate-300 hover:bg-[#1a2b4a] hover:text-white'}`}
+              >
+                <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                  <i className={`${group.icon} text-base`}></i>
+                </div>
+                <span className="flex-1 text-left">{group.label}</span>
+                <div className="w-4 h-4 flex items-center justify-center">
+                  <i className={`${open ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} text-sm text-slate-500`}></i>
+                </div>
+              </button>
+
+              {open && (
+                <ul className="mt-1 ml-3 pl-3 border-l border-[#1a2b4a] space-y-0.5">
+                  {group.items.map(item => (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        prefetch={false}
+                        onClick={() => setMobileOpen(false)}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer whitespace-nowrap outline-none ${isActive(item.href)
+                          ? 'bg-teal-500/10 text-teal-400'
+                          : 'text-slate-500 hover:bg-[#1a2b4a] hover:text-slate-200'}`}
+                      >
+                        <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                          <i className={`${item.icon} text-sm`}></i>
+                        </div>
+                        <span className="flex-1">{item.label}</span>
+                        {item.badge}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
-            {!collapsed && (
-              <>
-                <span className="flex-1">More</span>
-                {moreBadgeCount > 0 && (
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full leading-none bg-amber-400 text-slate-900">
-                    {moreBadgeCount > 99 ? '99+' : moreBadgeCount}
-                  </span>
-                )}
-                <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
-                  <i className={`${moreOpen ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} text-sm text-slate-500`}></i>
-                </div>
-              </>
-            )}
-          </button>
-          {moreOpen && (
-            <div className="mt-2 space-y-5">
-              {moreGroups.map((group) => (
-                <div key={group.label}>
-                  {!collapsed && (
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-1.5">
-                      {group.label}
-                    </p>
-                  )}
-                  <ul className="space-y-0.5">
-                    {group.items.map((item) => (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          prefetch={false}
-                          title={collapsed ? item.label : undefined}
-                          onClick={() => setMobileOpen(false)}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer whitespace-nowrap outline-none ${
-                            isActive(item.href)
-                              ? 'bg-teal-500/10 text-teal-400 shadow-sm ring-1 ring-teal-500/20'
-                              : 'text-slate-400 hover:bg-[#1a2b4a] hover:text-white'
-                          } ${collapsed ? 'justify-center' : ''}`}
-                        >
-                          <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 relative">
-                            <i className={`${item.icon} text-base ${isActive(item.href) ? 'text-teal-400' : ''}`}></i>
-                            {collapsed && 'badge' in item && item.badge && (
-                              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#0B1933]"></span>
-                            )}
-                          </div>
-                          {!collapsed && <span className="flex-1">{item.label}</span>}
-                          {!collapsed && 'badge' in item && item.badge}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+          );
+        })}
 
-        {/* Admin & Settings */}
-        <div>
+        <div className="pt-3 mt-3 border-t border-[#1a2b4a]">
           {!collapsed && (
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-1.5">
+            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest px-3 mb-1.5">
               Admin
             </p>
           )}
-          <ul className="space-y-0.5">
-            <li>
-              <Link
-                href="/admin/account"
-                prefetch={false}
-                title={collapsed ? 'My Account' : undefined}
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer whitespace-nowrap outline-none ${
-                  isActive('/admin/account')
-                    ? 'bg-teal-500/10 text-teal-400 shadow-sm ring-1 ring-teal-500/20'
-                    : 'text-slate-400 hover:bg-[#1a2b4a] hover:text-white'
-                } ${collapsed ? 'justify-center' : ''}`}
-              >
-                <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                  <i className={`ri-user-settings-line text-base ${isActive('/admin/account') ? 'text-teal-400' : ''}`}></i>
-                </div>
-                {!collapsed && <span>My Account</span>}
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/admin/settings"
-                prefetch={false}
-                title={collapsed ? 'Site Settings' : undefined}
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer whitespace-nowrap outline-none ${
-                  isActive('/admin/settings')
-                    ? 'bg-teal-500/10 text-teal-400 shadow-sm ring-1 ring-teal-500/20'
-                    : 'text-slate-400 hover:bg-[#1a2b4a] hover:text-white'
-                } ${collapsed ? 'justify-center' : ''}`}
-              >
-                <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                  <i className={`ri-settings-3-line text-base ${isActive('/admin/settings') ? 'text-teal-400' : ''}`}></i>
-                </div>
-                {!collapsed && <span>Site Settings</span>}
-              </Link>
-            </li>
-          </ul>
+          <Link
+            href="/admin/account"
+            prefetch={false}
+            title={collapsed ? 'My Account' : undefined}
+            onClick={() => setMobileOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer whitespace-nowrap outline-none ${isActive('/admin/account')
+              ? 'bg-teal-500/10 text-teal-400'
+              : 'text-slate-400 hover:bg-[#1a2b4a] hover:text-white'} ${collapsed ? 'justify-center' : ''}`}
+          >
+            <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+              <i className="ri-user-settings-line text-base"></i>
+            </div>
+            {!collapsed && <span>My Account</span>}
+          </Link>
         </div>
       </nav>
 
@@ -357,13 +338,12 @@ export default function AdminSidebar() {
               </div>
               <p className="text-sm font-semibold text-white truncate">{adminUser.name || 'Admin'}</p>
               {adminUser.role && (
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${
-                  adminUser.role === 'super_admin'
-                    ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
-                    : adminUser.role === 'finance_admin'
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${adminUser.role === 'super_admin'
+                  ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
+                  : adminUser.role === 'finance_admin'
                     ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                    : 'bg-[#1a2b4a] text-slate-400 border border-[#1a2b4a]'
-                }`}>
+                    : 'bg-[#1a2b4a] text-slate-400 border border-[#1a2b4a]'}`}
+                >
                   {adminUser.role === 'super_admin' ? 'Super Admin' : adminUser.role === 'finance_admin' ? 'Finance Admin' : 'Admin'}
                 </span>
               )}
@@ -371,6 +351,7 @@ export default function AdminSidebar() {
             <p className="text-xs text-slate-500 truncate pl-9">{adminUser.email}</p>
           </div>
         )}
+
         <button
           onClick={handleLogout}
           title={collapsed ? 'Logout' : undefined}
@@ -387,7 +368,6 @@ export default function AdminSidebar() {
 
   return (
     <>
-      {/* Mobile hamburger */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
         className="lg:hidden fixed top-4 left-4 z-50 w-10 h-10 flex items-center justify-center rounded-xl bg-[#111d35] shadow-lg border border-[#1a2b4a] text-white cursor-pointer"
@@ -396,7 +376,6 @@ export default function AdminSidebar() {
         <i className={`${mobileOpen ? 'ri-close-line' : 'ri-menu-3-line'} text-xl`}></i>
       </button>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
@@ -404,16 +383,13 @@ export default function AdminSidebar() {
         />
       )}
 
-      {/* Sidebar */}
       <aside
-        className={`flex flex-col bg-[#0B1933] transition-all duration-300 min-h-screen sticky top-0 border-r border-[#1a2b4a] shadow-sm ${
-          collapsed ? 'w-[4.5rem]' : 'w-64'
-        } ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:relative z-50`}
+        className={`flex flex-col bg-[#0B1933] transition-all duration-300 min-h-screen sticky top-0 border-r border-[#1a2b4a] shadow-sm ${collapsed ? 'w-[4.5rem]' : 'w-64'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:relative z-50`}
         style={{ flexShrink: 0 }}
       >
         {sidebarContent}
       </aside>
-      {/* Scrollbar styles */}
+
       <style>{`
         [data-sidebar-scroll] {
           scrollbar-width: thin;
