@@ -47,7 +47,11 @@ function GuardCompleteProfileWizardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mountedRef = useRef(true);
-  const [currentStep, setCurrentStep] = useState(1);
+  const initialStep = (() => {
+    const raw = parseInt(searchParams.get('step') || '', 10);
+    return Number.isFinite(raw) && raw >= 1 && raw <= WIZARD_STEPS.length ? raw : 1;
+  })();
+  const [currentStep, setCurrentStep] = useState(initialStep);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');

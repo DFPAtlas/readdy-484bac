@@ -1,6 +1,7 @@
 'use client';
 
 import { GuardVerification, getSiaCheckStatusBadge } from './types';
+import SiaRegisterCheckPanel from './SiaRegisterCheckPanel';
 
 interface SIALicenseSectionProps {
   guard: GuardVerification;
@@ -72,6 +73,8 @@ export default function SIALicenseSection({ guard, hasLicenceImages, onViewLicen
           )}
         </div>
       )}
+
+      <SiaRegisterCheckPanel guard={guard} />
 
       {hasLicenceImages && (
         <button

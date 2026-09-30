@@ -40,6 +40,7 @@ interface Stats {
   totalRejected: number;
   totalExpired: number;
   expiringIn30Days: number;
+  needsReview: number;
 }
 
 const PAGE_SIZE = 10;
@@ -50,11 +51,11 @@ export default function SIAVerificationsClient() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'verified' | 'rejected' | 'expired'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'verified' | 'rejected' | 'expired' | 'needs_review'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'expiry'>('date');
-  const [stats, setStats] = useState<Stats>({ totalPending: 0, totalVerified: 0, totalRejected: 0, totalExpired: 0, expiringIn30Days: 0 });
+  const [stats, setStats] = useState<Stats>({ totalPending: 0, totalVerified: 0, totalRejected: 0, totalExpired: 0, expiringIn30Days: 0, needsReview: 0 });
   const [retriggering, setRetriggering] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [selectedCardUser, setSelectedCardUser] = useState<VerificationEntry | null>(null);
@@ -555,6 +556,7 @@ export default function SIAVerificationsClient() {
             { key: 'verified', label: 'Verified', icon: 'ri-checkbox-circle-line', count: stats.totalVerified },
             { key: 'rejected', label: 'Rejected', icon: 'ri-close-circle-line', count: stats.totalRejected },
             { key: 'expired', label: 'Expired', icon: 'ri-error-warning-line', count: stats.totalExpired },
+            { key: 'needs_review', label: 'Needs review', icon: 'ri-alert-line', count: stats.needsReview },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -589,7 +591,7 @@ export default function SIAVerificationsClient() {
             <i className="ri-file-search-line text-3xl"></i>
           </div>
           <h3 className="text-lg font-bold text-white mb-1">{error ? 'Failed to Load' : 'No Results Found'}</h3>
-          <p className="text-sm text-slate-400">{searchTerm ? `No users found matching "${searchTerm}"` : `No ${filter === 'all' ? '' : filter} verifications found`}</p>
+          <p className="text-sm text-slate-400">{searchTerm ? `No users found matching "${searchTerm}"` : `No ${filter === 'all' ? '' : filter.replace('_', ' ') + ' '}verifications found`}</p>
         </div>
       ) : (
         <>

@@ -28,6 +28,32 @@ function mapGuardStatus(status: string): string {
   }
 }
 
+async function getLatestChecksByGuard(supabase: any) {
+  const { data: checks } = await supabase
+    .from("sia_checks")
+    .select("subject_id, decision, status, created_at")
+    .eq("subject_type", "guard")
+    .order("created_at", { ascending: false });
+
+  const latest: Record<string, any> = {};
+  (checks || []).forEach((c: any) => {
+    if (c.subject_id && !latest[c.subject_id]) latest[c.subject_id] = c;
+  });
+  return latest;
+}
+
+function isNeedsReviewCheck(check: any): boolean {
+  if (!check) return false;
+  const decision = String(check.decision || "").toLowerCase();
+  const status = String(check.status || "").toLowerCase();
+  return decision === "review" || decision === "error" || status === "error" || status === "failed";
+}
+
+async function getNeedsReviewGuardIds(supabase: any): Promise<string[]> {
+  const latest = await getLatestChecksByGuard(supabase);
+  return Object.keys(latest).filter((id) => isNeedsReviewCheck(latest[id]));
+}
+
 async function computeStats(supabase: any) {
   const now = new Date();
   const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -48,12 +74,24 @@ async function computeStats(supabase: any) {
     supabase.from("guards").select("*", { count: "exact", head: true }).not("sia_licence_number", "is", null).gte("sia_scraped_expiry_date", nowIso).lte("sia_scraped_expiry_date", thirtyDaysIso),
   ]);
 
+  const needsReviewIds = await getNeedsReviewGuardIds(supabase);
+  let needsReview = 0;
+  if (needsReviewIds.length > 0) {
+    const { count } = await supabase
+      .from("guards")
+      .select("*", { count: "exact", head: true })
+      .eq("verification_status", "manual_review")
+      .in("id", needsReviewIds);
+    needsReview = count || 0;
+  }
+
   return {
     totalPending: totalPending || 0,
     totalVerified: totalVerified || 0,
     totalRejected: totalRejected || 0,
     totalExpired: totalExpired || 0,
     expiringIn30Days: expiringIn30Days || 0,
+    needsReview,
   };
 }
 
@@ -64,7 +102,9 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: "app" } });
+  const authClient = createClient(supabaseUrl, supabaseAnonKey);
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
@@ -74,7 +114,7 @@ Deno.serve(async (req) => {
   }
 
   const jwt = authHeader.replace("Bearer ", "");
-  const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
+  const { data: { user }, error: authError } = await authClient.auth.getUser(jwt);
   if (authError || !user) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -119,6 +159,11 @@ Deno.serve(async (req) => {
         guardQuery = guardQuery.eq("verification_status", "rejected");
       } else if (filter === "expired") {
         guardQuery = guardQuery.eq("sia_scraped_status", "expired");
+      } else if (filter === "needs_review") {
+        const reviewIds = await getNeedsReviewGuardIds(supabase);
+        guardQuery = guardQuery
+          .eq("verification_status", "manual_review")
+          .in("id", reviewIds.length > 0 ? reviewIds : ["00000000-0000-0000-0000-000000000000"]);
       }
 
       const isLicenceSearch = /^\d+$/.test(search.trim());

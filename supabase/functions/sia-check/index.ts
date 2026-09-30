@@ -22,6 +22,29 @@ function decodeJwtPayload(jwt: string): any {
   }
 }
 
+function deriveNames(guard: {
+  first_name?: string | null;
+  last_name?: string | null;
+  full_name?: string | null;
+}): { firstName: string | null; surname: string | null } {
+  const firstRaw = (guard.first_name ?? "").toString().trim();
+  const lastRaw = (guard.last_name ?? "").toString().trim();
+
+  if (firstRaw || lastRaw) {
+    return { firstName: firstRaw || null, surname: lastRaw || null };
+  }
+
+  const full = (guard.full_name ?? "").toString().trim();
+  if (!full) return { firstName: null, surname: null };
+
+  const parts = full.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: null, surname: null };
+
+  const surname = parts[parts.length - 1];
+  const firstName = parts.slice(0, -1).join(" ") || null;
+  return { firstName, surname };
+}
+
 async function createAdminNotification(
   supabase: any,
   title: string,
@@ -82,8 +105,6 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const n8nWebhookUrl = Deno.env.get("N8N_SIA_CHECK_WEBHOOK_URL");
-  const n8nApiKey = Deno.env.get("N8N_SIA_CHECK_API_KEY");
 
   if (!supabaseUrl || !supabaseServiceKey) {
     return new Response(
@@ -215,21 +236,21 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
     const checkedBy = isAdminTrigger ? "admin" : isSelfTrigger ? "self" : "system";
-    const webhookConfigured = !!n8nWebhookUrl && !!n8nApiKey;
+    const reason = isAdminTrigger ? "manual" : "onboarding";
 
     await supabase.from("admin_activity_log").insert({
       action_type: "sia_check_performed",
       action_description: `SIA check started for guard: ${guard.full_name}${checkedBy === 'self' ? ' (self-triggered)' : checkedBy === 'admin' ? ' (admin-triggered)' : ''}`,
       target_type: "guard",
       target_name: guard.full_name,
-      metadata: { guardId: guard_id, sia_licence_number, triggeredBy: checkedBy, webhookConfigured },
+      metadata: { guardId: guard_id, sia_licence_number, triggeredBy: checkedBy, reason },
       created_at: now,
     }).catch(() => {});
 
     await supabase.from("guard_verification_audit").insert({
       guard_id,
       action: "sia_check_started",
-      raw_result_json: { source: checkedBy, sia_licence_number, webhook_configured: webhookConfigured },
+      raw_result_json: { source: checkedBy, sia_licence_number, reason },
       created_at: now,
     }).catch(() => {});
 
@@ -242,25 +263,23 @@ Deno.serve(async (req) => {
       updated_at: now,
     }).eq("id", guard_id);
 
-    if (!n8nWebhookUrl || !n8nApiKey) {
-      const missingConfig = !n8nWebhookUrl ? "N8N_SIA_CHECK_WEBHOOK_URL" : "N8N_SIA_CHECK_API_KEY";
-      const reason = !n8nWebhookUrl ? "webhook_missing" : "auth_key_missing";
-      console.log(`WARNING: ${missingConfig} is not configured. Falling back to manual_review.`);
+    const cleanedLicence = String(sia_licence_number).replace(/\s+/g, "");
 
+    if (!/^\d{16}$/.test(cleanedLicence)) {
       await supabase.from("guards").update({
         verification_status: "manual_review",
         is_active: false,
         dashboard_access: false,
-        sia_check_status: reason,
+        sia_check_status: "invalid_licence_format",
         updated_at: new Date().toISOString(),
       }).eq("id", guard_id);
 
       await supabase.from("admin_activity_log").insert({
         action_type: "sia_check_fallback",
-        action_description: `SIA check ${missingConfig} NOT CONFIGURED for guard: ${guard.full_name}. Set to manual review.`,
+        action_description: `SIA check skipped for guard: ${guard.full_name}. Invalid licence format (${cleanedLicence.length} digits).`,
         target_type: "guard",
         target_name: guard.full_name,
-        metadata: { guardId: guard_id, reason },
+        metadata: { guardId: guard_id, reason: "invalid_licence_format", cleanedLicence },
         created_at: new Date().toISOString(),
       }).catch(() => {});
 
@@ -269,236 +288,138 @@ Deno.serve(async (req) => {
         user_id: guard.user_id,
         sia_licence_number,
         status: "manual_review",
-        result: reason,
+        result: "invalid_licence_format",
         webhook_configured: false,
         webhook_response_code: null,
-        error_message: `${missingConfig} is not configured`,
+        error_message: "Licence number is not exactly 16 digits",
         checked_at: now,
         checked_by: checkedBy,
       });
 
       await createAdminNotification(
         supabase,
-        "SIA Webhook Missing - Manual Review Required",
-        `Guard ${guard.full_name} (${guard.sia_licence_number}) requires manual SIA verification. ${missingConfig} is not configured.`,
-        { guard_id, reason, sia_licence_number }
+        "SIA Licence Format Invalid - Manual Review Required",
+        `Guard ${guard.full_name} (${sia_licence_number}) has an invalid SIA licence format and requires manual verification.`,
+        { guard_id, reason: "invalid_licence_format", sia_licence_number }
       );
 
       return new Response(
         JSON.stringify({
           guard_id,
           verification_status: "manual_review",
-          sia_check_status: reason,
-          message: "SIA check configuration is incomplete. Your application requires manual admin review.",
+          sia_check_status: "invalid_licence_format",
+          message: "SIA licence format is invalid. Your application requires manual admin review.",
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    let n8nResult: any = null;
-    let webhookResponseCode: number | null = null;
-    let webhookErrorMessage: string | null = null;
+    const { data: existingCheck } = await supabase
+      .from("sia_checks")
+      .select("id")
+      .eq("subject_type", "guard")
+      .eq("subject_id", guard_id)
+      .in("status", ["pending", "processing"])
+      .limit(1)
+      .maybeSingle();
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-      const n8nResponse = await fetch(n8nWebhookUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${n8nApiKey}`,
-        },
-        body: JSON.stringify({
-          guard_id,
-          sia_licence_number,
-          full_name: guard.full_name,
-        }),
-        signal: controller.signal,
+    if (existingCheck) {
+      await logSiaVerification(supabase, {
+        guard_id,
+        user_id: guard.user_id,
+        sia_licence_number,
+        status: "pending",
+        result: "already_queued",
+        webhook_configured: false,
+        webhook_response_code: null,
+        error_message: null,
+        checked_at: now,
+        checked_by: checkedBy,
       });
 
-      clearTimeout(timeoutId);
-      webhookResponseCode = n8nResponse.status;
+      return new Response(
+        JSON.stringify({
+          guard_id,
+          verification_status: "pending_sia_check",
+          message: "SIA check already queued",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-      if (n8nResponse.ok) {
-        n8nResult = await n8nResponse.json();
-        console.log("n8n response:", JSON.stringify(n8nResult));
-      } else if (n8nResponse.status === 401 || n8nResponse.status === 403) {
-        webhookErrorMessage = `n8n webhook rejected authentication (status ${n8nResponse.status})`;
-        console.error(webhookErrorMessage);
-      } else {
-        webhookErrorMessage = `n8n webhook returned status ${n8nResponse.status}`;
-        console.error(webhookErrorMessage);
-        try {
-          const errorBody = await n8nResponse.text();
-          webhookErrorMessage += `: ${errorBody}`;
-        } catch {}
-      }
-    } catch (fetchError: any) {
-      webhookErrorMessage = fetchError.name === "AbortError"
-        ? "n8n webhook request timed out after 30 seconds"
-        : `n8n webhook fetch error: ${fetchError.message}`;
-      console.error(webhookErrorMessage);
+    const { firstName, surname } = deriveNames(guard);
 
-      await supabase.from("guard_verification_audit").insert({
-        guard_id,
-        action: "sia_check_webhook_error",
-        raw_result_json: { error: webhookErrorMessage, sia_licence_number },
-        created_at: now,
-      }).catch(() => {});
+    const { error: insertError } = await supabase
+      .from("sia_checks")
+      .insert({
+        subject_type: "guard",
+        subject_id: guard_id,
+        licence_number: cleanedLicence,
+        expected_first_name: firstName,
+        expected_surname: surname,
+        reason,
+      });
+
+    if (insertError) {
+      console.error("Failed to queue SIA check:", insertError);
 
       await supabase.from("guards").update({
         verification_status: "manual_review",
         is_active: false,
         dashboard_access: false,
-        sia_check_status: "webhook_error",
+        sia_check_status: "queue_error",
         updated_at: new Date().toISOString(),
       }).eq("id", guard_id);
+
+      await supabase.from("admin_activity_log").insert({
+        action_type: "sia_check_fallback",
+        action_description: `SIA check could not be queued for guard: ${guard.full_name}. Set to manual review.`,
+        target_type: "guard",
+        target_name: guard.full_name,
+        metadata: { guardId: guard_id, reason: "queue_error", error: insertError.message },
+        created_at: new Date().toISOString(),
+      }).catch(() => {});
 
       await logSiaVerification(supabase, {
         guard_id,
         user_id: guard.user_id,
         sia_licence_number,
         status: "manual_review",
-        result: "webhook_error",
-        webhook_configured: true,
-        webhook_response_code: webhookResponseCode,
-        error_message: webhookErrorMessage,
+        result: "queue_error",
+        webhook_configured: false,
+        webhook_response_code: null,
+        error_message: insertError.message,
         checked_at: now,
         checked_by: checkedBy,
       });
 
       await createAdminNotification(
         supabase,
-        "SIA Webhook Error - Manual Review Required",
-        `Guard ${guard.full_name} (${guard.sia_licence_number}) SIA check failed. Webhook error: ${webhookErrorMessage}`,
-        { guard_id, reason: "webhook_error", sia_licence_number, error: webhookErrorMessage }
+        "SIA Check Queue Error - Manual Review Required",
+        `Guard ${guard.full_name} (${guard.sia_licence_number}) SIA check could not be queued. Error: ${insertError.message}`,
+        { guard_id, reason: "queue_error", sia_licence_number }
       );
 
       return new Response(
         JSON.stringify({
           guard_id,
           verification_status: "manual_review",
-          sia_check_status: "webhook_error",
-          message: "SIA check encountered an error. Your application requires manual admin review.",
-          error: webhookErrorMessage,
+          sia_check_status: "queue_error",
+          message: "SIA check could not be queued. Your application requires manual admin review.",
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    if (n8nResult) {
-      const siaCheckStatus = n8nResult.verification_status === "verified"
-        ? "passed"
-        : n8nResult.verification_status === "rejected"
-        ? "failed"
-        : "pending";
-
-      await supabase.from("guard_verification_audit").insert({
-        guard_id,
-        action: "sia_check_completed",
-        result: n8nResult.verification_status,
-        confidence_score: n8nResult.confidence_score,
-        mismatch_reason: n8nResult.mismatch_reason,
-        raw_result_json: n8nResult,
-        created_at: now,
-      }).catch(() => {});
-
-      const updatePayload: any = {
-        sia_scraped_name: n8nResult.scraped_name || null,
-        sia_scraped_status: n8nResult.scraped_status || null,
-        sia_scraped_expiry_date: n8nResult.scraped_expiry_date || null,
-        sia_confidence_score: n8nResult.confidence_score || null,
-        sia_mismatch_reason: n8nResult.mismatch_reason || null,
-        sia_check_status: siaCheckStatus,
-        sia_raw_result_json: n8nResult,
-        sia_checked_at: now,
-        updated_at: now,
-      };
-
-      if (n8nResult.verification_status === "verified") {
-        updatePayload.verification_status = "approved";
-        updatePayload.is_active = true;
-        updatePayload.sia_verified = true;
-        updatePayload.dashboard_access = true;
-        updatePayload.verified_at = now;
-      } else if (n8nResult.verification_status === "rejected") {
-        updatePayload.verification_status = "rejected";
-        updatePayload.is_active = false;
-        updatePayload.sia_verified = false;
-        updatePayload.dashboard_access = false;
-        updatePayload.rejected_at = now;
-        updatePayload.rejection_reason = n8nResult.rejection_reason || "SIA licence could not be verified";
-      } else {
-        updatePayload.verification_status = "manual_review";
-        updatePayload.is_active = false;
-        updatePayload.dashboard_access = false;
-      }
-
-      await supabase.from("guards").update(updatePayload).eq("id", guard_id);
-
-      await logSiaVerification(supabase, {
-        guard_id,
-        user_id: guard.user_id,
-        sia_licence_number,
-        status: updatePayload.verification_status,
-        result: JSON.stringify(n8nResult),
-        webhook_configured: true,
-        webhook_response_code: webhookResponseCode,
-        error_message: null,
-        checked_at: now,
-        checked_by: checkedBy,
-      });
-
-      if (n8nResult.verification_status === "verified" || n8nResult.verification_status === "rejected") {
-        const logAction = n8nResult.verification_status === "verified" ? "guard_auto_verified" : "guard_auto_rejected";
-        await supabase.from("admin_activity_log").insert({
-          action_type: logAction,
-          action_description: `Auto-${n8nResult.verification_status === "verified" ? "approved" : "rejected"} guard: ${guard.full_name} via n8n SIA check (${checkedBy}-triggered)`,
-          target_type: "guard",
-          target_name: guard.full_name,
-          metadata: { guardId: guard_id, confidence: n8nResult.confidence_score, triggeredBy: checkedBy },
-          created_at: now,
-        }).catch(() => {});
-      }
-
-      return new Response(
-        JSON.stringify({
-          guard_id,
-          verification_status: updatePayload.verification_status,
-          sia_check_status: siaCheckStatus,
-          sia_scraped_name: n8nResult.scraped_name,
-          sia_scraped_status: n8nResult.scraped_status,
-          confidence_score: n8nResult.confidence_score,
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    await supabase.from("guards").update({
-      verification_status: "manual_review",
-      is_active: false,
-      dashboard_access: false,
-      sia_check_status: "webhook_error",
-      updated_at: new Date().toISOString(),
-    }).eq("id", guard_id);
-
-    await supabase.from("guard_verification_audit").insert({
-      guard_id,
-      action: "sia_check_failed",
-      raw_result_json: { error: webhookErrorMessage || "n8n webhook returned no result", sia_licence_number },
-      created_at: now,
-    }).catch(() => {});
 
     await logSiaVerification(supabase, {
       guard_id,
       user_id: guard.user_id,
       sia_licence_number,
-      status: "manual_review",
-      result: "no_result",
-      webhook_configured: true,
-      webhook_response_code: webhookResponseCode,
-      error_message: webhookErrorMessage || "n8n webhook returned no parseable result",
+      status: "pending",
+      result: "SIA check queued",
+      webhook_configured: false,
+      webhook_response_code: null,
+      error_message: null,
       checked_at: now,
       checked_by: checkedBy,
     });
@@ -506,9 +427,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         guard_id,
-        verification_status: "manual_review",
-        sia_check_status: "webhook_error",
-        message: "SIA check webhook did not return a usable result. Set to manual review.",
+        verification_status: "pending_sia_check",
+        message: "SIA check queued",
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
