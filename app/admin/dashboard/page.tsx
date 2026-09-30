@@ -9,6 +9,8 @@ import DashboardActivity, { ActivityItem } from './DashboardActivity';
 import DashboardQuickActions from './DashboardQuickActions';
 import StripeConnectHealth from './StripeConnectHealth';
 import LiveIndicator from '@/components/LiveIndicator';
+import AdminPageShell from '@/components/admin/AdminPageShell';
+import DashboardControlCentre from './DashboardControlCentre';
 
 interface DashboardStatsData {
   totalJobs: number;
@@ -536,110 +538,107 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B1933]">
-      <header className="sticky top-0 z-30 bg-[#111d35]/80 backdrop-blur-md border-b border-[#1a2b4a]">
-        <div className="max-w-7xl mx-auto px-5 sm:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-teal-600 text-white shadow-sm shadow-teal-900/50">
-                <i className="ri-dashboard-3-line text-xl"></i>
-              </div>
-              <div>
-                <div className="flex items-center gap-2.5">
-                  <h1 className="text-lg font-bold text-white leading-tight tracking-tight">Dashboard</h1>
-                  <LiveIndicator />
-                </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Updating...'}
-                  </p>
-                  {realtimeStatus === 'SUBSCRIBED' && (
-                    <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      Live
-                    </span>
-                  )}
-                  {realtimeStatus && realtimeStatus !== 'SUBSCRIBED' && (
-                    <span className="text-[10px] font-medium text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                      Realtime unavailable
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2.5">
-              <button
-                onClick={handleRefresh}
-                disabled={isRefreshing || loading}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-[#1a2b4a] transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap"
-                aria-label="Refresh dashboard"
-              >
-                <div className={`w-4 h-4 flex items-center justify-center ${isRefreshing ? 'animate-spin' : ''}`}>
-                  <i className="ri-refresh-line text-base"></i>
-                </div>
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
-              <Link
-                href="/admin/jobs"
-                className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm shadow-teal-900/50 whitespace-nowrap"
-              >
-                <div className="w-4 h-4 flex items-center justify-center">
-                  <i className="ri-briefcase-line text-sm"></i>
-                </div>
-                Manage Jobs
-              </Link>
-            </div>
-          </div>
+    <AdminPageShell
+      eyebrow="QuickGuard operations"
+      title="Admin control centre"
+      description={lastUpdated
+        ? `Live operational view · updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+        : 'Live operational view · updating now'}
+      status={
+        <div className="flex items-center gap-2">
+          <LiveIndicator />
+          {realtimeStatus === 'SUBSCRIBED' && (
+            <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Live
+            </span>
+          )}
+          {realtimeStatus && realtimeStatus !== 'SUBSCRIBED' && (
+            <span className="text-[10px] font-medium text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-md">
+              Realtime unavailable
+            </span>
+          )}
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-5 sm:px-8 py-8 space-y-8">
-        {error && (
-          <div className="rounded-2xl border-l-[5px] border-l-red-500 p-5 shadow-sm bg-[#111d35] flex items-start gap-4">
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-red-500/10 text-red-400">
-              <i className="ri-error-warning-line text-lg"></i>
+      }
+      actions={
+        <>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing || loading}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-[#1a2b4a] transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap"
+            aria-label="Refresh dashboard"
+          >
+            <div className={`w-4 h-4 flex items-center justify-center ${isRefreshing ? 'animate-spin' : ''}`}>
+              <i className="ri-refresh-line text-base"></i>
             </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-bold text-white">Failed to load dashboard</h3>
-              <p className="text-sm text-slate-400 mt-1 leading-relaxed">{error}</p>
-            </div>
-            <button
-              onClick={handleRefresh}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex-shrink-0 shadow-sm bg-red-600 hover:bg-red-500 text-white cursor-pointer"
-            >
-              Retry
-              <div className="w-4 h-4 flex items-center justify-center">
-                <i className="ri-refresh-line text-sm"></i>
-              </div>
-            </button>
+            <span>Refresh</span>
+          </button>
+          <Link
+            href="/admin/jobs"
+            prefetch={false}
+            className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap"
+          >
+            <i className="ri-briefcase-line text-sm"></i>
+            Manage Jobs
+          </Link>
+        </>
+      }
+    >
+      {error && (
+        <div className="rounded-2xl border-l-[5px] border-l-red-500 p-5 shadow-sm bg-[#111d35] flex items-start gap-4">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-red-500/10 text-red-400">
+            <i className="ri-error-warning-line text-lg"></i>
           </div>
-        )}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-bold text-white">Failed to load dashboard</h3>
+            <p className="text-sm text-slate-400 mt-1 leading-relaxed">{error}</p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex-shrink-0 shadow-sm bg-red-600 hover:bg-red-500 text-white cursor-pointer"
+          >
+            Retry
+            <i className="ri-refresh-line text-sm"></i>
+          </button>
+        </div>
+      )}
 
-        <DashboardAlerts alerts={alerts} loading={loading} />
-        <DashboardStats
-          pendingVerifications={stats.pendingVerifications}
-          failedPayments={stats.failedPayments}
-          activeSubscriptions={stats.activeSubscriptions}
-          trialAccounts={stats.trialAccounts}
-          incompleteProfiles={stats.incompleteProfiles}
-          openSupportTickets={stats.openSupportTickets}
-          newUsersThisMonth={stats.newUsersThisMonth}
-          monthlyRevenue={stats.monthlyRevenue}
-          loading={loading}
-          error={error}
-        />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <div className="lg:col-span-2">
-            <DashboardActivity activities={activities} loading={loading} error={activityError} />
-          </div>
-          <DashboardQuickActions />
+      <DashboardAlerts alerts={alerts} loading={loading} />
+
+      <DashboardControlCentre
+        activeJobs={stats.activeJobs}
+        totalJobs={stats.totalJobs}
+        pendingVerifications={stats.pendingVerifications}
+        pendingSiaVerifications={stats.pendingSiaVerifications}
+        openComplaints={stats.openComplaints}
+        failedPayments={stats.failedPayments}
+        heldPayments={stats.heldPayments}
+        openSupportTickets={stats.openSupportTickets}
+        activeSubscriptions={stats.activeSubscriptions}
+        monthlyRevenue={stats.monthlyRevenue}
+      />
+
+      <DashboardStats
+        pendingVerifications={stats.pendingVerifications}
+        failedPayments={stats.failedPayments}
+        activeSubscriptions={stats.activeSubscriptions}
+        trialAccounts={stats.trialAccounts}
+        incompleteProfiles={stats.incompleteProfiles}
+        openSupportTickets={stats.openSupportTickets}
+        newUsersThisMonth={stats.newUsersThisMonth}
+        monthlyRevenue={stats.monthlyRevenue}
+        loading={loading}
+        error={error}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <DashboardActivity activities={activities} loading={loading} error={activityError} />
         </div>
-        <div className="mb-8">
-          <StripeConnectHealth />
-        </div>
-      </main>
-    </div>
+        <DashboardQuickActions />
+      </div>
+
+      <StripeConnectHealth />
+    </AdminPageShell>
   );
 }
