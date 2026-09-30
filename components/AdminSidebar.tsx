@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -20,7 +21,7 @@ interface NavItem {
   href: string;
   icon: string;
   label: string;
-  badge?: React.ReactNode;
+  badge?: ReactNode;
 }
 
 interface NavGroup {
