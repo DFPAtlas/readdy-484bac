@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -30,6 +30,14 @@ interface NavGroup {
   items: NavItem[];
 }
 
+interface FlyoutState {
+  label: string;
+  top: number;
+}
+
+const COLLAPSED_WIDTH = 72;
+const COLLAPSED_STORAGE_KEY = 'qg-admin-sidebar-collapsed';
+
 export default function AdminSidebar() {
   const pathname = usePathname();
   const router = useSafeRouter();
@@ -37,10 +45,6 @@ export default function AdminSidebar() {
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    Overview: true,
-    People: true,
-  });
   const [badges, setBadges] = useState<BadgeCounts>({
     failedPayments: 0,
     guardVerifications: 0,
@@ -49,42 +53,29 @@ export default function AdminSidebar() {
     complaints: 0,
     contactSubmissions: 0,
   });
+  const [flyout, setFlyout] = useState<FlyoutState | null>(null);
+
+  const flyoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hydrated = useRef(false);
 
   useEffect(() => {
-    async function loadBadges() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-
-        const { data, error } = await supabase.functions.invoke('admin-security', {
-          body: { action: 'dashboard_stats' },
-        });
-
-        if (error) return;
-
-        setBadges({
-          failedPayments: data.failedPayments ?? 0,
-          guardVerifications: data.guardVerifications ?? 0,
-          siaVerifications: data.siaVerifications ?? 0,
-          heldPayments: data.heldPayments ?? 0,
-          complaints: data.complaints ?? 0,
-          contactSubmissions: data.contactSubmissions ?? 0,
-        });
-      } catch {
-        // Sidebar badges are non-critical.
-      }
+    try {
+      const stored = window.localStorage.getItem(COLLAPSED_STORAGE_KEY);
+      if (stored !== null) setCollapsed(stored === 'true');
+    } catch {
+      // Preference is optional.
     }
-
-    loadBadges();
-    const interval = setInterval(loadBadges, 60000);
-    return () => clearInterval(interval);
+    hydrated.current = true;
   }, []);
 
-  const handleLogout = async () => {
-    clearAdminAuthCache();
-    await supabase.auth.signOut();
-    router.push('/admin/login');
-  };
+  useEffect(() => {
+    if (!hydrated.current) return;
+    try {
+      window.localStorage.setItem(COLLAPSED_STORAGE_KEY, collapsed ? 'true' : 'false');
+    } catch {
+      // Preference is optional.
+    }
+  }, [collapsed]);
 
   const isActive = (href: string) =>
     pathname === href || (href !== '/admin/dashboard' && pathname.startsWith(`${href}/`));
@@ -96,7 +87,7 @@ export default function AdminSidebar() {
       : 'bg-amber-400 text-slate-900';
 
     return (
-      <span className={`ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full leading-none ${cls}`}>
+      <span className={`ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full leading-none tabular-nums ${cls}`}>
         {count > 99 ? '99+' : count}
       </span>
     );
@@ -207,19 +198,112 @@ export default function AdminSidebar() {
     },
   ], [badges]);
 
+  const [openGroup, setOpenGroup] = useState<string | null>(() => {
+    const active = groups.find(group => group.items.some(item => isActive(item.href)));
+    return active?.label ?? null;
+  });
+
   useEffect(() => {
     const activeGroup = groups.find(group => group.items.some(item => isActive(item.href)));
     if (!activeGroup) return;
-    setOpenGroups(prev => ({ ...prev, [activeGroup.label]: true }));
+    setOpenGroup(activeGroup.label);
   }, [pathname, groups]);
 
-  const toggleGroup = (label: string) => {
-    setOpenGroups(prev => ({ ...prev, [label]: !prev[label] }));
+  useEffect(() => {
+    async function loadBadges() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const { data, error } = await supabase.functions.invoke('admin-security', {
+          body: { action: 'dashboard_stats' },
+        });
+
+        if (error) return;
+
+        setBadges({
+          failedPayments: data.failedPayments ?? 0,
+          guardVerifications: data.guardVerifications ?? 0,
+          siaVerifications: data.siaVerifications ?? 0,
+          heldPayments: data.heldPayments ?? 0,
+          complaints: data.complaints ?? 0,
+          contactSubmissions: data.contactSubmissions ?? 0,
+        });
+      } catch {
+        // Sidebar badges are non-critical.
+      }
+    }
+
+    loadBadges();
+    const interval = setInterval(loadBadges, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (mobileOpen) {
+      const previous = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = previous; };
+    }
+    return undefined;
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileOpen(false);
+        setFlyout(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  useEffect(() => {
+    if (collapsed) return;
+    setFlyout(null);
+  }, [collapsed]);
+
+  const clearFlyoutTimer = () => {
+    if (flyoutTimer.current) {
+      clearTimeout(flyoutTimer.current);
+      flyoutTimer.current = null;
+    }
   };
+
+  const openFlyout = (label: string, element: HTMLElement) => {
+    clearFlyoutTimer();
+    const rect = element.getBoundingClientRect();
+    const viewport = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const top = Math.max(12, Math.min(rect.top - 8, viewport - 340));
+    setFlyout({ label, top });
+  };
+
+  const scheduleCloseFlyout = () => {
+    clearFlyoutTimer();
+    flyoutTimer.current = setTimeout(() => setFlyout(null), 140);
+  };
+
+  useEffect(() => () => clearFlyoutTimer(), []);
+
+  const handleLogout = async () => {
+    clearAdminAuthCache();
+    await supabase.auth.signOut();
+    router.push('/admin/login');
+  };
+
+  const toggleGroup = (label: string, isOpen: boolean) => {
+    setOpenGroup(isOpen ? null : label);
+  };
+
+  const flyoutGroup = flyout ? groups.find(group => group.label === flyout.label) : null;
+
+  const closeMobile = () => setMobileOpen(false);
 
   const sidebarContent = (
     <>
-      <div className={`flex items-center justify-between px-5 py-5 ${collapsed ? 'justify-center px-3 py-4' : ''}`}>
+      <div className={`flex items-center justify-between ${collapsed ? 'justify-center px-3 py-5' : 'px-5 py-5'}`}>
         {!collapsed && (
           <Link
             href="/admin/dashboard"
@@ -231,77 +315,107 @@ export default function AdminSidebar() {
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-[#1a2b4a] transition cursor-pointer text-slate-500 hover:text-white"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="w-8 h-8 hidden lg:flex items-center justify-center rounded-xl hover:bg-[#1a2b4a] transition-colors cursor-pointer text-slate-500 hover:text-white outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
           title={collapsed ? 'Expand' : 'Collapse'}
         >
           <i className={`${collapsed ? 'ri-menu-unfold-4-line' : 'ri-menu-fold-4-line'} text-lg`}></i>
         </button>
       </div>
 
-      <nav data-sidebar-scroll className="flex-1 overflow-y-auto py-2 px-3 space-y-1.5">
+      <nav data-sidebar-scroll className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-3 space-y-1">
         {groups.map((group) => {
           const groupActive = group.items.some(item => isActive(item.href));
-          const open = openGroups[group.label] || groupActive;
+          const isOpen = openGroup === group.label;
+          const primary = group.items[0];
 
           if (collapsed) {
-            const primary = group.items[0];
             return (
-              <Link
+              <div
                 key={group.label}
-                href={primary.href}
-                prefetch={false}
-                title={group.label}
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center justify-center px-3 py-2.5 rounded-xl transition-all cursor-pointer outline-none ${groupActive
-                  ? 'bg-teal-500/10 text-teal-400 shadow-sm ring-1 ring-teal-500/20'
-                  : 'text-slate-400 hover:bg-[#1a2b4a] hover:text-white'}`}
+                className="relative"
+                onMouseEnter={(event) => openFlyout(group.label, event.currentTarget)}
+                onMouseLeave={scheduleCloseFlyout}
               >
-                <div className="w-5 h-5 flex items-center justify-center">
-                  <i className={`${group.icon} text-base`}></i>
-                </div>
-              </Link>
+                <Link
+                  href={primary.href}
+                  prefetch={false}
+                  title={group.label}
+                  aria-label={group.label}
+                  aria-current={groupActive ? 'page' : undefined}
+                  onClick={closeMobile}
+                  onFocus={(event) => openFlyout(group.label, event.currentTarget)}
+                  onBlur={scheduleCloseFlyout}
+                  className={`relative flex items-center justify-center h-11 rounded-xl transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 ${groupActive
+                    ? 'bg-teal-500/12 text-teal-300 ring-1 ring-teal-500/25'
+                    : 'text-slate-400 hover:bg-[#1a2b4a] hover:text-white'}`}
+                >
+                  {groupActive && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-teal-400" />
+                  )}
+                  <div className="w-5 h-5 flex items-center justify-center">
+                    <i className={`${group.icon} text-[17px]`}></i>
+                  </div>
+                </Link>
+              </div>
             );
           }
 
           return (
-            <div key={group.label} className="rounded-xl">
+            <div key={group.label}>
               <button
-                onClick={() => toggleGroup(group.label)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${groupActive
-                  ? 'text-teal-300 bg-teal-500/5'
+                type="button"
+                onClick={() => toggleGroup(group.label, isOpen)}
+                aria-expanded={isOpen}
+                aria-controls={`admin-group-${group.label.toLowerCase()}`}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 ${groupActive
+                  ? 'text-teal-300 bg-teal-500/8'
                   : 'text-slate-300 hover:bg-[#1a2b4a] hover:text-white'}`}
               >
                 <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                   <i className={`${group.icon} text-base`}></i>
                 </div>
-                <span className="flex-1 text-left">{group.label}</span>
+                <span className="flex-1 text-left whitespace-nowrap">{group.label}</span>
                 <div className="w-4 h-4 flex items-center justify-center">
-                  <i className={`${open ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} text-sm text-slate-500`}></i>
+                  <i className={`ri-arrow-down-s-line text-sm text-slate-500 transition-transform duration-300 ease-out ${isOpen ? 'rotate-180' : 'rotate-0'}`}></i>
                 </div>
               </button>
 
-              {open && (
-                <ul className="mt-1 ml-3 pl-3 border-l border-[#1a2b4a] space-y-0.5">
-                  {group.items.map(item => (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        prefetch={false}
-                        onClick={() => setMobileOpen(false)}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer whitespace-nowrap outline-none ${isActive(item.href)
-                          ? 'bg-teal-500/10 text-teal-400'
-                          : 'text-slate-500 hover:bg-[#1a2b4a] hover:text-slate-200'}`}
-                      >
-                        <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
-                          <i className={`${item.icon} text-sm`}></i>
-                        </div>
-                        <span className="flex-1">{item.label}</span>
-                        {item.badge}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <div
+                id={`admin-group-${group.label.toLowerCase()}`}
+                aria-hidden={!isOpen}
+                className={`grid transition-all duration-300 ease-out ${isOpen ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0'}`}
+              >
+                <div className="overflow-hidden min-h-0">
+                  <ul className="ml-4 pl-3 border-l border-[#1a2b4a] space-y-0.5">
+                    {group.items.map(item => {
+                      const itemActive = isActive(item.href);
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            prefetch={false}
+                            aria-current={itemActive ? 'page' : undefined}
+                            onClick={closeMobile}
+                            className={`relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 ${itemActive
+                              ? 'bg-teal-500/15 text-teal-300 font-semibold shadow-[inset_0_0_0_1px_rgba(45,212,191,0.18)]'
+                              : 'text-slate-500 hover:bg-[#1a2b4a] hover:text-slate-200'}`}
+                          >
+                            <span
+                              className={`absolute -left-[13px] top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full transition-colors ${itemActive ? 'bg-teal-400' : 'bg-transparent'}`}
+                            />
+                            <div className={`w-4 h-4 flex items-center justify-center flex-shrink-0 ${itemActive ? 'text-teal-300' : ''}`}>
+                              <i className={`${item.icon} text-sm`}></i>
+                            </div>
+                            <span className="flex-1">{item.label}</span>
+                            {item.badge}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
             </div>
           );
         })}
@@ -316,11 +430,16 @@ export default function AdminSidebar() {
             href="/admin/account"
             prefetch={false}
             title={collapsed ? 'My Account' : undefined}
-            onClick={() => setMobileOpen(false)}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer whitespace-nowrap outline-none ${isActive('/admin/account')
-              ? 'bg-teal-500/10 text-teal-400'
+            aria-label="My Account"
+            aria-current={isActive('/admin/account') ? 'page' : undefined}
+            onClick={closeMobile}
+            className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 ${isActive('/admin/account')
+              ? 'bg-teal-500/12 text-teal-300'
               : 'text-slate-400 hover:bg-[#1a2b4a] hover:text-white'} ${collapsed ? 'justify-center' : ''}`}
           >
+            {collapsed && isActive('/admin/account') && (
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-teal-400" />
+            )}
             <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
               <i className="ri-user-settings-line text-base"></i>
             </div>
@@ -329,7 +448,7 @@ export default function AdminSidebar() {
         </div>
       </nav>
 
-      <div className={`border-t border-[#1a2b4a] p-3 ${collapsed ? 'flex justify-center' : ''}`}>
+      <div className={`border-t border-[#1a2b4a] p-3 ${collapsed ? 'flex flex-col items-center' : ''}`}>
         {!collapsed && adminUser.email && (
           <div className="px-3 py-2 mb-2 bg-[#111d35] rounded-xl">
             <div className="flex items-center gap-2 mb-0.5">
@@ -355,7 +474,8 @@ export default function AdminSidebar() {
         <button
           onClick={handleLogout}
           title={collapsed ? 'Logout' : undefined}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all w-full whitespace-nowrap ${collapsed ? 'justify-center' : ''}`}
+          aria-label="Logout"
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 ${collapsed ? 'justify-center w-11' : 'w-full'}`}
         >
           <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
             <i className="ri-logout-box-r-line text-base"></i>
@@ -370,25 +490,70 @@ export default function AdminSidebar() {
     <>
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 w-10 h-10 flex items-center justify-center rounded-xl bg-[#111d35] shadow-lg border border-[#1a2b4a] text-white cursor-pointer"
-        aria-label="Toggle menu"
+        className="lg:hidden fixed top-4 left-4 z-[70] w-10 h-10 flex items-center justify-center rounded-xl bg-[#111d35] shadow-lg border border-[#1a2b4a] text-white cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
+        aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+        aria-expanded={mobileOpen}
       >
         <i className={`${mobileOpen ? 'ri-close-line' : 'ri-menu-3-line'} text-xl`}></i>
       </button>
 
-      {mobileOpen && (
-        <div
-          className="lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+      <div
+        className={`lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        onClick={closeMobile}
+        aria-hidden="true"
+      />
 
       <aside
-        className={`flex flex-col bg-[#0B1933] transition-all duration-300 min-h-screen sticky top-0 border-r border-[#1a2b4a] shadow-sm ${collapsed ? 'w-[4.5rem]' : 'w-64'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:relative z-50`}
+        className={`flex flex-col bg-[#0B1933] transition-[width,transform] duration-300 ease-out min-h-screen sticky top-0 border-r border-[#1a2b4a] shadow-sm lg:translate-x-0 ${collapsed ? 'lg:w-[4.5rem]' : 'lg:w-64'} w-64 fixed lg:relative z-50 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
         style={{ flexShrink: 0 }}
+        aria-label="Admin navigation"
       >
         {sidebarContent}
       </aside>
+
+      {collapsed && flyoutGroup && flyout && (
+        <div
+          className="hidden lg:block fixed z-[80] animate-[flyoutIn_160ms_ease-out]"
+          style={{ left: COLLAPSED_WIDTH + 8, top: flyout.top }}
+          onMouseEnter={clearFlyoutTimer}
+          onMouseLeave={scheduleCloseFlyout}
+        >
+          <div className="min-w-[13rem] bg-[#111d35] border border-[#1a2b4a] rounded-xl shadow-2xl shadow-black/50 p-2">
+            <div className="flex items-center gap-2 px-2.5 py-2 mb-1">
+              <div className="w-5 h-5 flex items-center justify-center">
+                <i className={`${flyoutGroup.icon} text-sm text-teal-400`}></i>
+              </div>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                {flyoutGroup.label}
+              </p>
+            </div>
+            <ul className="space-y-0.5">
+              {flyoutGroup.items.map(item => {
+                const itemActive = isActive(item.href);
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      prefetch={false}
+                      onClick={closeMobile}
+                      aria-current={itemActive ? 'page' : undefined}
+                      className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 ${itemActive
+                        ? 'bg-teal-500/15 text-teal-300 font-semibold'
+                        : 'text-slate-400 hover:bg-[#1a2b4a] hover:text-white'}`}
+                    >
+                      <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                        <i className={`${item.icon} text-sm`}></i>
+                      </div>
+                      <span className="flex-1">{item.label}</span>
+                      {item.badge}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      )}
 
       <style>{`
         [data-sidebar-scroll] {
@@ -407,6 +572,13 @@ export default function AdminSidebar() {
         }
         [data-sidebar-scroll]::-webkit-scrollbar-thumb:hover {
           background: #3d5577;
+        }
+        @keyframes flyoutIn {
+          from { opacity: 0; transform: translateX(-6px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [data-sidebar-scroll] * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
         }
       `}</style>
     </>
