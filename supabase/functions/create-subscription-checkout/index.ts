@@ -292,7 +292,6 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    console.log('[create-subscription-checkout] Request body:', JSON.stringify(body));
 
     const { userId: requestedUserId, accountType: requestedAccountType, planId, userEmail: requestedEmail, billingCycle, siteUrl: bodySiteUrl } = body;
 
