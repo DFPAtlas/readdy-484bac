@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://quickguard.uk',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -76,14 +76,7 @@ serve(async (req) => {
 
     const renderData = await renderRes.json();
 
-    await supabase.from('email_queue').insert({
-      email_type: 'invoice_email',
-      recipient_email,
-      subject: `Invoice ${invoiceNumber} – £${total.toFixed(2)} – ${jobData.job_title || 'Security Job'}`,
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-      metadata: { job_id, invoice_number: invoiceNumber, total, sent_by_admin: sent_by_admin || false, caller_email: caller_email || null },
-    });
+
 
     return new Response(JSON.stringify({ success: true, invoice_number: invoiceNumber, email_id: renderData.email_id }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error: any) {
