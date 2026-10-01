@@ -55,9 +55,6 @@ export default function ConfirmSelectionModal({
   const daysDiff = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
   const guardFees = selectedGuards.reduce((sum, g) => sum + (g.hourly_rate || job.hourly_rate) * hoursPerShift * daysDiff, 0);
-  const serviceFee = guardFees * 0.1;
-  const vat = (guardFees + serviceFee) * 0.2;
-  const total = guardFees + serviceFee + vat;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -130,24 +127,16 @@ export default function ConfirmSelectionModal({
           </div>
 
           <div className="bg-[#162036] rounded-xl p-4 mb-6 border border-[#1e2d4d]">
-            <h3 className="text-sm font-semibold text-slate-200 mb-3">Cost Estimate</h3>
+            <h3 className="text-sm font-semibold text-slate-200 mb-3">Guard Cost Estimate</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-slate-400">
                 <span>Guard fees ({selectedGuards.length} guards x {hoursPerShift.toFixed(1)}hrs x {daysDiff} day{daysDiff > 1 ? "s" : ""})</span>
                 <span>£{guardFees.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-slate-400">
-                <span>QuickGuard service fee (10%)</span>
-                <span>£{serviceFee.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-slate-400">
-                <span>VAT (20%)</span>
-                <span>£{vat.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-white pt-2 border-t border-[#1e2d4d]">
-                <span>Estimated Total</span>
-                <span>£{total.toFixed(2)}</span>
-              </div>
+              <p className="text-xs text-slate-400">
+                This estimate uses the selected guards’ profile rates. The posted job rate is £{job.hourly_rate}/hr. Final service fees and the total due are shown on the payment screen before you pay.
+              </p>
+
             </div>
           </div>
 
