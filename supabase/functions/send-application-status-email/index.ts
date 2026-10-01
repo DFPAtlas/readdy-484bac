@@ -48,7 +48,7 @@ serve(async (req) => {
   let isClientOwner = false;
   let clientUserId: string | null = null;
 
-  if (!isServiceRole && !isTrustedInternal) {
+  if (!isServiceRole) {
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
       db: { schema: 'app' },
@@ -118,32 +118,6 @@ serve(async (req) => {
       }
     }
 
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const templateSlugMap: Record<string, string> = {
-      accepted: 'application_accepted',
-      declined: 'application_declined',
-      rejected: 'application_declined',
-      shortlisted: 'application_shortlisted',
-    };
-    const templateSlugForDedup = templateSlugMap[payload.status] || 'application_declined';
-
-    const { data: existingEmail } = await supabase
-      .from('email_send_log')
-      .select('id')
-      .eq('template', templateSlugForDedup)
-      .eq('related_user_id', payload.guard_id)
-      .eq('related_job_id', payload.job_id)
-      .eq('status', 'sent')
-      .gte('sent_at', cutoff)
-      .maybeSingle();
-
-    if (existingEmail) {
-      return new Response(
-        JSON.stringify({ success: true, skipped: true, reason: 'Duplicate prevented — notification already sent for this job+guard within 24 hours' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     let guardEmail = payload.guard_email;
     let guardName = payload.guard_name;
     let guardUserId = payload.guard_user_id;
@@ -157,7 +131,33 @@ serve(async (req) => {
       }
     }
 
-    if (!guardEmail) {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const templateSlugMap: Record<string, string> = {
+      accepted: 'application_accepted',
+      declined: 'application_declined',
+      rejected: 'application_declined',
+      shortlisted: 'application_shortlisted',
+    };
+    const templateSlugForDedup = templateSlugMap[payload.status] || 'application_declined';
+
+    const { data: existingEmail } = await supabase
+      .from('email_send_log')
+      .select('id')
+      .eq('template', templateSlugForDedup)
+      .eq('related_user_id', guardUserId || payload.guard_id)
+      .eq('related_job_id', payload.job_id)
+      .eq('status', 'sent')
+      .gte('sent_at', cutoff)
+      .maybeSingle();
+
+    if (existingEmail) {
+      return new Response(
+        JSON.stringify({ success: true, skipped: true, reason: 'Duplicate prevented — notification already sent for this job+guard within 24 hours' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+\n    if (!guardEmail) {
       return new Response(JSON.stringify({ message: 'Guard email not found, skipping' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -186,7 +186,7 @@ serve(async (req) => {
     clientName = clientName || 'the client';
     jobTitle = jobTitle || 'Unknown Job';
 
-    const { data: preferences } = await supabase.from('notification_preferences').select('application_updates').eq('user_id', payload.guard_id).maybeSingle();
+    const { data: preferences } = await supabase.from('notification_preferences').select('application_updates').eq('user_id', guardUserId || payload.guard_id).maybeSingle();
     if (preferences && preferences.application_updates === false) {
       return new Response(JSON.stringify({ message: 'User disabled application update notifications' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -232,7 +232,7 @@ serve(async (req) => {
         to: guardEmail,
         variables,
         from: 'QuickGuard <notifications@quickguard.uk>',
-        related_user_id: payload.guard_id,
+        related_user_id: guardUserId || payload.guard_id,
         related_job_id: payload.job_id,
       }),
     });
