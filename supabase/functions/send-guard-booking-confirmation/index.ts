@@ -61,12 +61,12 @@ serve(async (req) => {
     if (!guardEmail || !guardName) {
       const { data: guard } = await supabase
         .from('guards')
-        .select('email, full_name')
+        .select('email, full_name, user_id')
         .eq('id', guard_id)
         .maybeSingle();
       if (guard) {
         guardEmail = guardEmail || guard.email || '';
-        guardName = guardName || guard.full_name || 'Guard';
+        guardName = guardName || guard.full_name || 'Guard';\n        guardUserId = guard.user_id || '';
       }
     }
 
@@ -106,7 +106,7 @@ serve(async (req) => {
       .from('email_send_log')
       .select('id')
       .eq('template', 'guard_booking_confirmation')
-      .eq('related_user_id', guard_id)
+      .eq('related_user_id', guardUserId || guard_id)
       .eq('related_job_id', job_id)
       .eq('status', 'sent')
       .gte('sent_at', cutoff)
@@ -121,11 +121,11 @@ serve(async (req) => {
 
     const { data: preferences } = await supabase
       .from('notification_preferences')
-      .select('booking_updates')
-      .eq('user_id', guard_id)
+      .select('guard_confirmations')
+      .eq('user_id', guardUserId || guard_id)
       .maybeSingle();
 
-    if (preferences && preferences.booking_updates === false) {
+    if (preferences && preferences.guard_confirmations === false) {
       return new Response(
         JSON.stringify({ success: true, skipped: true, reason: 'Guard disabled booking notifications' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -174,21 +174,6 @@ serve(async (req) => {
 
     const rendered = await renderRes.json();
 
-    const n8nWebhookUrl = Deno.env.get('N8N_EMAIL_WEBHOOK_URL');
-    if (n8nWebhookUrl) {
-      await fetch(n8nWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: guardEmail,
-          subject: rendered.subject || `Booking Confirmed: ${jobTitle}`,
-          html: rendered.body_html,
-          template: 'guard_booking_confirmation',
-          data: variables,
-        }),
-      });
-    }
-
     console.log(`[SendGuardBookingConfirmation] Sent to ${guardEmail} for job ${job_id}`);
 
     return new Response(
@@ -196,7 +181,7 @@ serve(async (req) => {
         success: true,
         message: 'Guard booking confirmation sent',
         to: guardEmail,
-        subject: rendered.subject,
+        subject: rendered.subject,\n        email_id: rendered.email_id,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
