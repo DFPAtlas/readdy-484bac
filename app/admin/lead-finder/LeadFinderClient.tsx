@@ -52,10 +52,8 @@ export default function LeadFinderClient() {
   const [stats, setStats] = useState({ total: 0, newThisWeek: 0, highScore: 0, withEmail: 0, optedOut: 0 });
 
   const loadedRef = useRef(false);
-  const loadRef = useRef(load);
-  const loadStatsRef = useRef(loadStats);
-  loadRef.current = load;
-  loadStatsRef.current = loadStats;
+  const loadRef = useRef<() => Promise<void>>(async () => {});
+  const loadStatsRef = useRef<() => Promise<void>>(async () => {});
 
   const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
 
@@ -135,6 +133,9 @@ export default function LeadFinderClient() {
       optedOut: optOutRes.count || 0,
     });
   }, []);
+
+  loadRef.current = load;
+  loadStatsRef.current = loadStats;
 
   useEffect(() => {
     if (loadedRef.current) return;
@@ -361,7 +362,13 @@ export default function LeadFinderClient() {
                 </div>
               )}
             </div>
-            <LeadsTable leads={leads} onSelect={(l) => setSelected(l)} selectedIds={selectedIds} onToggleSelect={handleToggleSelect} onToggleAll={handleToggleAll} />
+            <LeadsTable
+              leads={leads}
+              onSelect={(lead) => setSelected(leads.find((item) => item.id === lead.id) ?? null)}
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              onToggleAll={handleToggleAll}
+            />
           </>
         )}
       </div>

@@ -4,7 +4,7 @@
 
 **Date:** 2026-06-16
 **Target:** Soft launch (early users, controlled rollout)
-**Launch checklist:** `/admin/go-live-checklist`
+**Launch checklist:** `/admin/live-test-checklist`
 
 Use the go-live checklist in the admin dashboard to track readiness. Score is calculated automatically as items are checked off.
 

@@ -44,7 +44,7 @@ export default function LaunchStatusWidget() {
 
   return (
     <Link
-      href="/admin/go-live-checklist"
+      href="/admin/live-test-checklist"
       className="block bg-[#111d35] rounded-2xl border border-[#1a2b4a] p-5 hover:border-teal-500/30 transition-all cursor-pointer group"
     >
       <div className="flex items-center justify-between mb-4">

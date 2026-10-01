@@ -119,7 +119,7 @@ function CallbackContent() {
         await ensureSubscriptionRow(userId, 'client');
         clearBadStoredRedirects();
         const storedRedirect = sessionStorage.getItem('post_auth_redirect');
-        if (storedRedirect) {
+        if (storedRedirect && existing?.profile_completed) {
           sessionStorage.removeItem('post_auth_redirect');
           const safeRedirect = sanitizeRedirectPath(storedRedirect, 'client', '/client/dashboard');
           setStatus('success');

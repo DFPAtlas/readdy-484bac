@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 export default function CompanyAuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(false);
 
@@ -15,21 +16,30 @@ export default function CompanyAuthGate({ children }: { children: React.ReactNod
     let cancelled = false;
 
     async function check() {
-      const { data: { session } } = await supabase.auth.getSession();
+      if (pathname === '/company/login') {
+        if (!cancelled) {
+          setAllowed(true);
+          setLoading(false);
+        }
+        return;
+      }
 
-      if (!session?.user) {
-        if (!cancelled) router.push('/company/login');
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        if (!cancelled) router.replace('/company/login');
         return;
       }
 
       const { data: company } = await supabase
         .from('companies')
         .select('id, profile_completed, verification_status, subscription_status')
-        .eq('user_id', session.user.id)
+        .eq('user_id', user.id)
         .maybeSingle();
 
       if (!company) {
-        if (!cancelled) router.push('/guard/register');
+        await supabase.auth.signOut({ scope: 'local' });
+        if (!cancelled) router.replace('/company/login?error=company-profile-not-found');
         return;
       }
 
@@ -40,7 +50,7 @@ export default function CompanyAuthGate({ children }: { children: React.ReactNod
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ userId: session.user.id, accountType: 'company' }),
+          body: JSON.stringify({ userId: user.id, accountType: 'company' }),
         });
       } catch {}
 
@@ -52,7 +62,7 @@ export default function CompanyAuthGate({ children }: { children: React.ReactNod
 
     check();
     return () => { cancelled = true; };
-  }, [router]);
+  }, [pathname, router]);
 
   if (loading) {
     return (

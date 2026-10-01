@@ -160,9 +160,12 @@ export default function PostJobWizard() {
   };
 
   const checkAuth = async () => {
+    const query = searchParams.toString();
+    const returnPath = query ? `/post-job?${query}` : '/post-job';
+    const registrationPath = `/client/register?redirect=${encodeURIComponent(returnPath)}`;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      router.push('/client/register?redirect=/post-job');
+      router.push(registrationPath);
       return;
     }
     const { data: clientData } = await supabase
@@ -171,7 +174,7 @@ export default function PostJobWizard() {
       .eq('user_id', user.id)
       .maybeSingle();
     if (!clientData) {
-      router.push('/client/register?redirect=/post-job');
+      router.push(registrationPath);
       return;
     }
     setIsAuth(true);
@@ -191,7 +194,7 @@ export default function PostJobWizard() {
       contactPhone: clientData.phone || '',
     }));
     setLoading(false);
-    const canPost = await hasFeature(user.id, 'client.post_jobs');
+    const canPost = await hasFeature(user.id, 'client.post_job');
     setCanPostJobs(canPost);
     setEntitlementsChecked(true);
   };

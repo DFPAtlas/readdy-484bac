@@ -1238,7 +1238,7 @@ export default function AdminQGLaunchRewardsPage() {
                       <option value="converted_client">Converted (Client)</option>
                       <option value="verified">Verified</option>
                     </select>
-                    <button onClick={() => handleExportCSV(filteredLaunchAccounts, 'qg_launch_accounts')} className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 text-sm whitespace-nowrap cursor-pointer flex items-center gap-2">
+                    <button onClick={() => handleExportCSV(getFilteredLaunchAccounts(), 'qg_launch_accounts')} className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 text-sm whitespace-nowrap cursor-pointer flex items-center gap-2">
                       <div className="w-4 h-4 flex items-center justify-center"><i className="ri-file-download-line"></i></div>Export CSV
                     </button>
                   </div>

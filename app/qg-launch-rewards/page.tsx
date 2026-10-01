@@ -40,7 +40,7 @@ export default function QGLaunchRewardsPage() {
   }, []);
 
   const tokenValuePence = settings.token_value_pence_per_100 || 1000;
-  const poundsPer100 = (tokenValuePence / 100).toFixed(0);
+  const poundsPer100 = tokenValuePence / 100;
   const guardReward = settings.verified_guard_referral_tokens || 250;
   const clientReward = settings.verified_client_referral_tokens || 500;
   const guardRewardPounds = ((guardReward / 100) * poundsPer100).toFixed(2);
@@ -146,7 +146,7 @@ export default function QGLaunchRewardsPage() {
       {/* Token Value Explainer */}
       <section className="py-20 px-6 bg-[#071321]">
         <div className="max-w-5xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">100 QG Tokens = £{poundsPer100} QuickGuard Credit</h2>
+          <h2 className="text-3xl font-bold text-white mb-4">100 QG Tokens = £{poundsPer100.toFixed(0)} QuickGuard Credit</h2>
           <p className="text-slate-400 max-w-2xl mx-auto text-lg">
             QG Tokens are discount credits that reduce your costs on QuickGuard. They have no cash value, cannot be withdrawn or transferred, and are exclusively for use on the QuickGuard platform.
           </p>

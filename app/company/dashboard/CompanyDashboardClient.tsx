@@ -99,16 +99,20 @@ export default function CompanyDashboardClient() {
   const [unreadMessages, setUnreadMessages] = useState(0);
 
   const loadDashboard = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) { router.push('/company/login'); return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { router.replace('/company/login'); return; }
 
     const { data: companyData } = await supabase
       .from('companies')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .maybeSingle();
 
-    if (!companyData) { router.push('/guard/register'); return; }
+    if (!companyData) {
+      await supabase.auth.signOut({ scope: 'local' });
+      router.replace('/company/login?error=company-profile-not-found');
+      return;
+    }
     setCompany(companyData as Company);
 
     const [
@@ -120,7 +124,7 @@ export default function CompanyDashboardClient() {
       supabase.from('incidents').select('*, company_sites(site_name)').eq('company_id', companyData.id).order('reported_at', { ascending: false }).limit(10),
       supabase.from('compliance_records').select('*').eq('company_id', companyData.id).order('created_at', { ascending: false }),
       supabase.from('training_records').select('*, guards(full_name)').eq('company_id', companyData.id).order('completion_date', { ascending: false }).limit(10),
-      supabase.from('messages').select('id').eq('receiver_id', session.user.id).eq('is_read', false),
+      supabase.from('messages').select('id').eq('receiver_id', user.id).eq('is_read', false),
     ]);
 
     setSites(sitesRes.data || []);

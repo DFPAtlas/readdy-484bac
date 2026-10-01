@@ -8,6 +8,7 @@ import ProfileWizard from '@/components/ProfileWizard';
 import WizardNavigation from '@/components/WizardNavigation';
 import WizardCard from '@/components/WizardCard';
 import DynamicProfileForm, { useProfileWizardFields, useProfileFormData } from '@/components/DynamicProfileForm';
+import { sanitizeRedirectPath } from '@/lib/safe-redirect';
 
 const WIZARD_STEPS = [
   { id: 1, title: 'Welcome', description: 'Get started', icon: 'ri-hand-heart-line' },
@@ -268,6 +269,15 @@ export default function ClientCompleteProfileWizard() {
           }
         }
         traceLog('password updated');
+      }
+
+      const storedRedirect = sessionStorage.getItem('post_auth_redirect');
+      if (storedRedirect) {
+        sessionStorage.removeItem('post_auth_redirect');
+        const safeRedirect = sanitizeRedirectPath(storedRedirect, 'client', '/client/onboarding');
+        traceLog('redirecting to saved destination', { safeRedirect });
+        router.push(safeRedirect);
+        return;
       }
 
       traceLog('redirecting to onboarding');
