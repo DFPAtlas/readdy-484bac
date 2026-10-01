@@ -136,7 +136,7 @@ serve(async (req) => {
 
     const { data: jobData, error: jobError } = await supabaseClient
       .from("jobs")
-      .select("id, status, sia_licence_required, required_licence_types, job_tier, job_access_level, job_title, start_date, venue_name, clients(id, email, company_name, first_name, last_name), is_deleted")
+      .select("id, status, sia_licence_required, required_licence_types, job_tier, job_access_level, job_title, start_date, venue_name, hourly_rate, clients(id, email, company_name, first_name, last_name), is_deleted")
       .eq("id", jobId)
       .maybeSingle();
 
@@ -297,6 +297,8 @@ serve(async (req) => {
       throw insertError;
     }
 
+    const warnings: string[] = [];
+
     try {
       const { data: guardInfo } = await supabaseClient
         .from("guards")
@@ -306,30 +308,33 @@ serve(async (req) => {
 
       if (guardInfo && jobData.clients) {
         const client = jobData.clients as any;
-        await fetch(`${supabaseUrl}/functions/v1/send-job-application-email`, {
+        const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-job-application-email`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${supabaseServiceKey}`,
           },
           body: JSON.stringify({
-            clientEmail: client.email || "",
-            clientName: client.company_name || `${client.first_name || ""} ${client.last_name || ""}`.trim(),
-            guardName: guardInfo.full_name,
-            jobTitle: jobData.job_title,
-            jobVenue: jobData.venue_name || "",
-            jobDate: jobData.start_date ? new Date(jobData.start_date).toLocaleDateString("en-GB", {
-              weekday: "long", day: "numeric", month: "long", year: "numeric"
-            }) : "",
-            guardPhone: guardInfo.phone || "",
-            guardEmail: guardInfo.email || "",
-            guardExperience: guardInfo.years_experience || 0,
-            siaLicense: guardInfo.sia_licence_number || "N/A",
-            coverLetter: coverMessage || "",
+            client_email: client.email || "",
+            client_name: client.company_name || `${client.first_name || ""} ${client.last_name || ""}`.trim(),
+            guard_name: guardInfo.full_name || "Guard",
+            job_title: jobData.job_title || "",
+            job_id: jobId,
+            proposed_rate: jobData.hourly_rate || 0,
+            cover_message: coverMessage || "",
+            guard_id: guardId,
           }),
         });
+
+        if (!emailResponse.ok) {
+          const emailError = await emailResponse.text();
+          console.error("[apply-to-job] Client application email failed:", emailResponse.status, emailError);
+          warnings.push("client_application_email_failed");
+        }
       }
-    } catch {
+    } catch (emailError) {
+      console.error("[apply-to-job] Client application email error:", emailError);
+      warnings.push("client_application_email_failed");
     }
 
     try {
@@ -347,7 +352,7 @@ serve(async (req) => {
     } catch {
     }
 
-    return new Response(JSON.stringify({ success: true, applicationId: application.id }), {
+    return new Response(JSON.stringify({ success: true, applicationId: application.id, warnings }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
