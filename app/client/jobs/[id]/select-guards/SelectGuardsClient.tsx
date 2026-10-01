@@ -816,7 +816,7 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
       setSuccessMessage(`${selectedArray.length} guard${selectedArray.length > 1 ? "s" : ""} selected — awaiting payment`);
 
       setTimeout(() => {
-        router.push(`/client/jobs/${job.id}/payment`);
+        router.push(`/client/jobs/payment?id=${encodeURIComponent(job.id)}`);
       }, 2000);
     } catch (error) {
       console.error("Error selecting guards:", error);
