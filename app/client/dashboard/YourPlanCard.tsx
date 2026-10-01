@@ -113,7 +113,7 @@ export default function YourPlanCard({ client }: { client: ClientPlanData }) {
       <div className="space-y-3 mb-5">
         {[
           { icon: 'ri-calendar-line', label: 'Member since', value: memberSince },
-          { icon: 'ri-shield-check-line', label: 'Service fee', value: tier === 'payg' ? '15% per booking' : tier === 'regular_sub' ? '8% per booking' : '4% per booking' },
+          { icon: 'ri-shield-check-line', label: 'Service fee', value: 'Plan rate shown before checkout (5–15%)' },
         ].map((row) => (
           <div key={row.label} className="flex items-start gap-3">
             <div className="w-8 h-8 bg-slate-100 dark:bg-[#162036] rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">

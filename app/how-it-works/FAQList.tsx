@@ -25,13 +25,13 @@ const faqs = [
     category: 'For Guards',
     question: 'When and how do guards get paid?',
     answer:
-      'Once a client confirms job completion, payment is released to your account minus a 5% platform fee. Funds are transferred directly to your registered UK bank account. You also receive automatic UTR and tax documentation to stay HMRC compliant.',
+      'Once a client confirms job completion, payment is released to your account in full, with no guard commission. Funds are transferred directly to your registered UK bank account. You also receive automatic UTR and tax documentation to stay HMRC compliant.',
   },
   {
     category: 'For Clients',
     question: 'Is there a cost for clients to post a job?',
     answer:
-      'Creating an account is free, and a free account can publish up to 1 job per month. You pay per job \u2014 the guard\u2019s hourly rate plus the platform fee \u2014 charged securely at posting and held with Stripe until the shift is completed. Optional paid subscriptions raise the monthly posting allowance (up to unlimited) and unlock extra features.',
+      'Creating an account is free, and a free account can publish up to 1 job per month. You pay per job \u2014 the guard\u2019s hourly rate plus the platform fee \u2014 charged securely after guard selection, before booking confirmation and held with Stripe until the shift is completed. Optional paid subscriptions raise the monthly posting allowance (up to unlimited) and unlock extra features.',
   },
   {
     category: 'For Clients',

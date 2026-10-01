@@ -385,25 +385,17 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
     return hours * days;
   };
 
-  const calculateCosts = () => {
-    if (!job) return { guardFees: 0, serviceFee: 0, vat: 0, total: 0, hours: 0 };
-    const hours = calculateHours(job.start_time, job.end_time, job.start_date, job.end_date);
-    const guardFees = hours * job.hourly_rate * guards.length;
-    const serviceFee = guardFees * 0.10;
-    const subtotal = guardFees + serviceFee;
-    const vat = subtotal * 0.20;
-    const total = subtotal + vat;
-    return {
-      hours,
-      guardFees: Math.round(guardFees * 100) / 100,
-      serviceFee: Math.round(serviceFee * 100) / 100,
-      vat: Math.round(vat * 100) / 100,
-      total: Math.round(total * 100) / 100,
-    };
-  };
+  const calculateCosts = () => ({
+    hours: job ? calculateHours(job.start_time, job.end_time, job.start_date, job.end_date) : 0,
+    guardFees: feeBreakdown?.guardFees ?? 0,
+    serviceFee: feeBreakdown?.platformFee ?? 0,
+    vat: 0,
+    processingFee: feeBreakdown?.stripeFeePayer === "client" ? feeBreakdown.stripeFeeEstimate : 0,
+    total: feeBreakdown?.clientTotalCharge ?? 0,
+  });
 
   const handlePayment = async () => {
-    if (!job || !client) return;
+    if (!job || !client || !feeBreakdown || feeLoading) return;
     if (!taxDisclaimerAccepted) {
       setToast("Please accept the tax responsibility statement before proceeding.");
       setTimeout(() => setToast(""), 4000);
@@ -454,7 +446,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
   };
 
   const handleRequestInvoice = async () => {
-    if (!job || !client) return;
+    if (!job || !client || !feeBreakdown || feeLoading) return;
     setProcessing(true);
     try {
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -638,9 +630,9 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
     hourlyRate: job.hourly_rate,
     guardFees: costs.guardFees,
     platformFee: costs.serviceFee,
-    platformFeePercent: 10,
+    platformFeePercent: 0,
     stripeFeeEstimate: 0,
-    stripeFeePayer: 'client',
+    stripeFeePayer: 'quickguard',
     vat: costs.vat,
     total: costs.total,
     paymentStatus,
@@ -957,7 +949,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
 
             <div className="lg:col-span-1">
               <div className="sticky top-24 space-y-6">
-                <CostBreakdown {...costBreakdownProps} />
+                {fb ? <CostBreakdown {...costBreakdownProps} /> : <p className="text-amber-400 p-4">{feeLoading ? "Loading booking total…" : "Booking total unavailable. Refresh before paying."}</p>}
 
                 <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-6 space-y-4">
                   <PaymentActions
@@ -970,7 +962,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
                     onViewInvoice={handleViewInvoice}
                     onDownloadReceipt={handleDownloadReceipt}
                     onContactSupport={handleContactSupport}
-                    processing={processing}
+                    processing={processing || feeLoading || !feeBreakdown}
                     agreedToTerms={agreedToTerms}
                     paymentMethod={paymentMethod}
                     totalAmount={fb?.clientTotalCharge?.toFixed(2) || costs.total.toFixed(2)}

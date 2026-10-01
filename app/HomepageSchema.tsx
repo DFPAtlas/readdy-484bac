@@ -77,7 +77,7 @@ export default function HomepageSchema() {
         name: 'When and how do guards get paid?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Once a client confirms job completion, payment is released to your account minus a 5% platform fee. Funds are transferred directly to your registered UK bank account. You also receive automatic UTR and tax documentation to stay HMRC compliant.',
+          text: 'Once a client confirms job completion, payment is released to your account in full, with no guard commission. Funds are transferred directly to your registered UK bank account. You also receive automatic UTR and tax documentation to stay HMRC compliant.',
         },
       },
       {
@@ -85,7 +85,7 @@ export default function HomepageSchema() {
         name: 'Is there a cost for clients to post a job?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: "There are no upfront costs or setup fees for clients. You only pay when a shift is successfully completed. Our transparent commission model means you always know exactly what you're paying for.",
+          text: "There are no upfront costs or setup fees for clients. Payment is required after guard selection, before booking confirmation. Client booking service fees are Free 15%, Starter 10%, Pro 7.5% and Enterprise 5%, with processing included.",
         },
       },
       {

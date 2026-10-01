@@ -508,7 +508,7 @@ export default function HowItWorksClient() {
                     'Client pre-pays for shift security',
                     'Funds held securely during shift',
                     'Client confirms job completion',
-                    'Guard receives payment (minus 5% platform fee)',
+                    'Guard receives full agreed pay (no guard commission)',
                     'Automatic UTR and tax documentation'
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-3">
@@ -677,7 +677,7 @@ export default function HowItWorksClient() {
                 img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20British%20businesswoman%20in%20her%20forties%20with%20blonde%20hair%2C%20wearing%20a%20charcoal%20blazer%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20soft%20professional%20lighting%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-008&orientation=squarish"
               },
               {
-                text: "The earnings dashboard is brilliant. I can track every shift, see my payouts clearly, and the 5% platform fee is the lowest I've seen. I've doubled my monthly income since joining QuickGuard.",
+                text: "The earnings dashboard is brilliant. I can track every shift, see my payouts clearly, and I keep my full agreed pay. I've doubled my monthly income since joining QuickGuard.",
                 name: "Rajan P.",
                 role: "SIA Security Officer · Birmingham",
                 tag: "Guard",

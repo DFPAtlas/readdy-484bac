@@ -159,8 +159,8 @@ export default function Terms() {
                 <div className="bg-amber-500/10 border border-amber-400/20 p-4 rounded-xl mb-4">
                   <ul className="space-y-2 text-slate-400">
                     <li><strong className="text-slate-300">Guard Subscription:</strong> Monthly fee for platform access</li>
-                    <li><strong className="text-slate-300">Client Booking Fee:</strong> 5% of total booking value</li>
-                    <li><strong className="text-slate-300">Payment Processing:</strong> 2.9% + £0.30 per transaction</li>
+                    <li><strong className="text-slate-300">Client Booking Fee:</strong> Free 15%, Starter 10%, Pro 7.5%, Enterprise 5% of agreed guard pay. Existing eligible promotions apply.</li>
+                    <li><strong className="text-slate-300">Payment Processing:</strong> Included in the client booking service fee; no separate card surcharge. Standard guard payouts are included.</li>
                   </ul>
                 </div>
 
@@ -431,7 +431,7 @@ export default function Terms() {
 
                 <h3 className="text-xl font-semibold text-white mb-3">Stripe Processing Fees:</h3>
                 <p className="text-slate-400 mb-4">
-                  Stripe charges a processing fee for each transaction. Depending on your subscription plan, this fee may be paid by the client, deducted from the guard payout, shared between both parties, or absorbed by QuickGuard. Your specific plan terms will indicate who pays the Stripe fee. QuickGuard is not responsible for Stripe's fee structure changes.
+                  QuickGuard covers payment processing and standard payout costs from the client booking service fee. The fee is the same regardless of payment method. Guards receive their full agreed pay with no guard commission.
                 </p>
 
                 <h3 className="text-xl font-semibold text-white mb-3">VAT:</h3>

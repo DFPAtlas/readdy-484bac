@@ -6,59 +6,12 @@ import Link from 'next/link';
 export default function PricingPDFClient() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
 
+  // Printable snapshot of the configured GBP catalogue. All checkout uses /pricing.
   const clientPlans = [
-    {
-      name: 'Free Starter',
-      monthlyPrice: 0,
-      annualPrice: 0,
-      description: 'Perfect for trying out the platform',
-      features: [
-        '1 job posting per month',
-        'Basic guard matching',
-        'Email support',
-        'Standard payment processing',
-        'Basic analytics',
-      ],
-      cta: 'Get Started',
-      monthlyPaymentLink: null,
-      annualPaymentLink: null,
-    },
-    {
-      name: 'Basic',
-      monthlyPrice: 49,
-      annualPrice: 470,
-      description: 'For small businesses with regular security needs',
-      features: [
-        '10 job postings per month',
-        'AI-powered matching',
-        'Priority support',
-        'Advanced analytics',
-        'Multiple guard selection',
-        'Job templates',
-        'Email notifications',
-      ],
-      cta: 'Get Started',
-      monthlyPaymentLink: 'https://buy.stripe.com/test_4gMbJ2dUO5yFgZugXM5Vu00',
-      annualPaymentLink: 'https://buy.stripe.com/test_dRm28s6smd1710w22S5Vu01',
-    },
-    {
-      name: 'Professional',
-      monthlyPrice: 149,
-      annualPrice: 1430,
-      description: 'For growing companies with high-volume needs',
-      features: [
-        'Unlimited job postings',
-        'Premium AI matching',
-        '24/7 priority support',
-        'Advanced analytics & reporting',
-        'Dedicated account manager',
-        'Custom job templates',
-        'Bulk posting',
-      ],
-      cta: 'Get Started',
-      monthlyPaymentLink: 'https://buy.stripe.com/test_cNibJ2aICe5bfVq9vk5Vu02',
-      annualPaymentLink: 'https://buy.stripe.com/test_00waEY8AugdjdNi7nc5Vu03',
-    },
+    { name: 'Free', monthlyPrice: 0, annualPrice: 0, description: 'For trying the platform', features: ['1 job posting per month', '15% booking service fee', 'Payment processing included'], cta: 'Get Started' },
+    { name: 'Starter', monthlyPrice: 49, annualPrice: 490, description: 'For regular security needs', features: ['10 job postings per month', '10% booking service fee', 'Payment processing included'], cta: 'View Plans' },
+    { name: 'Pro', monthlyPrice: 99, annualPrice: 990, description: 'For growing businesses', features: ['30 job postings per month', '7.5% booking service fee', 'Payment processing included'], cta: 'View Plans' },
+    { name: 'Enterprise', monthlyPrice: 199, annualPrice: 1990, description: 'For enterprise security needs', features: ['Unlimited job postings', '5% booking service fee', 'Payment processing included'], cta: 'View Plans' },
   ];
 
   const guardPlans = [
@@ -264,7 +217,7 @@ export default function PricingPDFClient() {
                       </Link>
                     ) : (
                       <a
-                        href={billingCycle === 'monthly' ? plan.monthlyPaymentLink! : plan.annualPaymentLink!}
+                        href="/pricing"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-full py-2.5 rounded-lg font-semibold text-sm transition-all whitespace-nowrap block text-center bg-teal-600 text-white hover:bg-teal-700"
@@ -408,7 +361,7 @@ export default function PricingPDFClient() {
             </table>
           </div>
           <p className="text-xs text-slate-400 mt-3">
-            Rates vary by location, shift length, and urgency. QuickGuard adds a 10% platform service fee to all guard payments.
+            Rates vary by location, shift length, and urgency. Client booking service fees are Free 15%, Starter 10%, Pro 7.5% and Enterprise 5%. Processing is included, and guards keep their full agreed pay.
           </p>
         </section>
 

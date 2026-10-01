@@ -408,7 +408,7 @@ export default function ClientHowItWorks() {
                   { feature: 'Time to hire', quickguard: 'Under 2 hours', agency: '1–3 days' },
                   { feature: 'Contract length', quickguard: 'No contract — book by shift', agency: '12-month minimum' },
                   { feature: 'Guard selection', quickguard: 'You choose the guard', agency: 'Agency assigns randomly' },
-                  { feature: 'Hourly cost', quickguard: 'Transparent rate + 5% fee', agency: 'Hidden markups (30–50%)' },
+                  { feature: 'Hourly cost', quickguard: 'Transparent rate + plan service fee (5–15%)', agency: 'Hidden markups (30–50%)' },
                   { feature: 'Payment', quickguard: 'Stripe held job payment — protected', agency: 'Invoice after service' },
                   { feature: 'Licence verification', quickguard: 'Every guard SIA-verified', agency: 'Manual checks, often missed' },
                 ].map((row, i) => (

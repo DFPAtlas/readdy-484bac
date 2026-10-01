@@ -1,3 +1,4 @@
+import { matchesSubscriptionPrice } from '../_shared/subscription-price.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3?target=deno';
@@ -64,8 +65,9 @@ async function getPriceId(
 
   const { data: plan, error: planError } = await publicSupabase
     .from('plans')
-    .select('name, stripe_price_id, stripe_annual_price_id, stripe_product_id')
+    .select('name, stripe_price_id, stripe_annual_price_id, stripe_product_id, monthly_price_pence')
     .eq('slug', planId)
+    .eq('active', true)
     .maybeSingle();
 
   if (planError) {
@@ -81,55 +83,15 @@ async function getPriceId(
 
   const targetPriceId = billingCycle === 'annual' ? plan?.stripe_annual_price_id : plan?.stripe_price_id;
 
-  if (targetPriceId) {
-    try {
-      const price = await stripe.prices.retrieve(targetPriceId);
-      if (price.active && price.recurring) {
-        console.log(`[getPriceId] Using price ${targetPriceId}`);
-        return { priceId: targetPriceId, error: null };
-      } else {
-        console.warn(`Price ${targetPriceId} is inactive or not recurring.`);
-      }
-    } catch (e: any) {
-      console.warn(`Stripe price retrieve failed for ${targetPriceId}:`, e.message);
-    }
-  }
-
-  if (plan?.stripe_product_id && plan.stripe_product_id.startsWith('prod_')) {
-    try {
-      const prices = await stripe.prices.list({
-        active: true,
-        limit: 10,
-        product: plan.stripe_product_id,
-      });
-      const recurringPrice = prices.data.find((p: any) => p.recurring);
-      if (recurringPrice) {
-        console.log(`[getPriceId] Fallback from product: ${recurringPrice.id}`);
-        return { priceId: recurringPrice.id, error: null };
-      }
-    } catch (e: any) {
-      console.warn(`Stripe product price list failed for ${plan.stripe_product_id}:`, e.message);
-    }
-  }
-
-  const planName = PLAN_NAMES[planId] || plan?.name;
-  if (!planName) return { priceId: null, error: `No plan name found for "${planId}".` };
-
+  if (!targetPriceId) return { priceId: null, error: 'Subscription price is not configured.' };
   try {
-    const products = await stripe.products.list({ active: true, limit: 100 });
-    const product = products.data.find(
-      (p: any) => p.name === planName || p.name === `${planName} — Monthly` || p.name === `${planName} — Annual`
-    );
-    if (!product) {
-      return { priceId: null, error: `Stripe product "${planName}" not found. Please run the Stripe price sync from the admin dashboard.` };
+    const price = await stripe.prices.retrieve(targetPriceId);
+    if (!matchesSubscriptionPrice(price, plan, billingCycle || 'monthly')) {
+      return { priceId: null, error: 'Subscription price does not match the selected plan and billing period.' };
     }
-
-    const prices = await stripe.prices.list({ active: true, limit: 10, product: product.id });
-    const recurringPrice = prices.data.find((p: any) => p.recurring);
-    if (recurringPrice) return { priceId: recurringPrice.id, error: null };
-    return { priceId: null, error: `No recurring price found for product "${planName}".` };
-  } catch (e: any) {
-    return { priceId: null, error: `Stripe API error: ${e.message}` };
+    return { priceId: targetPriceId, error: null };
+  } catch {
+    return { priceId: null, error: 'Unable to verify the selected subscription price.' };
   }
 }
 
@@ -294,6 +256,10 @@ serve(async (req) => {
     const body = await req.json();
 
     const { userId: requestedUserId, accountType: requestedAccountType, planId, userEmail: requestedEmail, billingCycle, siteUrl: bodySiteUrl } = body;
+
+    if (billingCycle != null && !['monthly', 'annual'].includes(billingCycle)) {
+      return new Response(JSON.stringify({ error: 'Invalid billing cycle' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     if (!planId) {
       return new Response(
