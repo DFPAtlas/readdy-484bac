@@ -7,6 +7,7 @@ import { useSafeRouter } from './useSafeRouter';
 
 const ROUTE_FEATURES: Record<string, string> = {
   '/client/post-job': 'client.post_job',
+  '/client/jobs/payment': 'client.escrow_payments',
   '/client/jobs/tracker': 'client.job_tracker',
   '/client/reports': 'client.analytics_dashboard',
   '/client/templates': 'client.job_templates',
