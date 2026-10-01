@@ -28,8 +28,9 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
     if (authError || !user) {
+      console.error('[create-job] Token validation failed:', authError?.message || 'User not found');
       return new Response(JSON.stringify({ error: 'unauthorized', message: 'Invalid auth token' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
