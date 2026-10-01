@@ -256,6 +256,34 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "needs_review_guards") {
+      const reviewIds = await getNeedsReviewGuardIds(supabase);
+      if (reviewIds.length === 0) {
+        return new Response(JSON.stringify({ data: [] }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      const { data: guards, error } = await supabase
+        .from("guards")
+        .select("id,sia_licence_number,full_name")
+        .eq("verification_status", "manual_review")
+        .not("sia_licence_number", "is", null)
+        .in("id", reviewIds);
+
+      if (error) throw error;
+
+      const data = (guards || []).map((g: any) => ({
+        guardId: g.id,
+        licenceNumber: g.sia_licence_number,
+        fullName: g.full_name || "N/A",
+      }));
+
+      return new Response(JSON.stringify({ data, totalCount: data.length }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Invalid action" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
     });

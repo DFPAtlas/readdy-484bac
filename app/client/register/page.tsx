@@ -8,6 +8,7 @@ import TaxDisclaimerCheckbox from '@/components/TaxDisclaimerCheckbox';
 import { sanitizeRedirectPath } from '@/lib/safe-redirect';
 import RegisterMarketingPanel from '@/components/login/RegisterMarketingPanel';
 import RegisterFormCard from '@/components/login/RegisterFormCard';
+import SocialConsentNotice from '@/components/login/SocialConsentNotice';
 import QGExitIntentPopup from '@/components/qg-rewards/QGExitIntentPopup';
 
 const mobileBg = "https://readdy.ai/api/search-image?query=Dark%20subtle%20abstract%20gradient%20background%20with%20faint%20navy%20blue%20and%20cyan%20mesh%20lines%2C%20minimal%20technology%20pattern%2C%20very%20low%20contrast%20and%20opacity%2C%20suitable%20for%20dark%20mode%20mobile%20login%20screen%20background%2C%20soft%20glowing%20particles%2C%20premium%20SaaS%20aesthetic&width=800&height=1200&seq=2&orientation=portrait";
@@ -381,6 +382,8 @@ export default function ClientRegister() {
                 )}
                 <span className="font-medium text-sm text-[#AAB7C4] whitespace-nowrap">Continue with LinkedIn</span>
               </button>
+
+              <SocialConsentNotice />
 
               <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center">

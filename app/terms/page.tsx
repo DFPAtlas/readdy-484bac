@@ -465,7 +465,6 @@ export default function Terms() {
                 <div className="space-y-2 text-slate-400">
                   <p><strong className="text-slate-300">Email:</strong> legal@quickguard.uk</p>
                   <p><strong className="text-slate-300">Phone:</strong> 01992 217019</p>
-                  <p><strong className="text-slate-300">Address:</strong> QuickGuard Legal Department, 123 Security Street, London, EC1A 1AA</p>
                 </div>
                 <div className="mt-4 pt-4 border-t border-slate-700/50">
                   <Link href="/contact" className="inline-flex items-center text-teal-400 hover:text-teal-300 transition-colors">

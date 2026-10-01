@@ -20,7 +20,7 @@ export default function PrivacyPolicy() {
             How we collect, use, and protect your personal information
           </p>
           <p className="text-sm text-slate-500 mt-4">
-            Last updated: January 2024
+            Last updated: 1 October 2026
           </p>
         </div>
       </section>
@@ -37,6 +37,7 @@ export default function PrivacyPolicy() {
                     <li><a href="#introduction" className="text-teal-400 hover:text-teal-300">1. Introduction</a></li>
                     <li><a href="#data-collection" className="text-teal-400 hover:text-teal-300">2. Data We Collect</a></li>
                     <li><a href="#google-oauth" className="text-teal-400 hover:text-teal-300">3. Google OAuth & Third-Party Login</a></li>
+                    <li><a href="#linkedin-signin" className="text-teal-400 hover:text-teal-300">Signing in with LinkedIn</a></li>
                     <li><a href="#how-we-use" className="text-teal-400 hover:text-teal-300">4. How We Use Your Data</a></li>
                     <li><a href="#legal-basis" className="text-teal-400 hover:text-teal-300">5. Legal Basis for Processing</a></li>
                     <li><a href="#data-sharing" className="text-teal-400 hover:text-teal-300">6. Data Sharing & Disclosure</a></li>
@@ -65,7 +66,7 @@ export default function PrivacyPolicy() {
                 </p>
                 <div className="bg-teal-500/10 border border-teal-400/20 p-4 my-4 rounded-xl">
                   <p className="text-teal-400">
-                    <strong className="text-teal-300">Data Controller:</strong> QuickGuard Ltd is the data controller responsible for your personal data. We are registered with the Information Commissioner's Office (ICO) under registration number ZA123456.
+                    <strong className="text-teal-300">Data Controller:</strong> QuickGuard Ltd is the data controller responsible for your personal data.
                   </p>
                 </div>
                 <p className="text-slate-400">
@@ -220,6 +221,82 @@ export default function PrivacyPolicy() {
                   <p className="text-sm text-slate-400">
                     QuickGuard's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-teal-400 mx-1">Google API Services User Data Policy</a>, including the Limited Use requirements.
                   </p>
+                </div>
+
+                <div id="linkedin-signin" className="mt-12 pt-12 border-t border-slate-700/50">
+                  <div className="bg-teal-500/10 border border-teal-400/20 p-6 mb-6 rounded-xl">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-[#0e1628] border border-teal-400/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <i className="ri-linkedin-fill text-teal-400 text-2xl" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold text-white mb-2">Signing in with LinkedIn</h3>
+                        <p className="text-slate-400">
+                          QuickGuard offers &ldquo;Continue with LinkedIn&rdquo; as an optional way to create an account or sign in. You can always use another sign-in method instead.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-slate-400 mb-4">
+                    When you select this option, you are redirected to LinkedIn and asked to approve the information that LinkedIn will provide to QuickGuard. Depending on the information available in your LinkedIn account and the permissions you approve, we may receive:
+                  </p>
+
+                  <ul className="list-disc list-inside space-y-2 text-slate-400 mb-6">
+                    <li>Your unique LinkedIn account identifier;</li>
+                    <li>Your name;</li>
+                    <li>Your primary email address;</li>
+                    <li>Your LinkedIn profile photograph; and</li>
+                    <li>Your email verification status, where provided.</li>
+                  </ul>
+
+                  <h4 className="text-lg font-semibold text-white mb-3">How we use this information</h4>
+                  <p className="text-slate-400 mb-4">We use this information only to:</p>
+                  <div className="space-y-3 mb-6">
+                    {[
+                      'Verify your identity;',
+                      'Create and manage your QuickGuard account;',
+                      'Sign you into QuickGuard;',
+                      'Pre-fill basic account information; and',
+                      'Protect QuickGuard and its users against fraud, misuse and unauthorised access.',
+                    ].map((item) => (
+                      <div key={item} className="flex items-start gap-3">
+                        <i className="ri-checkbox-circle-fill text-teal-400 text-xl flex-shrink-0 mt-1" />
+                        <p className="text-slate-400">{item}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-slate-400 mb-6">
+                    QuickGuard does not use LinkedIn sign-in to access your LinkedIn connections, private messages, posts or full employment history. We do not publish content to LinkedIn on your behalf.
+                  </p>
+
+                  <div className="bg-[#0e1628] border border-slate-700/50 p-4 rounded-xl mb-6">
+                    <p className="text-sm text-slate-400">
+                      LinkedIn authentication is processed through our authentication provider, Supabase. The information needed to operate your QuickGuard account is stored securely with your account and retained only for as long as it is needed to provide the service, comply with legal obligations, resolve disputes or protect the platform.
+                    </p>
+                  </div>
+
+                  <h4 className="text-lg font-semibold text-white mb-3">Managing and removing LinkedIn access</h4>
+                  <p className="text-slate-400 mb-4">
+                    You can stop using LinkedIn sign-in at any time. You can remove QuickGuard&rsquo;s access through your LinkedIn account settings or contact QuickGuard to withdraw your consent and request deletion of information obtained from LinkedIn.
+                  </p>
+                  <p className="text-slate-400 mb-4">
+                    Removing QuickGuard from LinkedIn does not automatically delete your QuickGuard account. If you want to keep your QuickGuard account, you may need to establish another sign-in method before disconnecting LinkedIn.
+                  </p>
+                  <p className="text-slate-400 mb-6">
+                    If you close your QuickGuard account or make a valid deletion request, we will delete information received from LinkedIn unless retaining specific information is required by law or is necessary for the establishment, exercise or defence of legal claims.
+                  </p>
+
+                  <div className="bg-amber-500/10 border border-amber-400/20 p-4 rounded-xl mb-6">
+                    <p className="text-sm text-slate-400">
+                      LinkedIn processes information under its own Privacy Policy. QuickGuard does not control LinkedIn&rsquo;s independent processing of personal information on LinkedIn&rsquo;s services.
+                    </p>
+                    <a href="https://www.linkedin.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-teal-400 hover:text-teal-300 mt-3 text-sm">
+                      <i className="ri-external-link-line" />
+                      LinkedIn Privacy Policy
+                    </a>
+                  </div>
                 </div>
               </section>
 
@@ -464,12 +541,9 @@ export default function PrivacyPolicy() {
                       </div>
                     </div>
                     <div>
-                      <h4 className="font-semibold text-teal-400 mb-3">Postal Address</h4>
+                      <h4 className="font-semibold text-teal-400 mb-3">Registered Entity</h4>
                       <p className="text-slate-400">
                         QuickGuard Ltd<br />
-                        Data Protection Officer<br />
-                        123 Security Street<br />
-                        London, EC1A 1AA<br />
                         United Kingdom
                       </p>
                     </div>
@@ -492,7 +566,7 @@ export default function PrivacyPolicy() {
             <div className="mt-12 pt-8 border-t border-slate-700/50">
               <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
                 <p className="text-sm text-slate-500">
-                  This Privacy Policy was last updated on January 2024.
+                  This Privacy Policy was last updated on 1 October 2026.
                 </p>
                 <div className="flex gap-4">
                   <Link href="/terms" className="inline-flex items-center text-teal-400 hover:text-teal-300 transition-colors text-sm">

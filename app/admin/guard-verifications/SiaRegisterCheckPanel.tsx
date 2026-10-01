@@ -103,6 +103,7 @@ export default function SiaRegisterCheckPanel({ guard }: { guard: GuardVerificat
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isMountedRef = useRef(true);
 
   const loadChecks = useCallback(async (): Promise<SiaCheckRecord[]> => {
     const { data, error: fetchError } = await supabase
@@ -112,6 +113,8 @@ export default function SiaRegisterCheckPanel({ guard }: { guard: GuardVerificat
       .eq('subject_id', guard.id)
       .order('created_at', { ascending: false })
       .limit(10);
+
+    if (!isMountedRef.current) return [];
 
     if (fetchError) {
       setError(fetchError.message);
@@ -123,13 +126,19 @@ export default function SiaRegisterCheckPanel({ guard }: { guard: GuardVerificat
   }, [guard.id]);
 
   useEffect(() => {
-    let active = true;
+    isMountedRef.current = true;
+    setLoading(true);
     (async () => {
-      setLoading(true);
       await loadChecks();
-      if (active) setLoading(false);
+      if (isMountedRef.current) setLoading(false);
     })();
-    return () => { active = false; };
+    return () => {
+      isMountedRef.current = false;
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
   }, [loadChecks]);
 
   const stopPolling = useCallback(() => {
@@ -137,7 +146,7 @@ export default function SiaRegisterCheckPanel({ guard }: { guard: GuardVerificat
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
-    setRunning(false);
+    if (isMountedRef.current) setRunning(false);
   }, []);
 
   const startPolling = useCallback(() => {
@@ -147,14 +156,13 @@ export default function SiaRegisterCheckPanel({ guard }: { guard: GuardVerificat
     pollRef.current = setInterval(async () => {
       attempts += 1;
       const list = await loadChecks();
+      if (!isMountedRef.current) return;
       const latest = list[0] || null;
       if (!isInProgress(latest) || attempts >= 30) {
         stopPolling();
       }
     }, 10000);
   }, [loadChecks, stopPolling]);
-
-  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   const handleRerun = async () => {
     setError(null);
@@ -163,11 +171,14 @@ export default function SiaRegisterCheckPanel({ guard }: { guard: GuardVerificat
       const { data, error: fnError } = await supabase.functions.invoke('sia-check', {
         body: { guard_id: guard.id, sia_licence_number: guard.sia_licence_number },
       });
+      if (!isMountedRef.current) return;
       if (fnError) throw new Error(fnError.message || 'SIA check call failed');
       if (data?.error) throw new Error(data.error);
       await loadChecks();
+      if (!isMountedRef.current) return;
       startPolling();
     } catch (err: any) {
+      if (!isMountedRef.current) return;
       setError(err.message || 'Failed to re-run SIA check');
       setRunning(false);
     }

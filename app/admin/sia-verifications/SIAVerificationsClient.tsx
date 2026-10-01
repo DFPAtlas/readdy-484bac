@@ -57,11 +57,21 @@ export default function SIAVerificationsClient() {
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'expiry'>('date');
   const [stats, setStats] = useState<Stats>({ totalPending: 0, totalVerified: 0, totalRejected: 0, totalExpired: 0, expiringIn30Days: 0, needsReview: 0 });
   const [retriggering, setRetriggering] = useState<string | null>(null);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [selectedCardUser, setSelectedCardUser] = useState<VerificationEntry | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   const fetchPage = useCallback(async (p: number, f: string, s: string, sb: string) => {
+    if (!isMountedRef.current) return;
     setLoading(true);
     setError(null);
     try {
@@ -69,6 +79,7 @@ export default function SIAVerificationsClient() {
         body: { action: 'list', page: p, pageSize: PAGE_SIZE, search: s, filter: f, sortBy: sb },
       });
 
+      if (!isMountedRef.current) return;
       if (fnError) throw new Error(fnError.message || 'Failed to load verifications');
       if (result?.error) throw new Error(result.error);
 
@@ -80,12 +91,13 @@ export default function SIAVerificationsClient() {
         setStats(result.stats);
       }
     } catch (err: any) {
+      if (!isMountedRef.current) return;
       console.error('Error fetching SIA verifications:', err);
       setError(err.message || 'Failed to load verifications');
       setEntries([]);
       setTotalCount(0);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) setLoading(false);
     }
   }, []);
 
@@ -94,6 +106,7 @@ export default function SIAVerificationsClient() {
       const { data: result, error: fnError } = await supabase.functions.invoke('admin-sia-verifications', {
         body: { action: 'stats' },
       });
+      if (!isMountedRef.current) return;
       if (!fnError && result?.stats) {
         setStats(result.stats);
       }
@@ -150,6 +163,7 @@ export default function SIAVerificationsClient() {
         body: { guard_id: entry.guardId, sia_licence_number: entry.siaLicenseNumber },
       });
 
+      if (!isMountedRef.current) return;
       if (fnError) throw new Error(fnError.message || 'SIA check call failed');
       if (result?.error) throw new Error(result.error);
 
@@ -167,12 +181,84 @@ export default function SIAVerificationsClient() {
 
       await fetchPage(page, filter, debouncedSearch, sortBy);
       await fetchStats();
-      setToast({ message: statusMessage, type: 'success' });
+      if (isMountedRef.current) setToast({ message: statusMessage, type: 'success' });
     } catch (err: any) {
       console.error('Error re-triggering SIA verification:', err);
-      setToast({ message: err.message || 'Failed to re-trigger verification', type: 'error' });
+      if (isMountedRef.current) setToast({ message: err.message || 'Failed to re-trigger verification', type: 'error' });
     } finally {
-      setRetriggering(null);
+      if (isMountedRef.current) setRetriggering(null);
+    }
+  };
+
+  const handleBulkRerun = async () => {
+    setShowBulkConfirm(false);
+    setBulkRunning(true);
+    setBulkProgress(null);
+    try {
+      const { data: listResult, error: listError } = await supabase.functions.invoke('admin-sia-verifications', {
+        body: { action: 'needs_review_guards' },
+      });
+      if (!isMountedRef.current) return;
+      if (listError) throw new Error(listError.message || 'Failed to load guards awaiting review');
+      if (listResult?.error) throw new Error(listResult.error);
+
+      const targets: Array<{ guardId: string; licenceNumber: string; fullName: string }> =
+        Array.isArray(listResult?.data) ? listResult.data : [];
+
+      if (targets.length === 0) {
+        setToast({ message: 'No guards need a re-check right now', type: 'success' });
+        return;
+      }
+
+      setBulkProgress({ done: 0, total: targets.length });
+
+      let queued = 0;
+      let failed = 0;
+      const failedNames: string[] = [];
+
+      for (let i = 0; i < targets.length; i++) {
+        const target = targets[i];
+        try {
+          const { data, error: fnError } = await supabase.functions.invoke('sia-check', {
+            body: { guard_id: target.guardId, sia_licence_number: target.licenceNumber },
+          });
+          if (!isMountedRef.current) return;
+          if (fnError || data?.error) throw new Error(fnError?.message || data?.error);
+          queued += 1;
+        } catch {
+          failed += 1;
+          failedNames.push(target.fullName || target.guardId);
+        }
+        if (isMountedRef.current) setBulkProgress({ done: i + 1, total: targets.length });
+      }
+
+      await logAdminAction({
+        actionType: 'sia_check_bulk_requeued',
+        actionDescription: `Re-ran SIA checks for ${queued} guard${queued !== 1 ? 's' : ''} awaiting review${failed ? `, ${failed} failed` : ''}`,
+        targetType: 'guard',
+        metadata: { total: targets.length, queued, failed, guardIds: targets.map((t) => t.guardId) },
+      });
+
+      await fetchPage(page, filter, debouncedSearch, sortBy);
+      await fetchStats();
+
+      if (!isMountedRef.current) return;
+      if (queued > 0) {
+        setToast({
+          message: `Re-queued checks for ${queued} guard${queued !== 1 ? 's' : ''}${failed ? ` · ${failed} failed` : ''}`,
+          type: 'success',
+        });
+      } else {
+        setToast({ message: `Could not queue any checks${failedNames.length ? ` (${failedNames.slice(0, 3).join(', ')}${failedNames.length > 3 ? '…' : ''})` : ''}`, type: 'error' });
+      }
+    } catch (err: any) {
+      console.error('Error bulk re-running SIA checks:', err);
+      if (isMountedRef.current) setToast({ message: err.message || 'Bulk re-run failed', type: 'error' });
+    } finally {
+      if (isMountedRef.current) {
+        setBulkRunning(false);
+        setBulkProgress(null);
+      }
     }
   };
 
@@ -287,6 +373,39 @@ export default function SIAVerificationsClient() {
             <i className={`${toast.type === 'success' ? 'ri-checkbox-circle-fill text-emerald-400' : 'ri-error-warning-fill text-red-400'} text-lg`}></i>
           </div>
           {toast.message}
+        </div>
+      )}
+
+      {showBulkConfirm && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6" onClick={() => setShowBulkConfirm(false)}>
+          <div className="bg-[#0a1628] rounded-3xl max-w-md w-full shadow-2xl border border-[#1a2b4a] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 px-6 py-5 border-b border-[#1a2b4a]">
+              <div className="w-11 h-11 rounded-xl bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                <i className="ri-refresh-line text-xl text-purple-400"></i>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Re-run SIA checks</h3>
+                <p className="text-xs text-slate-400 font-medium">Needs review queue</p>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-slate-300 font-medium">
+                This will queue a fresh register check for all <span className="font-bold text-white">{stats.needsReview}</span> guard{stats.needsReview !== 1 ? 's' : ''} currently in Needs review.
+              </p>
+              <div className="mt-3 bg-[#0B1933] rounded-xl p-4 ring-1 ring-[#1a2b4a]">
+                <p className="text-xs text-slate-400 font-medium">Results update automatically as each check completes. Any decision you've already made by hand stays in place.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 px-6 py-4 border-t border-[#1a2b4a]">
+              <button onClick={() => setShowBulkConfirm(false)} className="flex-1 px-5 py-2.5 bg-[#1a2b4a] hover:bg-[#243452] text-slate-300 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer">
+                Cancel
+              </button>
+              <button onClick={handleBulkRerun} className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer">
+                <div className="w-4 h-4 flex items-center justify-center"><i className="ri-refresh-line text-sm"></i></div>
+                Re-run {stats.needsReview} check{stats.needsReview !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -549,7 +668,8 @@ export default function SIAVerificationsClient() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
           {[
             { key: 'all', label: 'All', icon: 'ri-list-check', count: null },
             { key: 'pending', label: 'Pending', icon: 'ri-time-line', count: stats.totalPending },
@@ -576,6 +696,21 @@ export default function SIAVerificationsClient() {
               )}
             </button>
           ))}
+          </div>
+          {filter === 'needs_review' && (
+            <button
+              onClick={() => setShowBulkConfirm(true)}
+              disabled={bulkRunning || stats.needsReview === 0}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap cursor-pointer bg-purple-600 hover:bg-purple-500 text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="w-4 h-4 flex items-center justify-center">
+                <i className={`${bulkRunning ? 'ri-loader-4-line animate-spin' : 'ri-refresh-line'} text-sm`}></i>
+              </div>
+              {bulkRunning && bulkProgress
+                ? `Re-running ${bulkProgress.done}/${bulkProgress.total}…`
+                : `Re-run check (${stats.needsReview})`}
+            </button>
+          )}
         </div>
       </div>
 
