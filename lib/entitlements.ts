@@ -66,6 +66,31 @@ export const CLIENT_FEATURE_KEYS: ClientFeatureKey[] = [
   'client.job_tracker',
 ];
 
+function normaliseFeatures(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((feature): feature is string => typeof feature === 'string');
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((feature): feature is string => typeof feature === 'string');
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function normalisePlanSlug(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (value === 'free') return 'client_free';
+  return value;
+}
+
 const entitlementCache = new Map<string, { data: Entitlement | null; ts: number }>();
 const CACHE_TTL = 60_000;
 
@@ -105,7 +130,7 @@ export async function hasFeature(userId: string, featureKey: FeatureKey): Promis
   const ent = await getUserEntitlements(userId);
   let features: string[] = [];
   if (ent && ent.is_active) {
-    features = ent.features || [];
+    features = normaliseFeatures(ent.features);
   }
 
   if (features.length === 0) {
@@ -116,7 +141,7 @@ export async function hasFeature(userId: string, featureKey: FeatureKey): Promis
         .eq('user_id', userId)
         .maybeSingle();
 
-      const planSlug = clientRow?.plan_slug || clientRow?.subscription_plan;
+      const planSlug = normalisePlanSlug(clientRow?.plan_slug || clientRow?.subscription_plan);
       if (planSlug) {
         const { data: plan } = await supabase
           .from('plans')
@@ -125,9 +150,7 @@ export async function hasFeature(userId: string, featureKey: FeatureKey): Promis
           .eq('active', true)
           .maybeSingle();
 
-        if (plan?.features && Array.isArray(plan.features)) {
-          features = plan.features;
-        }
+        features = normaliseFeatures(plan?.features);
       }
     } catch {}
   }
@@ -274,7 +297,7 @@ export async function getAllClientFeaturesFromEntitlement(
   let entFeatures: string[] = [];
 
   if (ent && ent.is_active) {
-    entFeatures = ent.features || [];
+    entFeatures = normaliseFeatures(ent.features);
   }
 
   if (entFeatures.length === 0) {
@@ -285,7 +308,7 @@ export async function getAllClientFeaturesFromEntitlement(
         .eq('user_id', userId)
         .maybeSingle();
 
-      const planSlug = clientRow?.plan_slug || clientRow?.subscription_plan;
+      const planSlug = normalisePlanSlug(clientRow?.plan_slug || clientRow?.subscription_plan);
       if (planSlug) {
         const { data: plan } = await supabase
           .from('plans')
@@ -294,9 +317,7 @@ export async function getAllClientFeaturesFromEntitlement(
           .eq('active', true)
           .maybeSingle();
 
-        if (plan?.features && Array.isArray(plan.features)) {
-          entFeatures = plan.features;
-        }
+        entFeatures = normaliseFeatures(plan?.features);
       }
     } catch {}
   }
@@ -315,7 +336,7 @@ export async function getAllClientFeaturesFromEntitlement(
       if (adminId) {
         const adminEnt = await getUserEntitlements(adminId);
         if (adminEnt && adminEnt.is_active) {
-          teamFeatures = adminEnt.features || [];
+          teamFeatures = normaliseFeatures(adminEnt.features);
         }
       }
     }
