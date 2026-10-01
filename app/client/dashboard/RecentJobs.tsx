@@ -164,7 +164,7 @@ export default function RecentJobs({ jobs, loading = false }: RecentJobsProps) {
 
                 <div className="flex items-center gap-1.5 flex-wrap mt-1 sm:mt-0">
                   <button
-                    onClick={() => router.push(`/client/jobs/${job.id}`)}
+                    onClick={() => router.push(`/client/jobs/detail?id=${encodeURIComponent(job.id)}`)}
                     className="px-3 py-1.5 text-xs font-semibold bg-white dark:bg-[#111d35] border border-slate-200 dark:border-[#1e2d4d] rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#162036] transition-colors cursor-pointer whitespace-nowrap"
                   >
                     View Job
@@ -183,7 +183,7 @@ export default function RecentJobs({ jobs, loading = false }: RecentJobsProps) {
                   </button>
                   {job.applications_count > 0 && job.status !== 'completed' && job.status !== 'cancelled' && (
                     <button
-                      onClick={() => router.push(`/client/jobs/${job.id}`)}
+                      onClick={() => router.push(`/client/jobs/applicants?id=${encodeURIComponent(job.id)}`)}
                       className="px-3 py-1.5 text-xs font-semibold bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-500 hover:bg-blue-500/20 transition-colors cursor-pointer whitespace-nowrap"
                     >
                       Review Applicants
@@ -207,7 +207,7 @@ export default function RecentJobs({ jobs, loading = false }: RecentJobsProps) {
                   )}
                   {job.needs_review && (
                     <button
-                      onClick={() => router.push(`/client/jobs/${job.id}`)}
+                      onClick={() => router.push(`/client/jobs/detail?id=${encodeURIComponent(job.id)}`)}
                       className="px-3 py-1.5 text-xs font-semibold bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors cursor-pointer whitespace-nowrap"
                     >
                       <i className="ri-star-line mr-1" />
