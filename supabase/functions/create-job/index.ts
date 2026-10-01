@@ -36,7 +36,10 @@ serve(async (req) => {
       });
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      db: { schema: 'app' },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
 
     const body = await req.json();
     const { formData, clientId } = body;
@@ -47,11 +50,18 @@ serve(async (req) => {
       });
     }
 
-    const { data: client } = await supabaseAdmin
+    const { data: client, error: clientError } = await supabaseAdmin
       .from('clients')
       .select('id, user_id, contact_name, email, phone, company_name, subscription_tier')
       .eq('id', clientId)
       .maybeSingle();
+
+    if (clientError) {
+      console.error('[create-job] Client lookup failed:', clientError.code);
+      return new Response(JSON.stringify({ error: 'client_lookup_failed', message: 'Could not load your client profile. Please try again.' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!client || client.user_id !== user.id) {
       return new Response(JSON.stringify({ error: 'unauthorized', message: 'Client mismatch or not found' }), {
@@ -59,11 +69,18 @@ serve(async (req) => {
       });
     }
 
-    const { data: entitlement } = await supabaseAdmin
+    const { data: entitlement, error: entitlementError } = await supabaseAdmin
       .from('user_entitlements_data')
       .select('plan_slug, plan_name, features, is_active')
       .eq('user_id', user.id)
       .maybeSingle();
+
+    if (entitlementError) {
+      console.error('[create-job] Entitlement lookup failed:', entitlementError.code);
+      return new Response(JSON.stringify({ error: 'entitlement_lookup_failed', message: 'Could not load your subscription plan. Please try again.' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!entitlement?.plan_slug || !entitlement.is_active) {
       return new Response(JSON.stringify({
