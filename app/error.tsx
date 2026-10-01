@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import BrandLogo from '@/components/BrandLogo';
 
 export default function Error({
   error,
@@ -16,7 +17,9 @@ export default function Error({
   return (
     <div className="min-h-screen bg-[#0B1933] flex items-center justify-center p-4">
       <div className="max-w-md w-full text-center">
-        <div className="font-['Pacifico'] text-4xl text-teal-400 mb-8">QuickGuard</div>
+        <div className="flex justify-center mb-8">
+          <BrandLogo variant="full" theme="dark" imgClassName="h-11 w-auto" />
+        </div>
         <div className="text-6xl font-bold text-teal-400 mb-4">Oops!</div>
         <h1 className="text-2xl font-semibold text-white mb-2">Something went wrong</h1>
         <p className="text-slate-400 mb-6">

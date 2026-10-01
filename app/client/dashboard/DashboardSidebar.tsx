@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import BrandLogo from '@/components/BrandLogo';
 
 interface SidebarProps {
   companyName: string;
@@ -32,11 +33,8 @@ export default function DashboardSidebar({ companyName, subscriptionTier, initia
   return (
     <aside className="w-64 min-h-screen bg-[#0B1933] flex flex-col fixed left-0 top-0 z-30 border-r border-[#1a2b4a]">
       <div className="px-6 py-6 border-b border-[#1a2b4a]">
-        <Link href="/" className="flex items-center gap-2 mb-6">
-          <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
-            <i className="ri-shield-check-line text-white text-lg"></i>
-          </div>
-          <span className="text-white text-lg font-bold font-[family-name:var(--font-pacifico)]">QuickGuard</span>
+        <Link href="/" className="flex items-center mb-6" aria-label="QuickGuard home">
+          <BrandLogo variant="full" theme="dark" imgClassName="h-9 w-auto" />
         </Link>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">

@@ -165,10 +165,10 @@ export default function OnboardingPanel({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-violet-600 dark:text-violet-400">
-                Your trial is active — {trialDaysLeft} {trialDaysLeft === 1 ? 'day' : 'days'} remaining
+                You're on the Free plan — publish up to 1 job per month
               </p>
               <p className="text-xs text-violet-500/70">
-                {subscriptionStatus === 'trialing' ? 'No charges until your trial ends. Post jobs now and only pay after the trial.' : 'You can post jobs and hire guards immediately.'}
+                Free accounts pay per job. You can post jobs and hire guards immediately — upgrade any time for more monthly posts and lower fees.
               </p>
             </div>
             <Link

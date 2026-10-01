@@ -9,6 +9,7 @@ import { hasFeature, CLIENT_FEATURE_KEYS, getAllClientFeatures } from '@/lib/ent
 import { useSidebar } from '@/lib/SidebarContext';
 import type React from 'react';
 import NotificationBadge from '@/components/NotificationBadge';
+import BrandLogo from '@/components/BrandLogo';
 
 interface PortalSidebarProps {
   role: 'client' | 'guard' | 'company';
@@ -181,13 +182,12 @@ export default function PortalSidebar({
       </div>
 
       <div className={`border-b border-[#1a2b4a] ${collapsed ? 'px-2 py-4' : 'px-5 py-5'}`}>
-        <Link href="/" prefetch={false} className={`flex items-center gap-2.5 mb-5 outline-none ${collapsed ? 'justify-center' : ''}`}>
-          <div className="w-9 h-9 bg-teal-500 rounded-lg flex items-center justify-center shadow-lg shadow-teal-500/20 flex-shrink-0">
-            <i className="ri-shield-check-line text-white text-lg"></i>
-          </div>
-          {!collapsed && (
-            <span className="text-white text-lg font-bold font-[family-name:var(--font-pacifico)] tracking-wide">QuickGuard</span>
-          )}
+        <Link href="/" prefetch={false} className={`flex items-center mb-5 outline-none ${collapsed ? 'justify-center' : ''}`} aria-label="QuickGuard home">
+          <BrandLogo
+            variant={collapsed ? 'symbol' : 'full'}
+            theme="dark"
+            imgClassName={collapsed ? 'h-8 w-8' : 'h-9 w-auto'}
+          />
         </Link>
 
         <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>

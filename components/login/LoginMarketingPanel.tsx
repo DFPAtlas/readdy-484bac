@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import BrandLogo from "@/components/BrandLogo";
 
 const features = [
   "Instant Job Alerts",
@@ -37,11 +38,8 @@ export default function LoginMarketingPanel() {
       <div className="pointer-events-none absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.3) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
 
       <div className="relative z-10">
-        <Link href="/" className="inline-flex items-center gap-2 cursor-pointer">
-          <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#1DA1F2]/15 border border-[#1DA1F2]/20">
-            <i className="ri-shield-check-fill text-[#1DA1F2] text-lg" />
-          </div>
-          <span className="font-[family-name:var(--font-pacifico)] text-xl text-white">QuickGuard</span>
+        <Link href="/" className="inline-flex items-center cursor-pointer" aria-label="QuickGuard home">
+          <BrandLogo variant="full" theme="dark" imgClassName="h-9 w-auto" />
         </Link>
       </div>
 

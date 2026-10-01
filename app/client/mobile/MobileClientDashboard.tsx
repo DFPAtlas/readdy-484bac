@@ -213,7 +213,7 @@ export default function MobileClientDashboard() {
   const getSubscriptionStatus = () => {
     if (!client) return null;
     const { subscription_status, subscription_plan, subscription_tier } = client;
-    if (subscription_status === 'trialing') return { text: 'Free Trial', color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20' };
+    if (subscription_status === 'trialing') return { text: 'Free Plan', color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20' };
     if (subscription_status === 'active') return { text: subscription_plan || subscription_tier || 'Active', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' };
     if (subscription_status === 'cancelled') return { text: 'Cancelled', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' };
     if (subscription_status === 'past_due') return { text: 'Past Due', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' };

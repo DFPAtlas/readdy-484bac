@@ -7,6 +7,7 @@ import { logAdminAction } from '@/lib/admin-logger';
 import { resolveAdminMfaRoute } from '@/lib/admin-mfa';
 import Link from 'next/link';
 import AdminMarketingPanel from '@/components/login/AdminMarketingPanel';
+import BrandLogo from '@/components/BrandLogo';
 
 const mobileBg = "https://readdy.ai/api/search-image?query=Dark%20subtle%20abstract%20gradient%20background%20with%20faint%20navy%20blue%20and%20cyan%20mesh%20lines%2C%20minimal%20technology%20pattern%2C%20very%20low%20contrast%20and%20opacity%2C%20suitable%20for%20dark%20mode%20mobile%20login%20screen%20background%2C%20soft%20glowing%20particles%2C%20premium%20SaaS%20aesthetic&width=800&height=1200&seq=2&orientation=portrait";
 
@@ -152,11 +153,8 @@ export default function AdminLogin() {
         <div className="lg:hidden absolute inset-0 bg-[#071321]/90" />
 
         <div className="lg:hidden absolute top-6 left-6 z-20">
-          <Link href="/" className="inline-flex items-center gap-2 cursor-pointer">
-            <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#1DA1F2]/15 border border-[#1DA1F2]/20">
-              <i className="ri-shield-check-fill text-[#1DA1F2] text-base" />
-            </div>
-            <span className="font-[family-name:var(--font-pacifico)] text-lg text-white">QuickGuard</span>
+          <Link href="/" className="inline-flex items-center cursor-pointer" aria-label="QuickGuard home">
+            <BrandLogo variant="full" theme="dark" imgClassName="h-8 w-auto" />
           </Link>
         </div>
 

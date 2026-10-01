@@ -10,8 +10,8 @@ self.addEventListener('push', (e) => {
   try { data = e.data.json(); } catch { data = { title: 'QuickGuard', body: e.data.text() }; }
   const options = {
     body: data.body || 'New notification',
-    icon: data.icon || 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp',
-    badge: data.badge || 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp',
+    icon: data.icon || 'https://public.readdy.ai/ai/img_res/66933a83-eb29-486f-86a7-dac739aa1e53.png',
+    badge: data.badge || 'https://public.readdy.ai/ai/img_res/66933a83-eb29-486f-86a7-dac739aa1e53.png',
     tag: data.tag || 'quickguard-default',
     requireInteraction: data.requireInteraction || false,
     data: data.data || {},

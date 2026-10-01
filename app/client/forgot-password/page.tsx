@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import LoginMarketingPanel from "@/components/login/LoginMarketingPanel";
 import LoginFormCard from "@/components/login/LoginFormCard";
+import BrandLogo from "@/components/BrandLogo";
 
 const mobileBg = "https://readdy.ai/api/search-image?query=Dark%20abstract%20futuristic%20security%20technology%20background%20with%20deep%20navy%20blue%20tones%2C%20subtle%20cyan%20geometric%20mesh%20network%20pattern%2C%20soft%20light%20rays%20and%20particle%20effects%2C%20premium%20enterprise%20SaaS%20aesthetic%2C%20minimal%20elegant%20low%20contrast%20style%2C%20perfect%20for%20dark%20mode%20mobile%20login%20page%20background%20overlay&width=800&height=1200&seq=3&orientation=portrait";
 
@@ -73,7 +74,7 @@ export default function ClientForgotPasswordPage() {
             <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#1DA1F2]/15 border border-[#1DA1F2]/20">
               <i className="ri-shield-check-fill text-[#1DA1F2] text-lg" />
             </div>
-            <span className="font-[family-name:var(--font-pacifico)] text-xl text-white">QuickGuard</span>
+            <span className="font-semibold tracking-tight text-xl text-white">QuickGuard</span>
           </Link>
 
           <LoginFormCard

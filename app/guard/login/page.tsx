@@ -8,6 +8,7 @@ import { clearBadStoredRedirects } from '@/lib/safe-redirect';
 import LoginMarketingPanel from '@/components/login/LoginMarketingPanel';
 import LoginFormCard from '@/components/login/LoginFormCard';
 import SocialConsentNotice from '@/components/login/SocialConsentNotice';
+import BrandLogo from '@/components/BrandLogo';
 
 const mobileBg = "https://readdy.ai/api/search-image?query=Dark%20subtle%20abstract%20gradient%20background%20with%20faint%20navy%20blue%20and%20cyan%20mesh%20lines%2C%20minimal%20technology%20pattern%2C%20very%20low%20contrast%20and%20opacity%2C%20suitable%20for%20dark%20mode%20mobile%20login%20screen%20background%2C%20soft%20glowing%20particles%2C%20premium%20SaaS%20aesthetic&width=800&height=1200&seq=2&orientation=portrait";
 
@@ -172,11 +173,8 @@ export default function GuardLogin() {
         <div className="lg:hidden absolute inset-0 bg-[#071321]/90" />
 
         <div className="lg:hidden absolute top-6 left-6 z-20">
-          <Link href="/" className="inline-flex items-center gap-2 cursor-pointer">
-            <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#1DA1F2]/15 border border-[#1DA1F2]/20">
-              <i className="ri-shield-check-fill text-[#1DA1F2] text-base" />
-            </div>
-            <span className="font-[family-name:var(--font-pacifico)] text-lg text-white">QuickGuard</span>
+          <Link href="/" className="inline-flex items-center cursor-pointer" aria-label="QuickGuard home">
+            <BrandLogo variant="full" theme="dark" imgClassName="h-8 w-auto" />
           </Link>
         </div>
 
@@ -410,7 +408,7 @@ export default function GuardLogin() {
               <i className="ri-shield-check-fill text-[#1DA1F2] text-sm" />
             </div>
             <span>Powered by</span>
-            <span className="font-[family-name:var(--font-pacifico)] text-sm" style={{ color: "#1DA1F2" }}>QuickGuard</span>
+            <span className="text-sm font-semibold tracking-tight" style={{ color: "#1DA1F2" }}>QuickGuard</span>
             <span className="mx-1 text-[#AAB7C4]/20">&middot;</span>
             <i className="ri-lock-line text-[#AAB7C4]/20 text-xs" />
             <span>Secure &amp; SIA Verified</span>

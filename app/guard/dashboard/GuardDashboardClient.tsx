@@ -1104,7 +1104,7 @@ export default function GuardDashboardClient() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-blue-300">
-                    You're on a free trial until {userEntitlement.current_period_end ? new Date(userEntitlement.current_period_end).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'soon'}.
+                    You're on the Guard Free plan — apply to up to 2 jobs per month. Upgrade for more applications and features.
                   </p>
                 </div>
               </div>

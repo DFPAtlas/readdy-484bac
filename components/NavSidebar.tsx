@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import LoginModal from './LoginModal';
+import BrandLogo from '@/components/BrandLogo';
 
 type UserRole = 'guard' | 'client' | null;
 
@@ -233,11 +234,8 @@ export default function NavSidebar() {
         }}
         className={`fixed top-0 left-0 h-full w-72 bg-slate-900 shadow-2xl z-50 transform transition-transform duration-300 flex flex-col ${sidebarOpen ? 'translate-x-0 visible' : '-translate-x-full invisible'}`}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700 flex-shrink-0">
-          <Link href="/" prefetch={false} className="flex items-center gap-2 outline-none" onClick={() => setSidebarOpen(false)}>
-            <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
-              <i className="ri-shield-check-line text-white text-lg"></i>
-            </div>
-            <span className="text-xl font-bold text-white font-[family-name:var(--font-pacifico)]">QuickGuard</span>
+          <Link href="/" prefetch={false} className="flex items-center outline-none" onClick={() => setSidebarOpen(false)} aria-label="QuickGuard home">
+            <BrandLogo variant="full" theme="dark" imgClassName="h-8 w-auto" />
           </Link>
           <button onClick={() => setSidebarOpen(false)} className="p-2 hover:bg-slate-700 rounded-lg cursor-pointer" aria-label="Close menu">
             <i className="ri-close-line text-xl text-slate-400"></i>

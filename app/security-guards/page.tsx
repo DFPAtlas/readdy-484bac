@@ -96,7 +96,7 @@ export const metadata: Metadata = {
     locale: 'en_GB',
     images: [
       {
-        url: 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp',
+        url: 'https://public.readdy.ai/ai/img_res/99cbad8f-297d-414a-946f-a43c56ace314.png',
         width: 512,
         height: 512,
         alt: 'QuickGuard - Hire SIA Licensed Security Guards Across the UK',
@@ -107,7 +107,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Hire SIA Licensed Security Guards Across the UK | QuickGuard',
     description: 'Book verified SIA-licensed security guards in every major UK city.',
-    images: ['https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp'],
+    images: ['https://public.readdy.ai/ai/img_res/99cbad8f-297d-414a-946f-a43c56ace314.png'],
   },
 };
 
@@ -311,7 +311,7 @@ export default function SecurityGuardsIndex() {
             </Link>
           </div>
           <p className="text-sm text-slate-500 mt-6">
-            No credit card required &middot; Free to get started &middot; Cancel anytime
+            Free to create an account &middot; Pay per job &middot; Cancel subscriptions anytime
           </p>
         </div>
       </section>

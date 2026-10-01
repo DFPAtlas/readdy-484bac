@@ -63,55 +63,72 @@ export default function PricingPDFClient() {
 
   const guardPlans = [
     {
-      name: 'Starter',
+      name: 'Free Starter',
+      price: 0,
+      description: 'For starting your security career',
+      features: [
+        '2 job applications per month',
+        'Access to standard jobs',
+        'Job alerts',
+        'Verified guard profile',
+        'Secure payment processing',
+      ],
+      cta: 'Create Free Account',
+      link: '/guard/register',
+      isFree: true,
+      popular: false,
+    },
+    {
+      name: 'Guard Basic',
       price: 10,
       description: 'Perfect for getting started',
       features: [
         '10 job applications per month',
-        'AI-powered job matching',
-        'Email support',
-        'Instant notifications',
-        'Profile visibility',
+        'Access to standard jobs',
+        'Job alerts',
+        'Verified guard profile',
         'Secure payment processing',
       ],
-      cta: 'Subscribe',
-      paymentLink: 'https://buy.stripe.com/test_dRmfZibMG3qx6kQ7nc5Vu04',
+      cta: 'Get Started',
+      link: '/guard/register',
+      isFree: false,
+      popular: false,
     },
     {
-      name: 'Professional',
-      price: 20,
+      name: 'Guard Pro',
+      price: 19,
       description: 'For active security professionals',
       features: [
         '25 job applications per month',
-        'AI-powered job matching',
+        'Priority profile placement',
+        'Profile boost',
+        'Advanced job alerts',
         'Performance analytics',
-        'Priority email support',
-        'Instant notifications',
-        'Profile visibility',
-        'Secure payment processing',
-        'Job recommendations',
+        'Priority support',
+        'Direct client contact',
       ],
-      cta: 'Subscribe',
-      paymentLink: 'https://buy.stripe.com/test_bJe28s9EybX310w9vk5Vu05',
+      cta: 'Get Started',
+      link: '/guard/register',
+      isFree: false,
+      popular: false,
     },
     {
-      name: 'Premium',
-      price: 35,
+      name: 'Guard Elite',
+      price: 29,
       description: 'Full access to all features',
       features: [
-        'Unlimited job applications',
-        'AI-powered job matching',
+        'Up to 40 applications per month',
+        'Priority profile placement',
+        'Profile boost',
+        'Advanced job alerts',
         'Performance analytics',
-        '24/7 priority support',
-        'Instant notifications',
-        'Enhanced profile visibility',
-        'Secure payment processing',
-        'Advanced job recommendations',
-        'Priority placement in searches',
-        'Dedicated account support',
+        'Priority support',
+        'Direct client contact',
       ],
-      cta: 'Subscribe',
-      paymentLink: 'https://buy.stripe.com/test_28E9AU3ga2mt38E22S5Vu06',
+      cta: 'Get Started',
+      link: '/guard/register',
+      isFree: false,
+      popular: true,
     },
   ];
 
@@ -176,7 +193,7 @@ export default function PricingPDFClient() {
             <span className="font-[family-name:var(--font-pacifico)] text-3xl text-teal-600">logo</span>
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">QuickGuard Pricing Guide</h1>
-          <p className="text-slate-500 text-sm">Complete pricing for clients and security guards — updated May 2026</p>
+          <p className="text-slate-500 text-sm">Complete pricing for clients and security guards — updated October 2026</p>
           <div className="w-24 h-0.5 bg-teal-500 mx-auto mt-4" />
         </div>
 
@@ -282,38 +299,40 @@ export default function PricingPDFClient() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 print:gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:gap-3">
             {guardPlans.map((plan) => {
-              const isPopular = plan.name === 'Professional';
+              const isPopular = plan.popular;
 
               return (
                 <div
                   key={plan.name}
-                  className={`rounded-xl border p-5 print:p-4 print:border-slate-300 ${
+                  className={`rounded-xl border p-4 print:p-3 print:border-slate-300 flex flex-col ${
                     isPopular ? 'border-blue-500 bg-blue-50/40' : 'border-slate-200 bg-white'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-2 gap-2">
                     <h3 className="font-bold text-slate-900">{plan.name}</h3>
                     {isPopular && (
-                      <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap">
+                      <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap">
                         Popular
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500 mb-4">{plan.description}</p>
+                  <p className="text-xs text-slate-500 mb-3">{plan.description}</p>
 
-                  <div className="mb-4 pb-4 border-b border-slate-200">
+                  <div className="mb-3 pb-3 border-b border-slate-200">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-3xl font-bold text-slate-900">£{plan.price}</span>
-                      <span className="text-sm text-slate-500">/month</span>
+                      <span className="text-2xl font-bold text-slate-900">£{plan.price}</span>
+                      <span className="text-xs text-slate-500">/month</span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5">Billed monthly · Cancel anytime</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {plan.isFree ? 'Free forever — no card needed' : 'Billed monthly · Cancel anytime'}
+                    </p>
                   </div>
 
-                  <ul className="space-y-2">
+                  <ul className="space-y-1.5 flex-1">
                     {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm">
+                      <li key={idx} className="flex items-start gap-1.5 text-xs">
                         <i className="ri-check-line text-blue-600 mt-0.5 flex-shrink-0" />
                         <span className="text-slate-700">{feature}</span>
                       </li>
@@ -321,14 +340,16 @@ export default function PricingPDFClient() {
                   </ul>
 
                   <div className="mt-4 print:hidden">
-                    <a
-                      href={plan.paymentLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-2.5 rounded-lg font-semibold text-sm transition-all whitespace-nowrap block text-center bg-blue-600 text-white hover:bg-blue-700"
+                    <Link
+                      href={plan.link}
+                      className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-all whitespace-nowrap block text-center ${
+                        plan.isFree
+                          ? 'bg-slate-100 text-slate-900 hover:bg-slate-200'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
                     >
                       {plan.cta}
-                    </a>
+                    </Link>
                   </div>
                 </div>
               );
@@ -435,7 +456,7 @@ export default function PricingPDFClient() {
                   </li>
                   <li className="flex items-start gap-2">
                     <i className="ri-check-line text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-slate-700">First 7 days free on Starter plan</span>
+                    <span className="text-slate-700">Subscribe or cancel anytime</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <i className="ri-check-line text-blue-600 mt-0.5 flex-shrink-0" />
@@ -465,11 +486,11 @@ export default function PricingPDFClient() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="rounded-xl border border-teal-200 bg-teal-50/30 p-5">
               <div className="flex items-center gap-2 mb-2">
-                <i className="ri-gift-line text-teal-600" />
-                <span className="font-bold text-teal-800 text-sm">First Month Free</span>
+                <i className="ri-checkbox-circle-line text-teal-600" />
+                <span className="font-bold text-teal-800 text-sm">Free Plan Available</span>
               </div>
               <p className="text-sm text-slate-600">
-                New clients get their first month absolutely free on any paid plan. No credit card required to start.
+                Create a free account and publish up to 1 job per month, paying only for each booking. No subscription is required to get started.
               </p>
             </div>
             <div className="rounded-xl border border-blue-200 bg-blue-50/30 p-5">
@@ -515,7 +536,7 @@ export default function PricingPDFClient() {
             </div>
           </div>
           <p className="text-xs text-slate-400 text-center mt-4 print:mt-2">
-            All prices shown in GBP. VAT applies where applicable. Prices subject to change. Last updated May 2026.
+            All prices shown in GBP. VAT applies where applicable. Prices subject to change. Last updated October 2026.
           </p>
         </div>
       </div>

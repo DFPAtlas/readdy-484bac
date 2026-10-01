@@ -8,6 +8,7 @@ import TaxDisclaimerCheckbox from '@/components/TaxDisclaimerCheckbox';
 import { sanitizeRedirectPath } from '@/lib/safe-redirect';
 import RegisterMarketingPanel from '@/components/login/RegisterMarketingPanel';
 import RegisterFormCard from '@/components/login/RegisterFormCard';
+import BrandLogo from '@/components/BrandLogo';
 import SocialConsentNotice from '@/components/login/SocialConsentNotice';
 import QGExitIntentPopup from '@/components/qg-rewards/QGExitIntentPopup';
 
@@ -305,11 +306,8 @@ export default function ClientRegister() {
         <div className="lg:hidden absolute inset-0 bg-[#071321]/90" />
 
         <div className="lg:hidden absolute top-6 left-6 z-20">
-          <Link href="/" className="inline-flex items-center gap-2 cursor-pointer">
-            <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#1DA1F2]/15 border border-[#1DA1F2]/20">
-              <i className="ri-shield-check-fill text-[#1DA1F2] text-base" />
-            </div>
-            <span className="font-[family-name:var(--font-pacifico)] text-lg text-white">QuickGuard</span>
+          <Link href="/" className="inline-flex items-center cursor-pointer" aria-label="QuickGuard home">
+            <BrandLogo variant="full" theme="dark" imgClassName="h-8 w-auto" />
           </Link>
         </div>
 
@@ -472,7 +470,7 @@ export default function ClientRegister() {
               <i className="ri-shield-check-fill text-[#1DA1F2] text-sm" />
             </div>
             <span>Powered by</span>
-            <span className="font-[family-name:var(--font-pacifico)] text-sm" style={{ color: "#1DA1F2" }}>QuickGuard</span>
+            <span className="text-sm font-semibold tracking-tight" style={{ color: "#1DA1F2" }}>QuickGuard</span>
             <span className="mx-1 text-[#AAB7C4]/20">&middot;</span>
             <i className="ri-lock-line text-[#AAB7C4]/20 text-xs" />
             <span>Secure &amp; SIA Verified</span>
