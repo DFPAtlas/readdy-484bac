@@ -290,7 +290,7 @@ export default function GuardGuidePage() {
                   <h2 className="text-2xl font-bold text-white">SIA Verification</h2>
                 </div>
               </div>
-              <p className="text-slate-400 mb-6">Your SIA licence is automatically verified through our secure system, giving clients full confidence in your credentials.</p>
+              <p className="text-slate-400 mb-6">Your SIA licence is automatically verified through our secure system, giving clients full confidence in your credentials. Planned: QuickGuard is developing an AI agent to check guards’ SIA licence status weekly and flag suspended, revoked or expired licences for review.</p>
               <div className="space-y-3">
                 {[
                   { icon: 'ri-file-shield-line', label: 'Submit Licence', desc: 'Enter your SIA licence number in your profile' },

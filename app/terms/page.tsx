@@ -70,7 +70,7 @@ export default function Terms() {
                 <h3 className="text-xl font-semibold text-white mb-3">Who we are</h3>
                 <div className="bg-teal-500/10 border border-teal-400/20 p-4 my-4 rounded-xl space-y-3">
                   <p className="text-slate-300">
-                    QuickGuard.uk is owned and operated by Martin Hewett, a sole trader trading as Digital Footprint. Where we decide why and how your personal information is used, Martin Hewett trading as Digital Footprint is the data controller.
+                    QuickGuard is operated by Digital Footprint (digital-footprint.uk). Where we decide why and how your personal information is used, Digital Footprint is the data controller.
                   </p>
                   <p className="text-slate-300">
                     For any privacy questions or to exercise your data protection rights, you can contact us at{' '}
@@ -94,7 +94,7 @@ export default function Terms() {
                   <li>Job posting and booking system for clients</li>
                   <li>Secure payment processing and held job payment services</li>
                   <li>Rating and review system for quality assurance</li>
-                  <li>Customer support and dispute resolution</li>
+                  <li>Customer support and dispute resolution, including 24/7 AI support with escalation to human review</li>
                 </ul>
                 <p className="text-slate-400">
                   QuickGuard.uk acts as an intermediary platform and does not directly provide security services.
@@ -479,7 +479,7 @@ export default function Terms() {
                 <div className="space-y-2 text-slate-400">
                   <p><strong className="text-slate-300">Email:</strong> <a href="mailto:Martin.hewett@digital-footprint.uk" className="text-teal-400 hover:text-teal-300">Martin.hewett@digital-footprint.uk</a></p>
                   <p><strong className="text-slate-300">Phone:</strong> 01992 217019</p>
-                  <p><strong className="text-slate-300">Operator:</strong> Martin Hewett, sole trader trading as Digital Footprint, United Kingdom</p>
+                  <p><strong className="text-slate-300">Operator:</strong> Digital Footprint (<a href="https://digital-footprint.uk" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 underline">digital-footprint.uk</a>), United Kingdom</p>
                 </div>
                 <div className="mt-4 pt-4 border-t border-slate-700/50">
                   <Link href="/contact" className="inline-flex items-center text-teal-400 hover:text-teal-300 transition-colors">

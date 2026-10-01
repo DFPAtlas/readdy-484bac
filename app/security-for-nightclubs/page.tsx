@@ -46,7 +46,7 @@ const data = {
     { icon: 'ri-lock-line', title: 'Secure Payment', desc: 'Pay with Stripe. Funds are released only after the shift ends.' },
   ],
   faqs: [
-    { q: 'Do all guards have a valid Door Supervisor licence?', a: 'Yes. Every guard on QuickGuard is SIA-verified. Their licence number is visible on their profile and we check validity automatically against the SIA register.' },
+    { q: 'Do all guards have a valid Door Supervisor licence?', a: 'Yes. Every guard on QuickGuard is SIA-verified. Their licence number is visible on their profile and we check validity against the SIA register before approval. Planned: QuickGuard is developing an AI agent to check guards’ SIA licence status weekly and flag suspended, revoked or expired licences for review.' },
     { q: 'How quickly can I get a door supervisor?', a: 'Most jobs receive applications within minutes. For urgent same-night cover, select "Immediate" urgency when posting.' },
     { q: 'What if a guard does not show up?', a: 'You can re-post the shift instantly at no extra cost. If a guard fails to attend, they are flagged on the platform and you retain your held payment with Stripe.' },
     { q: 'Is there a minimum number of shifts?', a: 'No. Book a single night, a weekend, or a full season. You are never locked into a contract.' },

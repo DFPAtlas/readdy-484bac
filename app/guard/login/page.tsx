@@ -424,7 +424,7 @@ export default function GuardLogin() {
               style={{ color: "#1DA1F2" }}
             >
               <i className="ri-customer-service-line" />
-              Need help signing in? Chat with us
+              Need help signing in? Ask QuickGuard AI Support
             </button>
           </div>
         </LoginFormCard>

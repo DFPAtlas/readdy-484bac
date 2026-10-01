@@ -93,11 +93,11 @@ const steps = [
     number: '04',
     icon: 'ri-secure-payment-line',
     title: 'Secure Payment',
-    description: 'Pay guards safely and securely through our Stripe-powered payment system.',
+    description: 'Pay securely through Stripe before the booking is confirmed, with full transaction history.',
     paymentSteps: [
-      { icon: 'ri-check-double-line', label: 'Job Completion', desc: 'Guard completes the assigned security shift' },
-      { icon: 'ri-bank-card-line', label: 'Payment Processing', desc: 'Process payment through your dashboard using Stripe' },
-      { icon: 'ri-lock-line', label: 'Secure Transfer', desc: 'Payment is securely transferred to the guard\'s account' },
+      { icon: 'ri-check-double-line', label: 'Confirm & Pay', desc: 'Review the agreed guard pay, plan service fee and any eligible promotion, then pay securely before the booking is confirmed' },
+      { icon: 'ri-lock-line', label: 'Funds Held Securely', desc: 'Funds are held with Stripe until the shift is completed and the release checks pass' },
+      { icon: 'ri-bank-card-line', label: 'Guard Paid', desc: 'The guard receives their agreed pay after completion' },
       { icon: 'ri-mail-check-line', label: 'Confirmation', desc: 'Both parties receive payment confirmation emails' },
     ],
   },
@@ -107,7 +107,7 @@ const bestPractices = [
   { icon: 'ri-time-line', title: 'Post Jobs Early', desc: 'Give guards time to see and apply. Last-minute postings may get fewer quality applications.' },
   { icon: 'ri-message-3-line', title: 'Communicate Clearly', desc: 'Provide detailed job descriptions, venue info, and any special requirements upfront.' },
   { icon: 'ri-star-line', title: 'Leave Reviews', desc: 'Rate guards after jobs to help other clients and build a quality community.' },
-  { icon: 'ri-money-pound-circle-line', title: 'Pay Promptly', desc: 'Process payments quickly after job completion to maintain great guard relationships.' },
+  { icon: 'ri-money-pound-circle-line', title: 'Confirm Completion Promptly', desc: 'Approve completed shifts quickly so guard payouts are released without delay.' },
   { icon: 'ri-bookmark-line', title: 'Save Favourites', desc: 'Bookmark reliable guards for future jobs and build your trusted security team.' },
   { icon: 'ri-shield-check-line', title: 'Verify Requirements', desc: 'Always confirm SIA license types match your specific security needs before hiring.' },
 ];
@@ -160,7 +160,7 @@ export default function ClientGuidePage() {
               {[
                 { value: '5 mins', label: 'To post a job' },
                 { value: '100%', label: 'SIA verified guards' },
-                { value: '24/7', label: 'Platform support' },
+                { value: '24/7', label: 'AI support' },
               ].map((stat) => (
                 <div key={stat.label} className="text-center">
                   <div className="text-3xl font-extrabold text-white">{stat.value}</div>
@@ -369,7 +369,7 @@ export default function ClientGuidePage() {
                   <h2 className="text-2xl font-bold text-white">Secure Payment</h2>
                 </div>
               </div>
-              <p className="text-slate-400 mb-6">Pay guards safely through our Stripe-powered payment system with full transaction history.</p>
+              <p className="text-slate-400 mb-6">Pay securely through Stripe before the booking is confirmed, with full transaction history.</p>
               <div className="space-y-4">
                 {steps[3].paymentSteps!.map((ps, i) => (
                   <div key={i} className="flex items-start gap-4">

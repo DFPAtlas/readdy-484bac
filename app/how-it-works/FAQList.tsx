@@ -19,19 +19,19 @@ const faqs = [
     category: 'For Guards',
     question: 'How much does it cost for guards to use the platform?',
     answer:
-      'Guards pay a monthly subscription starting from \u00a310/month. There are multiple tiers available depending on the level of visibility and features you need. You can view all plans on our Pricing page.',
+      'Guard membership starts from \u00a310/month (Basic), with Pro at \u00a319/month and Elite at \u00a329/month. Annual options are available. Membership is separate from your earnings \u2014 you always receive your full agreed pay on bookings, with no guard commission.',
   },
   {
     category: 'For Guards',
     question: 'When and how do guards get paid?',
     answer:
-      'Once a client confirms job completion, payment is released to your account in full, with no guard commission. Funds are transferred directly to your registered UK bank account. You also receive automatic UTR and tax documentation to stay HMRC compliant.',
+      'After the client confirms the shift is complete, your pay is released under the existing confirmation, dispute and payout process. You receive your full agreed pay with no guard booking commission, and standard payout costs are covered by the client booking service fee. Payouts follow the existing Stripe onboarding and account eligibility checks \u2014 we do not promise instant payouts or fixed payout deadlines.',
   },
   {
     category: 'For Clients',
     question: 'Is there a cost for clients to post a job?',
     answer:
-      'Creating an account is free, and a free account can publish up to 1 job per month. You pay per job \u2014 the guard\u2019s hourly rate plus the platform fee \u2014 charged securely after guard selection, before booking confirmation and held with Stripe until the shift is completed. Optional paid subscriptions raise the monthly posting allowance (up to unlimited) and unlock extra features.',
+      'Creating an account is free, and the Free plan publishes jobs within its monthly allowance. Posting a job does not charge the booking payment \u2014 you pay per booking, after you select a guard and review the agreed guard pay plus your plan\u2019s service fee and any eligible promotion. Payment is taken securely through Stripe before the booking is confirmed and held with Stripe until release.',
   },
   {
     category: 'For Clients',
@@ -43,19 +43,31 @@ const faqs = [
     category: 'For Clients',
     question: 'Are all guards on the platform verified?',
     answer:
-      'Yes. Every guard undergoes SIA licence verification before being approved on the platform. We check licence validity, specialisations, and compliance status so you can hire with complete confidence.',
+      'Yes. Every guard undergoes SIA licence verification before being approved on the platform. We check licence validity, specialisations, and compliance status so you can hire with complete confidence. Planned: we are developing an AI agent to check guards\u2019 SIA licence status weekly and flag suspended, revoked or expired licences for review.',
+  },
+  {
+    category: 'Payments & Security',
+    question: 'How do subscription and booking payments work?',
+    answer:
+      'They are two separate charges. Your subscription pays for platform features and your monthly posting allowance, and it sets your booking service fee (15% on Free, down to 5% on Enterprise). Guard services are paid separately for each booking \u2014 a subscription never covers the guard\u2019s pay, and no plan removes booking fees entirely.',
+  },
+  {
+    category: 'Payments & Security',
+    question: 'Do guards pay a booking commission?',
+    answer:
+      'No. Guards receive their full agreed pay on new bookings and pay no booking commission. Guard membership is separate from earnings, and QuickGuard does not deduct anything from guard pay.',
+  },
+  {
+    category: 'Payments & Security',
+    question: 'Is Stripe processing charged separately?',
+    answer:
+      'No. Payment processing and standard guard payouts are included \u2014 there is no separate Stripe or card surcharge for clients, and nothing is deducted from guard pay. Any applicable tax is only shown where supported by the implemented checkout.',
   },
   {
     category: 'Payments & Security',
     question: 'How does the payment protection work?',
     answer:
-      'Clients pre-pay for the shift and funds are held securely with Stripe during the job. Payment is only released to the guard once the client confirms the shift has been completed satisfactorily. This protects both parties throughout the process.',
-  },
-  {
-    category: 'Payments & Security',
-    question: 'Is the platform HMRC compliant?',
-    answer:
-      'Yes. QuickGuard.uk is fully HMRC compliant. Guards receive automatic tax documentation and UTR support. All transactions are processed through our secure, regulated payment system.',
+      'You review the agreed guard pay, your plan\u2019s service fee and any eligible promotion, then pay securely through Stripe before the booking is confirmed. Funds remain with Stripe pending completion and the applicable release checks, and guard pay is released after completion. Cancellations or disputes can affect release under the published policy \u2014 existing funded bookings keep their recorded amounts and terms.',
   },
   {
     category: 'General',
@@ -101,7 +113,7 @@ export default function FAQList() {
 
           <div
             className={`overflow-hidden transition-all duration-300 ease-in-out ${
-              openIndex === index ? 'max-h-60 opacity-100' : 'max-h-0 opacity-0'
+              openIndex === index ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
             }`}
           >
             <div className="px-6 pb-5 pt-2 bg-[#0e1628] border-t border-slate-700/50">

@@ -21,7 +21,7 @@ export default function GuardGuideSchema() {
         '@type': 'HowToStep',
         position: 2,
         name: 'SIA Verification',
-        text: 'Submit your SIA licence number during profile setup. Our system automatically checks against the official SIA register and approval typically completes within 5–10 minutes.',
+        text: 'Submit your SIA licence number during profile setup. Our system automatically checks against the official SIA register and approval typically completes within 5–10 minutes. Planned: QuickGuard is developing an AI agent to check guards’ SIA licence status weekly and flag suspended, revoked or expired licences for review.',
         url: `${SITE_URL}/guide/guard#step-02`,
       },
       {

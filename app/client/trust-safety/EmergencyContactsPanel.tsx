@@ -253,11 +253,15 @@ export default function EmergencyContactsPanel({ jobs, clientId, onSaveJobContac
                     <span className="text-slate-900 dark:text-slate-200">support@quickguard.uk</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Hours</span>
-                    <span className="text-slate-900 dark:text-slate-200">24/7 Emergency Line</span>
+                    <span className="text-slate-500 dark:text-slate-400">AI support</span>
+                    <span className="text-slate-900 dark:text-slate-200">24/7</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 dark:text-slate-400">Phone line hours</span>
+                    <span className="text-slate-900 dark:text-slate-200">Mon–Fri 9AM–6PM</span>
                   </div>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">For guard no-shows, safety incidents, or urgent issues, call our emergency line immediately.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">Our AI assistant is available 24/7 to help with platform questions and common issues. For guard no-shows, safety incidents, or other urgent issues, report it in-app to escalate to our team.</p>
               </div>
             </div>
           )}

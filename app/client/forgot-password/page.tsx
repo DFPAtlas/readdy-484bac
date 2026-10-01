@@ -232,7 +232,7 @@ export default function ClientForgotPasswordPage() {
                 </div>
                 <span>Need help?</span>
                 <Link href="/contact" className="text-[#1DA1F2] hover:text-[#3B82F6] font-medium transition-colors">
-                  24/7 Support
+                  24/7 AI Support
                 </Link>
               </div>
 

@@ -126,7 +126,7 @@ export default function InvoicePreview({ job, client, guards, costs, invoiceNumb
       '<div class="header"><div class="logo"><div class="logo-icon">Q</div><span class="logo-text">QuickGuard</span></div>',
       '<div class="invoice-title"><h1>INVOICE</h1><p class="invoice-number">' + invoiceNumber + '</p></div></div>',
       '<div class="addresses">',
-      '<div class="address-block"><h3>From</h3><p class="company">QuickGuard Ltd</p><p>quickguard.uk</p></div>',
+      '<div class="address-block"><h3>From</h3><p class="company">QuickGuard</p><p>Operated by Digital Footprint</p><p>digital-footprint.uk</p></div>',
       '<div class="address-block"><h3>Bill To</h3><p class="company">' + (client.company_name || 'Client') + '</p>',
       '<p>' + (client.contact_name || '') + '</p><p>' + (client.address || '') + '</p>',
       '<p>' + (client.city || '') + ' ' + (client.postcode || '') + '</p><p style="margin-top:10px">' + client.email + '</p></div></div>',
@@ -149,7 +149,7 @@ export default function InvoicePreview({ job, client, guards, costs, invoiceNumb
       '<div class="totals-row total"><span>' + (isPaidHtml ? 'Total Paid' : 'Total Due') + '</span><span>&pound;' + costs.total.toFixed(2) + '</span></div></div>',
       '<div class="payment-info"><h4>Payment Information</h4>',
       '<p><strong>Bank:</strong> Barclays Bank PLC</p>',
-      '<p><strong>Account Name:</strong> QuickGuard Ltd</p>',
+      '<p><strong>Account Name:</strong> Digital Footprint</p>',
       '<p><strong>Sort Code:</strong> 20-00-00</p>',
       '<p><strong>Account Number:</strong> 12345678</p>',
       '<p><strong>Reference:</strong> ' + invoiceNumber + '</p>' + paymentInfoHtml + '</div>',
@@ -233,8 +233,9 @@ export default function InvoicePreview({ job, client, guards, costs, invoiceNumb
             <div className="grid grid-cols-2 gap-8 mb-8">
               <div>
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">From</h3>
-                <p className="font-bold text-[#1a237e]">QuickGuard Ltd</p>
-                <p className="text-sm text-gray-600">quickguard.uk</p>
+                <p className="font-bold text-[#1a237e]">QuickGuard</p>
+                <p className="text-sm text-gray-600">Operated by Digital Footprint</p>
+                <p className="text-sm text-gray-600">digital-footprint.uk</p>
 
                 <p className="text-sm text-gray-600">United Kingdom</p>
 
@@ -337,7 +338,7 @@ export default function InvoicePreview({ job, client, guards, costs, invoiceNumb
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-gray-600"><span className="font-medium">Bank:</span> Barclays Bank PLC</p>
-                  <p className="text-gray-600"><span className="font-medium">Account Name:</span> QuickGuard Ltd</p>
+                  <p className="text-gray-600"><span className="font-medium">Account Name:</span> Digital Footprint</p>
                 </div>
                 <div>
                   <p className="text-gray-600"><span className="font-medium">Sort Code:</span> 20-00-00</p>

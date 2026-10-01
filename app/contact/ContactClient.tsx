@@ -93,7 +93,7 @@ export default function ContactClient() {
       color: 'bg-teal-500/10 border-teal-400/20 text-teal-400',
       title: 'Email Us',
       value: 'info@quickguard.uk',
-      sub: 'Response within 24 hours',
+      sub: 'Our team replies in business hours',
       href: 'mailto:info@quickguard.uk',
     },
     {
@@ -116,8 +116,8 @@ export default function ContactClient() {
       icon: 'ri-time-line',
       color: 'bg-amber-500/10 border-amber-400/20 text-amber-400',
       title: 'Support Hours',
-      value: 'Mon–Fri 9AM–6PM',
-      sub: 'Sat–Sun 10AM–4PM',
+      value: '24/7 AI Support',
+      sub: 'Human team: Mon–Fri 9AM–6PM',
       href: '#',
     },
   ];
@@ -141,7 +141,7 @@ export default function ContactClient() {
             <span className="text-teal-400">QuickGuard</span>
           </h1>
           <p className="text-slate-400 text-xl max-w-2xl mx-auto leading-relaxed">
-            Whether you're a guard, a client, or just curious — our team is ready to answer your questions and support your journey.
+            Whether you're a guard, a client, or just curious — QuickGuard AI Support is available 24/7 for platform questions and common issues, and our UK team is here during business hours.
           </p>
         </div>
       </section>
@@ -171,7 +171,7 @@ export default function ContactClient() {
             <div>
               <h2 className="text-3xl font-bold text-white mb-3">Let's Talk</h2>
               <p className="text-slate-400 leading-relaxed">
-                Fill in the form and we'll get back to you within 24 hours. For urgent matters, call us directly.
+                Fill in the form and our UK team will get back to you during business hours. For instant platform help, QuickGuard AI Support is available 24/7.
               </p>
             </div>
 
@@ -202,12 +202,12 @@ export default function ContactClient() {
             </div>
 
             <div className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-6">
-              <h3 className="font-bold text-white mb-4">Typical Response Times</h3>
+              <h3 className="font-bold text-white mb-4">Support Channels</h3>
               <div className="space-y-3">
                 {[
-                  { type: 'Email', time: 'Within 24 hours', pct: 90, color: 'bg-teal-500' },
-                  { type: 'Phone', time: 'Immediate', pct: 100, color: 'bg-emerald-500' },
-                  { type: 'Technical', time: 'Within 48 hours', pct: 75, color: 'bg-purple-500' },
+                  { type: 'AI Support', time: '24/7', pct: 100, color: 'bg-teal-500' },
+                  { type: 'Email (human)', time: 'Business hours', pct: 75, color: 'bg-emerald-500' },
+                  { type: 'Phone (human)', time: 'Mon–Fri 9AM–6PM', pct: 60, color: 'bg-purple-500' },
                 ].map((r) => (
                   <div key={r.type}>
                     <div className="flex justify-between text-sm mb-1">
@@ -232,7 +232,7 @@ export default function ContactClient() {
                   </div>
                   <h3 className="text-2xl font-bold text-white mb-3">Message Sent!</h3>
                   <p className="text-slate-400 max-w-sm mb-8">
-                    Thanks for reaching out. Our team will get back to you within 24 hours.
+                    Thanks for reaching out. Our UK team will get back to you during business hours. For instant help, QuickGuard AI Support is available 24/7.
                   </p>
                   <button
                     onClick={() => setFormStatus('idle')}
@@ -403,6 +403,11 @@ export default function ContactClient() {
               Client Guide
             </a>
           </div>
+          <p className="text-slate-500 text-sm mt-8">
+            QuickGuard is operated by Digital Footprint (
+            <a href="https://digital-footprint.uk" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 underline">digital-footprint.uk</a>
+            ).
+          </p>
         </div>
       </section>
 

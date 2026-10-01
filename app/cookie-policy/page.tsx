@@ -306,10 +306,10 @@ export default function CookiePolicy() {
                     },
                     {
                       icon: 'ri-robot-line',
-                      title: 'Readdy AI (Chat Assistant)',
-                      text: 'Our AI-powered chat assistant is provided by Readdy AI. The widget may set a session cookie to maintain your chat session while you browse the Platform. Readdy AI does not use these cookies for tracking or advertising purposes.',
-                      link: 'https://readdy.ai/privacy',
-                      linkText: 'Readdy AI Privacy Policy',
+                      title: 'QuickGuard AI Support (Chat Assistant)',
+                      text: 'Our AI-powered chat assistant, QuickGuard AI Support, is available 24/7 to help with platform questions and common issues. The widget may set a session cookie to maintain your chat session while you browse the Platform. These cookies are not used for tracking or advertising purposes.',
+                      link: '/privacy',
+                      linkText: 'Privacy Policy',
                     },
                     {
                       icon: 'ri-google-fill',
@@ -410,7 +410,7 @@ export default function CookiePolicy() {
                         { name: 'pwaPromptDismissed', cat: 'Necessary', purpose: 'Remembers if you dismissed the mobile install prompt (localStorage)', duration: 'Persistent', party: 'First-party' },
                         { name: 'theme-preference', cat: 'Functional', purpose: 'Stores your light/dark theme preference (localStorage)', duration: 'Persistent', party: 'First-party' },
                         { name: 'dashboard-layout-prefs', cat: 'Functional', purpose: 'Stores customised dashboard panel preferences (localStorage)', duration: 'Persistent', party: 'First-party' },
-                        { name: 'Readdy AI session', cat: 'Necessary', purpose: 'Maintains chat assistant session during support conversations', duration: 'Session', party: 'Third-party (readdy.ai)' },
+                        { name: 'QuickGuard AI Support session', cat: 'Necessary', purpose: 'Maintains AI support chat session during support conversations', duration: 'Session', party: 'Third-party (AI support)' },
                         { name: 'Stripe cookies', cat: 'Necessary', purpose: 'Fraud prevention and secure payment processing', duration: 'Varies', party: 'Third-party (stripe.com)' },
                       ].map((row, i) => (
                         <tr key={i} className={`border-b border-slate-700/50 ${i % 2 === 1 ? 'bg-[#0e1628]/50' : ''}`}>
@@ -569,7 +569,7 @@ export default function CookiePolicy() {
                 <h3 className="text-xl font-semibold text-white mb-3">Who we are</h3>
                 <div className="bg-teal-500/10 border border-teal-400/20 p-4 mb-6 rounded-xl space-y-3">
                   <p className="text-slate-300">
-                    QuickGuard.uk is owned and operated by Martin Hewett, a sole trader trading as Digital Footprint. Where we decide why and how your personal information is used, Martin Hewett trading as Digital Footprint is the data controller.
+                    QuickGuard is operated by Digital Footprint (digital-footprint.uk). Where we decide why and how your personal information is used, Digital Footprint is the data controller.
                   </p>
                   <p className="text-slate-300">
                     For any privacy questions or to exercise your data protection rights, you can contact us at{' '}
@@ -620,7 +620,7 @@ export default function CookiePolicy() {
             <div className="mt-12 pt-8 border-t border-slate-700/50">
               <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
                 <p className="text-sm text-slate-500">
-                  Last updated: 1 October 2026 &bull; Martin Hewett, sole trader trading as Digital Footprint
+                  Last updated: 1 October 2026 &bull; Digital Footprint (digital-footprint.uk)
                 </p>
                 <div className="flex gap-4">
                   <Link href="/privacy" className="inline-flex items-center text-teal-400 hover:text-teal-300 transition-colors text-sm">

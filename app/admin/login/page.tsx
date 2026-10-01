@@ -396,7 +396,7 @@ export default function AdminLogin() {
                 style={{ color: "#F59E0B" }}
               >
                 <i className="ri-customer-service-2-line" />
-                Need help signing in? Chat with us
+                Need help signing in? Ask QuickGuard AI Support
               </button>
             </div>
           </div>

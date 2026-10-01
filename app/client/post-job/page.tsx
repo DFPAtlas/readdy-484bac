@@ -824,7 +824,7 @@ function PostJobContent() {
                 <i className="ri-customer-service-2-line text-teal-400 text-xl"></i>
               </div>
               <h3 className="font-semibold text-white mb-2">UK Support</h3>
-              <p className="text-sm text-slate-400">Dedicated support team available 24/7</p>
+              <p className="text-sm text-slate-400">24/7 AI support for platform questions</p>
             </div>
           </div>
         </div>

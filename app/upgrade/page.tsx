@@ -151,10 +151,10 @@ const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { 
   },
   'client.priority_support': {
     title: 'Why upgrade to Priority Support?',
-    desc: 'When things go wrong at 2 AM, you need answers fast. Priority support means you skip the queue.',
+    desc: 'Our AI assistant is available 24/7 to help with platform questions and common issues. Priority support adds a human fast-track for issues that need review during business hours.',
     points: [
       { icon: 'ri-customer-service-2-line', label: 'Dedicated Support Line', detail: 'A named point of contact who knows your account and your venues.' },
-      { icon: 'ri-timer-flash-line', label: 'Fast-Track Resolution', detail: 'Priority tickets are answered within 2 hours during business hours, not 24.' },
+      { icon: 'ri-timer-flash-line', label: 'Fast-Track Resolution', detail: 'Priority tickets are reviewed ahead of standard requests during business hours.' },
       { icon: 'ri-phone-line', label: 'Phone Support', detail: 'Call us directly for urgent issues like no-show guards or payment problems.' },
       { icon: 'ri-shield-user-line', label: 'Emergency Guard Replacement', detail: 'Priority access to replacement guards if someone does not show up.' },
     ],
@@ -271,7 +271,7 @@ const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { 
   },
   'guard.priority_support': {
     title: 'Why upgrade to Priority Support?',
-    desc: 'Get fast help when you need it — payment issues, client disputes, or licence verification questions.',
+    desc: 'Our AI assistant is available 24/7 for platform questions and common issues. Priority support adds human help for payment issues, client disputes, or licence verification.',
     points: [
       { icon: 'ri-customer-service-2-line', label: 'Priority Queue', detail: 'Your support tickets jump to the front of the queue.' },
       { icon: 'ri-phone-line', label: 'Phone Support', detail: 'Call us directly for urgent issues related to payments or job disputes.' },

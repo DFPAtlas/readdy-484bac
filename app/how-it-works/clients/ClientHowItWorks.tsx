@@ -5,6 +5,9 @@ import Header from '../../../components/Header';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import FAQList from '../FAQList';
+import SubscriptionVsBooking from '../SubscriptionVsBooking';
+import ClientBookingJourney from '../ClientBookingJourney';
+import PaymentExampleTable from '../PaymentExampleTable';
 
 const CLIENT_STEPS = [
   {
@@ -25,7 +28,7 @@ const CLIENT_STEPS = [
   {
     icon: 'ri-secure-payment-line',
     title: 'Pay & Confirm',
-    desc: 'Pre-pay securely via Stripe. Funds are held with Stripe and released only after the shift is marked complete.',
+    desc: 'Review the agreed guard pay and your plan\u2019s service fee, then pay securely via Stripe. Funds are held with Stripe and released only after the shift is complete.',
   },
 ];
 
@@ -381,6 +384,11 @@ export default function ClientHowItWorks() {
         </div>
       </section>
 
+      {/* PAYMENT SYSTEM */}
+      <SubscriptionVsBooking />
+      <ClientBookingJourney />
+      <PaymentExampleTable />
+
       {/* WHY DIRECT */}
       <section className="py-20 bg-[#0e1628] border-b border-slate-800/60">
         <div className="max-w-5xl mx-auto px-6">
@@ -435,7 +443,7 @@ export default function ClientHowItWorks() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
-              { icon: 'ri-shield-check-line', title: 'All Guards SIA-Verified', desc: 'Every badge checked against the official register.' },
+              { icon: 'ri-shield-check-line', title: 'All Guards SIA-Verified', desc: 'SIA-verified before joining, with planned weekly AI licence checks.' },
               { icon: 'ri-lock-2-line', title: 'Payment Held with Stripe', desc: 'Your money is safe until the shift is done.' },
               { icon: 'ri-star-line', title: 'Rated by Real Clients', desc: 'Read genuine reviews before you book.' },
               { icon: 'ri-map-pin-line', title: 'UK-Wide Coverage', desc: 'From London to Glasgow — guards everywhere.' },

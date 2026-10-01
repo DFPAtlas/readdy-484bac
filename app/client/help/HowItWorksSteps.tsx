@@ -43,7 +43,7 @@ const steps = [
     number: '06',
     icon: 'ri-secure-payment-line',
     title: 'Pay & Confirm Booking',
-    desc: 'Pay securely via Stripe. Funds are held with Stripe until the shift is completed.',
+    desc: 'Review the agreed guard pay, your plan’s service fee and any eligible promotion, then pay securely via Stripe before the booking is confirmed.',
     href: '/client/payment-history',
   },
   {

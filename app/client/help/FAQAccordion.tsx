@@ -16,7 +16,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: 'When do I pay?',
-    answer: 'You pay after selecting guards and confirming your booking. Payment is processed securely via Stripe. Funds are held safely until the job is completed. You can also set up automatic billing for recurring jobs.',
+    answer: 'You review the agreed guard pay, your plan’s service fee and any eligible promotion, then pay securely via Stripe before the booking is confirmed. Funds are held safely with Stripe and released to the guard after completion and the applicable release checks. You can also set up automatic billing for recurring jobs.',
     icon: 'ri-secure-payment-line',
   },
   {

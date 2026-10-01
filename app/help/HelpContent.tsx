@@ -9,8 +9,8 @@ import NavSidebar from '@/components/NavSidebar';
 const faqs = [
   { question: 'How do I get started as a Client?', answer: 'Register as a client, complete your profile, and post your first job. You can browse verified guards, review applications, and hire the best match for your security needs.', icon: 'ri-user-add-line' },
   { question: 'How do I get started as a Guard?', answer: 'Register as a guard, upload your SIA licence, and complete your profile. Once verified, you can browse available jobs and submit applications directly through the platform.', icon: 'ri-shield-user-line' },
-  { question: 'Is SIA licence verification required?', answer: 'Yes. All security guards must hold a valid SIA licence. Our automated verification system checks your licence status in real time to ensure full compliance and safety.', icon: 'ri-verified-badge-line' },
-  { question: 'How does payment work?', answer: 'Clients pay securely via Stripe when a job is confirmed. Guards receive their earnings after completing assignments. All transactions are encrypted and processed through our secure platform.', icon: 'ri-secure-payment-line' },
+  { question: 'Is SIA licence verification required?', answer: 'Yes. All security guards must hold a valid SIA licence. Every guard is SIA-verified before joining, and we are developing an AI agent to check guards’ SIA licence status weekly and flag suspended, revoked or expired licences for review.', icon: 'ri-verified-badge-line' },
+  { question: 'How does payment work?', answer: 'Clients review the agreed guard pay, plan service fee and any eligible promotion, then pay securely via Stripe before the booking is confirmed. Funds are held with Stripe and released to the guard after completion. All transactions are encrypted and processed through our secure platform.', icon: 'ri-secure-payment-line' },
   { question: 'Can I cancel or edit a job after posting?', answer: 'Yes. You can edit job details or cancel a posting from your client dashboard before guards are assigned. Once guards are assigned, please contact support for assistance.', icon: 'ri-edit-2-line' },
   { question: 'How long does guard verification take?', answer: 'SIA licence verification is typically completed within 24–48 hours. You will receive an email notification once your profile has been reviewed and approved.', icon: 'ri-time-line' },
   { question: 'What subscription plans are available?', answer: 'We offer flexible plans for clients of all sizes. Visit our Pricing page to compare features and choose the plan that best suits your business needs.', icon: 'ri-price-tag-3-line' },
@@ -254,7 +254,7 @@ export default function HelpContent() {
               <i className="ri-headphone-line text-2xl text-teal-400" />
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Still need help?</h2>
-            <p className="text-slate-400 mb-6 max-w-md mx-auto text-sm">Our support team is available to assist you. Reach out and we'll get back to you as soon as possible.</p>
+            <p className="text-slate-400 mb-6 max-w-md mx-auto text-sm">Our AI assistant is available 24/7 to help with platform questions and common issues. Issues needing human review can be escalated.</p>
             <Link href="/contact">
               <button className="bg-teal-500 text-slate-900 font-bold px-8 py-3 rounded-xl hover:bg-teal-400 transition-all whitespace-nowrap shadow-lg hover:shadow-teal-500/20">
                 Contact Support

@@ -297,7 +297,7 @@ function FindGuardContent() {
           </div>
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {[
-              { icon: 'ri-shield-check-line', title: 'Verify the SIA Licence', desc: 'Every guard on QuickGuard holds a valid SIA licence, checked against the official register before they can accept direct bookings.' },
+              { icon: 'ri-shield-check-line', title: 'Verify the SIA Licence', desc: 'Every guard on QuickGuard holds a valid SIA licence, checked against the official register before they can accept direct bookings. Planned: weekly AI licence checks flag suspended, revoked or expired licences for review.' },
               { icon: 'ri-star-line', title: 'Read Real Reviews', desc: 'Ratings come from completed jobs with genuine clients. A strong track record means a professional you can trust on site.' },
               { icon: 'ri-money-pound-circle-line', title: 'Check the Hourly Rate', desc: 'Rates are shown transparently per hour. Compare profiles to find quality cover that fits your budget, with no hidden agency markups.' },
             ].map((item) => (

@@ -68,7 +68,7 @@ export default function PrivacyPolicy() {
                 <h3 className="text-xl font-semibold text-white mb-3">Who we are</h3>
                 <div className="bg-teal-500/10 border border-teal-400/20 p-4 my-4 rounded-xl space-y-3">
                   <p className="text-slate-300">
-                    QuickGuard.uk is owned and operated by Martin Hewett, a sole trader trading as Digital Footprint. Where we decide why and how your personal information is used, Martin Hewett trading as Digital Footprint is the data controller.
+                    QuickGuard is operated by Digital Footprint (digital-footprint.uk). Where we decide why and how your personal information is used, Digital Footprint is the data controller.
                   </p>
                   <p className="text-slate-300">
                     For any privacy questions or to exercise your data protection rights, you can contact us at{' '}
@@ -552,7 +552,7 @@ export default function PrivacyPolicy() {
                     <div>
                       <h4 className="font-semibold text-teal-400 mb-3">Operator</h4>
                       <p className="text-slate-400">
-                        Martin Hewett, sole trader trading as Digital Footprint<br />
+                        Digital Footprint (<a href="https://digital-footprint.uk" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 underline">digital-footprint.uk</a>)<br />
                         United Kingdom
                       </p>
                     </div>

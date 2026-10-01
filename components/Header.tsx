@@ -40,6 +40,7 @@ export default function Header() {
   const [showGuardDropdown, setShowGuardDropdown] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showMegaMenu, setShowMegaMenu] = useState(false);
+  const [showIndustriesDropdown, setShowIndustriesDropdown] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
@@ -205,6 +206,7 @@ export default function Header() {
         setShowGuardDropdown(false);
         setShowClientDropdown(false);
         setShowMegaMenu(false);
+        setShowIndustriesDropdown(false);
         setShowProfileDropdown(false);
       }
       setLastScrollY(currentScrollY);
@@ -363,6 +365,18 @@ export default function Header() {
     { label: 'Events', href: '/security-for-events' },
   ];
 
+  const industryPages = [
+    { label: 'Security Companies', href: '/security-companies', icon: 'ri-shield-star-line' },
+    { label: 'Pubs, Bars & Nightclubs', href: '/pubs-bars-nightclubs', icon: 'ri-goblet-line' },
+    { label: 'Events & Festivals', href: '/event-security', icon: 'ri-calendar-event-line' },
+    { label: 'Construction', href: '/construction-security', icon: 'ri-hammer-line' },
+    { label: 'Hotels & Hospitality', href: '/hotel-security', icon: 'ri-hotel-line' },
+    { label: 'Retail', href: '/retail-security', icon: 'ri-store-2-line' },
+  ];
+
+  const isIndustryActive =
+    industryPages.some((p) => p.href === pathname) || pathname === '/industries';
+
   const handleSearchIconClick = () => {
     setShowSearchBar(true);
     setTimeout(() => searchInputRef.current?.focus(), 50);
@@ -392,6 +406,57 @@ export default function Header() {
                 <Link href="/how-it-works" prefetch={false} onClick={handleLinkClick} className={navLinkClass('/how-it-works')}>
                   How It Works
                 </Link>
+              </li>
+              <li className="relative">
+                <button
+                  onClick={() => setShowIndustriesDropdown(!showIndustriesDropdown)}
+                  onKeyDown={(e) => handleKeyDown(e, () => setShowIndustriesDropdown(!showIndustriesDropdown))}
+                  className={`flex items-center space-x-1 font-medium transition-colors focus:outline-none rounded px-2 py-1 ${
+                    isIndustryActive ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
+                  }`}
+                  aria-expanded={showIndustriesDropdown}
+                  aria-haspopup="true"
+                  aria-controls="industries-dropdown-menu"
+                >
+                  <span>Industries</span>
+                  <i className={`ri-arrow-down-s-line transition-transform ${showIndustriesDropdown ? 'rotate-180' : ''}`} aria-hidden="true"></i>
+                </button>
+                {showIndustriesDropdown && (
+                  <ul id="industries-dropdown-menu" className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 border border-gray-100 list-none m-0 p-0" role="menu" aria-label="Industries">
+                    {industryPages.map((industry) => (
+                      <li key={industry.href} role="none">
+                        <Link
+                          href={industry.href}
+                          prefetch={false}
+                          onClick={(e) => { handleLinkClick(e); setShowIndustriesDropdown(false); }}
+                          className={`flex items-center gap-3 px-4 py-2.5 transition-colors focus:outline-none ${
+                            isActive(industry.href) ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
+                          }`}
+                          role="menuitem"
+                        >
+                          <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                            <i className={`${industry.icon} text-base`} aria-hidden="true"></i>
+                          </span>
+                          {industry.label}
+                        </Link>
+                      </li>
+                    ))}
+                    <li role="none" className="border-t border-gray-100 mt-1 pt-1">
+                      <Link
+                        href="/industries"
+                        prefetch={false}
+                        onClick={(e) => { handleLinkClick(e); setShowIndustriesDropdown(false); }}
+                        className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors focus:outline-none ${
+                          isActive('/industries') ? 'bg-blue-50 text-blue-600' : 'text-blue-600 hover:bg-blue-50'
+                        }`}
+                        role="menuitem"
+                      >
+                        View All Industries
+                        <i className="ri-arrow-right-line" aria-hidden="true"></i>
+                      </Link>
+                    </li>
+                  </ul>
+                )}
               </li>
               <li>
                 <Link href="/jobs" prefetch={false} onClick={handleLinkClick} className={navLinkClass('/jobs')}>
@@ -761,6 +826,23 @@ export default function Header() {
                 </li>
                 <li>
                   <Link href="/qg-launch-rewards" prefetch={false} onClick={handleLinkClick} className={mobileNavLinkClass('/qg-launch-rewards')}>Launch Rewards</Link>
+                </li>
+              </ul>
+
+              <div className="border-t border-gray-100 my-2" role="separator"></div>
+              <p className="px-4 py-2 text-sm font-semibold text-gray-500">Industries</p>
+              <ul className="list-none m-0 p-0">
+                {industryPages.map((industry) => (
+                  <li key={industry.href}>
+                    <Link href={industry.href} prefetch={false} onClick={handleLinkClick} className={mobileNavLinkClass(industry.href)}>
+                      {industry.label}
+                    </Link>
+                  </li>
+                ))}
+                <li>
+                  <Link href="/industries" prefetch={false} onClick={handleLinkClick} className={`${mobileNavLinkClass('/industries')} font-semibold`}>
+                    View All Industries
+                  </Link>
                 </li>
               </ul>
 

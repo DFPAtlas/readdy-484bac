@@ -5,6 +5,10 @@ import NavSidebar from '@/components/NavSidebar';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import FAQList from './FAQList';
+import SubscriptionVsBooking from './SubscriptionVsBooking';
+import ClientBookingJourney from './ClientBookingJourney';
+import PaymentExampleTable from './PaymentExampleTable';
+import GuardPaymentJourney from './GuardPaymentJourney';
 
 const DEMO_TABS = [
   {
@@ -16,7 +20,7 @@ const DEMO_TABS = [
       { icon: 'ri-user-add-line', title: 'Create Your Profile', desc: 'Register in minutes, upload your SIA licence, and set your availability across the UK.' },
       { icon: 'ri-notification-3-line', title: 'Get Instant Job Alerts', desc: 'Receive real-time notifications for jobs that match your skills, location, and schedule.' },
       { icon: 'ri-send-plane-line', title: 'Apply with One Click', desc: 'Apply to multiple jobs instantly. Your verified SIA badge builds instant client trust.' },
-      { icon: 'ri-bank-card-line', title: 'Get Paid Securely', desc: 'Funds are released automatically after shift completion. Track every payout in your dashboard.' },
+      { icon: 'ri-bank-card-line', title: 'Get Paid Securely', desc: 'Receive your full agreed pay after the shift is confirmed complete. No guard commission — standard payouts are covered by the client booking service fee.' },
     ],
   },
   {
@@ -25,10 +29,10 @@ const DEMO_TABS = [
     icon: 'ri-building-2-line',
     color: 'blue',
     steps: [
-      { icon: 'ri-file-list-3-line', title: 'Post Your Job', desc: 'Describe your security needs — location, shift times, SIA requirements — in under 2 minutes.' },
+      { icon: 'ri-file-list-3-line', title: 'Post Your Job', desc: 'Describe your security needs — location, shift times, SIA requirements. Posting a job does not charge the booking payment.' },
       { icon: 'ri-robot-line', title: 'AI Matches Guards', desc: 'Our smart algorithm instantly surfaces the best-matched, verified UK security professionals.' },
       { icon: 'ri-user-search-line', title: 'Review & Select', desc: 'Browse guard profiles, check SIA credentials, and confirm your preferred candidate.' },
-      { icon: 'ri-secure-payment-line', title: 'Pay & Confirm', desc: 'Pre-pay securely via Stripe. Funds are held with Stripe and released only on job completion.' },
+      { icon: 'ri-secure-payment-line', title: 'Pay & Confirm', desc: 'Review the agreed guard pay, your plan\u2019s service fee and any eligible promotion, then pay securely via Stripe. Funds are held with Stripe until release.' },
     ],
   },
 ];
@@ -501,15 +505,15 @@ export default function HowItWorksClient() {
                 </div>
                 <h3 className="text-3xl font-bold text-white mb-4">Secure Payment & Job Completion</h3>
                 <p className="text-lg text-slate-400 mb-6">
-                  Our secure UK payment system ensures protection for both parties with HMRC compliance:
+                  Our secure UK payment system is built around held job payments and protects both sides:
                 </p>
                 <ul className="space-y-3 text-slate-400 list-none p-0 m-0">
                   {[
-                    'Client pre-pays for shift security',
-                    'Funds held securely during shift',
-                    'Client confirms job completion',
-                    'Guard receives full agreed pay (no guard commission)',
-                    'Automatic UTR and tax documentation'
+                    'Review the agreed guard pay, your plan\u2019s service fee and any eligible promotion before checkout',
+                    'Pay securely through Stripe before the booking is confirmed',
+                    'Funds remain with Stripe pending completion and the applicable release checks',
+                    'Guard pay is released after completion under the confirmation, dispute and payout process',
+                    'Guards keep their full agreed pay — no guard commission'
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-3">
                       <i className="ri-check-line text-teal-400" />
@@ -533,6 +537,12 @@ export default function HowItWorksClient() {
           </ol>
         </div>
       </section>
+
+      {/* PAYMENT SYSTEM */}
+      <SubscriptionVsBooking />
+      <ClientBookingJourney />
+      <PaymentExampleTable />
+      <GuardPaymentJourney />
 
       {/* PRICING SECTION */}
       <section className="py-20 bg-[#0B1933] border-b border-slate-800/60" aria-labelledby="pricing-overview-heading">
@@ -558,7 +568,7 @@ export default function HowItWorksClient() {
               <p className="text-slate-400 mb-6 text-sm">Monthly subscription for access to UK security jobs</p>
               <ul className="text-sm text-slate-400 space-y-2 mb-6 text-left list-none p-0 m-0">
                 {[
-                  'Multiple membership tiers available',
+                  'Keep your full agreed pay — no guard commission',
                   'Profile visibility to UK clients',
                   'Mobile app with instant notifications',
                   'SIA licence verification support'
@@ -590,13 +600,13 @@ export default function HowItWorksClient() {
               >
                 View Pricing
               </Link>
-              <p className="text-slate-400 mb-6 mt-3 text-sm">Commission on successful shift completion</p>
+              <p className="text-slate-400 mb-6 mt-3 text-sm">Booking service fee from 5% to 15% by plan. Guard services are paid separately for each booking.</p>
               <ul className="text-sm text-slate-400 space-y-2 text-left list-none p-0 m-0">
                 {[
-                  'No upfront costs or setup fees',
-                  'Pay only for completed shifts',
-                  'HMRC compliant payment processing',
-                  'Full UK client support'
+                  'Free, Starter, Pro and Enterprise plans',
+                  'Booking service fee from 15% down to 5%',
+                  'Payment held with Stripe until release',
+                  '24/7 AI support'
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-2">
                     <i className="ri-check-line text-blue-400 text-xs" />
@@ -669,7 +679,7 @@ export default function HowItWorksClient() {
                 img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20confident%20Black%20British%20man%20in%20his%20thirties%20with%20short%20hair%2C%20wearing%20a%20navy%20blue%20polo%20shirt%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20warm%20natural%20highlights%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-007&orientation=squarish"
               },
               {
-                text: "We needed security for a large corporate event in London on short notice. QuickGuard matched us with four verified guards within hours. The payment system is transparent and HMRC compliant — exactly what we needed.",
+                text: "We needed security for a large corporate event in London on short notice. QuickGuard matched us with four verified guards within hours. The payment system is transparent and straightforward — exactly what we needed.",
                 name: "Sarah M.",
                 role: "Events Director · London",
                 tag: "Client",

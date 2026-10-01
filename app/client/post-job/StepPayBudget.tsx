@@ -125,7 +125,7 @@ export default function StepPayBudget({ formData, errors, onChange, onNext, onBa
                 <span className="font-bold text-white">Total to pay</span>
                 <span className="font-bold text-teal-400 text-lg">{formatCurrency(fees.total)}</span>
               </div>
-              <p className="text-xs text-slate-500">Pay only when you book. Funds held with Stripe until shift is complete.</p>
+              <p className="text-xs text-slate-500">You pay securely before your booking is confirmed. Funds held with Stripe until shift is complete.</p>
             </div>
           </div>
         )}

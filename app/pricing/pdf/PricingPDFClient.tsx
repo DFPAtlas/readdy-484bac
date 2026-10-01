@@ -489,7 +489,7 @@ export default function PricingPDFClient() {
             </div>
           </div>
           <p className="text-xs text-slate-400 text-center mt-4 print:mt-2">
-            All prices shown in GBP. VAT applies where applicable. Prices subject to change. Last updated October 2026.
+            All prices shown in GBP. VAT applies where applicable. Prices subject to change. 24/7 support is provided by our AI assistant; issues needing human review can be escalated during business hours. Last updated October 2026.
           </p>
         </div>
       </div>

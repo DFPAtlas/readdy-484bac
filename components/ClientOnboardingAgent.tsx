@@ -102,7 +102,7 @@ export default function ClientOnboardingAgent({
             </div>
             <div>
               <h3 className="text-white font-semibold mb-1">Need help getting started?</h3>
-              <p className="text-sm text-slate-400">Ask QuickGuard Assistant — I can guide you through posting your first job, selecting guards, and more.</p>
+              <p className="text-sm text-slate-400">Ask QuickGuard AI Support — available 24/7 to help with platform questions and common issues.</p>
             </div>
           </div>
           <div className="flex gap-3 flex-shrink-0">
@@ -111,7 +111,7 @@ export default function ClientOnboardingAgent({
               className="px-5 py-2.5 bg-teal-500 text-slate-900 rounded-xl font-medium text-sm hover:bg-teal-400 transition whitespace-nowrap cursor-pointer flex items-center gap-2"
             >
               <i className="ri-robot-line w-4 h-4 flex items-center justify-center"></i>
-              Ask QuickGuard Assistant
+              Ask QuickGuard AI Support
             </button>
           </div>
         </div>
@@ -128,7 +128,7 @@ export default function ClientOnboardingAgent({
           </div>
           <div className="flex-1 text-center sm:text-left">
             <p className="text-white font-semibold text-sm mb-1">Stuck on any step?</p>
-            <p className="text-slate-400 text-xs">Ask QuickGuard Assistant for help with your job post</p>
+            <p className="text-slate-400 text-xs">Ask QuickGuard AI Support for help with your job post</p>
           </div>
           <button
             onClick={() => handleOpenAgent()}
@@ -152,7 +152,7 @@ export default function ClientOnboardingAgent({
             </div>
             <div>
               <h3 className="text-white font-semibold">Need help setting up your first job?</h3>
-              <p className="text-sm text-slate-400 mt-0.5">Ask QuickGuard Assistant — I&apos;m here to guide you</p>
+              <p className="text-sm text-slate-400 mt-0.5">Ask QuickGuard AI Support — I&apos;m here to guide you</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -178,7 +178,7 @@ export default function ClientOnboardingAgent({
           className="w-full px-4 py-2.5 bg-teal-500 text-slate-900 rounded-xl font-semibold text-sm hover:bg-teal-400 transition whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 mb-3"
         >
           <i className="ri-robot-line w-4 h-4 flex items-center justify-center"></i>
-          Ask QuickGuard Assistant
+          Ask QuickGuard AI Support
         </button>
 
         {expanded && (

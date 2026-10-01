@@ -180,7 +180,7 @@ export default function HomepageClient() {
               Why Choose QuickGuard?
             </h2>
             <p className="text-xl text-slate-400 max-w-3xl mx-auto">
-              A secure, efficient platform trusted by security professionals and businesses across the UK — with verified guards, protected payments, and 24/7 support whenever you need it.
+              A secure, efficient platform trusted by security professionals and businesses across the UK — with verified guards, protected payments, and 24/7 AI support whenever you need it.
             </p>
           </div>
 
@@ -199,7 +199,7 @@ export default function HomepageClient() {
                 <i className="ri-shield-check-line text-2xl text-teal-400"></i>
               </div>
               <h3 className="text-lg font-semibold mb-2 text-white">Verified Guards</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">All security professionals are SIA-licensed, background checked and certified</p>
+              <p className="text-slate-400 text-sm leading-relaxed">All security professionals are SIA-licensed, background checked and certified. Planned: weekly AI licence checks flag suspended, revoked or expired licences for review</p>
             </li>
 
             <li
@@ -249,8 +249,8 @@ export default function HomepageClient() {
               >
                 <i className="ri-customer-service-2-line text-2xl text-teal-400"></i>
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-white">24/7 Support</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">Round-the-clock customer support for all users</p>
+              <h3 className="text-lg font-semibold mb-2 text-white">24/7 AI Support</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">Our AI assistant is available 24/7 to help with platform questions and common issues. Issues requiring human review can be escalated.</p>
             </li>
           </ul>
         </div>

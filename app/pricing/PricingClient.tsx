@@ -70,8 +70,8 @@ const planLimitations: Record<string, string[]> = {
   'client-starter': ['Limited to 10 jobs per month', 'No priority matching', 'No dedicated support'],
   'client-pro': ['Limited to 30 jobs per month', 'No dedicated account manager', 'No bulk posting'],
   'guard_starter': ['Limited to 2 applications per month', 'No advanced job alerts', 'No performance analytics', 'No priority support'],
-  'guard-basic': ['Limited to 10 applications/month', 'No performance analytics', 'No 24/7 support'],
-  'guard-pro': ['Limited to 25 applications/month', 'No 24/7 support'],
+  'guard-basic': ['Limited to 10 applications/month', 'No performance analytics', 'No 24/7 AI support'],
+  'guard-pro': ['Limited to 25 applications/month', 'No 24/7 AI support'],
 };
 
 const getFeatureLabel = (key: string, audience: string) => {
@@ -247,7 +247,7 @@ export default function PricingClient() {
   };
 
   const faqs = [
-    { question: 'When am I charged?', answer: 'You are charged the full amount (guard pay + service fee) at the moment you post the job. Funds are held with Stripe and only released to the guard after the shift is confirmed complete.' },
+    { question: 'When am I charged?', answer: 'Posting a job does not charge the booking payment. Once you have reviewed applicants and selected your guards, you review the agreed guard pay, your plan’s service fee and any eligible promotion, then pay securely through Stripe before the booking is confirmed. Funds are held with Stripe and released to the guard after completion and the applicable release checks.' },
     { question: 'What if a guard cancels?', answer: 'If the guard cancels before the shift starts, you get a full refund including the service fee. If a pattern of cancellations emerges, our admin team investigates.' },
     { question: 'What if I cancel the job?', answer: 'Cancelling more than 24 hours before the shift: full refund including the service fee. 12–24 hours before: 50% refund of the guard fee; service fee is retained. Less than 12 hours: no refund.' },
     { question: 'Is there a contract or minimum commitment?', answer: 'No. Pay-As-You-Go means zero commitment. Subscription plans can be cancelled anytime with no penalties.' },
@@ -510,7 +510,7 @@ export default function PricingClient() {
               Not sure which plan fits you?
             </h2>
             <p className="text-slate-400 max-w-2xl mx-auto mb-8">
-              All plans include SIA-verified guards, secure held job payments with Stripe, and 24/7 dispute support. Upgrade, downgrade, or cancel anytime.
+              All plans include SIA-verified guards, secure held job payments with Stripe, and 24/7 AI dispute support. Upgrade, downgrade, or cancel anytime.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
@@ -547,9 +547,9 @@ export default function PricingClient() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                { icon: 'ri-shield-check-line', title: 'SIA Re-verification', desc: 'Every guard licence is checked and re-verified every 6 months so you only work with valid, active SIA holders.' },
+                { icon: 'ri-shield-check-line', title: 'Weekly automated SIA licence checks', desc: 'Every guard is SIA-verified before joining. Planned: an AI agent will check guards’ SIA licence status weekly and flag suspended, revoked or expired licences for review.' },
                 { icon: 'ri-safe-2-line', title: 'Held Job Payment Protection', desc: 'Your payment is held securely with Stripe and only released to the guard after the shift is marked complete.' },
-                { icon: 'ri-customer-service-2-line', title: '24/7 Dispute Support', desc: 'If anything goes wrong, our support team is available around the clock to investigate and resolve.' },
+                { icon: 'ri-customer-service-2-line', title: '24/7 AI Dispute Support', desc: 'Our AI assistant is available 24/7 to help with dispute questions and common issues. Cases needing human review can be escalated to our team.' },
                 { icon: 'ri-bank-card-line', title: 'Payment Processing', desc: 'Stripe handles all card processing securely. The fee covers PCI-compliant infrastructure and fraud prevention.' },
               ].map((item, i) => (
                 <div key={i} className="bg-[#111d35] rounded-xl border border-slate-700/50 p-6">
@@ -603,8 +603,9 @@ export default function PricingClient() {
                   <div className="flex-1 bg-[#0b1322] rounded-xl border border-slate-700/30 p-5 text-sm text-slate-400 flex flex-col justify-center">
                     <p className="font-semibold text-slate-300 mb-3">What happens next:</p>
                     <ul className="space-y-2 list-disc pl-4">
-                      <li>Stripe charges your card {formatCurrency(example.total)} at posting</li>
-                      <li>Money sits with Stripe until the shift ends</li>
+                      <li>Stripe charges your card {formatCurrency(example.total)} before the booking is confirmed</li>
+                      <li>Posting the job does not charge the booking payment</li>
+                      <li>Money sits with Stripe until completion and the release checks</li>
                       <li>Guard gets paid {formatCurrency(example.guardTotal)} after completion</li>
                       <li>QuickGuard retains {formatCurrency(example.serviceFee)} for platform services</li>
                     </ul>
@@ -652,7 +653,7 @@ export default function PricingClient() {
                 className="inline-flex items-center gap-2 bg-teal-500 text-slate-900 px-6 py-3 rounded-xl font-semibold hover:bg-teal-400 transition-all whitespace-nowrap cursor-pointer shadow-lg hover:shadow-teal-500/20"
               >
                 <i className="ri-customer-service-line" />
-                Talk to Us
+                QuickGuard AI Support
               </button>
             </div>
           </div>

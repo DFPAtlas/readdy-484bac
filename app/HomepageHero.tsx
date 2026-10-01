@@ -1,18 +1,9 @@
 import Link from 'next/link';
 import BrandLogo from '@/components/BrandLogo';
+import HomepageIndustries from './HomepageIndustries';
 
 const HERO_IMAGE =
   'https://readdy.ai/api/search-image?query=Professional%20male%20security%20guard%20in%20sharp%20black%20uniform%20with%20visible%20SIA%20badge%20standing%20confidently%20beside%20a%20sleek%20modern%20laptop%20displaying%20a%20dashboard%20interface%20with%20job%20match%20listings%20in%20a%20modern%20urban%20London%20night%20setting%20with%20subtle%20city%20lights%20and%20blurred%20skyline%20background%2C%20high-end%20cinematic%20lighting%20with%20sharp%20realistic%20details%2C%20dark%20navy%20blue%20and%20teal%20color%20palette%2C%20left%20side%20features%20a%20clean%20dark%20gradient%20background%20perfect%20for%20text%20overlay%2C%20right%20side%20shows%20the%20guard%20and%20technology%20scene%2C%20ultra%20clean%20premium%20corporate%20composition%2C%20modern%20minimalist%20web%20design%20aesthetic%2C%20excellent%20contrast%20ensuring%20white%20text%20readability%20on%20the%20left%2C%20professional%20studio-quality%20lighting%20with%20soft%20shadows%2C%20simple%20background%20highlighting%20the%20subject&width=1600&height=900&seq=hero_quickguard_main_20260503&orientation=landscape';
-
-const venueIcons = [
-  { icon: 'ri-door-open-line', label: 'Nightclubs' },
-  { icon: 'ri-store-2-line', label: 'Retail' },
-  { icon: 'ri-hammer-line', label: 'Construction' },
-  { icon: 'ri-calendar-event-line', label: 'Events' },
-  { icon: 'ri-group-line', label: 'Festivals' },
-  { icon: 'ri-archive-line', label: 'Warehouses' },
-  { icon: 'ri-building-2-line', label: 'Offices' },
-];
 
 export default function HomepageHero() {
   return (
@@ -84,21 +75,7 @@ export default function HomepageHero() {
             </Link>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mb-10">
-            {venueIcons.map((v) => (
-              <Link
-                key={v.label}
-                href="/client/register"
-                prefetch={false}
-                className="flex items-center gap-1.5 text-slate-400 hover:text-teal-400 transition-colors text-sm"
-              >
-                <div className="w-6 h-6 flex items-center justify-center">
-                  <i className={`${v.icon} text-teal-400 text-sm`}></i>
-                </div>
-                {v.label}
-              </Link>
-            ))}
-          </div>
+          <HomepageIndustries />
 
           <div className="flex flex-wrap items-center gap-x-8 gap-y-4 text-slate-300 text-sm">
             <div className="flex items-center gap-2">

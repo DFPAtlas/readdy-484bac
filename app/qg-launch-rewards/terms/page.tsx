@@ -122,7 +122,7 @@ export default function QGLaunchRewardsTermsPage() {
 
         <div className="mt-12 pt-8 border-t border-[#1a2b4a]">
           <p className="text-slate-500 text-xs">
-            QG Launch Rewards is operated by QuickGuard. For questions about the programme, contact support through your dashboard or email support@quickguard.uk.
+            QuickGuard is operated by Digital Footprint (<a href="https://digital-footprint.uk" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 underline">digital-footprint.uk</a>). For questions about the programme, contact support through your dashboard or email support@quickguard.uk.
           </p>
         </div>
       </div>

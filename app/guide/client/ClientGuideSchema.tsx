@@ -40,7 +40,7 @@ export default function ClientGuideSchema() {
         '@type': 'HowToStep',
         position: 4,
         name: 'Secure Payment',
-        text: 'Pay guards safely through Stripe after job completion. Full transaction history and automatic receipts provided.',
+        text: 'Review the agreed guard pay, plan service fee and any eligible promotion, then pay securely through Stripe before the booking is confirmed. Funds are held and released to the guard after completion. Full transaction history and automatic receipts provided.',
         url: `${SITE_URL}/guide/client#step-04`,
       },
     ],

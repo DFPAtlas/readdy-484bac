@@ -4,7 +4,7 @@ import HelpContent from './HelpContent';
 export const metadata: Metadata = {
   title: 'QuickGuard Help Centre | Security Guard Hire FAQs',
   description:
-    "Find answers about hiring security guards, SIA licence checks, payments, and cancellations. Browse QuickGuard's UK help centre or chat with our support team.",
+    "Find answers about hiring security guards, SIA licence checks, payments, and cancellations. Browse QuickGuard's UK help centre or chat with QuickGuard AI Support, available 24/7.",
   keywords:
     'QuickGuard help, security guard FAQ, SIA verification help, hiring security guards UK, QuickGuard support, guard payment questions',
   alternates: {
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Help Centre | QuickGuard',
     description:
-      'Answers to your questions about hiring guards, SIA verification, payments, and more. Browse guides or talk to our UK support team.',
+      'Answers to your questions about hiring guards, SIA verification, payments, and more. Browse guides or chat with QuickGuard AI Support, available 24/7.',
     url: 'https://quickguard.uk/help',
     siteName: 'QuickGuard',
     type: 'website',

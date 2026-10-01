@@ -14,9 +14,14 @@ export default function Footer() {
               <BrandLogo variant="full" theme="dark" imgClassName="h-10 w-auto" />
             </div>
             <p className="text-slate-400 mb-6 leading-relaxed text-sm">
-              The UK's leading platform connecting SIA-licensed security professionals with businesses nationwide. Trusted, verified, and available 24/7.
+              The UK's leading platform connecting SIA-licensed security professionals with businesses nationwide. Trusted, verified, with 24/7 AI support.
             </p>
             <p className="text-slate-500 text-sm mb-2">© {currentYear} QuickGuard. All rights reserved.</p>
+            <p className="text-slate-400 text-sm">
+              QuickGuard is operated by Digital Footprint (
+              <a href="https://digital-footprint.uk" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 underline">digital-footprint.uk</a>
+              ).
+            </p>
           </div>
 
           <nav aria-label="Hire security">

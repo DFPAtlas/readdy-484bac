@@ -129,7 +129,7 @@ export default function UseCasePage({ data }: { data: UseCaseData }) {
         <div className="max-w-6xl mx-auto px-6 md:px-8">
           <div className="grid md:grid-cols-4 gap-6">
             {[
-              { icon: 'ri-shield-check-line', label: 'All Guards SIA-Verified', desc: 'Automatic licence checking against the SIA register' },
+              { icon: 'ri-shield-check-line', label: 'All Guards SIA-Verified', desc: 'SIA-verified before joining, with planned weekly AI licence checks' },
               { icon: 'ri-lock-line', label: 'Held Job Payment with Stripe', desc: 'Funds released only after the shift is complete' },
               { icon: 'ri-money-pound-circle-line', label: 'Pay Per Shift', desc: 'No contracts, no hidden fees — pay per shift' },
               { icon: 'ri-map-pin-2-line', label: 'UK-Wide Coverage', desc: 'Guards in London, Manchester, Birmingham & beyond' },

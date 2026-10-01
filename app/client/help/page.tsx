@@ -271,7 +271,7 @@ export default function ClientHelpPage() {
                       <i className="ri-shield-check-line text-teal-400 text-xl" />
                     </div>
                     <p className="text-white font-semibold text-sm mb-1">SIA Verification</p>
-                    <p className="text-slate-400 text-xs">Every guard is checked against the official SIA register. Look for the verified badge.</p>
+                    <p className="text-slate-400 text-xs">Every guard is checked against the official SIA register before joining. Planned: weekly AI licence checks flag suspended, revoked or expired licences for review. Look for the verified badge.</p>
                   </div>
                   <div className="bg-[#162036] rounded-xl p-4 border border-[#1e2d4d] text-center">
                     <div className="w-10 h-10 bg-amber-500/10 rounded-lg flex items-center justify-center mx-auto mb-3 border border-amber-400/20">
@@ -311,7 +311,7 @@ export default function ClientHelpPage() {
                     </div>
                     <div>
                       <p className="text-white font-semibold text-sm">Secure Payment</p>
-                      <p className="text-slate-400 text-sm">Pay via Stripe. Funds are held with Stripe and only released after the shift is completed.</p>
+                      <p className="text-slate-400 text-sm">Review your booking total, then pay via Stripe before the booking is confirmed. Funds are held with Stripe and only released after the shift is completed and the release checks pass.</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-4">
@@ -412,7 +412,7 @@ export default function ClientHelpPage() {
 
             <HelpSection id="support-disputes" icon="ri-customer-service-2-line" title="Support & Disputes">
               <div className="space-y-4 text-sm text-slate-400">
-                <p>If something goes wrong, we are here to help. You can get support in several ways:</p>
+                <p>If something goes wrong, we are here to help. Our AI assistant is available 24/7 for platform questions and common issues, and you can escalate anything that needs human review:</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-[#162036] rounded-xl p-4 border border-[#1e2d4d]">
                     <p className="text-white font-semibold text-sm mb-2">Create a Support Ticket</p>
@@ -429,7 +429,7 @@ export default function ClientHelpPage() {
                     </Link>
                   </div>
                 </div>
-                <p>All tickets are tracked in real time. You will receive notifications when our team replies. For urgent issues, we aim to respond within 1 hour during business hours.</p>
+                <p>All tickets are tracked in real time and you will receive notifications when our team replies. Our AI assistant is available 24/7 for immediate platform help and common issues; issues needing human review can be escalated to our team during business hours.</p>
               </div>
             </HelpSection>
 
@@ -484,7 +484,7 @@ export default function ClientHelpPage() {
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Still need help?</h3>
               <p className="text-slate-400 text-sm mb-6 max-w-md mx-auto">
-                Our UK support team is available to assist you. Reach out and we will get back to you as soon as possible.
+                Our AI assistant is available 24/7 to help with platform questions and common issues. Issues needing human review can be escalated to our UK team.
               </p>
               <div className="flex flex-wrap gap-3 justify-center">
                 <Link href="/client/support">

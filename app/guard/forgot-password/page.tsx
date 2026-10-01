@@ -212,7 +212,7 @@ export default function GuardForgotPasswordPage() {
                     </div>
                     <div>
                       <h4 className="text-xs font-medium text-slate-200">Contact Support</h4>
-                      <p className="text-xs text-slate-500">Our team is available 24/7 to help you</p>
+                      <p className="text-xs text-slate-500">Our AI assistant is available 24/7 to help you</p>
                       <Link href="/contact" className="text-xs text-[#1DA1F2] hover:text-[#3B82F6] font-medium transition-colors">
                         Get in touch &rarr;
                       </Link>

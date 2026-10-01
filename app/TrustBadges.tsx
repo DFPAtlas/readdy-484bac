@@ -7,7 +7,7 @@ const badges = [
   {
     icon: 'ri-shield-star-line',
     title: 'SIA Approved Contractor',
-    description: 'All guards hold valid SIA licences verified in real time',
+    description: 'All guards hold valid SIA licences, verified before joining',
     color: 'blue',
   },
   {

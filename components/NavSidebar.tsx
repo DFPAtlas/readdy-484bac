@@ -22,6 +22,15 @@ interface LoggedInUser {
 
 const ROLE_PREF_KEY = 'quickguard_active_role';
 
+const INDUSTRY_LINKS = [
+  { label: 'Security Companies', href: '/security-companies', icon: 'ri-shield-star-line' },
+  { label: 'Pubs, Bars & Nightclubs', href: '/pubs-bars-nightclubs', icon: 'ri-goblet-line' },
+  { label: 'Events & Festivals', href: '/event-security', icon: 'ri-calendar-event-line' },
+  { label: 'Construction', href: '/construction-security', icon: 'ri-hammer-line' },
+  { label: 'Hotels & Hospitality', href: '/hotel-security', icon: 'ri-hotel-line' },
+  { label: 'Retail', href: '/retail-security', icon: 'ri-store-2-line' },
+];
+
 function getStoredRole(): UserRole {
   if (typeof window === 'undefined') return null;
   const stored = localStorage.getItem(ROLE_PREF_KEY);
@@ -291,6 +300,18 @@ export default function NavSidebar() {
           <Link href="/qg-launch-rewards" prefetch={false} onClick={() => setSidebarOpen(false)} className={linkClass('/qg-launch-rewards')}>
             <div className={iconClass('/qg-launch-rewards')}><i className="ri-rocket-2-line text-lg"></i></div>
             Launch Rewards
+          </Link>
+          <div className="border-t border-slate-700 my-3"></div>
+          <p className="text-xs font-bold text-teal-400 uppercase tracking-widest px-3 mb-2">Industries</p>
+          {INDUSTRY_LINKS.map((industry) => (
+            <Link key={industry.href} href={industry.href} prefetch={false} onClick={() => setSidebarOpen(false)} className={linkClass(industry.href)}>
+              <div className={iconClass(industry.href)}><i className={`${industry.icon} text-lg`}></i></div>
+              {industry.label}
+            </Link>
+          ))}
+          <Link href="/industries" prefetch={false} onClick={() => setSidebarOpen(false)} className={linkClass('/industries')}>
+            <div className={iconClass('/industries')}><i className="ri-layout-grid-line text-lg"></i></div>
+            View All Industries
           </Link>
           <div className="border-t border-slate-700 my-3"></div>
           <p className="text-xs font-bold text-teal-400 uppercase tracking-widest px-3 mb-2">Popular Cities</p>

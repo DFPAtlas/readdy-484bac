@@ -84,7 +84,7 @@ export default function RegisterMarketingPanel() {
           {[
             { value: '500+', label: 'UK businesses' },
             { value: '4.9/5', label: 'Average rating' },
-            { value: '24/7', label: 'Platform support' },
+            { value: '24/7', label: 'AI support' },
           ].map((stat) => (
             <div key={stat.label} className="rounded-xl border border-white/10 bg-white/5 px-3 py-4 text-center">
               <p className="text-lg font-bold text-white">{stat.value}</p>
