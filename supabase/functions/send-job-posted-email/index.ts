@@ -91,43 +91,26 @@ serve(async (req: Request) => {
     const renderRes = await fetch(`${supabaseUrl}/functions/v1/render-email-template`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
-      body: JSON.stringify({ template_slug: 'job_posted', to: clientEmail, variables, dry_run: true }),
+      body: JSON.stringify({
+        template_slug: 'job_posted',
+        to: clientEmail,
+        variables,
+        from: 'QuickGuard <notifications@quickguard.uk>',
+        related_job_id: jobId,
+      }),
     });
 
     if (!renderRes.ok) {
       const errText = await renderRes.text();
-      throw new Error(`Template render failed: ${errText}`);
+      throw new Error(`Template send failed: ${errText}`);
     }
 
-    const rendered = await renderRes.json();
-    const emailSubject = rendered.subject || `Job Posted: ${jobTitle}`;
-    const emailHtml = rendered.body_html;
-
-    const resendRes = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: `QuickGuard <noreply@${fromDomain}>`,
-        to: [clientEmail],
-        subject: emailSubject,
-        html: emailHtml,
-      }),
-    });
-
-    if (!resendRes.ok) {
-      const errText = await resendRes.text();
-      throw new Error(`Resend send failed (${resendRes.status}): ${errText}`);
-    }
-
-    const result = await resendRes.json();
+    const result = await renderRes.json();
 
     return corsResponse(origin, 200, {
       success: true,
       message: 'Email sent successfully',
-      message_id: result.id,
+      message_id: result.email_id,
     });
   } catch (error) {
     console.error('Error sending job posted email:', error);
