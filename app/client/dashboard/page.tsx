@@ -862,7 +862,7 @@ export default function ClientDashboardPage() {
                 label="Active Jobs"
                 sub="Currently open"
                 subColor="text-amber-400"
-                href="/client/jobs/tracker"
+                href="/client/jobs"
               />
               <StatsCard
                 icon="ri-pulse-line"
