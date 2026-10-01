@@ -282,6 +282,7 @@ Deno.serve(async (req) => {
       password,
       email_confirm: true,
       user_metadata: {
+        role: normalizedRole,
         first_name: first_name || '',
         last_name: last_name || '',
         email: normalizedEmail,

@@ -83,7 +83,7 @@ export default function HomepageHero() {
               I Need a Guard
             </Link>
             <Link
-              href="/client/register"
+              href="/company/login"
               prefetch={false}
               className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-8 py-4 rounded-lg text-lg font-semibold transition-all duration-300 hover:scale-105 whitespace-nowrap focus:ring-4 focus:ring-white/20 focus:outline-none backdrop-blur-sm text-center"
             >
