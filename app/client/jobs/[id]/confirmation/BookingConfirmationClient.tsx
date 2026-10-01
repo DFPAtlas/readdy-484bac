@@ -102,6 +102,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
   const [serviceFee, setServiceFee] = useState(0);
   const [vat, setVat] = useState(0);
   const [total, setTotal] = useState(0);
+  const [feesReady, setFeesReady] = useState(false);
 
   function getInitials(name: string): string {
     const parts = name.trim().split(' ');
@@ -192,16 +193,15 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
         jobData.start_date,
         jobData.end_date
       );
-      const gp = totalHours * (jobData.number_of_guards || 1) * (jobData.hourly_rate || 0);
-      const sf = gp * 0.10;
-      const v = (gp + sf) * 0.20;
-      const t = gp + sf + v;
+      const { data: fees, error: feeError } = await supabase.functions.invoke('calculate-job-fees', { body: { jobId } });
+      if (feeError || !fees || fees.error) throw new Error('Booking total unavailable');
       setHours(totalHours);
       setDays(d);
-      setGuardPay(Math.round(gp * 100) / 100);
-      setServiceFee(Math.round(sf * 100) / 100);
-      setVat(Math.round(v * 100) / 100);
-      setTotal(Math.round(t * 100) / 100);
+      setGuardPay(Number(fees.guardFees));
+      setServiceFee(Number(fees.platformFee));
+      setVat(0);
+      setTotal(Number(fees.clientTotalCharge));
+      setFeesReady(true);
 
       if (jobData.terms_accepted) {
         setTermsBooking(true);
@@ -279,6 +279,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
   const blockers = [];
   if (guardsSelected === 0) blockers.push({ icon: 'ri-user-unfollow-line', text: 'No guards selected for this job' });
   if (guardsSelected < guardsRequired) blockers.push({ icon: 'ri-user-add-line', text: `Only ${guardsSelected} of ${guardsRequired} required guards selected` });
+  if (!feesReady) blockers.push({ icon: "ri-error-warning-line", text: "Recorded booking total unavailable. Refresh before confirming." });
   if (!paymentComplete) blockers.push({ icon: 'ri-secure-payment-line', text: 'Payment is required before confirmation' });
   if (!allTermsAccepted) blockers.push({ icon: 'ri-file-list-3-line', text: 'You must accept all terms and conditions' });
   if (!job?.venue_address_line1) blockers.push({ icon: 'ri-map-pin-line', text: 'Site address is missing' });
@@ -411,7 +412,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
                   </div>
                   <div className="text-right">
                     <p className="text-teal-400 text-sm">Total Cost</p>
-                    <p className="text-3xl font-bold text-white">£{total.toFixed(2)}</p>
+                    <p className="text-3xl font-bold text-white">{feesReady ? `£${total.toFixed(2)}` : "Unavailable"}</p>
                   </div>
                 </div>
               </div>
@@ -485,16 +486,16 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
                       <span className="text-slate-200 font-semibold">£{guardPay.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Platform / Service Fee (10%)</span>
+                      <span className="text-slate-500">QuickGuard Service Fee</span>
                       <span className="text-slate-200 font-semibold">£{serviceFee.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">VAT (20%)</span>
+                      <span className="text-slate-500">Additional VAT</span>
                       <span className="text-slate-200 font-semibold">£{vat.toFixed(2)}</span>
                     </div>
                     <div className="border-t border-[#1e2d4d] pt-3 flex justify-between">
                       <span className="text-white font-semibold">Total Payable</span>
-                      <span className="text-teal-400 font-bold text-lg">£{total.toFixed(2)}</span>
+                      <span className="text-teal-400 font-bold text-lg">{feesReady ? `£${total.toFixed(2)}` : "Unavailable"}</span>
                     </div>
                   </div>
 

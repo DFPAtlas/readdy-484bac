@@ -1,63 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-async function getSubscriptionAwareFee(
-  supabaseService: any,
-  userId: string,
-  role: 'client' | 'guard',
-): Promise<{ feePercent: number; feeFixed: number; isSubscribed: boolean; planSlug: string | null }> {
-  const { data: sub } = await supabaseService
-    .from('subscriptions')
-    .select('plan_slug, status')
-    .eq('user_id', userId)
-    .eq('account_type', role)
-    .in('status', ['active', 'trialing'])
-    .maybeSingle();
-
-  if (sub) {
-    return { feePercent: 0, feeFixed: 0, isSubscribed: true, planSlug: sub.plan_slug };
-  }
-
-  const table = role === 'client' ? 'clients' : 'guards';
-  const { data: profile } = await supabaseService
-    .from(table)
-    .select('subscription_plan')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  const planSlug = profile?.subscription_plan || (role === 'client' ? 'payg' : 'guard-starter');
-
-  const { data: rules } = await supabaseService
-    .from('plan_fee_rules')
-    .select('platform_fee_percent, platform_fee_fixed_pence')
-    .eq('plan_slug', planSlug)
-    .maybeSingle();
-
-  const feePercent = rules?.platform_fee_percent ? Number(rules.platform_fee_percent) : 0;
-  const feeFixed = rules?.platform_fee_fixed_pence ? Number(rules.platform_fee_fixed_pence) : 0;
-
-  return { feePercent, feeFixed, isSubscribed: false, planSlug };
-}
-
-async function getStripeFeeConfig(
-  supabaseService: any,
-  clientPlanSlug: string | null,
-): Promise<{ stripeFeePayer: string; stripeFeePct: number; payoutDelay: number; autoRelease: number; disputeWindow: number }> {
-  const slug = clientPlanSlug || 'payg';
-  const { data: rules } = await supabaseService
-    .from('plan_fee_rules')
-    .select('stripe_fee_payer, stripe_fee_estimate_percent, payout_delay_days, auto_release_hours, dispute_window_hours')
-    .eq('plan_slug', slug)
-    .maybeSingle();
-
-  return {
-    stripeFeePayer: rules?.stripe_fee_payer || 'quickguard',
-    stripeFeePct: rules?.stripe_fee_estimate_percent ? Number(rules.stripe_fee_estimate_percent) : 1.5,
-    payoutDelay: rules?.payout_delay_days ? Number(rules.payout_delay_days) : 3,
-    autoRelease: rules?.auto_release_hours ? Number(rules.auto_release_hours) : 72,
-    disputeWindow: rules?.dispute_window_hours ? Number(rules.dispute_window_hours) : 48,
-  };
-}
+import { getBookingPolicy, applyClientPromotion, bookingAmounts } from '../_shared/booking-policy.ts';
 
 serve(async (req) => {
   const origin = req.headers.get('origin') || 'https://quickguard.uk';
@@ -96,149 +40,78 @@ serve(async (req) => {
 
     const { data: job } = await supabaseService
       .from('jobs')
-      .select('id, client_id, hourly_rate, start_date, end_date, start_time, end_time, number_of_guards, tax_disclaimer_accepted')
+      .select('id, client_id, hourly_rate, start_date, end_date, start_time, end_time, number_of_guards, number_of_days, payment_status, tax_disclaimer_accepted')
       .eq('id', jobId)
       .maybeSingle();
     if (!job) return new Response(JSON.stringify({ error: 'Job not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    if (guardProfile) {
-      const { data: assignment } = await supabaseService.from('job_assignments').select('id').eq('job_id', jobId).eq('guard_id', guardProfile.id).maybeSingle();
-      if (!assignment && !clientProfile) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    } else if (clientProfile) {
-      if (job.client_id !== clientProfile.id) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    } else {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    const ownsJob = clientProfile?.id === job.client_id;
+    if (!ownsJob) {
+      if (!guardProfile) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: corsHeaders });
+      const { data: ownAssignment } = await supabaseService.from('job_assignments').select('id').eq('job_id', jobId).eq('guard_id', guardProfile.id).maybeSingle();
+      if (!ownAssignment) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: corsHeaders });
     }
 
-    const { data: assignments } = await supabaseService
-      .from('job_assignments')
-      .select('id, guard_id, agreed_hourly_rate, agreed_hours, gross_guard_amount, guards(user_id)')
-      .eq('job_id', jobId);
-
-    if (!assignments || assignments.length === 0) {
-      const start = new Date(`1970-01-01T${job.start_time}`);
-      const end = new Date(`1970-01-01T${job.end_time}`);
-      let hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-      if (hours <= 0) hours += 24;
-      const days = Math.max(1, Number(job.number_of_days ?? 1));
-      const totalHours = hours * days;
-      const guardFees = totalHours * Number(job.hourly_rate) * Number(job.number_of_guards);
-
-      return new Response(JSON.stringify({
-        jobId,
-        guardFees: Math.round(guardFees * 100) / 100,
-        platformFee: 0,
-        platformFeePercent: 0,
-        guardServiceFee: 0,
-        guardServiceFeePercent: 0,
-        stripeFeeEstimate: 0,
-        stripeFeePercent: 1.5,
-        stripeFeePayer: 'quickguard',
-        clientTotalCharge: Math.round(guardFees * 100) / 100,
-        guardPayoutAmount: Math.round(guardFees * 100) / 100,
-        quickguardNetFee: 0,
-        payoutDelayDays: 3,
-        autoReleaseHours: 72,
-        disputeWindowHours: 48,
-        taxDisclaimerAccepted: job.tax_disclaimer_accepted || false,
-        hours: totalHours,
-        days,
-        assignments: [],
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+    if (['funded', 'succeeded', 'completed', 'refunded', 'processing'].includes(job.payment_status)) {
+      if (ownsJob) {
+        const { data: snapshot, error: snapshotError } = await supabaseService.from('payment_fee_breakdowns')
+          .select('*').eq('job_id', jobId).eq('client_id', job.client_id).maybeSingle();
+        if (snapshotError || !snapshot) throw new Error('Recorded payment breakdown unavailable');
+        return new Response(JSON.stringify({ jobId, guardFees: Number(snapshot.job_amount),
+          platformFee: Number(snapshot.platform_fee), platformFeePercent: Number(snapshot.platform_fee_percent),
+          stripeFeeEstimate: Number(snapshot.stripe_fee_estimate), stripeFeePercent: Number(snapshot.stripe_fee_percent),
+          stripeFeePayer: snapshot.stripe_fee_payer, clientTotalCharge: Number(snapshot.client_total_charge),
+          guardPayoutAmount: Number(snapshot.guard_payout_amount), quickguardNetFee: Number(snapshot.quickguard_net_fee),
+          taxDisclaimerAccepted: snapshot.tax_disclaimer_accepted, recordedPayment: true,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const { data: a, error: snapshotError } = await supabaseService.from('job_assignments')
+        .select('gross_guard_amount, platform_fee_amount, guard_service_fee_amount, stripe_fee_amount, client_total_amount, guard_net_payout')
+        .eq('job_id', jobId).eq('guard_id', guardProfile.id).single();
+      if (snapshotError || !a) throw new Error('Recorded payment breakdown unavailable');
+      return new Response(JSON.stringify({ jobId, guardFees: Number(a.gross_guard_amount),
+        platformFee: Number(a.platform_fee_amount), guardServiceFee: Number(a.guard_service_fee_amount),
+        stripeFeeEstimate: Number(a.stripe_fee_amount), clientTotalCharge: Number(a.client_total_amount),
+        guardPayoutAmount: Number(a.guard_net_payout), recordedPayment: true,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { data: clientUser } = await supabaseService.from('clients').select('user_id, subscription_plan').eq('id', job.client_id).maybeSingle();
-    const clientUserId = clientUser?.user_id || null;
-
-    const clientFeeResult = clientUserId
-      ? await getSubscriptionAwareFee(supabaseService, clientUserId, 'client')
-      : { feePercent: 0, feeFixed: 0, isSubscribed: false, planSlug: 'payg' };
-
-    const stripeConfig = await getStripeFeeConfig(supabaseService, clientFeeResult.planSlug);
-
-    const STRIPE_FEE_FIXED = 0.20;
-
-    let totalGuardFees = 0;
-    let totalPlatformFee = 0;
-    let totalGuardServiceFee = 0;
-    let totalStripeFeeEstimate = 0;
-    let totalClientCharge = 0;
-    let totalGuardNet = 0;
-    let guardServiceFeePercent = 0;
-
-    const assignmentBreakdowns = [];
-
-    for (const assignment of assignments) {
-      const guardUserId = assignment.guards?.user_id || null;
-
-      const guardFeeResult = guardUserId
-        ? await getSubscriptionAwareFee(supabaseService, guardUserId, 'guard')
-        : { feePercent: 10, feeFixed: 0, isSubscribed: false, planSlug: 'guard-starter' };
-
-      guardServiceFeePercent = guardFeeResult.feePercent;
-
-      const grossGuardAmount = assignment.gross_guard_amount
-        ? Number(assignment.gross_guard_amount)
-        : (Number(assignment.agreed_hourly_rate || job.hourly_rate) * Number(assignment.agreed_hours || 1));
-
-      const guardServiceFee = grossGuardAmount * (guardServiceFeePercent / 100);
-      const guardNetPayout = grossGuardAmount - guardServiceFee;
-
-      const platformFee = grossGuardAmount * (clientFeeResult.feePercent / 100) + clientFeeResult.feeFixed;
-      const subTotal = grossGuardAmount + platformFee;
-
-      const stripeFee = stripeConfig.stripeFeePayer === 'client'
-        ? (subTotal * (stripeConfig.stripeFeePct / 100)) + STRIPE_FEE_FIXED
-        : 0;
-
-      const clientTotalForGuard = stripeConfig.stripeFeePayer === 'client'
-        ? subTotal + stripeFee
-        : subTotal;
-
-      totalGuardFees += grossGuardAmount;
-      totalPlatformFee += platformFee;
-      totalGuardServiceFee += guardServiceFee;
-      if (stripeConfig.stripeFeePayer === 'client') totalStripeFeeEstimate += stripeFee;
-      totalClientCharge += clientTotalForGuard;
-      totalGuardNet += guardNetPayout;
-
-      assignmentBreakdowns.push({
-        assignmentId: assignment.id,
-        guardId: assignment.guard_id,
-        agreedHourlyRate: Number(assignment.agreed_hourly_rate || job.hourly_rate),
-        agreedHours: Number(assignment.agreed_hours || 1),
-        grossGuardAmount: Math.round(grossGuardAmount * 100) / 100,
-        platformFeeAmount: Math.round(platformFee * 100) / 100,
-        guardServiceFeeAmount: Math.round(guardServiceFee * 100) / 100,
-        stripeFeeAmount: Math.round(stripeFee * 100) / 100,
-        clientTotalAmount: Math.round(clientTotalForGuard * 100) / 100,
-        guardNetPayout: Math.round(guardNetPayout * 100) / 100,
-      });
-    }
-
-    const quickguardNetFee = totalPlatformFee + totalGuardServiceFee - totalStripeFeeEstimate;
-
-    return new Response(JSON.stringify({
-      jobId,
-      guardFees: Math.round(totalGuardFees * 100) / 100,
-      platformFee: Math.round(totalPlatformFee * 100) / 100,
-      platformFeePercent: clientFeeResult.feePercent,
-      guardServiceFee: Math.round(totalGuardServiceFee * 100) / 100,
-      guardServiceFeePercent,
-      stripeFeeEstimate: Math.round(totalStripeFeeEstimate * 100) / 100,
-      stripeFeePercent: stripeConfig.stripeFeePct,
-      stripeFeePayer: stripeConfig.stripeFeePayer,
-      clientTotalCharge: Math.round(totalClientCharge * 100) / 100,
-      guardPayoutAmount: Math.round(totalGuardNet * 100) / 100,
-      quickguardNetFee: Math.round(quickguardNetFee * 100) / 100,
-      payoutDelayDays: stripeConfig.payoutDelay,
-      autoReleaseHours: stripeConfig.autoRelease,
-      disputeWindowHours: stripeConfig.disputeWindow,
-      taxDisclaimerAccepted: job.tax_disclaimer_accepted || false,
-      hours: assignments.reduce((s, a) => s + Number(a.agreed_hours || 0), 0),
-      days: 1,
-      clientIsSubscribed: clientFeeResult.isSubscribed,
-      assignments: assignmentBreakdowns,
+    const { data: client, error: clientError } = await supabaseService.from('clients').select('*').eq('id', job.client_id).single();
+    if (clientError || !client) throw new Error('Client billing profile unavailable');
+    const policy = applyClientPromotion(await getBookingPolicy(supabaseService, client.user_id), client);
+    let assignmentQuery = supabaseService.from('job_assignments')
+      .select('id, guard_id, agreed_hourly_rate, agreed_hours, gross_guard_amount')
+      .eq('job_id', jobId).in('status', ['selected', 'awaiting_payment']);
+    if (!ownsJob) assignmentQuery = assignmentQuery.eq('guard_id', guardProfile.id);
+    const { data: assignments, error: assignmentError } = await assignmentQuery;
+    if (assignmentError) throw new Error('Unable to load agreed booking amounts');
+    const start = new Date(`1970-01-01T${job.start_time}`);
+    const end = new Date(`1970-01-01T${job.end_time}`);
+    let hours = (end.getTime() - start.getTime()) / 3600000;
+    if (hours <= 0) hours += 24;
+    const days = Math.max(1, Number(job.number_of_days ?? 1));
+    const rows = assignments?.length ? assignments : Array.from({ length: Number(job.number_of_guards) }, () => ({
+      id: null, guard_id: null, agreed_hourly_rate: job.hourly_rate, agreed_hours: hours * days,
+      gross_guard_amount: Number(job.hourly_rate) * hours * days,
+    }));
+    const breakdowns = rows.map((a: any) => {
+      const gross = Math.round(Number(a.gross_guard_amount || Number(a.agreed_hourly_rate || job.hourly_rate) * Number(a.agreed_hours || 1)) * 100);
+      const amounts = bookingAmounts(gross, policy.feePercent, policy.feeFixedPence);
+      return { assignmentId: a.id, guardId: a.guard_id, agreedHourlyRate: Number(a.agreed_hourly_rate), agreedHours: Number(a.agreed_hours),
+        grossGuardAmount: amounts.grossGuardPence / 100, platformFeeAmount: amounts.platformFeePence / 100,
+        guardServiceFeeAmount: 0, stripeFeeAmount: 0, clientTotalAmount: amounts.clientTotalPence / 100,
+        guardNetPayout: amounts.guardNetPence / 100 };
+    });
+    const sum = (key: string) => breakdowns.reduce((n: number, a: any) => n + Math.round(a[key] * 100), 0) / 100;
+    return new Response(JSON.stringify({ jobId, guardFees: sum('grossGuardAmount'), platformFee: sum('platformFeeAmount'),
+      platformFeePercent: policy.feePercent, guardServiceFee: 0, guardServiceFeePercent: 0,
+      stripeFeeEstimate: 0, stripeFeePercent: policy.stripeFeePct, stripeFeePayer: 'quickguard',
+      clientTotalCharge: sum('clientTotalAmount'), guardPayoutAmount: sum('guardNetPayout'),
+      quickguardNetFee: sum('platformFeeAmount'), feePolicyVersion: 'client-service-fee-v2',
+      payoutDelayDays: policy.payoutDelay, autoReleaseHours: policy.autoRelease, disputeWindowHours: policy.disputeWindow,
+      taxDisclaimerAccepted: job.tax_disclaimer_accepted || false, hours: hours * days, days,
+      clientIsSubscribed: policy.isSubscribed, promoApplied: policy.promoApplied, promoLabel: policy.promoLabel,
+      assignments: breakdowns,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
   } catch (error: any) {
     console.error('[calculate-job-fees] ERROR:', error);

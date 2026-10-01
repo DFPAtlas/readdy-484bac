@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-const STRIPE_FEE_FIXED = 0.20;
+import { getBookingPolicy, applyClientPromotion, bookingAmounts } from '../_shared/booking-policy.ts';
 
 const CORS_ALLOWLIST = [
   'https://quickguard.uk',
@@ -13,67 +13,6 @@ function isAllowedOrigin(origin: string | null): string {
   if (!origin) return 'https://quickguard.uk';
   if (CORS_ALLOWLIST.includes(origin)) return origin;
   return 'https://quickguard.uk';
-}
-
-async function getSubscriptionAwareFee(
-  supabaseService: any,
-  userId: string,
-  role: 'client' | 'guard',
-): Promise<{ feePercent: number; feeFixedPence: number; isSubscribed: boolean; planSlug: string | null }> {
-  const { data: sub, error: subErr } = await supabaseService
-    .from('subscriptions')
-    .select('plan_slug, status')
-    .eq('user_id', userId)
-    .eq('account_type', role)
-    .in('status', ['active', 'trialing'])
-    .maybeSingle();
-
-  if (subErr) {
-    console.error('[create-job-payment] Subscription lookup error:', subErr.message);
-  }
-
-  if (sub) {
-    return { feePercent: 0, feeFixedPence: 0, isSubscribed: true, planSlug: sub.plan_slug };
-  }
-
-  const table = role === 'client' ? 'clients' : 'guards';
-  const { data: profile } = await supabaseService
-    .from(table)
-    .select('subscription_plan')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  const planSlug = profile?.subscription_plan || (role === 'client' ? 'payg' : 'guard-starter');
-
-  const { data: rules } = await supabaseService
-    .from('plan_fee_rules')
-    .select('platform_fee_percent, platform_fee_fixed_pence')
-    .eq('plan_slug', planSlug)
-    .maybeSingle();
-
-  return {
-    feePercent: rules?.platform_fee_percent ? Number(rules.platform_fee_percent) : 0,
-    feeFixedPence: rules?.platform_fee_fixed_pence ? Number(rules.platform_fee_fixed_pence) : 0,
-    isSubscribed: false,
-    planSlug,
-  };
-}
-
-async function getStripeFeeConfig(supabaseService: any, clientPlanSlug: string | null) {
-  const slug = clientPlanSlug || 'payg';
-  const { data: rules } = await supabaseService
-    .from('plan_fee_rules')
-    .select('stripe_fee_payer, stripe_fee_estimate_percent, payout_delay_days, auto_release_hours, dispute_window_hours')
-    .eq('plan_slug', slug)
-    .maybeSingle();
-
-  return {
-    stripeFeePayer: rules?.stripe_fee_payer || 'quickguard',
-    stripeFeePct: rules?.stripe_fee_estimate_percent ? Number(rules.stripe_fee_estimate_percent) : 1.5,
-    payoutDelay: rules?.payout_delay_days ? Number(rules.payout_delay_days) : 3,
-    autoRelease: rules?.auto_release_hours ? Number(rules.auto_release_hours) : 72,
-    disputeWindow: rules?.dispute_window_hours ? Number(rules.dispute_window_hours) : 48,
-  };
 }
 
 serve(async (req) => {
@@ -271,35 +210,11 @@ serve(async (req) => {
       );
     }
 
-    const feeResult = await getSubscriptionAwareFee(supabaseService, user.id, 'client');
-    const stripeConfig = await getStripeFeeConfig(supabaseService, feeResult.planSlug);
-
-    let effectiveFeePercent = feeResult.feePercent;
-    let promoApplied = false;
-    let promoLabel = '';
-    let jobsRemainingAfter: number | null = null;
-    const now = new Date();
-    const promoEnds = clientData?.client_promo_ends_at ? new Date(clientData.client_promo_ends_at) : null;
-    const promoTier = clientData?.client_promo_tier || 'standard';
-
-    if (!feeResult.isSubscribed && clientData?.client_type !== 'security_company' && clientData?.client_signup_number !== null) {
-      if (promoTier === 'launch_client' && clientData.client_promo_jobs_remaining !== null && clientData.client_promo_jobs_remaining > 0) {
-        effectiveFeePercent = 0;
-        promoApplied = true;
-        promoLabel = `Launch promo — ${clientData.client_promo_jobs_remaining} free jobs remaining`;
-        jobsRemainingAfter = (clientData.client_promo_jobs_remaining || 0) - 1;
-      } else if (promoEnds && now < promoEnds) {
-        effectiveFeePercent = 0;
-        promoApplied = true;
-        promoLabel = promoTier === 'founding_client' ? 'Founding Client — zero fees' : 'Early Client — zero fees';
-      } else if (clientData.client_lifetime_fee_discount !== null) {
-        effectiveFeePercent = effectiveFeePercent * (1 - clientData.client_lifetime_fee_discount);
-        promoApplied = true;
-        promoLabel = `Founding Client — ${Math.round(clientData.client_lifetime_fee_discount * 100)}% off forever`;
-      }
-    }
-
-    const effectiveFeeFixedPence = feeResult.feeFixedPence;
+    const feeResult = await getBookingPolicy(supabaseService, user.id);
+    const stripeConfig = feeResult;
+    const promotion = applyClientPromotion(feeResult, clientData);
+    const { feePercent: effectiveFeePercent, promoApplied, promoLabel, jobsRemainingAfter } = promotion;
+    const effectiveFeeFixedPence = promotion.feeFixedPence;
 
     let totalGrossGuardPence = 0;
     let totalPlatformFeePence = 0;
@@ -323,22 +238,8 @@ serve(async (req) => {
         ? Math.round(Number(assignment.gross_guard_amount) * 100)
         : Math.round(Number(assignment.agreed_hourly_rate || jobData.hourly_rate) * Number(assignment.agreed_hours || 1) * 100);
 
-      const guardUserId = assignment.guards?.user_id || null;
-      const guardFeeResult = guardUserId
-        ? await getSubscriptionAwareFee(supabaseService, guardUserId, 'guard')
-        : { feePercent: 10, feeFixedPence: 0, isSubscribed: false, planSlug: 'guard-starter' };
-
-      const guardServiceFeePence = Math.round(grossGuardPence * (guardFeeResult.feePercent / 100));
-      const guardNetPence = grossGuardPence - guardServiceFeePence;
-
-      const platformFeePence = Math.round(grossGuardPence * (effectiveFeePercent / 100) + effectiveFeeFixedPence);
-
-      const subTotalBeforeStripePence = grossGuardPence + platformFeePence;
-      const stripeFeePence = stripeConfig.stripeFeePayer === 'client'
-        ? Math.round(subTotalBeforeStripePence * (stripeConfig.stripeFeePct / 100) + (STRIPE_FEE_FIXED * 100))
-        : 0;
-
-      const clientTotalPence = subTotalBeforeStripePence + stripeFeePence;
+      const { platformFeePence, guardServiceFeePence, guardNetPence, stripeFeePence, clientTotalPence } =
+        bookingAmounts(grossGuardPence, effectiveFeePercent, effectiveFeeFixedPence);
 
       totalGrossGuardPence += grossGuardPence;
       totalPlatformFeePence += platformFeePence;
@@ -372,8 +273,8 @@ serve(async (req) => {
     const totalClientChargeGbp = totalClientChargePence / 100;
     const totalGuardNetGbp = totalGuardNetPence / 100;
 
-    const paymentVersion = 1;
-    const idempotencyKey = `job-payment:${jobId}:${clientData.id}:v${paymentVersion}`;
+    const paymentVersion = 2;
+    const idempotencyKey = `job-payment:${jobId}:${clientData.id}:v${paymentVersion}:${existingTx?.stripe_session_id || "initial"}`;
 
     const sessionPayload: Record<string, unknown> = {
       mode: 'payment',
@@ -401,6 +302,7 @@ serve(async (req) => {
         clientId: clientData.id,
         paymentType: 'job_payment',
         paymentVersion: String(paymentVersion),
+        feePolicyVersion: 'client-service-fee-v2',
         guardFees: totalGrossGuardGbp.toFixed(2),
         serviceFeePct: String(effectiveFeePercent),
         platformFee: totalPlatformFeeGbp.toFixed(2),
@@ -545,6 +447,7 @@ serve(async (req) => {
       payoutDelay: stripeConfig.payoutDelay,
       autoRelease: stripeConfig.autoRelease,
       clientIsSubscribed: feeResult.isSubscribed,
+      feePolicyVersion: 'client-service-fee-v2',
     };
 
     const txMetadata = {
@@ -591,8 +494,10 @@ serve(async (req) => {
           payment_method: 'stripe',
           status: 'pending',
           stripe_session_id: session.id,
-          description: `Payment for job: ${jobData.job_title}`,
-          metadata: txMetadata,
+          metadata: {
+            ...txMetadata,
+            job_title: jobData.job_title,
+          },
           created_at: nowIso,
         });
       txWriteError = error;

@@ -146,7 +146,7 @@ export default function CostBreakdown({
           )}
           {quickguardNetFee !== undefined && (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">QuickGuard net fee</span>
+              <span className="text-sm text-slate-500">QuickGuard service fee</span>
               <span className="font-semibold text-blue-400">£{quickguardNetFee.toFixed(2)}</span>
             </div>
           )}

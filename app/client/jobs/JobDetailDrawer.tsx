@@ -91,10 +91,10 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
   if (hours <= 0) hours += 24;
   const days = Math.max(1, job.number_of_days || 1);
   const totalHours = hours * days;
-  const guardPay = totalHours * (job.number_of_guards || 1) * (job.hourly_rate || 0);
-  const serviceFee = guardPay * 0.15;
-  const vat = (guardPay + serviceFee) * 0.2;
-  const total = guardPay + serviceFee + vat;
+  const guardPay = Number(latestTransaction?.metadata?.breakdown?.guardFees ?? (totalHours * (job.number_of_guards || 1) * (job.hourly_rate || 0)));
+  const recorded = latestTransaction?.metadata?.breakdown;
+  const serviceFee = Number(recorded?.platformFee ?? 0);
+  const total = Number(recorded?.clientTotalCharge ?? latestTransaction?.amount ?? guardPay);
 
   const riskLevelColors: Record<string, { bg: string; text: string; border: string }> = {
     low: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/25' },
@@ -215,9 +215,9 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
             <div className="space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-slate-500">Total Hours</span><span className="text-slate-200">{totalHours.toFixed(1)}h</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Guard Pay</span><span className="text-slate-200">£{guardPay.toFixed(2)}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Service Fee</span><span className="text-slate-200">£{serviceFee.toFixed(2)}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">VAT (20%)</span><span className="text-slate-200">£{vat.toFixed(2)}</span></div>
-              <div className="flex justify-between pt-2 border-t border-[#1e2d4d]"><span className="text-white font-semibold">Total</span><span className="text-teal-400 font-bold">£{total.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">{recorded ? "Service Fee" : "Service Fee (at checkout)"}</span><span className="text-slate-200">{recorded ? `£${serviceFee.toFixed(2)}` : "Shown before payment"}</span></div>
+              <p className="text-xs text-slate-500">{recorded ? "Recorded checkout amounts; processing included." : "Guard pay estimate. Final service fee and total appear before checkout."}</p>
+              <div className="flex justify-between pt-2 border-t border-[#1e2d4d]"><span className="text-white font-semibold">{recorded ? "Total paid / payable" : "Guard pay estimate"}</span><span className="text-teal-400 font-bold">£{total.toFixed(2)}</span></div>
             </div>
           </div>
 

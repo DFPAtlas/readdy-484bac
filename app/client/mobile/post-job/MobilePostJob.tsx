@@ -316,7 +316,7 @@ export default function MobilePostJob() {
           <div className="bg-[#162036] rounded-xl p-4 mb-5 text-left border border-[#1e2d4d]">
             <p className="text-xs text-slate-500 mb-1">Estimated cost</p>
             <p className="text-xl font-bold text-teal-400">£{estimatedTotal()}</p>
-            <p className="text-xs text-slate-500 mt-1">+ £{serviceFee()} QuickGuard fee</p>
+            <p className="text-xs text-slate-500 mt-1">Free-plan fee example: £{serviceFee()}. Your plan and eligible promotions determine the final fee before checkout.</p>
           </div>
           <div className="flex flex-col gap-3">
             <Link href={`/client/jobs/${jobId}`} className="bg-teal-500 text-white py-3 rounded-xl font-semibold text-center text-sm whitespace-nowrap">
@@ -694,7 +694,7 @@ export default function MobilePostJob() {
                     <span className="font-bold text-teal-400">£{estimatedTotal()}</span>
                   </div>
                   <div className="flex justify-between text-xs text-slate-500">
-                    <span>QuickGuard fee (15%)</span>
+                    <span>Free-plan example fee (15%)</span>
                     <span>£{serviceFee()}</span>
                   </div>
                 </div>

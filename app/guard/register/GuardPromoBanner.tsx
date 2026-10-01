@@ -81,7 +81,7 @@ export default function GuardPromoBanner() {
         bg: 'bg-amber-500/10 border-amber-500/20',
         accent: 'text-amber-400',
         label: `${data.tier1Remaining} of ${data.tier1Cap} Founding Guard spots left`,
-        sub: '12 months free + 5% lifetime fee',
+        sub: 'Founding status + no guard booking commission',
       };
     }
     if (data.tier2Remaining > 0) {

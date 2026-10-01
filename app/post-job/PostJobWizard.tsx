@@ -429,7 +429,7 @@ export default function PostJobWizard() {
             ) : isLifetimeDiscount() ? (
               <p className="text-xs text-amber-400 mt-1">QuickGuard fee: £{promoServiceFee()} ({promoFeePct().toFixed(1)}%)</p>
             ) : (
-              <p className="text-xs text-slate-500 mt-1">+ £{serviceFee()} QuickGuard fee</p>
+              <p className="text-xs text-slate-500 mt-1">Free-plan fee example: £{serviceFee()}. Your plan and eligible promotions determine the final fee before checkout.</p>
             )}
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -673,13 +673,13 @@ export default function PostJobWizard() {
                   </div>
                   {isPromoZeroFee() ? (
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-400 line-through">QuickGuard service fee (15%)</span>
+                      <span className="text-slate-400 line-through">Free-plan example fee (15%)</span>
                       <span className="text-slate-500 line-through">£{serviceFee()}</span>
                     </div>
                   ) : isLifetimeDiscount() ? (
                     <>
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-500 line-through">QuickGuard service fee (15%)</span>
+                        <span className="text-slate-500 line-through">Free-plan example fee (15%)</span>
                         <span className="text-slate-500 line-through">£{serviceFee()}</span>
                       </div>
                       <div className="flex justify-between text-sm">
@@ -689,7 +689,7 @@ export default function PostJobWizard() {
                     </>
                   ) : (
                     <div className="flex justify-between text-xs text-slate-500">
-                      <span>QuickGuard service fee (15%)</span>
+                      <span>Free-plan example fee (15%)</span>
                       <span>£{serviceFee()}</span>
                     </div>
                   )}

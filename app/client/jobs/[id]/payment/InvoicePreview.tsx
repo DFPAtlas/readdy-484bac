@@ -41,6 +41,7 @@ interface Costs {
   guardFees: number;
   serviceFee: number;
   vat: number;
+  processingFee?: number;
   total: number;
 }
 
@@ -125,7 +126,7 @@ export default function InvoicePreview({ job, client, guards, costs, invoiceNumb
       '<div class="header"><div class="logo"><div class="logo-icon">Q</div><span class="logo-text">QuickGuard</span></div>',
       '<div class="invoice-title"><h1>INVOICE</h1><p class="invoice-number">' + invoiceNumber + '</p></div></div>',
       '<div class="addresses">',
-      '<div class="address-block"><h3>From</h3><p class="company">QuickGuard Ltd</p><p>123 Security House</p><p>London, EC1A 1BB</p><p>United Kingdom</p><p style="margin-top:10px">VAT: GB123456789</p></div>',
+      '<div class="address-block"><h3>From</h3><p class="company">QuickGuard Ltd</p><p>quickguard.uk</p></div>',
       '<div class="address-block"><h3>Bill To</h3><p class="company">' + (client.company_name || 'Client') + '</p>',
       '<p>' + (client.contact_name || '') + '</p><p>' + (client.address || '') + '</p>',
       '<p>' + (client.city || '') + ' ' + (client.postcode || '') + '</p><p style="margin-top:10px">' + client.email + '</p></div></div>',
@@ -139,11 +140,12 @@ export default function InvoicePreview({ job, client, guards, costs, invoiceNumb
       '<td>' + guards.length + ' guards &times; ' + (costs.hours || 0).toFixed(1) + 'h</td>',
       '<td>&pound;' + job.hourly_rate.toFixed(2) + '/hr</td>',
       '<td class="amount">&pound;' + costs.guardFees.toFixed(2) + '</td></tr>',
-      '<tr><td>QuickGuard Service Fee (10%)</td><td>1</td><td>10%</td><td class="amount">&pound;' + costs.serviceFee.toFixed(2) + '</td></tr>',
+      '<tr><td>QuickGuard Service Fee</td><td>1</td><td>—</td><td class="amount">&pound;' + costs.serviceFee.toFixed(2) + '</td></tr>',
+      ...((costs.processingFee || 0) > 0 ? ['<tr><td>Recorded processing fee</td><td>1</td><td>—</td><td class="amount">&pound;' + costs.processingFee?.toFixed(2) + '</td></tr>'] : []),
       '</tbody></table>',
       '<div class="totals">',
-      '<div class="totals-row"><span>Subtotal</span><span>&pound;' + (costs.guardFees + costs.serviceFee).toFixed(2) + '</span></div>',
-      '<div class="totals-row"><span>VAT (20%)</span><span>&pound;' + costs.vat.toFixed(2) + '</span></div>',
+      '<div class="totals-row"><span>Subtotal</span><span>&pound;' + (costs.guardFees + costs.serviceFee + (costs.processingFee || 0)).toFixed(2) + '</span></div>',
+      ...(costs.vat > 0 ? ['<div class="totals-row"><span>VAT</span><span>&pound;' + costs.vat.toFixed(2) + '</span></div>'] : []),
       '<div class="totals-row total"><span>' + (isPaidHtml ? 'Total Paid' : 'Total Due') + '</span><span>&pound;' + costs.total.toFixed(2) + '</span></div></div>',
       '<div class="payment-info"><h4>Payment Information</h4>',
       '<p><strong>Bank:</strong> Barclays Bank PLC</p>',
@@ -232,10 +234,10 @@ export default function InvoicePreview({ job, client, guards, costs, invoiceNumb
               <div>
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">From</h3>
                 <p className="font-bold text-[#1a237e]">QuickGuard Ltd</p>
-                <p className="text-sm text-gray-600">123 Security House</p>
-                <p className="text-sm text-gray-600">London, EC1A 1BB</p>
+                <p className="text-sm text-gray-600">quickguard.uk</p>
+
                 <p className="text-sm text-gray-600">United Kingdom</p>
-                <p className="text-sm text-gray-600 mt-2">VAT: GB123456789</p>
+
               </div>
               <div>
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Bill To</h3>
@@ -304,11 +306,12 @@ export default function InvoicePreview({ job, client, guards, costs, invoiceNumb
                   <td className="py-4 px-4 text-right font-semibold">£{costs.guardFees.toFixed(2)}</td>
                 </tr>
                 <tr className="border-b border-gray-200">
-                  <td className="py-4 px-4 text-gray-600">QuickGuard Service Fee (10%)</td>
+                  <td className="py-4 px-4 text-gray-600">QuickGuard Service Fee</td>
                   <td className="py-4 px-4 text-gray-600">1</td>
-                  <td className="py-4 px-4 text-gray-600">10%</td>
+                  <td className="py-4 px-4 text-gray-600">—</td>
                   <td className="py-4 px-4 text-right font-semibold">£{costs.serviceFee.toFixed(2)}</td>
                 </tr>
+              {(costs.processingFee || 0) > 0 && <tr><td className="py-4 px-4">Recorded processing fee</td><td>1</td><td>—</td><td className="text-right">£{costs.processingFee?.toFixed(2)}</td></tr>}
               </tbody>
             </table>
 
@@ -316,10 +319,10 @@ export default function InvoicePreview({ job, client, guards, costs, invoiceNumb
               <div className="w-72">
                 <div className="flex justify-between py-2 border-b border-gray-200">
                   <span className="text-gray-600">Subtotal</span>
-                  <span className="font-semibold">£{(costs.guardFees + costs.serviceFee).toFixed(2)}</span>
+                  <span className="font-semibold">£{(costs.guardFees + costs.serviceFee + (costs.processingFee || 0)).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200">
-                  <span className="text-gray-600">VAT (20%)</span>
+                  <span className="text-gray-600">Additional VAT</span>
                   <span className="font-semibold">£{costs.vat.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between py-3 border-t-2 border-[#1a237e] mt-2">

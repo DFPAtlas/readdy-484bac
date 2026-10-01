@@ -34,17 +34,14 @@ export default function ConfirmModal({ selectedGuards, job, onClose, onConfirm, 
   const endH = parseInt(job.end_time.split(':')[0]);
   const endM = parseInt(job.end_time.split(':')[1]);
   let totalMinutes = (endH * 60 + endM) - (startH * 60 + startM);
-  if (totalMinutes < 0) totalMinutes += 24 * 60;
+  if (totalMinutes <= 0) totalMinutes += 24 * 60;
   const hoursPerShift = totalMinutes / 60;
 
   const startDate = new Date(job.start_date);
   const endDate = job.end_date ? new Date(job.end_date) : startDate;
   const daysDiff = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
-  const guardFees = selectedGuards.reduce((sum, g) => sum + (g.hourly_rate || job.hourly_rate) * hoursPerShift * daysDiff, 0);
-  const serviceFee = guardFees * 0.1;
-  const vat = (guardFees + serviceFee) * 0.2;
-  const total = guardFees + serviceFee + vat;
+  const guardFees = selectedGuards.length * job.hourly_rate * hoursPerShift * daysDiff;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -103,24 +100,14 @@ export default function ConfirmModal({ selectedGuards, job, onClose, onConfirm, 
                 <span>Guard fees ({selectedGuards.length} guards × {hoursPerShift.toFixed(1)}hrs × {daysDiff} day{daysDiff > 1 ? 's' : ''})</span>
                 <span>£{guardFees.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-slate-400">
-                <span>QuickGuard service fee (10%)</span>
-                <span>£{serviceFee.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-slate-400">
-                <span>VAT (20%)</span>
-                <span>£{vat.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-white pt-2 border-t border-[#1e2d4d]">
-                <span>Estimated Total</span>
-                <span>£{total.toFixed(2)}</span>
-              </div>
+              <p className="text-xs text-slate-400 pt-2">Your plan’s service fee, any promotion and the final total appear on the payment page before checkout. Payment processing is included.</p>
+
             </div>
           </div>
 
           <p className="text-xs text-slate-500 mb-6">
             <i className="ri-information-line mr-1"></i>
-            By confirming, selected guards will be notified and assigned to this job. Payment will be processed upon job completion.
+            By confirming, selected guards will be notified and assigned to this job. Payment is required before the booking is confirmed.
           </p>
 
           <div className="flex gap-3">

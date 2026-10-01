@@ -81,8 +81,8 @@ export default function FoundingGuardsOfferClient() {
     },
     {
       id: 'lifetime',
-      q: 'Is the 5% fee really forever?',
-      a: 'Yes. Founding Guards keep the 5% lifetime fee as long as their account remains active. Even after the 12-month free period ends, you only pay 5% per job instead of the standard 10%.',
+      q: 'Do guards pay a booking commission?',
+      a: 'No. Guards keep their full agreed pay on new bookings. QuickGuard charges the client a plan-based booking service fee, which includes payment processing and standard payouts.',
     },
     {
       id: 'cancel',
@@ -92,7 +92,7 @@ export default function FoundingGuardsOfferClient() {
     {
       id: 'after-promo',
       q: 'What happens after my free period ends?',
-      a: 'After your free period, you move to either your lifetime rate (Founding = 5%) or the standard 10% rate. There is no subscription — you only pay when you work.',
+      a: 'No guard booking commission is deducted after the introductory period. Guard membership prices and existing eligible membership promotions are shown separately on the pricing page.',
     },
   ];
 
@@ -130,7 +130,7 @@ export default function FoundingGuardsOfferClient() {
             </span>
           </h1>
           <p className="text-xl text-slate-500 dark:text-slate-400 max-w-2xl mx-auto mb-10">
-            12 months of zero platform fees. Then just 5% for life. Join the security platform that puts guards first.
+            Keep your full agreed pay with no guard commission. Join the security platform that puts guards first.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
@@ -178,7 +178,7 @@ export default function FoundingGuardsOfferClient() {
                 </li>
                 <li className="flex items-start gap-2">
                   <i className="ri-check-line text-teal-500 mt-0.5"></i>
-                  <span><strong>5% lifetime fee</strong> forever (vs 10% standard)</span>
+                  <span><strong>No guard commission</strong> on new bookings</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <i className="ri-check-line text-teal-500 mt-0.5"></i>
@@ -227,7 +227,7 @@ export default function FoundingGuardsOfferClient() {
                 </li>
                 <li className="flex items-start gap-2">
                   <i className="ri-check-line text-teal-500 mt-0.5"></i>
-                  <span>Standard 10% after free period</span>
+                  <span>No guard commission after introductory period</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <i className="ri-check-line text-teal-500 mt-0.5"></i>
@@ -264,7 +264,7 @@ export default function FoundingGuardsOfferClient() {
                 </li>
                 <li className="flex items-start gap-2">
                   <i className="ri-check-line text-teal-500 mt-0.5"></i>
-                  <span>Standard 10% after free period</span>
+                  <span>No guard commission after introductory period</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <i className="ri-check-line text-teal-500 mt-0.5"></i>

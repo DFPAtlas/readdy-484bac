@@ -17,6 +17,7 @@ interface Plan {
   limitations?: string[];
   badge?: string;
   audience: string;
+  bookingFee?: number;
 }
 
 const clientFeatureLabels: Record<string, string> = {
@@ -99,9 +100,12 @@ export default function PricingClient() {
         .eq('active', true)
         .order('monthly_price_pence', { ascending: true });
 
+      const { data: feeRules } = await supabase.from('plan_fee_rules').select('plan_slug, platform_fee_percent');
+      const bookingFees = new Map((feeRules || []).map(r => [r.plan_slug, Number(r.platform_fee_percent)]));
       if (data) {
         const enriched = data.map((p: any) => ({
           ...p,
+          bookingFee: bookingFees.get(p.slug),
           description: planDescriptions[p.slug] || '',
           badge: planBadges[p.slug] || undefined,
           limitations: planLimitations[p.slug] || undefined,
@@ -292,6 +296,7 @@ export default function PricingClient() {
             </div>
           </div>
           <p className="text-slate-400 mb-6 text-sm">{plan.description}</p>
+          <p className="text-sm text-teal-400 mb-4">{plan.audience === "client" ? (plan.bookingFee != null ? `${plan.bookingFee}% booking service fee. Payment processing included.` : "Booking service fee shown before checkout.") : "Keep your full agreed pay. No guard commission. Standard payouts included."}</p>
 
           <div className="mb-6">
             <div className="flex items-baseline gap-2">
@@ -311,7 +316,7 @@ export default function PricingClient() {
             {plan.monthly_price_pence === 0 && (
               <p className="text-sm text-slate-500 mt-1">No credit card required</p>
             )}
-            {plan.monthly_price_pence === 0 && (
+            {plan.monthly_price_pence === 0 && plan.audience === 'client' && (
               <div className="mt-3 bg-amber-500/10 border border-amber-400/20 rounded-xl p-3 flex items-start gap-2.5">
                 <i className="ri-information-line text-amber-400 text-sm flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-300 leading-relaxed">
