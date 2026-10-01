@@ -37,7 +37,7 @@ const guardFeatureLabels: Record<string, string> = {
   'guard.performance_analytics': 'Performance Analytics',
   'guard.priority_support': 'Priority Support',
   'guard.direct_contact': 'Direct Contact',
-  'guard.unlimited_applications': 'Unlimited Applications',
+  'guard.unlimited_applications': 'Up to 40 Applications per Month',
   'guard_application_limit_reached': 'Monthly Application Limit Reached',
   'guard.plan_verification_failed': 'Plan Verification Failed',
   'job_limit_reached': 'Monthly Job Posting Limit Reached',
@@ -286,17 +286,17 @@ const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { 
     ],
   },
   'guard.unlimited_applications': {
-    title: 'Why upgrade to Unlimited Applications?',
-    desc: 'Apply to as many jobs as you want. No monthly caps, no throttling — just maximum opportunity.',
+    title: 'Why upgrade to a bigger application allowance?',
+    desc: 'Increase your monthly application allowance so you can apply for more jobs each month.',
     points: [
-      { icon: 'ri-infinity-line', label: 'No Application Limits', detail: 'Apply to every job that fits your schedule and preferences without worrying about caps.' },
-      { icon: 'ri-money-pound-circle-line', label: 'Maximise Earnings', detail: 'More applications mean more bookings. Elite guards book 40% more shifts on average.' },
+      { icon: 'ri-arrow-up-circle-line', label: 'Higher Monthly Allowance', detail: 'Guard Elite raises your allowance to 40 applications per month, up from 25 on Guard Pro.' },
+      { icon: 'ri-money-pound-circle-line', label: 'Maximise Earnings', detail: 'More applications mean more bookings and more shifts filled each month.' },
     ],
   },
 };
 
 const planDescriptions: Record<string, string> = {
-  'client_free': 'For trying out QuickGuard with basic job posting',
+  'client_free': 'Free account — publish up to 1 job per month, pay per job',
   'client-starter': 'For small businesses with regular security needs',
   'client-pro': 'For growing companies with high-volume needs',
   'client-enterprise': 'For multi-site and enterprise security needs',
@@ -315,7 +315,7 @@ const planLimitations: Record<string, string[]> = {
   'client_free': ['Limited to 1 job per month', 'Upgrade required for advanced matching', 'Upgrade required for job templates', 'Upgrade required for analytics dashboard', 'Upgrade required for direct contact', 'Upgrade required for multi-site features'],
   'client-starter': ['Limited to 10 jobs per month', 'No priority matching', 'No dedicated support'],
   'client-pro': ['Limited to 30 jobs per month', 'No dedicated account manager', 'No bulk posting'],
-  'guard_starter': ['Limited to 1 application/month', 'No advanced job alerts', 'No performance analytics', 'No priority support'],
+  'guard_starter': ['Limited to 2 applications/month', 'No advanced job alerts', 'No performance analytics', 'No priority support'],
   'guard-basic': ['Limited to 10 applications/month', 'No advanced job alerts', 'No performance analytics', 'No priority support'],
   'guard-pro': ['Limited to 25 applications/month'],
 };
@@ -552,7 +552,7 @@ function UpgradeContent() {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-slate-300">Guard Starter</span>
-                      <span className="text-slate-400">1 application per month</span>
+                      <span className="text-slate-400">2 applications per month</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-300">Guard Basic</span>
@@ -564,7 +564,7 @@ function UpgradeContent() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-slate-300">Guard Elite</span>
-                      <span className="text-teal-400 font-semibold">Unlimited applications</span>
+                      <span className="text-teal-400 font-semibold">40 applications per month</span>
                     </div>
                   </div>
                 </div>

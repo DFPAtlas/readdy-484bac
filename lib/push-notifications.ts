@@ -18,7 +18,7 @@ export async function sendPushToUser(userId: string, role: 'guard' | 'client', p
         body: payload.body,
         tag: payload.tag || 'quickguard-notification',
         url: payload.url || '/',
-        icon: payload.icon || 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp',
+        icon: payload.icon || 'https://public.readdy.ai/ai/img_res/66933a83-eb29-486f-86a7-dac739aa1e53.png',
       },
     });
     if (error) throw error;

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import LoginMarketingPanel from '@/components/login/LoginMarketingPanel';
 import LoginFormCard from '@/components/login/LoginFormCard';
+import BrandLogo from '@/components/BrandLogo';
 
 export default function CompanyLoginPage() {
   const router = useRouter();
@@ -62,11 +63,8 @@ export default function CompanyLoginPage() {
       <div className="flex flex-1 items-center justify-center px-6 py-12 lg:px-12">
         <div className="w-full max-w-md">
           <div className="lg:hidden mb-8">
-            <Link href="/" className="inline-flex items-center gap-2">
-              <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#1DA1F2]/15 border border-[#1DA1F2]/20">
-                <i className="ri-shield-check-fill text-[#1DA1F2]" />
-              </div>
-              <span className="font-[family-name:var(--font-pacifico)] text-lg text-white">QuickGuard</span>
+            <Link href="/" className="inline-flex items-center" aria-label="QuickGuard home">
+              <BrandLogo variant="full" theme="dark" imgClassName="h-8 w-auto" />
             </Link>
           </div>
 

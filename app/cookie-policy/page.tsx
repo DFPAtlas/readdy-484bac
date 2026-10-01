@@ -20,7 +20,7 @@ export default function CookiePolicy() {
             How we use cookies, what they do, and how you can control them
           </p>
           <p className="text-sm text-slate-500 mt-4">
-            Last updated: 18 June 2026
+            Last updated: 1 October 2026
           </p>
         </div>
       </section>
@@ -556,7 +556,7 @@ export default function CookiePolicy() {
                     </p>
                   </div>
                   <p className="text-sm text-slate-400">
-                    We encourage you to review this page periodically. This Cookie Policy was last updated on 18 June 2026.
+                    We encourage you to review this page periodically. This Cookie Policy was last updated on 1 October 2026.
                   </p>
                 </div>
               </section>
@@ -566,17 +566,31 @@ export default function CookiePolicy() {
                   13. Contact Us
                 </h2>
 
+                <h3 className="text-xl font-semibold text-white mb-3">Who we are</h3>
+                <div className="bg-teal-500/10 border border-teal-400/20 p-4 mb-6 rounded-xl space-y-3">
+                  <p className="text-slate-300">
+                    QuickGuard.uk is owned and operated by Martin Hewett, a sole trader trading as Digital Footprint. Where we decide why and how your personal information is used, Martin Hewett trading as Digital Footprint is the data controller.
+                  </p>
+                  <p className="text-slate-300">
+                    For any privacy questions or to exercise your data protection rights, you can contact us at{' '}
+                    <a href="mailto:Martin.hewett@digital-footprint.uk" className="text-teal-300 underline hover:text-teal-200">Martin.hewett@digital-footprint.uk</a>.
+                  </p>
+                  <p className="text-slate-300">
+                    When a business customer uses this platform to manage personal information on its own behalf, that customer may be the data controller and Digital Footprint may act as its data processor. In those circumstances, requests about that information should normally be directed to the relevant business.
+                  </p>
+                </div>
+
                 <div className="bg-[#0e1628] border border-slate-700/50 p-6 rounded-xl mb-6">
                   <p className="text-slate-400 mb-4">
                     If you have questions about this Cookie Policy, our use of cookies, or wish to exercise your data protection rights, please contact us:
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <h4 className="font-semibold text-teal-400 mb-3">Data Protection Officer</h4>
+                      <h4 className="font-semibold text-teal-400 mb-3">Privacy Contact</h4>
                       <div className="space-y-2 text-slate-400">
                         <p className="flex items-center gap-2">
                           <i className="ri-mail-line" />
-                          <a href="mailto:privacy@quickguard.uk" className="hover:text-teal-400">privacy@quickguard.uk</a>
+                          <a href="mailto:Martin.hewett@digital-footprint.uk" className="hover:text-teal-400">Martin.hewett@digital-footprint.uk</a>
                         </p>
                         <p className="flex items-center gap-2">
                           <i className="ri-phone-line" />
@@ -606,7 +620,7 @@ export default function CookiePolicy() {
             <div className="mt-12 pt-8 border-t border-slate-700/50">
               <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
                 <p className="text-sm text-slate-500">
-                  Last updated: 18 June 2026 &bull; QuickGuard Ltd, Registered in England and Wales
+                  Last updated: 1 October 2026 &bull; Martin Hewett, sole trader trading as Digital Footprint
                 </p>
                 <div className="flex gap-4">
                   <Link href="/privacy" className="inline-flex items-center text-teal-400 hover:text-teal-300 transition-colors text-sm">

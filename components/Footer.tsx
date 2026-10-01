@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import FooterExitPopupTestIcon from '@/components/qg-rewards/FooterExitPopupTestIcon';
+import BrandLogo from '@/components/BrandLogo';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -9,16 +10,8 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-12 mb-12">
           <div className="lg:col-span-1">
-            <div className="flex items-center space-x-3 mb-4">
-              <img
-                src="https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp"
-                alt="QuickGuard"
-                title="QuickGuard"
-                width={40}
-                height={40}
-                className="w-10 h-10 rounded-lg object-contain"
-              />
-              <span className="text-2xl font-bold font-[family-name:var(--font-pacifico)] text-white">QuickGuard</span>
+            <div className="flex items-center mb-4">
+              <BrandLogo variant="full" theme="dark" imgClassName="h-10 w-auto" />
             </div>
             <p className="text-slate-400 mb-6 leading-relaxed text-sm">
               The UK's leading platform connecting SIA-licensed security professionals with businesses nationwide. Trusted, verified, and available 24/7.

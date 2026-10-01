@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useCallback } from 'react';
+import BrandLogo from '@/components/BrandLogo';
 
 interface Job {
   id: string;
@@ -219,10 +220,7 @@ export default function InvoicePreview({ job, client, guards, costs, invoiceNumb
           <div ref={invoiceRef} className="bg-white rounded-xl shadow-lg p-8 max-w-3xl mx-auto">
             <div className="flex items-start justify-between mb-8 pb-6 border-b-2 border-[#1a237e]">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-[#1a237e] rounded-lg flex items-center justify-center">
-                  <i className="ri-shield-check-line text-white text-2xl"></i>
-                </div>
-                <span className="text-2xl font-bold text-[#1a237e] font-[family-name:var(--font-pacifico)]">QuickGuard</span>
+                <BrandLogo variant="full" theme="light" imgClassName="h-10 w-auto" />
               </div>
               <div className="text-right">
                 <h1 className="text-3xl font-bold text-[#1a237e]">INVOICE</h1>

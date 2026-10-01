@@ -38,7 +38,7 @@ export default function EmptyDashboard({
           <div className="inline-flex items-center gap-2 bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 rounded-xl px-4 py-2 mb-6">
             <i className="ri-gift-line text-violet-500"></i>
             <span className="text-sm font-semibold">
-              Your trial is active — {trialDaysLeft} {trialDaysLeft === 1 ? 'day' : 'days'} left
+              You're on the Free plan — publish up to 1 job per month
             </span>
           </div>
         )}

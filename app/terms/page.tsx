@@ -17,7 +17,7 @@ export default function Terms() {
             Legal terms and conditions for using the QuickGuard platform
           </p>
           <p className="text-sm text-slate-500 mt-4">
-            Last updated: January 2024
+            Last updated: 1 October 2026
           </p>
         </div>
       </section>
@@ -64,6 +64,20 @@ export default function Terms() {
                 <div className="bg-teal-500/10 border border-teal-400/20 p-4 my-4 rounded-xl">
                   <p className="text-teal-400">
                     <strong className="text-teal-300">Important:</strong> These Terms apply to both security guards ("Guards") and clients ("Clients") using our platform to connect and book security services.
+                  </p>
+                </div>
+
+                <h3 className="text-xl font-semibold text-white mb-3">Who we are</h3>
+                <div className="bg-teal-500/10 border border-teal-400/20 p-4 my-4 rounded-xl space-y-3">
+                  <p className="text-slate-300">
+                    QuickGuard.uk is owned and operated by Martin Hewett, a sole trader trading as Digital Footprint. Where we decide why and how your personal information is used, Martin Hewett trading as Digital Footprint is the data controller.
+                  </p>
+                  <p className="text-slate-300">
+                    For any privacy questions or to exercise your data protection rights, you can contact us at{' '}
+                    <a href="mailto:Martin.hewett@digital-footprint.uk" className="text-teal-300 underline hover:text-teal-200">Martin.hewett@digital-footprint.uk</a>.
+                  </p>
+                  <p className="text-slate-300">
+                    When a business customer uses this platform to manage personal information on its own behalf, that customer may be the data controller and Digital Footprint may act as its data processor. In those circumstances, requests about that information should normally be directed to the relevant business.
                   </p>
                 </div>
               </section>
@@ -463,8 +477,9 @@ export default function Terms() {
                   If you have any questions about these Terms of Service, please contact our legal team:
                 </p>
                 <div className="space-y-2 text-slate-400">
-                  <p><strong className="text-slate-300">Email:</strong> legal@quickguard.uk</p>
+                  <p><strong className="text-slate-300">Email:</strong> <a href="mailto:Martin.hewett@digital-footprint.uk" className="text-teal-400 hover:text-teal-300">Martin.hewett@digital-footprint.uk</a></p>
                   <p><strong className="text-slate-300">Phone:</strong> 01992 217019</p>
+                  <p><strong className="text-slate-300">Operator:</strong> Martin Hewett, sole trader trading as Digital Footprint, United Kingdom</p>
                 </div>
                 <div className="mt-4 pt-4 border-t border-slate-700/50">
                   <Link href="/contact" className="inline-flex items-center text-teal-400 hover:text-teal-300 transition-colors">

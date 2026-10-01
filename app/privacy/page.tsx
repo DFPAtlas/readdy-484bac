@@ -64,9 +64,18 @@ export default function PrivacyPolicy() {
                 <p className="text-slate-400 mb-4">
                   QuickGuard.uk ("we", "our", "us") is committed to protecting and respecting your privacy. This Privacy Policy explains how we collect, use, store, and protect your personal data when you use our platform.
                 </p>
-                <div className="bg-teal-500/10 border border-teal-400/20 p-4 my-4 rounded-xl">
-                  <p className="text-teal-400">
-                    <strong className="text-teal-300">Data Controller:</strong> QuickGuard Ltd is the data controller responsible for your personal data.
+
+                <h3 className="text-xl font-semibold text-white mb-3">Who we are</h3>
+                <div className="bg-teal-500/10 border border-teal-400/20 p-4 my-4 rounded-xl space-y-3">
+                  <p className="text-slate-300">
+                    QuickGuard.uk is owned and operated by Martin Hewett, a sole trader trading as Digital Footprint. Where we decide why and how your personal information is used, Martin Hewett trading as Digital Footprint is the data controller.
+                  </p>
+                  <p className="text-slate-300">
+                    For any privacy questions or to exercise your data protection rights, you can contact us at{' '}
+                    <a href="mailto:Martin.hewett@digital-footprint.uk" className="text-teal-300 underline hover:text-teal-200">Martin.hewett@digital-footprint.uk</a>.
+                  </p>
+                  <p className="text-slate-300">
+                    When a business customer uses this platform to manage personal information on its own behalf, that customer may be the data controller and Digital Footprint may act as its data processor. In those circumstances, requests about that information should normally be directed to the relevant business.
                   </p>
                 </div>
                 <p className="text-slate-400">
@@ -453,7 +462,7 @@ export default function PrivacyPolicy() {
                 <div className="bg-amber-500/10 border border-amber-400/20 p-4 rounded-xl mt-6">
                   <h4 className="font-semibold text-amber-400 mb-2">How to Exercise Your Rights</h4>
                   <p className="text-sm text-slate-400">
-                    To exercise any of these rights, please contact our Data Protection Officer at <a href="mailto:privacy@quickguard.uk" className="text-teal-400 hover:text-teal-300">privacy@quickguard.uk</a>. We will respond within 30 days.
+                    To exercise any of these rights, please contact us at <a href="mailto:Martin.hewett@digital-footprint.uk" className="text-teal-400 hover:text-teal-300">Martin.hewett@digital-footprint.uk</a>. We will respond within 30 days.
                   </p>
                 </div>
               </section>
@@ -528,11 +537,11 @@ export default function PrivacyPolicy() {
                 <div className="bg-[#0e1628] border border-slate-700/50 p-6 rounded-xl">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <h4 className="font-semibold text-teal-400 mb-3">Data Protection Officer</h4>
+                      <h4 className="font-semibold text-teal-400 mb-3">Privacy Contact</h4>
                       <div className="space-y-2 text-slate-400">
                         <p className="flex items-center gap-2">
                           <i className="ri-mail-line" />
-                          <a href="mailto:privacy@quickguard.uk" className="hover:text-teal-400">privacy@quickguard.uk</a>
+                          <a href="mailto:Martin.hewett@digital-footprint.uk" className="hover:text-teal-400">Martin.hewett@digital-footprint.uk</a>
                         </p>
                         <p className="flex items-center gap-2">
                           <i className="ri-phone-line" />
@@ -541,9 +550,9 @@ export default function PrivacyPolicy() {
                       </div>
                     </div>
                     <div>
-                      <h4 className="font-semibold text-teal-400 mb-3">Registered Entity</h4>
+                      <h4 className="font-semibold text-teal-400 mb-3">Operator</h4>
                       <p className="text-slate-400">
-                        QuickGuard Ltd<br />
+                        Martin Hewett, sole trader trading as Digital Footprint<br />
                         United Kingdom
                       </p>
                     </div>

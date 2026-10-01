@@ -31,7 +31,7 @@ const faqs = [
     category: 'For Clients',
     question: 'Is there a cost for clients to post a job?',
     answer:
-      'There are no upfront costs or setup fees for clients. You only pay when a shift is successfully completed. Our transparent commission model means you always know exactly what you\'re paying for.',
+      'Creating an account is free, and a free account can publish up to 1 job per month. You pay per job \u2014 the guard\u2019s hourly rate plus the platform fee \u2014 charged securely at posting and held with Stripe until the shift is completed. Optional paid subscriptions raise the monthly posting allowance (up to unlimited) and unlock extra features.',
   },
   {
     category: 'For Clients',

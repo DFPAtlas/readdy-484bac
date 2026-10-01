@@ -117,7 +117,7 @@ export async function getSafeSubscription(): Promise<SafeSubscription | null> {
   return {
     id: data.id,
     userId: data.user_id,
-    planName: data.plan_name || 'Free Trial',
+    planName: data.plan_name || 'Free plan',
     planSlug: data.plan_slug || 'trial',
     status: data.status || 'trialing',
     currentPeriodEnd: data.current_period_end || null,

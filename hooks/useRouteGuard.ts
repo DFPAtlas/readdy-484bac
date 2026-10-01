@@ -19,7 +19,6 @@ const ROUTE_FEATURES: Record<string, string> = {
 };
 
 const DYNAMIC_ROUTE_FEATURES: Record<string, string> = {
-  '/client/jobs/[id]/select-guards': 'client.advanced_matching',
   '/client/jobs/[id]/payment': 'client.escrow_payments',
 };
 

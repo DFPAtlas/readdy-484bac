@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 const trustSignals = [
   { icon: 'ri-shield-check-line', label: 'All Guards SIA-Verified', sub: 'Licence checked every 6 months' },
   { icon: 'ri-lock-line', label: 'Held Job Payment with Stripe', sub: 'Released only after shift completion' },
-  { icon: 'ri-money-pound-circle-line', label: 'Pay Per Shift', sub: 'No contracts, no subscriptions' },
+  { icon: 'ri-money-pound-circle-line', label: 'Pay Per Shift', sub: 'No contracts, pay per shift' },
   { icon: 'ri-map-pin-2-line', label: 'UK-Wide Coverage', sub: 'Guards in every major city' },
 ];
 

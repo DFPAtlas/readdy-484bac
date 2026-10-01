@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { useAdminAuth, clearAdminAuthCache } from '@/hooks/useAdminAuth';
+import BrandLogo from '@/components/BrandLogo';
 
 interface BadgeCounts {
   failedPayments: number;
@@ -304,15 +305,18 @@ export default function AdminSidebar() {
   const sidebarContent = (
     <>
       <div className={`flex items-center justify-between ${collapsed ? 'justify-center px-3 py-5' : 'px-5 py-5'}`}>
-        {!collapsed && (
-          <Link
-            href="/admin/dashboard"
-            prefetch={false}
-            className="text-2xl font-[family-name:var(--font-pacifico)] text-white whitespace-nowrap tracking-tight"
-          >
-            QuickGuard
-          </Link>
-        )}
+        <Link
+          href="/admin/dashboard"
+          prefetch={false}
+          className="flex items-center outline-none rounded-lg focus-visible:ring-2 focus-visible:ring-teal-400/60"
+          aria-label="QuickGuard admin dashboard"
+        >
+          <BrandLogo
+            variant={collapsed ? 'symbol' : 'full'}
+            theme="dark"
+            imgClassName={collapsed ? 'h-8 w-8' : 'h-8 w-auto'}
+          />
+        </Link>
         <button
           onClick={() => setCollapsed(!collapsed)}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}

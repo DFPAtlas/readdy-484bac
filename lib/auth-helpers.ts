@@ -173,7 +173,7 @@ export async function ensureSubscriptionRow(
       const trialEnd = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
       await supabase.from('subscriptions').insert({
         user_id: userId,
-        plan_name: 'Free Trial',
+        plan_name: 'Free plan',
         plan_slug: 'trial',
         status: 'trialing',
         account_type: userType,

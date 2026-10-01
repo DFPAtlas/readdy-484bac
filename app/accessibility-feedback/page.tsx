@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import BrandLogo from '@/components/BrandLogo';
 
 const generateTicketId = () => {
   const prefix = 'ACC';
@@ -152,8 +153,8 @@ export default function AccessibilityFeedback() {
     <div className="min-h-screen bg-white">
       <header className="bg-black text-white py-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="text-2xl font-bold font-[family-name:var(--font-pacifico)]">
-            QuickGuard
+          <Link href="/" className="inline-flex items-center" aria-label="QuickGuard home">
+            <BrandLogo variant="full" theme="dark" imgClassName="h-8 w-auto" />
           </Link>
         </div>
       </header>

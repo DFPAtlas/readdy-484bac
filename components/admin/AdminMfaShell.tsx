@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { clearAdminAuthCache } from '@/hooks/useAdminAuth';
+import BrandLogo from '@/components/BrandLogo';
 
 interface AdminMfaShellProps {
   title: string;
@@ -29,11 +30,8 @@ export default function AdminMfaShell({
   return (
     <div className="min-h-screen flex bg-[#071321] relative">
       <div className="absolute top-6 left-6 z-20">
-        <Link href="/" className="inline-flex items-center gap-2 cursor-pointer">
-          <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#1DA1F2]/15 border border-[#1DA1F2]/20">
-            <i className="ri-shield-check-fill text-[#1DA1F2] text-base" />
-          </div>
-          <span className="font-[family-name:var(--font-pacifico)] text-lg text-white">QuickGuard</span>
+        <Link href="/" className="inline-flex items-center cursor-pointer" aria-label="QuickGuard home">
+          <BrandLogo variant="full" theme="dark" imgClassName="h-8 w-auto" />
         </Link>
       </div>
 

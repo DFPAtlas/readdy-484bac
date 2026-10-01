@@ -5,6 +5,7 @@ import Link from 'next/link';
 import MobileGuardApp from './guard/MobileGuardApp';
 import MobileSupervisorHome from './supervisor/MobileSupervisorHome';
 import MobileAreaManagerHome from './area-manager/MobileAreaManagerHome';
+import BrandLogo from '@/components/BrandLogo';
 
 const roles = [
   {
@@ -50,9 +51,8 @@ export default function MobileAppShowcase() {
       <div className="border-b border-[#1e2d4d] bg-[#0B1933] px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 cursor-pointer">
-              <img src="https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp" alt="QuickGuard" className="w-8 h-8 rounded-lg" />
-              <span className="text-white font-bold text-lg font-[family-name:var(--font-pacifico)]">QuickGuard</span>
+            <Link href="/" className="flex items-center cursor-pointer" aria-label="QuickGuard home">
+              <BrandLogo variant="full" theme="dark" imgClassName="h-8 w-auto" />
             </Link>
             <span className="text-slate-600">·</span>
             <span className="text-slate-400 text-sm">Mobile App Preview</span>

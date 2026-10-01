@@ -45,7 +45,7 @@ const guardFeatureLabels: Record<string, string> = {
   'guard.priority_support': 'Priority support',
   'guard.bulk_apply': 'Bulk applications',
   'guard.dedicated_manager': 'Dedicated account manager',
-  'guard.unlimited_applications': 'Unlimited applications',
+  'guard.unlimited_applications': 'Up to 40 applications per month',
   'guard.enhanced_profile': 'Enhanced profile',
   'guard.priority_listing': 'Priority listing',
 };
@@ -68,7 +68,7 @@ const planLimitations: Record<string, string[]> = {
   'client_free': ['Limited to 1 job per month', 'Upgrade required for advanced matching', 'Upgrade required for job templates', 'Upgrade required for analytics dashboard', 'Upgrade required for direct contact', 'Upgrade required for multi-site features'],
   'client-starter': ['Limited to 10 jobs per month', 'No priority matching', 'No dedicated support'],
   'client-pro': ['Limited to 30 jobs per month', 'No dedicated account manager', 'No bulk posting'],
-  'guard_starter': ['Limited to 1 application per month', 'No advanced job alerts', 'No performance analytics', 'No priority support'],
+  'guard_starter': ['Limited to 2 applications per month', 'No advanced job alerts', 'No performance analytics', 'No priority support'],
   'guard-basic': ['Limited to 10 applications/month', 'No performance analytics', 'No 24/7 support'],
   'guard-pro': ['Limited to 25 applications/month', 'No 24/7 support'],
 };
@@ -416,7 +416,7 @@ export default function PricingClient() {
               Simple plans. No surprises.
             </h1>
             <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-              Choose a subscription that fits your needs, or stick with Pay-As-You-Go. Cancel anytime.
+              Choose a subscription that fits your needs, or stick with Pay-As-You-Go. Subscriptions can be cancelled anytime. A free account can publish 1 job per month.
             </p>
 
             <div className="inline-flex items-center bg-slate-800/80 backdrop-blur-sm rounded-full p-1 gap-1 border border-slate-700">
@@ -524,7 +524,7 @@ export default function PricingClient() {
               </Link>
             </div>
             <p className="text-sm text-slate-500 mt-6">
-              No credit card required · Cancel anytime · Upgrade or downgrade as needed
+              Free to create an account · Cancel subscriptions anytime · Upgrade or downgrade as needed
             </p>
           </div>
 
@@ -682,7 +682,7 @@ export default function PricingClient() {
               </Link>
             </div>
             <p className="text-sm text-slate-500 mt-6">
-              No credit card required · Cancel anytime · Upgrade or downgrade as needed
+              Free to create an account · Cancel subscriptions anytime · Upgrade or downgrade as needed
             </p>
           </div>
         </section>

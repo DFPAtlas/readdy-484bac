@@ -3,6 +3,7 @@ import { Pacifico } from 'next/font/google';
 import './globals.css';
 import ClientLayout from './ClientLayout';
 import { Suspense } from 'react';
+import { BRAND_LOGO } from '@/lib/brand';
 
 const pacifico = Pacifico({
   weight: '400',
@@ -31,6 +32,7 @@ export const metadata: Metadata = {
   keywords:
     'security guards UK, SIA licensed, hire security, event security, door supervisor, security jobs, UK security staffing',
   metadataBase: new URL('https://quickguard.uk'),
+  manifest: '/manifest.webmanifest',
   alternates: {
     canonical: 'https://quickguard.uk',
   },
@@ -44,9 +46,9 @@ export const metadata: Metadata = {
     locale: 'en_GB',
     images: [
       {
-        url: 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp',
-        width: 512,
-        height: 512,
+        url: BRAND_LOGO.social,
+        width: 1200,
+        height: 630,
         alt: 'QuickGuard - Hire SIA Licensed Security Guards Directly',
       },
     ],
@@ -56,7 +58,7 @@ export const metadata: Metadata = {
     title: 'Hire SIA-Licensed Security Guards Directly | QuickGuard UK',
     description:
       'Book verified SIA-licensed security guards directly. No agency fees. Pay by the shift with held payment.',
-    images: ['https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp'],
+    images: [BRAND_LOGO.social],
   },
   appleWebApp: {
     capable: true,
@@ -64,12 +66,13 @@ export const metadata: Metadata = {
     title: 'QuickGuard',
   },
   icons: {
-    icon: 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp',
+    icon: BRAND_LOGO.favicon,
+    shortcut: BRAND_LOGO.favicon,
     apple: [
       {
-        url: 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp',
+        url: BRAND_LOGO.appIcon,
         sizes: '180x180',
-        type: 'image/webp',
+        type: 'image/png',
       },
     ],
   },

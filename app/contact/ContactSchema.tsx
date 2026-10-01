@@ -8,8 +8,8 @@ export default function ContactSchema() {
     name: 'QuickGuard',
     alternateName: 'QuickGuard.uk',
     url: SITE_URL,
-    logo: 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp',
-    image: 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp',
+    logo: 'https://public.readdy.ai/ai/img_res/99cbad8f-297d-414a-946f-a43c56ace314.png',
+    image: 'https://public.readdy.ai/ai/img_res/99cbad8f-297d-414a-946f-a43c56ace314.png',
     description:
       'QuickGuard is a UK-based marketplace connecting clients with SIA-licensed security guards for emergency cover, events, and ongoing security assignments.',
     telephone: '',

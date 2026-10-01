@@ -686,7 +686,7 @@ export default function ClientDashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-blue-300">
-                    You're on a free trial until {userEntitlement.current_period_end ? new Date(userEntitlement.current_period_end).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'soon'}.
+                    You're on the QuickGuard Free plan — publish up to 1 job per month and pay per job. Upgrade for more posts and lower fees.
                   </p>
                 </div>
               </div>
@@ -862,7 +862,7 @@ export default function ClientDashboardPage() {
                 label="Active Jobs"
                 sub="Currently open"
                 subColor="text-amber-400"
-                href="/client/jobs/tracker"
+                href="/client/jobs"
               />
               <StatsCard
                 icon="ri-pulse-line"

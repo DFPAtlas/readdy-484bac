@@ -529,7 +529,7 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
       locale: 'en_GB',
       images: [
         {
-          url: 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp',
+          url: 'https://public.readdy.ai/ai/img_res/99cbad8f-297d-414a-946f-a43c56ace314.png',
           width: 512,
           height: 512,
           alt: `QuickGuard - Hire SIA Licensed Security Guards in ${data.city}`,
@@ -540,7 +540,7 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
       card: 'summary_large_image',
       title: `Hire SIA Licensed Security Guards in ${data.city} | QuickGuard`,
       description: `Book verified SIA-licensed security guards in ${data.city}. Instant matching, same-day deployment.`,
-      images: ['https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/d77a7e7e-ca7e-482b-8c82-eb899404ecd8_compressed_Copy-of-Untitled.webp'],
+      images: ['https://public.readdy.ai/ai/img_res/99cbad8f-297d-414a-946f-a43c56ace314.png'],
     },
   };
 }

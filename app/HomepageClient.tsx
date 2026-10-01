@@ -489,7 +489,7 @@ export default function HomepageClient() {
               </Link>
             </div>
             <p className="text-sm text-slate-500 mt-6">
-              No credit card required &middot; First month free &middot; Cancel anytime
+              Free to create an account &middot; Pay per job &middot; Cancel subscriptions anytime
             </p>
           </div>
         </div>
