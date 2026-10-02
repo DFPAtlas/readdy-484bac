@@ -10,6 +10,9 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  if (req.headers.get('Authorization') !== `Bearer ${supabaseServiceKey}`) {
+    return new Response(JSON.stringify({ error: 'Service role required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
 
   try {
     const { guard_email, guard_name, week_range, digest_content } = await req.json();
@@ -22,7 +25,7 @@ serve(async (req) => {
       year: String(new Date().getFullYear()),
     };
 
-    await fetch(`${supabaseUrl}/functions/v1/render-email-template`, {
+    const sendRes = await fetch(`${supabaseUrl}/functions/v1/render-email-template`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
       body: JSON.stringify({ template_slug: 'weekly_digest', to: guard_email, variables, from: 'QuickGuard <digest@quickguard.uk>' }),
