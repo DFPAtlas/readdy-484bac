@@ -7,18 +7,33 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
   const siteUrl = Deno.env.get('SITE_URL') || 'https://quickguard.uk';
+  const authHeader = req.headers.get('Authorization') || '';
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  if (authHeader !== `Bearer ${serviceKey}`) {
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+      db: { schema: 'app' },
+    });
+    const { data: { user }, error } = await userClient.auth.getUser();
+    if (error || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const { data: admin } = await userClient.from('admin_users').select('id,is_active').eq('user_id', user.id).maybeSingle();
+    if (!admin?.is_active) {
+      return new Response(JSON.stringify({ error: 'Active admin access required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+  }
+
+  const supabase = createClient(supabaseUrl, serviceKey, { db: { schema: 'app' } });
 
   try {
-    const { job_id, sent_by_admin } = await req.json();
+    const { job_id } = await req.json();
     if (!job_id) {
       return new Response(JSON.stringify({ error: 'job_id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -31,16 +46,12 @@ serve(async (req) => {
     const { data: clientData } = await supabase.from('clients').select('company_name, contact_name').eq('id', jobData.client_id).maybeSingle();
     const { data: assignments } = await supabase.from('job_assignments').select('guard_id').eq('job_id', job_id);
 
-    if (!assignments || assignments.length === 0) {
+    if (!assignments?.length) {
       return new Response(JSON.stringify({ success: true, message: 'No assigned guards' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const guardIds = assignments.map((a: any) => a.guard_id);
-    const { data: guardsData } = await supabase.from('guards').select('id, user_id, first_name, last_name, email').in('id', guardIds);
-
-    if (!guardsData || guardsData.length === 0) {
-      return new Response(JSON.stringify({ success: true, message: 'No guard records' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+    const { data: guardsData } = await supabase.from('guards').select('id, user_id, first_name, last_name, full_name, email').in('id', guardIds);
 
     const clientName = clientData?.company_name || clientData?.contact_name || 'The client';
     const startDate = new Date(jobData.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -48,26 +59,26 @@ serve(async (req) => {
     let emailsSent = 0;
     const errors: string[] = [];
 
-    for (const guard of guardsData) {
+    for (const guard of guardsData || []) {
       if (!guard.email) continue;
 
-      const variables: Record<string, string> = {
-        guard_name: `${guard.first_name} ${guard.last_name}`,
+      const variables = {
+        guard_name: guard.full_name || `${guard.first_name || ''} ${guard.last_name || ''}`.trim() || 'Guard',
         client_name: clientName,
         job_title: jobData.job_title,
-        venue: `${jobData.venue_name || ''}, ${jobData.venue_city || ''}`,
+        venue: `${jobData.venue_name || ''}${jobData.venue_city ? ', ' + jobData.venue_city : ''}`,
         start_date: startDate,
         start_time: jobData.start_time || '',
         end_time: jobData.end_time || '',
-        location: `${jobData.venue_name || ''}, ${jobData.venue_city || ''}`,
+        location: `${jobData.venue_name || ''}${jobData.venue_city ? ', ' + jobData.venue_city : ''}`,
         dashboard_url: `${siteUrl}/guard/earnings`,
         year: String(new Date().getFullYear()),
       };
 
       try {
-        const rres = await fetch(`${supabaseUrl}/functions/v1/render-email-template`, {
+        const res = await fetch(`${supabaseUrl}/functions/v1/render-email-template`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
           body: JSON.stringify({
             template_slug: 'job_completed_guard',
             to: guard.email,
@@ -78,19 +89,22 @@ serve(async (req) => {
           }),
         });
 
-        if (rres.ok) {
-          emailsSent++;
-);
-        } else {
-          errors.push(`Guard ${guard.first_name}: ${await rres.text()}`);
+        if (!res.ok) {
+          errors.push(`${guard.email}: ${await res.text()}`);
+          continue;
         }
+        emailsSent++;
       } catch (e: any) {
-        errors.push(`Guard ${guard.first_name}: ${e.message}`);
+        errors.push(`${guard.email}: ${e.message}`);
       }
     }
 
-    return new Response(JSON.stringify({ success: true, emails_sent: emailsSent, errors }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ success: true, emails_sent: emailsSent, errors }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: 'Failed to send', details: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: 'Failed to send', details: error.message }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
