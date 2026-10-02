@@ -1,6 +1,20 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
+
+async function isWorkerAuthorized(
+  supabaseUrl: string,
+  serviceKey: string,
+  req: Request,
+): Promise<boolean> {
+  if (req.headers.get('Authorization') === `Bearer ${serviceKey}`) return true;
+  const token = req.headers.get('x-qg-email-worker-token') || '';
+  if (!token) return false;
+  const service = createClient(supabaseUrl, serviceKey, { db: { schema: 'app' } });
+  const { data, error } = await service.rpc('validate_email_worker_token', { p_token: token });
+  return !error && data === true;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://quickguard.uk',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -35,8 +49,8 @@ serve(async (req) => {
     });
   }
 
-  if (req.headers.get('Authorization') !== `Bearer ${serviceKey}`) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+  if (!(await isWorkerAuthorized(supabaseUrl, serviceKey, req))) {
+    return new Response(JSON.stringify({ error: 'Unauthorized email worker' }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
