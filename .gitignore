@@ -1,5 +1,9 @@
 node_modules/
 .next/
-*.tsbuildinfo
+playwright-report/
+test-results/
+uat-results/
 .env.local
 .env.*.local
+.auth/
+*.tsbuildinfo

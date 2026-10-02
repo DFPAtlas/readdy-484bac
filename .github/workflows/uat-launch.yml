@@ -1,0 +1,52 @@
+name: QuickGuard UAT
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: Published Readdy preview or staging URL
+        required: true
+        type: string
+      seed_accounts:
+        description: Create or refresh the seven UAT accounts before testing
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: quickguard-uat-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  uat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.QG_UAT_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.QG_UAT_SUPABASE_SERVICE_ROLE_KEY }}
+      QG_UAT_INBOX: ${{ secrets.QG_UAT_INBOX }}
+      QG_UAT_SHARED_PASSWORD: ${{ secrets.QG_UAT_SHARED_PASSWORD }}
+      QG_UAT_RUN_ID: launch-2026-11
+      PLAYWRIGHT_BASE_URL: ${{ inputs.target_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - if: ${{ inputs.seed_accounts }}
+        run: npm run uat:seed
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quickguard-uat-evidence
+          path: |
+            playwright-report/
+            test-results/
+            uat-results/
+          if-no-files-found: ignore
+          retention-days: 30
+

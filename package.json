@@ -13,6 +13,7 @@
     "recharts": "^3.0.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -28,7 +29,15 @@
   "scripts": {
     "build": "next build",
     "dev": "cross-env NODE_ENV=development next dev -H 0.0.0.0 -p 3000",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "node --test tests/*.test.cjs",
+    "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test --grep @smoke",
+    "test:e2e:uat": "playwright test --grep @uat",
+    "test:e2e:report": "playwright show-report",
+    "uat:seed": "node scripts/uat/seed.mjs",
+    "uat:cleanup": "node scripts/uat/cleanup.mjs"
   },
   "version": "0.1.0"
 }
