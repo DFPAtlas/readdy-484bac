@@ -539,7 +539,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
   };
 
   const handleProceedToConfirmation = () => {
-    router.push(`/client/jobs/${jobId}/confirmation`);
+    router.push(`/client/jobs/confirmation?id=${encodeURIComponent(jobId)}`);
   };
 
   if (loading || authLoading || !allowed || checking) {
@@ -994,7 +994,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
                     <div>
                       <p className="text-sm font-medium text-teal-400">Payment Protection</p>
                       <p className="text-xs text-teal-500 mt-1">
-                        Your payment is protected by QuickGuard. Guards will be paid within {fb?.payoutDelayDays ?? 3}-{fb?.payoutDelayDays ? fb.payoutDelayDays + 2 : 5} business days after your payment is confirmed.
+                        Your payment is held with Stripe. Guard pay is released after shift completion and the applicable confirmation, dispute and payout checks. Bank arrival times depend on Stripe and the guard’s account.
                       </p>
                     </div>
                   </div>

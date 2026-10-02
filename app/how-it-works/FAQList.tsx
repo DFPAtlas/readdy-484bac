@@ -43,7 +43,7 @@ const faqs = [
     category: 'For Clients',
     question: 'Are all guards on the platform verified?',
     answer:
-      'Yes. Every guard undergoes SIA licence verification before being approved on the platform. We check licence validity, specialisations, and compliance status so you can hire with complete confidence. Planned: we are developing an AI agent to check guards\u2019 SIA licence status weekly and flag suspended, revoked or expired licences for review.',
+      'Yes. Every guard undergoes SIA licence verification before being approved on the platform. We check licence validity, specialisations, and compliance status so you can hire with complete confidence. Automated SIA licence rechecks are scheduled weekly. Failed licence checks block new work; uncertain results and worker delays are flagged for admin review.',
   },
   {
     category: 'Payments & Security',

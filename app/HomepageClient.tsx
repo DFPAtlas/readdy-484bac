@@ -199,7 +199,7 @@ export default function HomepageClient() {
                 <i className="ri-shield-check-line text-2xl text-teal-400"></i>
               </div>
               <h3 className="text-lg font-semibold mb-2 text-white">Verified Guards</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">All security professionals are SIA-licensed, background checked and certified. Planned: weekly AI licence checks flag suspended, revoked or expired licences for review</p>
+              <p className="text-slate-400 text-sm leading-relaxed">All security professionals are SIA-licensed, background checked and certified. Automated SIA licence rechecks are scheduled weekly. Failed checks block new work; uncertain results and delays are flagged for review</p>
             </li>
 
             <li
