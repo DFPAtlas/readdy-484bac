@@ -1,5 +1,5 @@
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://quickguard.uk',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -8,6 +8,9 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  if (req.headers.get('Authorization') !== `Bearer ${supabaseServiceKey}`) {
+    return new Response(JSON.stringify({ error: 'Service role required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
 
   try {
     const { guardName, guardEmail, tier, signupNumber, promoEndsAt, lifetimeFee } = await req.json();

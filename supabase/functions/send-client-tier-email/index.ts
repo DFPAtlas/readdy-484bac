@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://quickguard.uk',
@@ -10,6 +11,24 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+  const authHeader = req.headers.get('Authorization') || '';
+  const isServiceRole = authHeader === `Bearer ${supabaseServiceKey}`;
+  if (!isServiceRole) {
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      db: { schema: 'app' },
+    });
+    const { data: { user }, error } = await userClient.auth.getUser();
+    if (error || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const { data: admin } = await userClient.from('admin_users').select('id,is_active').eq('user_id', user.id).maybeSingle();
+    if (!admin?.is_active) {
+      return new Response(JSON.stringify({ error: 'Active admin access required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+  }
 
   try {
     const { client_email, client_name, tier, signup_number, ends_at, discount, jobs_remaining } = await req.json();

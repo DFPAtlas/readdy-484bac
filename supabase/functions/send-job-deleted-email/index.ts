@@ -1,8 +1,9 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://quickguard.uk',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -11,7 +12,25 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
   const siteUrl = Deno.env.get('SITE_URL') || 'https://quickguard.uk';
+
+  const authHeader = req.headers.get('Authorization') || '';
+  const isServiceRole = authHeader === `Bearer ${supabaseServiceKey}`;
+  if (!isServiceRole) {
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      db: { schema: 'app' },
+    });
+    const { data: { user }, error } = await userClient.auth.getUser();
+    if (error || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const { data: admin } = await userClient.from('admin_users').select('id,is_active').eq('user_id', user.id).maybeSingle();
+    if (!admin?.is_active) {
+      return new Response(JSON.stringify({ error: 'Active admin access required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+  }
 
   try {
     const body = await req.json();
@@ -44,7 +63,8 @@ serve(async (req) => {
         template_slug: 'job_deleted',
         to: email,
         variables,
-        from: 'QuickGuard <notifications@quickguard.co.uk>',
+        from: 'QuickGuard <notifications@quickguard.uk>',
+        related_job_id: job_id || null,
       }),
     });
 
