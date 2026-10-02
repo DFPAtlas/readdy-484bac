@@ -64,7 +64,7 @@ export default function LoginFormCard({ children, userTypeLabel, formId, heading
           </p>
         </div>
 
-        <div id={formId}>
+        <div data-form-id={formId}>
           {children}
         </div>
       </div>
