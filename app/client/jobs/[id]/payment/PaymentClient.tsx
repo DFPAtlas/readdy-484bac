@@ -539,7 +539,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
   };
 
   const handleProceedToConfirmation = () => {
-    router.push(`/client/jobs/${jobId}/confirmation`);
+    router.push(`/client/jobs/confirmation?id=${encodeURIComponent(jobId)}`);
   };
 
   if (loading || authLoading || !allowed || checking) {
