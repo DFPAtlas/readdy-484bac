@@ -63,7 +63,8 @@ serve(async (req) => {
         template_slug: 'job_deleted',
         to: email,
         variables,
-        from: 'QuickGuard <notifications@quickguard.uk>',\n        related_job_id: job_id || null,
+        from: 'QuickGuard <notifications@quickguard.uk>',
+        related_job_id: job_id || null,
       }),
     });
 
