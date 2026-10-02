@@ -311,7 +311,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
       <div className="flex-1 min-h-screen flex flex-col pb-20 lg:pb-0">
         <header className="bg-[#111d35] border-b border-[#1e2d4d] px-8 py-4 flex items-center justify-between sticky top-0 z-20">
           <div className="flex items-center gap-3">
-            <Link href={`/client/jobs/${jobId}`} className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#162036] hover:bg-[#1a2642] transition-colors cursor-pointer">
+            <Link href={`/client/jobs/detail?id=${encodeURIComponent(jobId)}`} className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#162036] hover:bg-[#1a2642] transition-colors cursor-pointer">
               <i className="ri-arrow-left-line text-slate-400 text-base"></i>
             </Link>
             <div>
@@ -507,7 +507,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
                     {assignments.length === 0 ? (
                       <div className="p-4 bg-[#162036] rounded-xl border border-[#1e2d4d] text-center">
                         <p className="text-sm text-slate-500">No guards selected yet</p>
-                        <Link href={`/client/jobs/${jobId}/select-guards`}>
+                        <Link href={`/client/jobs/applicants?id=${encodeURIComponent(jobId)}`}>
                           <button className="mt-2 text-teal-400 text-sm font-semibold hover:text-teal-300 cursor-pointer whitespace-nowrap">
                             Select Guards <i className="ri-arrow-right-line text-xs"></i>
                           </button>
@@ -573,7 +573,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
                             </p>
                           )}
                           {!paymentComplete && !isConfirmed && (
-                            <Link href={`/client/jobs/${jobId}/payment`}>
+                            <Link href={`/client/jobs/payment?id=${encodeURIComponent(jobId)}`}>
                               <button className="mt-2 text-xs font-semibold text-teal-400 hover:text-teal-300 cursor-pointer whitespace-nowrap">
                                 <i className="ri-secure-payment-line mr-1"></i>Pay Now
                               </button>
@@ -749,7 +749,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
                       Message Guards
                     </button>
                   </Link>
-                  <Link href={`/client/jobs/${jobId}`}>
+                  <Link href={`/client/jobs/detail?id=${encodeURIComponent(jobId)}`}>
                     <button className="w-full flex items-center gap-2 px-4 py-3 bg-[#162036] border border-[#1e2d4d] text-slate-300 rounded-xl text-sm font-semibold hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap">
                       <i className="ri-eye-line text-teal-400"></i>
                       View Job
