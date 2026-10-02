@@ -115,10 +115,10 @@ export async function resolveAccountState(): Promise<QuickGuardAccountState> {
     }
 
     let role: QuickGuardRole = null
-    if (guardData) role = 'guard'
-    else if (clientData) role = 'client'
-    else if (userRow?.user_type === 'guard') role = 'guard'
+    if (userRow?.user_type === 'guard') role = 'guard'
     else if (userRow?.user_type === 'client') role = 'client'
+    else if (guardData) role = 'guard'
+    else if (clientData) role = 'client'
 
     let accountStatus: QuickGuardAccountStatus = 'active'
     let onboardingComplete = false
