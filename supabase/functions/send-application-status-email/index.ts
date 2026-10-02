@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://quickguard.uk',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qg-email-worker-token',
 };
 
 interface Payload {
@@ -29,18 +29,26 @@ serve(async (req) => {
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
   const siteUrl = Deno.env.get('SITE_URL') || 'https://quickguard.uk';
   const authHeader = req.headers.get('Authorization') || '';
+  const workerToken = req.headers.get('x-qg-email-worker-token') || '';
+  const serviceClient = createClient(supabaseUrl, serviceKey, { db: { schema: 'app' } });
 
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
-      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+  let isWorker = false;
+  if (workerToken) {
+    const { data: validWorker, error: workerError } = await serviceClient.rpc('validate_email_worker_token', { p_token: workerToken });
+    isWorker = !workerError && validWorker === true;
   }
 
   const isServiceRole = authHeader === `Bearer ${serviceKey}`;
   let isAdmin = false;
   let clientId: string | null = null;
 
-  if (!isServiceRole) {
+  if (!isWorker && !isServiceRole && !authHeader) {
+    return new Response(JSON.stringify({ error: 'Missing authorization' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (!isWorker && !isServiceRole) {
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
       db: { schema: 'app' },
@@ -69,9 +77,9 @@ serve(async (req) => {
 
   try {
     const payload: Payload = await req.json();
-    const supabase = createClient(supabaseUrl, serviceKey, { db: { schema: 'app' } });
+    const supabase = serviceClient;
 
-    if (!isServiceRole && !isAdmin && clientId) {
+    if (!isWorker && !isServiceRole && !isAdmin && clientId) {
       if (!['declined', 'rejected'].includes(payload.status)) {
         return new Response(JSON.stringify({ error: 'Clients can only send declined status notifications' }), {
           status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
