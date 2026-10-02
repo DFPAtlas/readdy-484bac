@@ -71,7 +71,6 @@ function entitlement(persona, userId) {
     features: { uat: true, run_id: runId },
     monthly_price_pence: 0,
     subscription_status: persona.key === 'client-cancelled' ? 'cancelled' : 'active',
-    is_active: persona.key !== 'client-cancelled',
     is_free_tier: true,
     cancel_at_period_end: false,
   };
