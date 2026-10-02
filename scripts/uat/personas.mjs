@@ -7,8 +7,8 @@ export const personas = [
     fullName: 'UAT Free Client',
     companyName: 'Red Lion UAT Venue',
     clientType: 'venue',
-    planSlug: 'client-free',
-    planName: 'Client Free',
+    planSlug: 'client_free',
+    planName: 'Free Starter',
     industry: 'Hospitality',
   },
   {
@@ -27,8 +27,8 @@ export const personas = [
     fullName: 'UAT Cancelled Client',
     companyName: 'Apex Build UAT Ltd',
     clientType: 'business',
-    planSlug: 'client-free',
-    planName: 'Client Free',
+    planSlug: 'client_free',
+    planName: 'Free Starter',
     industry: 'Construction',
   },
   {
