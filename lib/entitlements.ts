@@ -233,50 +233,24 @@ export async function getPlansForAudience(audience: 'client' | 'guard') {
   return data || [];
 }
 
-export async function ensureEntitlement(userId: string, audience?: 'guard' | 'client'): Promise<Entitlement | null> {
+export async function ensureEntitlement(userId: string, _audience?: 'guard' | 'client'): Promise<Entitlement | null> {
   if (!userId) return null;
 
   const existing = await getUserEntitlements(userId);
   if (existing) return existing;
 
-  const resolvedAudience = audience || await getUserAudience(userId);
-  if (!resolvedAudience) return null;
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || user?.id !== userId) return null;
 
-  const freeSlug = resolvedAudience === 'guard' ? 'guard_starter' : 'client_free';
-
-  const { data: plan } = await supabase
-    .from('plans')
-    .select('slug, name, audience, features, monthly_price_pence')
-    .eq('slug', freeSlug)
-    .eq('active', true)
-    .maybeSingle();
-
-  if (!plan) return null;
-
-  const { error: insertError } = await supabase
-    .from('user_entitlements_data')
-    .insert({
-      user_id: userId,
-      plan_slug: plan.slug,
-      plan_name: plan.name,
-      audience: plan.audience,
-      features: plan.features,
-      monthly_price_pence: plan.monthly_price_pence,
-      subscription_status: 'active',
-      current_period_end: null,
-      cancel_at_period_end: false,
-      stripe_subscription_id: null,
-    });
-
-  if (insertError) {
-    console.warn('[auto-heal] Could not create entitlement for', userId, insertError.message);
+  const { data, error } = await supabase.rpc('ensure_my_free_entitlement');
+  if (error) {
+    console.warn('[auto-heal] Could not create free entitlement:', error.message);
     return null;
   }
 
-  const newEnt = await getUserEntitlements(userId);
   clearEntitlementCache(userId);
-  console.log('[auto-heal] Created missing entitlement for', userId, plan.slug);
-  return newEnt;
+  const entitlement = Array.isArray(data) ? data[0] : null;
+  return entitlement ? (entitlement as Entitlement) : null;
 }
 
 export async function getAllClientFeatures(userId: string): Promise<Record<string, boolean>> {
