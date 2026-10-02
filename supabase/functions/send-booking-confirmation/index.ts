@@ -66,7 +66,10 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Job not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { data: client } = await supabase.from('clients').select('email, contact_name, company_name').eq('id', job.client_id).maybeSingle();
+    const { data: client } = await supabase.from('clients').select('email, contact_name, company_name, user_id').eq('id', job.client_id).maybeSingle();
+    if (!client?.email) {
+      return new Response(JSON.stringify({ error: 'Client email not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     const start = new Date(`1970-01-01T${job.start_time}`);
     const end = new Date(`1970-01-01T${job.end_time}`);
@@ -104,28 +107,13 @@ serve(async (req) => {
 
     if (!renderRes.ok) {
       const errText = await renderRes.text();
-      console.error('Template render error:', errText);
+      throw new Error(`Booking confirmation send failed: ${errText}`);
     }
 
     const rendered = await renderRes.json();
 
-    const n8nWebhookUrl = Deno.env.get('N8N_EMAIL_WEBHOOK_URL');
-    if (n8nWebhookUrl) {
-      await fetch(n8nWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: client?.email,
-          subject: rendered.subject,
-          html: rendered.body_html,
-          template: 'booking_confirmation',
-          data: variables,
-        }),
-      });
-    }
-
     return new Response(
-      JSON.stringify({ success: true, payload: { to: client?.email, subject: rendered.subject } }),
+      JSON.stringify({ success: true, email_id: rendered.email_id, payload: { to: client.email, subject: rendered.subject } }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error: any) {
