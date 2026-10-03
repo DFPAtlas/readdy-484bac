@@ -68,11 +68,11 @@ const steps = [
     number: '02',
     icon: 'ri-shield-check-line',
     title: 'SIA Verification',
-    description: 'Your SIA licence is automatically verified through our secure system.',
+    description: 'Your SIA licence must pass an initial verification check before you can take work through QuickGuard.',
     items: [
       'Submit your SIA licence number during profile setup',
       'Our system checks your licence against the SIA register',
-      'Verification typically completes within 5–10 minutes',
+      'Verification timing can vary depending on the licence check and whether manual review is required',
       'You\'ll receive an email once your account is approved',
       'A verified badge appears on your profile for clients to see',
     ],
@@ -82,7 +82,7 @@ const steps = [
         'Ensure your SIA licence is current and not expired',
         'Double-check the licence number before submitting',
         'Keep your profile details consistent with your licence',
-        'Contact support if verification takes longer than 30 minutes',
+        'Contact support if your verification remains pending or you are asked for additional information',
       ],
     },
   },
@@ -105,7 +105,7 @@ const steps = [
     description: 'Work your shift and receive secure payment directly to your bank account.',
     paymentSteps: [
       { icon: 'ri-briefcase-line', label: 'Complete the Shift', desc: 'Finish your assigned security duties professionally' },
-      { icon: 'ri-bank-card-line', label: 'Client Processes Payment', desc: 'Client reviews and releases payment through the platform' },
+      { icon: 'ri-bank-card-line', label: 'Client Processes Payment', desc: 'Client pays securely through QuickGuard before the booking is confirmed' },
       { icon: 'ri-lock-line', label: 'Secure Bank Transfer', desc: 'Payment is transferred to your registered bank account' },
       { icon: 'ri-mail-check-line', label: 'Email Confirmation', desc: 'You receive a payment confirmation with full details' },
     ],
@@ -167,7 +167,7 @@ export default function GuardGuidePage() {
             </div>
             <div className="mt-16 grid grid-cols-3 gap-8 w-full max-w-2xl mx-auto">
               {[
-                { value: '5–10 min', label: 'SIA verification time' },
+                { value: 'Required', label: 'Initial SIA verification' },
                 { value: '100%', label: 'Secure payments' },
                 { value: '24/7', label: 'Job alerts available' },
               ].map((stat) => (
@@ -276,7 +276,7 @@ export default function GuardGuidePage() {
                   <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                     <i className="ri-time-line text-teal-400 text-lg" />
                   </div>
-                  <span className="text-teal-400 text-sm font-semibold">Verification usually takes 5–10 minutes</span>
+                  <span className="text-teal-400 text-sm font-semibold">Verification timing can vary and may require manual review</span>
                 </div>
               </div>
             </div>
@@ -290,7 +290,7 @@ export default function GuardGuidePage() {
                   <h2 className="text-2xl font-bold text-white">SIA Verification</h2>
                 </div>
               </div>
-              <p className="text-slate-400 mb-6">Your SIA licence is automatically verified through our secure system, giving clients full confidence in your credentials. Planned: QuickGuard is developing an AI agent to check guards’ SIA licence status weekly and flag suspended, revoked or expired licences for review.</p>
+              <p className="text-slate-400 mb-6">Your SIA licence must pass an initial verification check before you can take work through QuickGuard. Planned: QuickGuard is developing an AI agent to re-check guards’ SIA licence status weekly and flag suspended, revoked or expired licences for review.</p>
               <div className="space-y-3">
                 {[
                   { icon: 'ri-file-shield-line', label: 'Submit Licence', desc: 'Enter your SIA licence number in your profile' },
