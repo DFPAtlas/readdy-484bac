@@ -65,7 +65,7 @@ serve(async (req) => {
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
     if (userError || !user) {
       return new Response(
         JSON.stringify({ error: 'Authentication required' }),

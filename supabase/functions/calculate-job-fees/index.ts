@@ -29,7 +29,7 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     const supabaseAuth = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false }, global: { headers: { Authorization: `Bearer ${token}` } } });
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
     if (userError || !user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     const { jobId } = await req.json();
