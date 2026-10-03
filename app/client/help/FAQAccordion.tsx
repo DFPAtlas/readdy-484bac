@@ -41,7 +41,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: 'How do I contact support?',
-    answer: 'Click "Support" in your sidebar, or visit the Help Centre. You can create a support ticket, chat with our team, or report urgent issues. Support tickets are tracked in real time and you will receive notifications when we reply. For emergencies, use the urgent issue button.',
+    answer: 'Click "Support" in your sidebar, or visit the Help Centre. You can create a support ticket, use 24/7 QuickGuard AI support for common platform questions, or report urgent issues. Issues that need human review can be escalated to the support team. Support tickets are tracked in real time and you will receive notifications when we reply. For emergencies, use the urgent issue button.',
     icon: 'ri-customer-service-2-line',
   },
   {
@@ -51,7 +51,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: 'What are the cancellation and refund terms?',
-    answer: 'Cancellations made more than 48 hours before the shift start time are typically eligible for a full refund. Cancellations within 48 hours may receive a partial refund depending on whether guards have already been assigned and confirmed. Platform fees are refunded if cancellation occurs before guard confirmation. For disputed cancellations, our support team will review and determine eligibility.',
+    answer: 'Cancellations made more than 24 hours before the shift start time are eligible for a full refund including the service fee. Cancellations 12–24 hours before the shift receive a 50% refund of the guard fee while the service fee is retained. Cancellations less than 12 hours before the shift are not refundable. If a guard cancels before the shift, the client receives a full refund including the service fee. Disputed cancellations are reviewed by support.',
     icon: 'ri-refund-line',
   },
   {
