@@ -271,7 +271,7 @@ export default function ClientHelpPage() {
                       <i className="ri-shield-check-line text-teal-400 text-xl" />
                     </div>
                     <p className="text-white font-semibold text-sm mb-1">SIA Verification</p>
-                    <p className="text-slate-400 text-xs">Every guard is checked against the official SIA register before joining. Planned: weekly AI licence checks flag suspended, revoked or expired licences for review. Look for the verified badge.</p>
+                    <p className="text-slate-400 text-xs">Every guard must pass an initial SIA licence check before they can take work through QuickGuard. Planned weekly AI licence re-checks will flag suspended, revoked or expired licences for review. Look for the verified badge.</p>
                   </div>
                   <div className="bg-[#162036] rounded-xl p-4 border border-[#1e2d4d] text-center">
                     <div className="w-10 h-10 bg-amber-500/10 rounded-lg flex items-center justify-center mx-auto mb-3 border border-amber-400/20">
@@ -302,7 +302,7 @@ export default function ClientHelpPage() {
                     </div>
                     <div>
                       <p className="text-white font-semibold text-sm">Guard Selection</p>
-                      <p className="text-slate-400 text-sm">After selecting guards, you review the cost breakdown including guard fees, service fees, and VAT.</p>
+                      <p className="text-slate-400 text-sm">After selecting guards, you review the cost breakdown including guard pay, the plan service fee, any eligible promotion, and applicable VAT.</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-4">
@@ -393,11 +393,11 @@ export default function ClientHelpPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-2 h-2 rounded-full bg-amber-400" />
-                      <span className="text-slate-300">Awaiting Payment — Refund minus platform fee</span>
+                      <span className="text-slate-300">Awaiting Payment — no booking payment has been captured yet</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-2 h-2 rounded-full bg-orange-400" />
-                      <span className="text-slate-300">Confirmed — Partial refund depending on timing</span>
+                      <span className="text-slate-300">Confirmed — more than 24h: full refund; 12–24h: 50% guard-fee refund; under 12h: no refund</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-2 h-2 rounded-full bg-red-400" />
@@ -460,7 +460,7 @@ export default function ClientHelpPage() {
                 </ul>
                 <div className="bg-[#162036] rounded-xl p-4 border border-[#1e2d4d]">
                   <p className="text-teal-400 font-semibold text-sm mb-1">Subscription Plans</p>
-                  <p className="text-slate-400 text-sm">Compare Starter, Professional, and Enterprise plans. Upgrade anytime to unlock more features, lower fees, and priority support.</p>
+                  <p className="text-slate-400 text-sm">Compare Free, Starter, Pro, and Enterprise options. Free accounts can publish 1 job per month; paid plans increase limits and can reduce service fees or unlock additional features.</p>
                   <Link href="/pricing" className="inline-flex items-center gap-1 text-teal-400 text-sm font-semibold mt-2 hover:underline cursor-pointer">
                     View Plans <i className="ri-arrow-right-line" />
                   </Link>
