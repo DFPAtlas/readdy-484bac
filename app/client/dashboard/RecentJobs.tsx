@@ -199,7 +199,7 @@ export default function RecentJobs({ jobs, loading = false }: RecentJobsProps) {
                   )}
                   {job.needs_payment && (
                     <button
-                      onClick={() => router.push(`/client/jobs/${job.id}/payment`)}
+                      onClick={() => router.push(`/client/jobs/payment?id=${encodeURIComponent(job.id)}`)}
                       className="px-3 py-1.5 text-xs font-semibold bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-500 hover:bg-amber-500/20 transition-colors cursor-pointer whitespace-nowrap"
                     >
                       Pay Now
