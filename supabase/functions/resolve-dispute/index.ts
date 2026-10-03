@@ -141,6 +141,19 @@ serve(async (req) => {
     let actualRefundAmount = 0;
 
     if (resolution === 'resolved_client_refund' || resolution === 'resolved_client_partial') {
+      const { data: assignments, error: assignmentError } = await supabase.from('job_assignments')
+        .select('payment_status, payout_released, stripe_transfer_id').eq('job_id', job.id);
+      const { data: payouts, error: payoutError } = await supabase.from('guard_payouts')
+        .select('status').eq('job_id', job.id);
+      if (assignmentError || payoutError) throw new Error('Unable to verify payout safety');
+      const protectedStates = ['payout_pending', 'payout_processing', 'paid_out', 'paid', 'client_released'];
+      if (['payout_approved', 'paid_out'].includes(job.status) ||
+          protectedStates.includes(job.payment_status) ||
+          (assignments || []).some((a: any) => protectedStates.includes(a.payment_status) || a.payout_released || a.stripe_transfer_id) ||
+          (payouts || []).some((p: any) => !['failed', 'cancelled'].includes(p.status))) {
+        return new Response(JSON.stringify({ error: 'Refund blocked: guard payout has started. Finance recovery review required.' }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
       const { data: transaction } = await supabase
         .from('transactions')
         .select('id, amount, currency, stripe_payment_intent, stripe_charge_id, refunded, refund_amount')
