@@ -225,37 +225,28 @@ export default function ClientCompleteProfileWizard() {
         }
       }
 
-      const updatePayload: Record<string, any> = {
-        subscription_plan: 'client_free',
-        profile_completed: true,
-        onboarding_status: 'completed',
-        subscription_status: 'active',
-        updated_at: new Date().toISOString()
-      };
-
-      fields.forEach((field) => {
-        if (formData[field.field_key] !== undefined) {
-          updatePayload[field.field_key] = formData[field.field_key] || null;
-        }
+      const allowedProfileFields = new Set([
+        'first_name','last_name','phone','company_name','industry','company_size',
+        'website','address_line1','address_line2','city','postcode','billing_email',
+        'vat_number','preferred_contact_method','security_needs','hear_about_us','additional_notes'
+      ]);
+      const profilePayload: Record<string, any> = {};
+      fields.filter(field => field.is_enabled && allowedProfileFields.has(field.field_key)).forEach(field => {
+        if (formData[field.field_key] !== undefined) profilePayload[field.field_key] = formData[field.field_key];
       });
-
-      traceLog('saving profile', { userId, fieldsCount: fields.length, hasPassword: !!password });
-
-      const { error: updateError } = await supabase
-        .from('clients')
-        .update(updatePayload)
-        .eq('user_id', userId);
-
-      if (updateError) throw updateError;
-
-      traceLog('profile saved successfully');
-
-      await ensureEntitlement(userId, 'client');
-      const { error: entActivateError } = await supabase
-        .from('user_entitlements_data')
-        .update({ subscription_status: 'active', updated_at: new Date().toISOString() })
-        .eq('user_id', userId);
-      if (entActivateError) traceLog('entitlement activation failed', { error: entActivateError.message });
+      const billingEmail = String(profilePayload.billing_email || '').trim();
+      if (billingEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(billingEmail)) {
+        setError('Please enter a valid billing email address.');
+        setSaving(false);
+        setCurrentStep(5);
+        return;
+      }
+      const { data: completion, error: completionError } = await supabase.functions.invoke('complete-client-profile', { body: profilePayload });
+      if (completionError || !completion?.success) {
+        let message = completion?.error || 'Unable to complete your profile. Please try again.';
+        try { const body = await completionError?.context?.json(); if (body?.error) message = body.error; } catch {}
+        throw new Error(message);
+      }
 
       if (password) {
         const { error: pwdError } = await supabase.auth.updateUser({ password });
@@ -338,7 +329,7 @@ export default function ClientCompleteProfileWizard() {
                   <i className="ri-time-line text-teal-400 text-xl w-5 h-5 flex items-center justify-center"></i>
                   <div>
                     <h4 className="font-semibold text-teal-300 mb-1">Takes About 3 Minutes</h4>
-                    <p className="text-sm text-teal-400">Your information is saved automatically as you progress.</p>
+                    <p className="text-sm text-teal-400">Your information is saved when you complete the profile.</p>
                   </div>
                 </div>
               </div>
