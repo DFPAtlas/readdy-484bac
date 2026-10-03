@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import Header from '@/components/Header';
+import PortalSidebar from '@/components/PortalSidebar';
 import Footer from '@/components/Footer';
 import JobSummaryCard from './JobSummaryCard';
 import SelectedGuardsPaymentSummary from './SelectedGuardsPaymentSummary';
@@ -193,6 +193,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
   const [maxRetriesReached, setMaxRetriesReached] = useState(false);
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [feeLoading, setFeeLoading] = useState(false);
+  const [feeError, setFeeError] = useState<string | null>(null);
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -296,28 +297,35 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
 
   const loadFeeBreakdown = async (jobId: string) => {
     setFeeLoading(true);
+    setFeeError(null);
+    setFeeBreakdown(null);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) throw new Error("Please sign in again to load your booking total.");
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/calculate-job-fees`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
             "Authorization": `Bearer ${sessionData.session?.access_token ?? ""}`,
           },
           body: JSON.stringify({ jobId }),
+          signal: AbortSignal.timeout(20000),
         }
       );
-      if (response.ok) {
-        const data = await response.json();
-        if (!data.error) {
-          setFeeBreakdown(data);
-          setTaxDisclaimerAccepted(data.taxDisclaimerAccepted || false);
-        }
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        throw new Error(data.error || data.message || "Unable to load the booking total. Please try again.");
       }
+      if (typeof data.clientTotalCharge !== "number" || !Number.isFinite(data.clientTotalCharge) || data.clientTotalCharge <= 0) {
+        throw new Error("The booking total is invalid. Please contact support.");
+      }
+      setFeeBreakdown(data);
+      setTaxDisclaimerAccepted(data.taxDisclaimerAccepted || false);
     } catch (error) {
-      console.error("Error loading fee breakdown:", error);
+      setFeeError(error instanceof Error && error.name !== "TimeoutError" ? error.message : "Loading the booking total timed out. Please try again.");
     } finally {
       setFeeLoading(false);
     }
@@ -425,13 +433,15 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
             "Authorization": `Bearer ${sessionData.session?.access_token ?? ""}`,
           },
           body: JSON.stringify({ jobId: job.id }),
+          signal: AbortSignal.timeout(30000),
         }
       );
       const data = await response.json();
-      if (data.url) {
+      if (response.ok && data.url) {
         window.location.href = data.url;
       } else {
         throw new Error(data.error || "Failed to create payment session");
@@ -463,7 +473,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
   };
 
   const handleRetry = async () => {
-    if (!job || !client || maxRetriesReached) return;
+    if (!job || !client || !feeBreakdown || feeLoading || maxRetriesReached) return;
     setProcessing(true);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -473,13 +483,15 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
             "Authorization": `Bearer ${sessionData.session?.access_token ?? ""}`,
           },
           body: JSON.stringify({ jobId: job.id }),
+          signal: AbortSignal.timeout(30000),
         }
       );
       const data = await response.json();
-      if (data.url) {
+      if (response.ok && data.url) {
         window.location.href = data.url;
       } else if (data.error) {
         if (data.error === 'Payment already completed for this job') {
@@ -556,7 +568,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
   if (blocked) {
     return (
       <div className="min-h-screen bg-[#0B1933] flex flex-col">
-        <Header />
+        <PortalSidebar role="client" displayName={client?.company_name || client?.contact_name || "Client"} subtitle="Client Portal" initials={(client?.contact_name || client?.company_name || "Client").split(" ").map(word => word[0]).join("").slice(0, 2)} />
         <div className="flex-1 flex items-center justify-center px-6">
           <div className="w-full max-w-lg">
             <UpgradePrompt feature="client.escrow_payments" />
@@ -646,9 +658,9 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
 
   return (
     <div className="min-h-screen bg-[#0B1933] flex flex-col">
-      <Header />
+      <PortalSidebar role="client" displayName={client?.company_name || client?.contact_name || "Client"} subtitle="Client Portal" initials={(client?.contact_name || client?.company_name || "Client").split(" ").map(word => word[0]).join("").slice(0, 2)} />
 
-      <div className="flex-1 py-8">
+      <div className="flex-1 py-8 pt-20 lg:pt-8">
         <div className="max-w-6xl mx-auto px-6">
           <div className="mb-8">
             <Link href="/client/jobs" className="text-teal-400 hover:text-teal-300 font-medium mb-4 inline-flex items-center whitespace-nowrap cursor-pointer">
@@ -949,7 +961,12 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
 
             <div className="lg:col-span-1">
               <div className="sticky top-24 space-y-6">
-                {fb ? <CostBreakdown {...costBreakdownProps} /> : <p className="text-amber-400 p-4">{feeLoading ? "Loading booking total…" : "Booking total unavailable. Refresh before paying."}</p>}
+                {fb ? <CostBreakdown {...costBreakdownProps} /> : (
+                  <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4" role="status">
+                    <p className="text-amber-400">{feeLoading ? "Loading booking total…" : feeError || "Booking total unavailable."}</p>
+                    {!feeLoading && <button onClick={() => loadFeeBreakdown(job.id)} className="mt-3 text-teal-400 hover:text-teal-300 font-semibold">Retry booking total</button>}
+                  </div>
+                )}
 
                 <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-6 space-y-4">
                   <PaymentActions
@@ -962,7 +979,9 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
                     onViewInvoice={handleViewInvoice}
                     onDownloadReceipt={handleDownloadReceipt}
                     onContactSupport={handleContactSupport}
-                    processing={processing || feeLoading || !feeBreakdown}
+                    processing={processing}
+                    feeLoading={feeLoading}
+                    feesReady={!!feeBreakdown}
                     agreedToTerms={agreedToTerms}
                     paymentMethod={paymentMethod}
                     totalAmount={fb?.clientTotalCharge?.toFixed(2) || costs.total.toFixed(2)}

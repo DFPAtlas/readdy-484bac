@@ -11,6 +11,8 @@ interface Props {
   onDownloadReceipt: () => void;
   onContactSupport: () => void;
   processing: boolean;
+  feeLoading?: boolean;
+  feesReady?: boolean;
   agreedToTerms: boolean;
   paymentMethod: "card" | "invoice";
   totalAmount: string;
@@ -29,6 +31,8 @@ export default function PaymentActions({
   onDownloadReceipt,
   onContactSupport,
   processing,
+  feeLoading = false,
+  feesReady = true,
   agreedToTerms,
   paymentMethod,
   totalAmount,
@@ -40,9 +44,9 @@ export default function PaymentActions({
       {(paymentStatus === "pending_payment" || paymentStatus === "not_required") && (
         <button
           onClick={onPayNow}
-          disabled={processing || !agreedToTerms}
+          disabled={processing || feeLoading || !feesReady || !agreedToTerms}
           className={`w-full py-4 rounded-xl font-bold text-lg transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 ${
-            processing || !agreedToTerms
+            processing || feeLoading || !feesReady || !agreedToTerms
               ? "bg-[#162036] text-slate-600 cursor-not-allowed"
               : "bg-teal-500 text-white hover:bg-teal-600 shadow-lg"
           }`}
@@ -52,7 +56,7 @@ export default function PaymentActions({
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               Creating secure payment...
             </>
-          ) : (
+          ) : feeLoading ? "Loading booking total…" : !feesReady ? "Booking total unavailable" : (
             <>
               <i className="ri-secure-payment-line"></i>
               {paymentMethod === "card" ? `Pay & Confirm Booking (${totalAmount})` : "Request Invoice"}
@@ -65,9 +69,9 @@ export default function PaymentActions({
         <>
           <button
             onClick={onRetry}
-            disabled={processing || !agreedToTerms || maxRetriesReached}
+            disabled={processing || feeLoading || !feesReady || !agreedToTerms || maxRetriesReached}
             className={`w-full py-4 rounded-xl font-bold text-lg transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 ${
-              processing || !agreedToTerms || maxRetriesReached
+              processing || feeLoading || !feesReady || !agreedToTerms || maxRetriesReached
                 ? "bg-[#162036] text-slate-600 cursor-not-allowed"
                 : "bg-red-500 text-white hover:bg-red-600 shadow-lg"
             }`}
@@ -77,7 +81,7 @@ export default function PaymentActions({
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 Retrying...
               </>
-            ) : (
+            ) : feeLoading ? "Loading booking total…" : !feesReady ? "Booking total unavailable" : (
               <>
                 <i className="ri-refresh-line"></i>
                 {maxRetriesReached ? "Max Retries Reached" : `Retry Payment (£${totalAmount})`}
