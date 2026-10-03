@@ -392,11 +392,11 @@ export default function PricingPDFClient() {
                   </li>
                   <li className="flex items-start gap-2">
                     <i className="ri-check-line text-teal-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-slate-700">10% platform service fee on guard payments</span>
+                    <span className="text-slate-700">Booking service fee set by your plan: Free 15%, Starter 10%, Pro 7.5%, Enterprise 5%</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <i className="ri-check-line text-teal-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-slate-700">20% VAT on service fee (UK only)</span>
+                    <span className="text-slate-700">Any applicable VAT is shown at checkout</span>
                   </li>
                 </ul>
               </div>

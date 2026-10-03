@@ -7,7 +7,7 @@ const faqs = [
     category: 'General',
     question: 'What is QuickGuard.uk?',
     answer:
-      'QuickGuard.uk is a UK-based platform that connects SIA-licensed security guards with clients who need professional security services. Our AI-powered matching system ensures the right guard is paired with the right job, anywhere across England, Scotland, Wales, and Northern Ireland.',
+      'QuickGuard.uk is a UK-based platform that connects SIA-licensed security guards with clients who need professional security services. When a job is posted, QuickGuard notifies verified guards whose travel radius covers the job location, anywhere across England, Scotland, Wales and Northern Ireland.',
   },
   {
     category: 'For Guards',
@@ -37,13 +37,13 @@ const faqs = [
     category: 'For Clients',
     question: 'How quickly can I find a security guard?',
     answer:
-      'Our AI matching system instantly surfaces the most suitable verified guards for your job. Many clients receive applications within minutes of posting. You can review profiles, check SIA credentials, and confirm a guard \u2014 all within the same day.',
+      'As soon as you post, QuickGuard notifies verified guards whose travel radius covers your location. You can review applications, check SIA credentials and confirm a guard as soon as applications arrive.',
   },
   {
     category: 'For Clients',
     question: 'Are all guards on the platform verified?',
     answer:
-      'Yes. Every guard undergoes SIA licence verification before being approved on the platform. We check licence validity, specialisations, and compliance status so you can hire with complete confidence. Automated SIA licence rechecks are scheduled weekly. Failed licence checks block new work; uncertain results and worker delays are flagged for admin review.',
+      'Yes. Every guard must pass an SIA licence check before they can take work through QuickGuard. We are developing automated weekly re-checks that will flag suspended, revoked or expired licences for review.',
   },
   {
     category: 'Payments & Security',

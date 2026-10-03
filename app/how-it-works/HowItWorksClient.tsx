@@ -30,7 +30,7 @@ const DEMO_TABS = [
     color: 'blue',
     steps: [
       { icon: 'ri-file-list-3-line', title: 'Post Your Job', desc: 'Describe your security needs — location, shift times, SIA requirements. Posting a job does not charge the booking payment.' },
-      { icon: 'ri-robot-line', title: 'AI Matches Guards', desc: 'Our smart algorithm instantly surfaces the best-matched, verified UK security professionals.' },
+      { icon: 'ri-robot-line', title: 'Local Guards Notified', desc: 'QuickGuard notifies verified guards whose travel radius covers your job location.' },
       { icon: 'ri-user-search-line', title: 'Review & Select', desc: 'Browse guard profiles, check SIA credentials, and confirm your preferred candidate.' },
       { icon: 'ri-secure-payment-line', title: 'Pay & Confirm', desc: 'Review the agreed guard pay, your plan\u2019s service fee and any eligible promotion, then pay securely via Stripe. Funds are held with Stripe until release.' },
     ],
@@ -38,7 +38,7 @@ const DEMO_TABS = [
 ];
 
 const PLATFORM_STATS = [
-  { icon: 'ri-timer-flash-line', value: '< 2 hrs', label: 'Average time to hire' },
+  { icon: 'ri-timer-flash-line', value: 'No commission', label: 'Guards keep full agreed pay' },
   { icon: 'ri-shield-check-line', value: '100%', label: 'SIA-verified guards' },
   { icon: 'ri-map-pin-2-line', value: 'UK-wide', label: 'Coverage across all regions' },
   { icon: 'ri-lock-2-line', value: 'Held with Stripe', label: 'Secure payment protection' },
@@ -440,7 +440,7 @@ export default function HowItWorksClient() {
                     loading="lazy" decoding="async" className="w-full h-[260px] object-cover object-top"
                   />
                 </div>
-                <figcaption className="sr-only">AI Matching Process Visualization</figcaption>
+                <figcaption className="sr-only">Guard Matching Process</figcaption>
               </figure>
             </li>
 
@@ -631,119 +631,6 @@ export default function HowItWorksClient() {
             <p className="text-lg text-slate-400">Everything you need to know about QuickGuard.uk</p>
           </div>
           <FAQList />
-        </div>
-      </section>
-
-      {/* TESTIMONIALS SECTION */}
-      <section className="py-20 bg-[#0B1933] border-b border-slate-800/60" aria-labelledby="testimonials-heading">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-14">
-            <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-400/20 text-teal-400 px-4 py-1.5 rounded-full text-sm font-medium mb-4">
-              <i className="ri-star-fill" />
-              Real Reviews
-            </div>
-            <h2 id="testimonials-heading" className="text-3xl md:text-4xl font-bold text-white mb-4">Trusted by Guards & Clients Across the UK</h2>
-            <p className="text-lg text-slate-400 max-w-2xl mx-auto">See what security professionals and businesses say about their experience with QuickGuard.uk</p>
-          </div>
-
-          {/* Stats Row */}
-          <div className="grid grid-cols-3 gap-6 max-w-2xl mx-auto mb-14">
-            <div className="text-center bg-[#111d35] border border-slate-700/50 rounded-2xl p-6">
-              <p className="text-4xl font-bold text-teal-400">4.9<span className="text-2xl">/5</span></p>
-              <div className="flex justify-center gap-0.5 my-1">
-                {[1,2,3,4,5].map(i => (
-                  <i key={i} className="ri-star-fill text-yellow-400 text-lg" />
-                ))}
-              </div>
-              <p className="text-sm text-slate-400">Average Rating</p>
-            </div>
-            <div className="text-center bg-[#111d35] border border-slate-700/50 rounded-2xl p-6">
-              <p className="text-4xl font-bold text-teal-400">2,400+</p>
-              <p className="text-sm text-slate-400 mt-2">Verified Reviews</p>
-            </div>
-            <div className="text-center bg-[#111d35] border border-slate-700/50 rounded-2xl p-6">
-              <p className="text-4xl font-bold text-teal-400">98%</p>
-              <p className="text-sm text-slate-400 mt-2">Would Recommend</p>
-            </div>
-          </div>
-
-          {/* Testimonial Cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[
-              {
-                text: "QuickGuard.uk completely transformed how I find security work. Within 48 hours of signing up I had three job offers in Manchester. The SIA verification process was smooth and clients trust the platform.",
-                name: "Marcus T.",
-                role: "SIA Door Supervisor · Manchester",
-                tag: "Guard",
-                tagColor: "teal",
-                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20confident%20Black%20British%20man%20in%20his%20thirties%20with%20short%20hair%2C%20wearing%20a%20navy%20blue%20polo%20shirt%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20warm%20natural%20highlights%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-007&orientation=squarish"
-              },
-              {
-                text: "We needed security for a large corporate event in London on short notice. QuickGuard matched us with four verified guards within hours. The payment system is transparent and straightforward — exactly what we needed.",
-                name: "Sarah M.",
-                role: "Events Director · London",
-                tag: "Client",
-                tagColor: "blue",
-                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20British%20businesswoman%20in%20her%20forties%20with%20blonde%20hair%2C%20wearing%20a%20charcoal%20blazer%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20soft%20professional%20lighting%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-008&orientation=squarish"
-              },
-              {
-                text: "The earnings dashboard is brilliant. I can track every shift, see my payouts clearly, and I keep my full agreed pay. I've doubled my monthly income since joining QuickGuard.",
-                name: "Rajan P.",
-                role: "SIA Security Officer · Birmingham",
-                tag: "Guard",
-                tagColor: "teal",
-                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20South%20Asian%20British%20man%20in%20his%20thirties%20with%20neat%20dark%20hair%2C%20wearing%20a%20light%20blue%20button-up%20shirt%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20warm%20natural%20highlights%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-009&orientation=squarish"
-              },
-              {
-                text: "As a retail chain manager, I use QuickGuard regularly for weekend cover across our Leeds stores. The AI matching is genuinely impressive — it always finds guards with retail experience. Highly recommended.",
-                name: "David H.",
-                role: "Retail Operations Manager · Leeds",
-                tag: "Client",
-                tagColor: "blue",
-                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20British%20man%20in%20his%20fifties%20with%20grey%20hair%2C%20wearing%20a%20dark%20green%20sweater%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20soft%20natural%20lighting%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-010&orientation=squarish"
-              },
-              {
-                text: "I was sceptical at first but the SIA licence verification gave me real confidence. The platform is easy to use, the app notifications are instant, and I've never missed a job opportunity since joining.",
-                name: "Claire W.",
-                role: "SIA CCTV Operator · Glasgow",
-                tag: "Guard",
-                tagColor: "teal",
-                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20Scottish%20woman%20in%20her%20thirties%20with%20auburn%20hair%2C%20wearing%20a%20white%20blouse%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20warm%20professional%20lighting%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-011&orientation=squarish"
-              },
-              {
-                text: "The held job payment system with Stripe is a game-changer. Funds are held securely until the shift is complete — it protects both sides. We've hired over 30 guards through QuickGuard and every experience has been professional.",
-                name: "Priya K.",
-                role: "Venue Manager · Bristol",
-                tag: "Client",
-                tagColor: "blue",
-                img: "https://readdy.ai/api/search-image?query=Professional%20headshot%20portrait%20of%20a%20British%20Indian%20woman%20in%20her%20thirties%20with%20long%20dark%20hair%2C%20wearing%20a%20burgundy%20top%2C%20dark%20grey%20studio%20background%20with%20subtle%20rim%20lighting%2C%20soft%20natural%20lighting%2C%20clean%20corporate%20photography%20style&width=96&height=96&seq=hiw-avatar-012&orientation=squarish"
-              }
-            ].map((card, idx) => (
-              <article key={idx} className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-7 flex flex-col gap-4 hover:border-slate-600 transition-all">
-                <div className="flex items-center gap-1">
-                  {[1,2,3,4,5].map(i => <i key={i} className="ri-star-fill text-yellow-400 text-base" />)}
-                </div>
-                <p className="text-slate-300 text-sm leading-relaxed flex-1">
-                  "{card.text}"
-                </p>
-                <div className="flex items-center gap-3 pt-4 border-t border-slate-700/50">
-                  <img
-                    src={card.img}
-                    alt={card.name}
-                    title={`${card.name} — ${card.role}`}
-                    loading="lazy" decoding="async" className="w-11 h-11 rounded-full object-cover object-top"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-white text-sm">{card.name}</p>
-                    <p className="text-xs text-slate-500">{card.role}</p>
-                  </div>
-                  <span className={`${card.tagColor === 'teal' ? 'bg-teal-500/15 text-teal-400 border-teal-400/20' : 'bg-blue-500/15 text-blue-400 border-blue-400/20'} text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap`}>
-                    {card.tag}
-                  </span>
-                </div>
-              </article>
-            ))}
-          </div>
         </div>
       </section>
 

@@ -17,8 +17,8 @@ const CLIENT_STEPS = [
   },
   {
     icon: 'ri-robot-line',
-    title: 'AI Finds Matching Guards',
-    desc: 'Our system instantly surfaces verified, SIA-licensed guards in your area with the right licence type.',
+    title: 'Local Guards Are Notified',
+    desc: 'QuickGuard notifies verified, SIA-licensed guards whose travel radius covers your job location.',
   },
   {
     icon: 'ri-user-search-line',
@@ -33,7 +33,7 @@ const CLIENT_STEPS = [
 ];
 
 const CLIENT_STATS = [
-  { icon: 'ri-timer-flash-line', value: '< 2 hrs', label: 'Average time to hire' },
+  { icon: 'ri-timer-flash-line', value: '5–15%', label: 'Service fee, set by your plan' },
   { icon: 'ri-shield-check-line', value: '100%', label: 'SIA-licensed guards' },
   { icon: 'ri-map-pin-2-line', value: 'UK-wide', label: 'Coverage everywhere' },
   { icon: 'ri-lock-2-line', value: 'Held with Stripe', label: 'Your money is protected' },
@@ -46,27 +46,6 @@ const VENUE_TYPES = [
   { icon: 'ri-calendar-event-line', label: 'Private Events', slug: 'private_event', href: '/security-for-events' },
   { icon: 'ri-building-2-line', label: 'Office Buildings', slug: 'office_building', href: '/post-job' },
   { icon: 'ri-store-3-line', label: 'Warehouses', slug: 'warehouse_property', href: '/post-job' },
-];
-
-const TESTIMONIALS = [
-  {
-    text: 'We needed a door supervisor for a busy Saturday night. Posted the job at 2pm, had a guard confirmed by 3:30pm. No paperwork, no agency calls. Brilliant.',
-    name: 'Sarah M.',
-    role: 'Venue Manager · London',
-    stars: 5,
-  },
-  {
-    text: 'Used QuickGuard for our wedding reception security. The guard turned up early, was professional, and the held job payment with Stripe gave us peace of mind.',
-    name: 'James R.',
-    role: 'Private Client · Manchester',
-    stars: 5,
-  },
-  {
-    text: 'As a retail chain we were tied into a 12-month agency contract. Switching to QuickGuard cut our costs by 30% and we only pay for the shifts we actually need.',
-    name: 'David H.',
-    role: 'Operations Director · Leeds',
-    stars: 5,
-  },
 ];
 
 export default function ClientHowItWorks() {
@@ -455,46 +434,6 @@ export default function ClientHowItWorks() {
                 <p className="text-sm font-semibold text-white mb-1">{item.title}</p>
                 <p className="text-xs text-slate-400 leading-relaxed">{item.desc}</p>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* TESTIMONIALS */}
-      <section className="py-20 bg-[#0e1628] border-b border-slate-800/60">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center mb-14">
-            <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-400/20 text-teal-400 px-4 py-1.5 rounded-full text-sm font-medium mb-4">
-              <i className="ri-star-fill" />
-              Real Reviews
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Trusted by Venues & Events Across the UK
-            </h2>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map((t, i) => (
-              <article
-                key={i}
-                className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-6 flex flex-col gap-4 hover:border-slate-600 transition-all"
-              >
-                <div className="flex items-center gap-0.5">
-                  {[...Array(5)].map((_, s) => (
-                    <i
-                      key={s}
-                      className={`ri-star-fill text-base ${s < t.stars ? 'text-yellow-400' : 'text-slate-700'}`}
-                    />
-                  ))}
-                </div>
-                <p className="text-slate-300 text-sm leading-relaxed flex-1">
-                  &ldquo;{t.text}&rdquo;
-                </p>
-                <div className="pt-4 border-t border-slate-700/50">
-                  <p className="font-semibold text-white text-sm">{t.name}</p>
-                  <p className="text-xs text-slate-500">{t.role}</p>
-                </div>
-              </article>
             ))}
           </div>
         </div>

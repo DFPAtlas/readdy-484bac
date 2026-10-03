@@ -12,7 +12,7 @@ const faqs = [
   { question: 'How do I get started as a Guard?', answer: 'Register as a guard, upload your SIA licence, and complete your profile. Once verified, you can browse available jobs and submit applications directly through the platform.', icon: 'ri-shield-user-line' },
   { question: 'Is SIA licence verification required?', answer: 'Yes. All security guards must hold a valid SIA licence. Every guard must pass an initial SIA licence check before they can take work through QuickGuard. We are also developing an AI agent to re-check licence status weekly and flag suspended, revoked or expired licences for review.', icon: 'ri-verified-badge-line' },
   { question: 'How does payment work?', answer: 'Clients review the agreed guard pay, plan service fee and any eligible promotion, then pay securely via Stripe before the booking is confirmed. Funds are held with Stripe and released to the guard after completion and the applicable release checks. All transactions are encrypted and processed through our secure platform.', icon: 'ri-secure-payment-line' },
-  { question: 'Can I cancel or edit a job after posting?', answer: 'Yes. You can edit job details or cancel a posting from your client dashboard before guards are assigned. Once guards are assigned, please contact support for assistance.', icon: 'ri-edit-2-line' },
+  { question: 'Can I cancel or edit a job after posting?', answer: "Yes. You can cancel a job from My Jobs until the guard's payout has started. Refunds follow our published cancellation policy: more than 24 hours before the shift, a full refund including the service fee; 12\u201324 hours before, a 50% refund of the guard fee (the service fee is retained); under 12 hours, no refund. If a guard cancels, you receive a full refund including the service fee. Refund requests are reviewed by our team. To change job details once a guard is booked, contact support.", icon: 'ri-edit-2-line' },
   { question: 'How long does guard verification take?', answer: 'Verification timing can vary depending on the licence check and whether manual review is required. You will receive an email notification once your profile has been reviewed and approved.', icon: 'ri-time-line' },
   { question: 'What subscription plans are available?', answer: 'We offer flexible plans for clients of all sizes. Visit our Pricing page to compare features and choose the plan that best suits your business needs.', icon: 'ri-price-tag-3-line' },
   { question: 'How do I raise a complaint?', answer: 'You can submit a complaint directly from your job detail page. Our team reviews all complaints promptly and will keep you updated on the resolution progress.', icon: 'ri-feedback-line' },
@@ -51,9 +51,9 @@ const visualGuides = [
 
 const popularArticles = [
   { title: 'How to Post Your First Security Job', excerpt: 'A step-by-step walkthrough for clients posting their first job — from job details to guard selection.', category: 'Getting Started', categoryColor: 'bg-teal-500/10 text-teal-400 border-teal-400/20', icon: 'ri-file-add-line', views: 'Guide', href: '/guide/client', trending: true },
-  { title: 'SIA Licence Verification Explained', excerpt: 'Understand how our automated SIA licence check works and what to do if your verification is delayed.', category: 'Guard Verification', categoryColor: 'bg-purple-500/10 text-purple-400 border-purple-400/20', icon: 'ri-shield-check-line', views: 'Guide', href: '/guide/guard', trending: true },
-  { title: 'Understanding Subscription Plans', excerpt: 'Compare Free, Starter, Pro, and Enterprise options to find the right fit for your business.', category: 'Payments & Billing', categoryColor: 'bg-blue-500/10 text-blue-400 border-blue-400/20', icon: 'ri-price-tag-3-line', views: 'Guide', href: '/pricing', trending: false },
-  { title: 'How Guards Get Paid', excerpt: 'Learn about payout schedules, bank detail setup, and how earnings are calculated per assignment.', category: 'Payments & Billing', categoryColor: 'bg-blue-500/10 text-blue-400 border-blue-400/20', icon: 'ri-money-pound-circle-line', views: 'Guide', href: '/guide/guard', trending: false },
+  { title: 'SIA Licence Verification Explained', excerpt: 'How the SIA licence check works before guards can take work, what to do if your verification is delayed, and the weekly re-checks we are developing.', category: 'Guard Verification', categoryColor: 'bg-purple-500/10 text-purple-400 border-purple-400/20', icon: 'ri-shield-check-line', views: 'Guide', href: '/guide/guard', trending: true },
+  { title: 'Understanding Subscription Plans', excerpt: 'Compare Free, Starter, Pro and Enterprise. Your plan sets your monthly posting allowance and your booking service fee (15%, 10%, 7.5% or 5%).', category: 'Payments & Billing', categoryColor: 'bg-blue-500/10 text-blue-400 border-blue-400/20', icon: 'ri-price-tag-3-line', views: 'Guide', href: '/pricing', trending: false },
+  { title: 'How Guards Get Paid', excerpt: 'How guard pay is released after a shift is confirmed complete, how to set up your Stripe payout account, and why guards keep their full agreed pay.', category: 'Payments & Billing', categoryColor: 'bg-blue-500/10 text-blue-400 border-blue-400/20', icon: 'ri-money-pound-circle-line', views: 'Guide', href: '/guide/guard', trending: false },
   { title: 'Selecting & Hiring the Right Guard', excerpt: 'Tips on reviewing guard profiles, ratings, and experience to make the best hiring decision.', category: 'Job Management', categoryColor: 'bg-orange-500/10 text-orange-400 border-orange-400/20', icon: 'ri-user-search-line', views: 'Guide', href: '/guide/client', trending: true },
   { title: 'How to Raise a Complaint', excerpt: "If something goes wrong on a job, here's how to submit a complaint and what happens next.", category: 'Account & Profile', categoryColor: 'bg-pink-500/10 text-pink-400 border-pink-400/20', icon: 'ri-feedback-line', views: 'Guide', href: '/guide/client', trending: false },
 ];
@@ -138,12 +138,6 @@ export default function HelpContent() {
                   <p className="text-slate-400 text-xs leading-relaxed flex-1 mb-4">{article.excerpt}</p>
                   <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-700/50">
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${article.categoryColor}`}>{article.category}</span>
-                    <div className="flex items-center gap-1 text-slate-500 text-xs">
-                      <div className="w-4 h-4 flex items-center justify-center">
-                        <i className="ri-eye-line text-xs" />
-                      </div>
-                      <span>{article.views}</span>
-                    </div>
                   </div>
                 </div>
               </Link>

@@ -154,9 +154,9 @@ export default function HomepageClient() {
               >
                 <i className="ri-cpu-line text-2xl text-teal-400"></i>
               </div>
-              <h3 className="text-xl font-semibold mb-4 text-white">AI Matches &amp; Connects</h3>
+              <h3 className="text-xl font-semibold mb-4 text-white">We Match &amp; Connect</h3>
               <p className="text-slate-400 leading-relaxed">
-                Smart matching connects the most qualified guards based on skills, proximity, and real-time availability.
+                When you post a job, QuickGuard notifies verified guards whose travel radius covers your location.
               </p>
             </li>
           </ol>
@@ -199,7 +199,7 @@ export default function HomepageClient() {
                 <i className="ri-shield-check-line text-2xl text-teal-400"></i>
               </div>
               <h3 className="text-lg font-semibold mb-2 text-white">Verified Guards</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">All security professionals are SIA-licensed, background checked and certified. Automated SIA licence rechecks are scheduled weekly. Failed checks block new work; uncertain results and delays are flagged for review</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Every guard must pass an SIA licence check before they can take work through QuickGuard. We are developing automated weekly re-checks that will flag suspended, revoked or expired licences for review.</p>
             </li>
 
             <li

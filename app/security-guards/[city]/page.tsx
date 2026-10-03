@@ -49,7 +49,7 @@ const cityData: Record<string, CityData> = {
       'Barnet', 'Hillingdon',
     ],
     faqs: [
-      { question: 'How quickly can I hire a security guard in London?', answer: 'Most London bookings are matched within 15 minutes. For urgent same-day requirements, our AI matching system prioritises guards already active in your borough. Over 850 verified guards are available across all 32 London boroughs.' },
+      { question: 'How quickly can I hire a security guard in London?', answer: 'Post your job and QuickGuard immediately notifies verified guards whose travel radius covers your London location. For urgent same-day cover, mark the job as urgent so available guards see it straight away.' },
       { question: 'Are your London security guards fully SIA licensed?', answer: 'Yes. Every security guard on QuickGuard holds a valid SIA licence, and we verify credentials before they can accept jobs. Clients can view licence details on each guard\'s profile before confirming a booking.' },
       { question: 'Which London areas do you cover?', answer: 'We cover all 32 Greater London boroughs including Westminster, City of London, Camden, Kensington & Chelsea, Hackney, Tower Hamlets, Southwark, Lambeth, and extending to outer boroughs like Croydon, Bromley, Barnet, and Hillingdon.' },
       { question: 'What types of security services are available in London?', answer: 'We provide corporate office security, retail loss prevention, event stewards and crowd management, door supervisors for hospitality venues, construction site guarding, residential concierge, CCTV monitoring, and mobile patrols across London.' },

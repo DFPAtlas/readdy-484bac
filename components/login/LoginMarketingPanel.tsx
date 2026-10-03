@@ -8,7 +8,7 @@ const features = [
   "Secure Client Messaging",
   "Live Shift Tracking",
   "Verified Security Network",
-  "AI Powered Matching",
+  "Local Guard Matching",
   "Secure Cloud Platform",
 ];
 

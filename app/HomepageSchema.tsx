@@ -53,7 +53,7 @@ export default function HomepageSchema() {
         name: 'What is QuickGuard.uk?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'QuickGuard.uk is a UK-based platform that connects SIA-licensed security guards with clients who need professional security services. Our AI-powered matching system ensures the right guard is paired with the right job, anywhere across England, Scotland, Wales, and Northern Ireland.',
+          text: 'QuickGuard.uk is a UK-based platform that connects SIA-licensed security guards with clients who need professional security services. When a job is posted, QuickGuard notifies verified guards whose travel radius covers the job location.',
         },
       },
       {
@@ -93,7 +93,7 @@ export default function HomepageSchema() {
         name: 'How quickly can I find a security guard?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Our AI matching system instantly surfaces the most suitable verified guards for your job. Many clients receive applications within minutes of posting. You can review profiles, check SIA credentials, and confirm a guard — all within the same day.',
+          text: 'As soon as you post, QuickGuard notifies verified guards whose travel radius covers your location. You can review applications, check SIA credentials and confirm a guard as soon as applications arrive.',
         },
       },
       {

@@ -547,7 +547,7 @@ export default function PricingClient() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                { icon: 'ri-shield-check-line', title: 'Weekly automated SIA licence checks', desc: 'Every guard must pass an initial SIA licence check before taking work through QuickGuard. Automated rechecks are scheduled within seven days of a successful check. Failed licence checks block new work; uncertain results and worker delays are flagged for admin review.' },
+                { icon: 'ri-shield-check-line', title: 'SIA licence checked before work', desc: 'Every guard must pass an SIA licence check before they can take work through QuickGuard. We are developing automated weekly re-checks that will flag suspended, revoked or expired licences for review.' },
                 { icon: 'ri-safe-2-line', title: 'Held Job Payment Protection', desc: 'Your payment is held securely with Stripe and only released to the guard after the shift is marked complete.' },
                 { icon: 'ri-customer-service-2-line', title: '24/7 AI Dispute Support', desc: 'Our AI assistant is available 24/7 to help with dispute questions and common issues. Cases needing human review can be escalated to our team.' },
                 { icon: 'ri-bank-card-line', title: 'Payment Processing', desc: 'Stripe handles all card processing securely. The fee covers PCI-compliant infrastructure and fraud prevention.' },

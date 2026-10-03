@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'How It Works | QuickGuard',
-    description: 'Hire SIA-licensed security guards in 5 easy steps. AI-powered matching and secure UK payments.',
+    description: 'Hire SIA-licensed security guards in 5 easy steps. Local guard matching and secure UK payments.',
     url: 'https://quickguard.uk/how-it-works',
     siteName: 'QuickGuard',
     type: 'website',
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'How It Works | QuickGuard',
-    description: 'Hire SIA-licensed security guards in 5 easy steps. AI-powered matching and secure UK payments.',
+    description: 'Hire SIA-licensed security guards in 5 easy steps. Local guard matching and secure UK payments.',
     images: ['https://readdy.ai/api/search-image?query=AI-powered%20security%20guard%20matching%20process%20infographic%20concept%2C%20digital%20connection%20nodes%20linking%20a%20professional%20SIA%20licensed%20security%20guard%20silhouette%20to%20a%20UK%20business%20client%2C%20glowing%20blue%20tech%20lines%20on%20a%20deep%20navy%20gradient%20background%2C%20step%20by%20step%20icons%2C%20modern%20fintech%20aesthetic%2C%20clean%20minimalist%20style%2C%20no%20text%20in%20image&width=1200&height=630&seq=og-hiw-001&orientation=landscape'],
   },
 };
