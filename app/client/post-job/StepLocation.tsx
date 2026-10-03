@@ -1,4 +1,5 @@
 'use client';
+import SecureMapsPreview from '@/components/SecureMapsPreview';
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -265,12 +266,14 @@ export default function StepLocation({ formData, errors, onChange, onNext, onBac
           <input
             type="text"
             name="venue"
+              aria-invalid={!!errors.venue}
+              aria-describedby={errors.venue ? "error-venue" : undefined}
             value={formData.venue}
             onChange={onChange}
             placeholder="e.g., The Grand Hotel, O2 Arena, Westfield Shopping Centre"
             className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500"
           />
-          {errors.venue && <p className="text-red-400 text-sm mt-1">{errors.venue}</p>}
+          {errors.venue && <p id="error-venue" className="text-red-400 text-sm mt-1">{errors.venue}</p>}
         </div>
 
         <div>
@@ -278,12 +281,14 @@ export default function StepLocation({ formData, errors, onChange, onNext, onBac
           <input
             type="text"
             name="addressLine1"
+              aria-invalid={!!errors.addressLine1}
+              aria-describedby={errors.addressLine1 ? "error-addressLine1" : undefined}
             value={formData.addressLine1}
             onChange={onChange}
             placeholder="Street address"
             className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500"
           />
-          {errors.addressLine1 && <p className="text-red-400 text-sm mt-1">{errors.addressLine1}</p>}
+          {errors.addressLine1 && <p id="error-addressLine1" className="text-red-400 text-sm mt-1">{errors.addressLine1}</p>}
         </div>
 
         <div>
@@ -291,6 +296,8 @@ export default function StepLocation({ formData, errors, onChange, onNext, onBac
           <input
             type="text"
             name="addressLine2"
+              aria-invalid={!!errors.addressLine2}
+              aria-describedby={errors.addressLine2 ? "error-addressLine2" : undefined}
             value={formData.addressLine2}
             onChange={onChange}
             placeholder="Apartment, suite, building name, floor number..."
@@ -304,39 +311,34 @@ export default function StepLocation({ formData, errors, onChange, onNext, onBac
             <input
               type="text"
               name="city"
+              aria-invalid={!!errors.city}
+              aria-describedby={errors.city ? "error-city" : undefined}
               value={formData.city}
               onChange={onChange}
               placeholder="e.g., London"
               className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500"
             />
-            {errors.city && <p className="text-red-400 text-sm mt-1">{errors.city}</p>}
+            {errors.city && <p id="error-city" className="text-red-400 text-sm mt-1">{errors.city}</p>}
           </div>
           <div>
             <label className="block text-sm font-semibold text-slate-300 mb-2">Postcode *</label>
             <input
               type="text"
               name="postcode"
+              aria-invalid={!!errors.postcode}
+              aria-describedby={errors.postcode ? "error-postcode" : undefined}
               value={formData.postcode}
               onChange={onChange}
               placeholder="e.g., SW1A 1AA"
               className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500"
             />
-            {errors.postcode && <p className="text-red-400 text-sm mt-1">{errors.postcode}</p>}
+            {errors.postcode && <p id="error-postcode" className="text-red-400 text-sm mt-1">{errors.postcode}</p>}
           </div>
         </div>
 
         {formData.postcode && (
           <div className="rounded-2xl overflow-hidden border border-[#1e2d4d]">
-            <iframe
-              src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}&q=${encodeURIComponent([formData.addressLine1, formData.city, formData.postcode].filter(Boolean).join(', '))}`}
-              width="100%"
-              height="200"
-              style={{ border: 0 }}
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              title="Location preview"
-            ></iframe>
+            <SecureMapsPreview query={[formData.addressLine1, formData.city, formData.postcode, 'UK'].filter(Boolean).join(', ')} />
           </div>
         )}
 
@@ -348,6 +350,8 @@ export default function StepLocation({ formData, errors, onChange, onNext, onBac
               <input
                 type="text"
                 name="siteContactName"
+              aria-invalid={!!errors.siteContactName}
+              aria-describedby={errors.siteContactName ? "error-siteContactName" : undefined}
                 value={formData.siteContactName}
                 onChange={onChange}
                 placeholder="e.g., John Smith (Duty Manager)"
@@ -359,6 +363,8 @@ export default function StepLocation({ formData, errors, onChange, onNext, onBac
               <input
                 type="tel"
                 name="siteContactPhone"
+              aria-invalid={!!errors.siteContactPhone}
+              aria-describedby={errors.siteContactPhone ? "error-siteContactPhone" : undefined}
                 value={formData.siteContactPhone}
                 onChange={onChange}
                 placeholder="07XXX XXXXXX"
@@ -374,6 +380,8 @@ export default function StepLocation({ formData, errors, onChange, onNext, onBac
           </label>
           <textarea
             name="siteInstructions"
+              aria-invalid={!!errors.siteInstructions}
+              aria-describedby={errors.siteInstructions ? "error-siteInstructions" : undefined}
             value={formData.siteInstructions}
             onChange={onChange}
             maxLength={500}

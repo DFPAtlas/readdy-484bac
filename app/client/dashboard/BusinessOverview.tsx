@@ -35,7 +35,7 @@ export default function BusinessOverview({
       suffix: '',
     },
     {
-      label: 'Total Spend This Month',
+      label: 'Gross Job Payments This Month',
       value: `£${totalSpendThisMonth.toFixed(2)}`,
       icon: 'ri-wallet-3-line',
       iconBg: 'bg-violet-500/15',

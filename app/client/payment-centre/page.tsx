@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { paymentLabel, planLabel } from '@/lib/client-journey';
+import { isCollected } from '@/lib/financeAmounts';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
@@ -15,6 +17,8 @@ export default function ClientPaymentCentrePage() {
   const { loading: authLoading, allowed } = useClientGuard();
   const {
     loading,
+    error,
+    refetch,
     spendingSummary,
     billingInfo,
     jobPayments,
@@ -24,6 +28,8 @@ export default function ClientPaymentCentrePage() {
   } = useClientPaymentCentre();
 
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const [jobFilter, setJobFilter] = useState('');
+  useEffect(() => { const params = new URLSearchParams(window.location.search); const tab = params.get('tab'); if (tab === 'history' || tab === 'receipts') setActiveTab(tab); setJobFilter(params.get('job') || ''); }, []);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [companyName, setCompanyName] = useState('Client');
@@ -44,7 +50,7 @@ export default function ClientPaymentCentrePage() {
         .maybeSingle();
       if (client) {
         setCompanyName(client.company_name || 'Client');
-        setSubscriptionTier(client.subscription_tier || 'Free');
+        setSubscriptionTier(planLabel(client.subscription_tier));
         const parts = (client.company_name || 'Client').trim().split(' ');
         if (parts.length >= 2) setInitials(`${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase());
         else setInitials((client.company_name || 'Client').slice(0, 2).toUpperCase());
@@ -54,7 +60,7 @@ export default function ClientPaymentCentrePage() {
   }, []);
 
   const filteredPayments = useMemo(() => {
-    let filtered = jobPayments;
+    let filtered = jobFilter ? jobPayments.filter(p => p.jobId === jobFilter) : jobPayments;
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       filtered = filtered.filter(p =>
@@ -63,10 +69,10 @@ export default function ClientPaymentCentrePage() {
       );
     }
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(p => p.paymentStatus === statusFilter);
+      filtered = filtered.filter(p => paymentLabel(p.paymentStatus) === paymentLabel(statusFilter));
     }
     return filtered;
-  }, [jobPayments, searchTerm, statusFilter]);
+  }, [jobPayments, searchTerm, statusFilter, jobFilter]);
 
   const handleOpenBillingPortal = useCallback(async () => {
     try {
@@ -94,12 +100,13 @@ export default function ClientPaymentCentrePage() {
     const steps = [
       { label: 'Job Posted', done: true, icon: 'ri-file-list-3-line' },
       { label: 'Guard Selected', done: payment.paymentStatus !== 'pending_payment', icon: 'ri-user-star-line' },
-      { label: 'Client Paid', done: payment.paymentStatus === 'completed' || payment.paymentStatus === 'succeeded', icon: 'ri-money-pound-circle-line' },
+      { label: 'Client Paid', done: isCollected(payment.paymentStatus), icon: 'ri-money-pound-circle-line' },
       { label: 'Funds Held', done: payment.releaseStatus === 'funded' || payment.releaseStatus === 'completed' || payment.releaseStatus === 'released', icon: 'ri-safe-line' },
       { label: 'Guard Completed', done: payment.releaseStatus === 'completed' || payment.releaseStatus === 'released', icon: 'ri-check-double-line' },
       { label: 'Funds Released', done: payment.releaseStatus === 'released', icon: 'ri-send-plane-line' },
       { label: 'Transfer Paid', done: payment.releaseStatus === 'released', icon: 'ri-bank-card-line' },
     ];
+    if (payment.refundStatus !== '—') steps.push({label:payment.refundStatus, done:payment.paymentStatus === 'refunded' || payment.paymentStatus === 'partially_refunded',icon:'ri-refund-line'});
     return steps;
   };
 
@@ -140,7 +147,9 @@ export default function ClientPaymentCentrePage() {
           </div>
         </header>
 
-        <main className="flex-1 px-8 py-8">
+        <main className="flex-1 px-4 sm:px-8 py-8">
+          {error && <div role="alert" className="mb-4 rounded-xl p-4 bg-red-500/10 text-red-300">{error}<button onClick={refetch} className="ml-3 underline">Retry</button></div>}
+          {jobFilter && <div className="mb-4 text-sm text-slate-300">Showing this job’s payments. <button className="text-teal-400 underline" onClick={() => setJobFilter('')}>Show all payments</button></div>}
           {toast && (
             <div className={`mb-6 border rounded-xl p-4 flex items-center gap-3 ${
               toast.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'
@@ -155,7 +164,7 @@ export default function ClientPaymentCentrePage() {
             </div>
           )}
 
-          <div className="flex gap-2 mb-6 bg-[#111d35] rounded-xl p-1.5 border border-[#1e2d4d] w-fit">
+          <div className="flex gap-2 mb-6 bg-[#111d35] rounded-xl p-1.5 border border-[#1e2d4d] max-w-full overflow-x-auto">
             {tabs.map(tab => (
               <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-colors cursor-pointer whitespace-nowrap ${
@@ -170,11 +179,11 @@ export default function ClientPaymentCentrePage() {
           {activeTab === 'overview' && (
             <div className="space-y-6">
               {/* Spending Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-5 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full -translate-y-8 translate-x-8" />
                   <div className="relative">
-                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">This Month</p>
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Gross Payments This Month</p>
                     <p className="text-2xl font-bold text-white">£{spendingSummary.thisMonthSpend.toFixed(2)}</p>
                     <p className="text-xs text-slate-500 mt-1">Job payments</p>
                   </div>
@@ -182,7 +191,7 @@ export default function ClientPaymentCentrePage() {
                 <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-5 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/10 rounded-full -translate-y-8 translate-x-8" />
                   <div className="relative">
-                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Total Spend</p>
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Gross Payments</p>
                     <p className="text-2xl font-bold text-white">£{spendingSummary.totalSpend.toFixed(2)}</p>
                     <p className="text-xs text-slate-500 mt-1">All-time</p>
                   </div>
@@ -192,7 +201,7 @@ export default function ClientPaymentCentrePage() {
                   <div className="relative">
                     <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Jobs Paid</p>
                     <p className="text-2xl font-bold text-white">{spendingSummary.jobsPaid}</p>
-                    <p className="text-xs text-slate-500 mt-1">Completed payments</p>
+                    <p className="text-xs text-slate-500 mt-1">Includes refunded payments</p>
                   </div>
                 </div>
                 <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-5 relative overflow-hidden">
@@ -213,6 +222,7 @@ export default function ClientPaymentCentrePage() {
                 </div>
               </div>
 
+              <div className="rounded-xl border border-[#1e2d4d] bg-[#111d35] p-5"><p className="text-sm text-slate-400">Net Job Spend (all-time)</p><p className="text-2xl font-bold text-white">£{spendingSummary.netSpend.toFixed(2)}</p><p className="text-xs text-slate-500">Gross collected payments minus completed refunds. Pending and failed attempts are excluded.</p></div>
               {/* Billing / Payment Method Card */}
               <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -292,14 +302,12 @@ export default function ClientPaymentCentrePage() {
                       <tbody className="divide-y divide-[#1e2d4d]">
                         {jobPayments.slice(0, 5).map(p => (
                           <tr key={p.id} className="hover:bg-[#162036]/50 cursor-pointer" onClick={() => { setSelectedPayment(p); setShowTimeline(true); }}>
-                            <td className="px-5 py-3 text-sm text-white">{p.jobTitle}</td>
+                            <td className="px-5 py-3 text-sm text-white"><Link href={`/client/jobs/detail?id=${encodeURIComponent(p.jobId)}`} className="underline">{p.jobTitle}</Link></td>
                             <td className="px-5 py-3 text-sm text-slate-400">{p.guardName}</td>
                             <td className="px-5 py-3 text-sm text-white text-right font-semibold">£{p.amountPaid.toFixed(2)}</td>
                             <td className="px-5 py-3">
                               <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(p.paymentStatus)}`}>
-                                {p.paymentStatus === 'completed' || p.paymentStatus === 'succeeded' ? 'Paid' :
-                                 p.paymentStatus === 'pending_payment' ? 'Pending' :
-                                 p.paymentStatus.charAt(0).toUpperCase() + p.paymentStatus.slice(1)}
+                                {paymentLabel(p.paymentStatus)}
                               </span>
                             </td>
                           </tr>
@@ -315,13 +323,13 @@ export default function ClientPaymentCentrePage() {
           {activeTab === 'history' && (
             <div className="space-y-4">
               <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4 flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-                <div className="flex gap-1 bg-[#0B1933] rounded-lg p-1">
-                  {['all', 'completed', 'pending', 'failed', 'refunded'].map(s => (
+                <div className="flex flex-wrap gap-1 bg-[#0B1933] rounded-lg p-1">
+                  {['all', 'completed', 'pending', 'failed', 'partially_refunded', 'refunded'].map(s => (
                     <button key={s} onClick={() => setStatusFilter(s)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
                         statusFilter === s ? 'bg-teal-500 text-white' : 'text-slate-400 hover:text-white'
                       }`}>
-                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                      {s === 'all' ? 'All' : paymentLabel(s)}
                     </button>
                   ))}
                 </div>
@@ -365,17 +373,17 @@ export default function ClientPaymentCentrePage() {
                             <td className="px-5 py-3 text-sm text-slate-400 whitespace-nowrap">
                               {new Date(p.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </td>
-                            <td className="px-5 py-3 text-sm text-white font-medium">{p.jobTitle}</td>
+                            <td className="px-5 py-3 text-sm text-white font-medium"><Link href={`/client/jobs/detail?id=${encodeURIComponent(p.jobId)}`} className="underline">{p.jobTitle}</Link></td>
                             <td className="px-5 py-3 text-sm text-slate-400">{p.guardName}</td>
                             <td className="px-5 py-3 text-sm text-white text-right font-semibold">£{p.amountPaid.toFixed(2)}</td>
                             <td className="px-5 py-3">
                               <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(p.paymentStatus)}`}>
-                                {p.paymentStatus === 'completed' || p.paymentStatus === 'succeeded' ? 'Paid' : p.paymentStatus}
+                                {paymentLabel(p.paymentStatus)}
                               </span>
                             </td>
                             <td className="px-5 py-3">
                               <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(p.releaseStatus)}`}>
-                                {p.releaseStatus === 'released' ? 'Released' : p.releaseStatus === 'funded' ? 'Held' : p.releaseStatus === 'completed' ? 'Awaiting Release' : p.releaseStatus}
+                                {p.releaseStatus === 'released' ? 'Released' : p.releaseStatus === 'funded' ? 'Held' : p.releaseStatus === 'completed' ? 'Awaiting Release' : paymentLabel(p.releaseStatus)}
                               </span>
                             </td>
                             <td className="px-5 py-3">
@@ -409,7 +417,7 @@ export default function ClientPaymentCentrePage() {
                   <h3 className="font-semibold text-white">Receipts & Invoices</h3>
                   <p className="text-sm text-slate-400 mt-1">Download receipts and invoices for your job payments</p>
                 </div>
-                {jobPayments.filter(p => p.receiptUrl || p.invoiceUrl).length === 0 && jobPayments.filter(p => p.paymentStatus === 'completed' || p.paymentStatus === 'succeeded').length === 0 ? (
+                {jobPayments.filter(p => p.receiptUrl || p.invoiceUrl).length === 0 && jobPayments.filter(p => isCollected(p.paymentStatus)).length === 0 ? (
                   <div className="p-12 text-center">
                     <div className="w-12 h-12 bg-[#162036] rounded-full flex items-center justify-center mx-auto mb-3">
                       <i className="ri-file-text-line text-2xl text-slate-500"></i>
@@ -430,15 +438,15 @@ export default function ClientPaymentCentrePage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#1e2d4d]">
-                        {jobPayments.filter(p => p.paymentStatus === 'completed' || p.paymentStatus === 'succeeded' || p.receiptUrl || p.invoiceUrl).map(p => (
+                        {jobPayments.filter(p => isCollected(p.paymentStatus) || p.receiptUrl || p.invoiceUrl).map(p => (
                           <tr key={p.id} className="hover:bg-[#162036]/50">
                             <td className="px-5 py-3 text-sm text-slate-400 whitespace-nowrap">
                               {new Date(p.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </td>
-                            <td className="px-5 py-3 text-sm text-white">{p.jobTitle}</td>
+                            <td className="px-5 py-3 text-sm text-white"><Link href={`/client/jobs/detail?id=${encodeURIComponent(p.jobId)}`} className="underline">{p.jobTitle}</Link></td>
                             <td className="px-5 py-3 text-sm text-white text-right">£{p.amountPaid.toFixed(2)}</td>
                             <td className="px-5 py-3">
-                              <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(p.paymentStatus)}`}>Paid</span>
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(p.paymentStatus)}`}>{paymentLabel(p.paymentStatus)}</span>
                             </td>
                             <td className="px-5 py-3">
                               <div className="flex items-center gap-2">

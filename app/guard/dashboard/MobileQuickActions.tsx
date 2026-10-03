@@ -7,11 +7,11 @@ interface Props {
 }
 
 const ACTIONS = [
-  { label: 'Find Jobs', icon: 'ri-briefcase-line', href: '/jobs', isHash: false },
+  { label: 'Find Jobs', icon: 'ri-briefcase-line', href: '/guard/jobs', isHash: false },
   { label: 'My Applications', icon: 'ri-send-plane-line', href: '#applications', isHash: true },
   { label: 'Upcoming Shifts', icon: 'ri-calendar-line', href: '#upcoming', isHash: true },
   { label: 'Messages', icon: 'ri-message-3-line', href: '#responses', isHash: true },
-  { label: 'Profile', icon: 'ri-user-line', href: '/guard/profile', isHash: false },
+  { label: 'Payments', icon: 'ri-wallet-3-line', href: '/guard/payment-centre', isHash: false },
 ];
 
 export default function MobileQuickActions({ onNavigate }: Props) {

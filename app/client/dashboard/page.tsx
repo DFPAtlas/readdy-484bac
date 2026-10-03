@@ -15,6 +15,7 @@ import type {
   BusinessData,
   SafetyCounts,
   ActionData,
+  DashboardData,
   RecommendedGuard,
 } from "@/lib/client-types";
 import PortalSidebar from "@/components/PortalSidebar";
@@ -26,6 +27,8 @@ import ActionRequired from "./ActionRequired";
 import JobPipeline from "./JobPipeline";
 import BusinessOverview from "./BusinessOverview";
 import RecentJobs from "./RecentJobs";
+import NextActions from "./NextActions";
+import { planLabel } from "@/lib/client-journey";
 import QuickActions from "./QuickActions";
 import StatsCard from "./StatsCard";
 import ClientPromoCard from "./ClientPromoCard";
@@ -226,12 +229,12 @@ export default function ClientDashboardPage() {
       const warnings: string[] = [];
 
       const [promoRes, subRes] = await Promise.all([
-        supabase.rpc("get_client_promo_stats").then(r => ({ data: r.data, error: r.error })).catch(e => { warnings.push('Promo data failed to load'); return { data: null, error: null }; }),
+        Promise.resolve(supabase.rpc("get_client_promo_stats")).then(r => ({ data: r.data, error: r.error })).catch(e => { warnings.push('Promo data failed to load'); return { data: null, error: null }; }),
         Promise.resolve(supabase.from("subscriptions").select("*").eq("user_id", user.id).maybeSingle()).catch(e => { warnings.push('Subscription data failed to load'); return { data: null, error: null }; }),
       ]);
 
       const [statsResult, topGuardsResult] = await Promise.all([
-        getClientDashboardStats(cid, user.id).catch(e => { warnings.push('Dashboard stats failed to load'); return { stats: null, actionData: {}, error: null }; }),
+        getClientDashboardStats(cid, user.id).catch(e => { warnings.push('Dashboard stats failed to load'); return { stats: null, actionData: {} as Partial<DashboardData>, error: null }; }),
         getRecommendedGuards(5).catch(e => { warnings.push('Recommended guards failed to load'); return { guards: [], error: null }; }),
       ]);
 
@@ -569,7 +572,7 @@ export default function ClientDashboardPage() {
       <PortalSidebar
         role="client"
         displayName={client.company_name || client.contact_name || "Client"}
-        subtitle={client.plan_name || client.subscription_plan || client.subscription_tier || "Free"}
+        subtitle={planLabel(userEntitlement?.plan_name || client.subscription_tier)}
         initials={initials}
         userId={userId}
         featureFlags={featureFlags}
@@ -594,7 +597,7 @@ export default function ClientDashboardPage() {
               <Link
                 href="/client/post-job"
                 onClick={(e) => {
-                  if (entitlementsLoaded && !featureFlags['client.post_job']) {
+                  if (entitlementsLoaded && !featureFlags?.['client.post_job']) {
                     e.preventDefault();
                     setBlockedFeatureName('job posting');
                     setShowUpgradeModal(true);
@@ -657,7 +660,7 @@ export default function ClientDashboardPage() {
             jobsRemaining={client?.client_promo_jobs_remaining}
             lifetimeDiscount={client?.client_lifetime_fee_discount}
             foundingBadge={client?.founding_client_badge}
-            globalCounts={globalPromoCounts}
+            globalCounts={globalPromoCounts || undefined}
           />
 
           <MobileQuickActions />
@@ -695,6 +698,8 @@ export default function ClientDashboardPage() {
               </Link>
             </div>
           )}
+
+          <NextActions jobs={recentJobs} />
 
           {/* Onboarding Section */}
           {!onboardingComplete && showOnboarding && !onboardingDismissed && (
@@ -819,7 +824,7 @@ export default function ClientDashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
             <div className="lg:col-span-2 space-y-4 sm:space-y-6">
               <DynamicRecentActivity clientId={clientId || ''} />
-              <RecentJobs jobs={recentJobs} />
+              <RecentJobs jobs={recentJobs.slice(0, 5)} />
               <DynamicYourTemplates clientId={clientId || ''} />
               <QuickActions />
             </div>
@@ -920,7 +925,7 @@ export default function ClientDashboardPage() {
                 complianceWarnings={safetyCounts.complianceWarnings}
                 missingEmergencyContacts={safetyCounts.missingEmergencyContacts}
               />
-              {featureFlags['client.advanced_matching'] !== false && <DynamicTopRecommendedGuards guards={recommendedGuards} />}
+              {featureFlags?.['client.advanced_matching'] !== false && <DynamicTopRecommendedGuards guards={recommendedGuards} />}
               <ClientPromoCard />
               {!usageLoading && clientLimit && (
                 <UsageLimitWidget

@@ -52,7 +52,7 @@ const actions = [
     hover: 'hover:bg-slate-200 dark:hover:bg-[#1a2642]',
   },
   {
-    href: '/client/payment-history',
+    href: '/client/payment-centre?tab=receipts',
     icon: 'ri-receipt-line',
     label: 'View Invoices',
     desc: 'Check payment history & receipts',

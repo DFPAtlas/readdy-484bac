@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 const actions = [
   { label: 'Post Job', icon: 'ri-add-circle-line', color: 'bg-teal-500 text-white', href: '/client/post-job' },
   { label: 'My Jobs', icon: 'ri-briefcase-4-line', color: 'bg-blue-500 text-white', href: '/client/jobs' },
-  { label: 'Templates', icon: 'ri-file-copy-line', color: 'bg-indigo-500 text-white', href: '/client/templates' },
+  { label: 'Payments', icon: 'ri-wallet-3-line', color: 'bg-indigo-500 text-white', href: '/client/payment-centre' },
   { label: 'Sites', icon: 'ri-building-line', color: 'bg-cyan-600 text-white', href: '/client/sites' },
   { label: 'Setup', icon: 'ri-rocket-line', color: 'bg-indigo-500 text-white', href: '/client/profile' },
   { label: 'Safety', icon: 'ri-shield-check-line', color: 'bg-teal-600 text-white', href: '/client/trust-safety' },

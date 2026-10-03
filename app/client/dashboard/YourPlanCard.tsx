@@ -103,9 +103,9 @@ export default function YourPlanCard({ client }: { client: ClientPlanData }) {
           <p className="text-lg font-bold text-slate-900 dark:text-white">{client.total_jobs_posted || 0}</p>
         </div>
         <div className="bg-slate-50 dark:bg-[#162036] rounded-xl p-3 border border-slate-200 dark:border-[#1e2d4d]">
-          <p className="text-xs text-slate-500 dark:text-slate-500 mb-0.5">Total spend</p>
+          <p className="text-xs text-slate-500 dark:text-slate-500 mb-0.5">Payments & Refunds</p>
           <p className="text-lg font-bold text-slate-900 dark:text-white">
-            {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(client.total_spent || 0)}
+            <Link href="/client/payment-centre" className="text-sm text-teal-500 underline">View payment totals</Link>
           </p>
         </div>
       </div>

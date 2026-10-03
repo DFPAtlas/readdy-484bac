@@ -16,6 +16,7 @@ import NeedsAttentionBadge, { getAttentionItems } from './NeedsAttentionBadge';
 import SearchFilterBar from '../components/SearchFilterBar';
 import BulkActionBar from '../components/BulkActionBar';
 import { useRouter } from 'next/navigation';
+import { planLabel, paymentLabel, bookingLabels } from '@/lib/client-journey';
 
 interface Draft {
   id: string;
@@ -34,6 +35,7 @@ const TABS = [
   { key: 'posted', label: 'Posted', icon: 'ri-send-plane-line' },
   { key: 'applications_open', label: 'Applications Open', icon: 'ri-user-received-line' },
   { key: 'awaiting_payment', label: 'Awaiting Payment', icon: 'ri-secure-payment-line' },
+  { key: 'confirmed', label: 'Confirmed Bookings', icon: 'ri-checkbox-circle-line' },
   { key: 'active', label: 'Active', icon: 'ri-pulse-line' },
   { key: 'completed', label: 'Completed', icon: 'ri-checkbox-circle-line' },
   { key: 'cancelled', label: 'Cancelled', icon: 'ri-close-circle-line' },
@@ -46,21 +48,14 @@ const STATUS_FILTERS: Record<string, string[]> = {
   scheduled: [],
   posted: ['open', 'pending'],
   applications_open: ['awaiting_guard_selection'],
-  awaiting_payment: ['awaiting_payment'],
-  active: ['in_progress'],
+  awaiting_payment: ['awaiting_payment', 'payment_pending'],
+  confirmed: ['confirmed'],
+  active: ['in_progress', 'active'],
   completed: ['completed'],
   cancelled: ['cancelled'],
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  open: 'Posted',
-  pending: 'Pending',
-  awaiting_guard_selection: 'Applications Open',
-  awaiting_payment: 'Awaiting Payment',
-  in_progress: 'Active',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-};
+const STATUS_LABELS = bookingLabels;
 
 const PAYMENT_LABELS: Record<string, string> = {
   pending: 'Pending',
@@ -90,6 +85,7 @@ const JOB_FILTER_CONFIGS = [
       { value: 'pending', label: 'Pending' },
       { value: 'awaiting_guard_selection', label: 'Applications Open' },
       { value: 'awaiting_payment', label: 'Awaiting Payment' },
+      { value: 'confirmed', label: 'Confirmed' },
       { value: 'in_progress', label: 'Active' },
       { value: 'completed', label: 'Completed' },
       { value: 'cancelled', label: 'Cancelled' },
@@ -104,6 +100,7 @@ const JOB_FILTER_CONFIGS = [
       { value: 'pending', label: 'Pending' },
       { value: 'completed', label: 'Paid' },
       { value: 'failed', label: 'Failed' },
+      { value: 'partially_refunded', label: 'Partially refunded' },
       { value: 'refunded', label: 'Refunded' },
       { value: 'none', label: 'No Payment' },
     ],
@@ -150,7 +147,7 @@ function buildCsvRows(jobs: ClientJob[], paymentMap: Record<string, string>): st
     const row = [
       job.id, job.job_title,
       STATUS_LABELS[job.status] || job.status,
-      PAYMENT_LABELS[paymentMap[job.id]] || paymentMap[job.id] || 'No Payment',
+      paymentLabel(paymentMap[job.id]),
       job.venue_name, job.venue_city, job.venue_postcode,
       job.start_date, job.end_date || job.start_date,
       job.start_time, job.end_time,
@@ -168,11 +165,12 @@ export default function JobManagement() {
   const { loading: authLoading, allowed, userId, clientData } = useClientGuard();
   const clientId = clientData?.id || null;
   const companyName = clientData?.company_name || 'Client';
-  const subscriptionTier = clientData?.subscription_tier || 'Basic';
+  const subscriptionTier = planLabel(clientData?.subscription_tier);
   const initials = getInitials(clientData?.company_name || 'Client');
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [summaryJobs, setSummaryJobs] = useState<ClientJob[]>([]);
   const [jobs, setJobs] = useState<ClientJob[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [paymentMap, setPaymentMap] = useState<Record<string, string>>({});
@@ -205,6 +203,38 @@ export default function JobManagement() {
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [bulkAction, setBulkAction] = useState<string>('');
 
+  const pendingScrollRestore = useRef<number | null>(null);
+  const [navigationReady, setNavigationReady] = useState(false);
+  useEffect(() => {
+    if (!clientId) return;
+    const key = `qg:jobs:${clientId}`;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(key) || '{}');
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab') || saved.activeTab || 'all';
+      setActiveTab(TABS.some(t => t.key === tab) ? tab : 'all');
+      if (!params.has('tab')) {
+        setSearchQuery(saved.searchQuery || ''); setStatusFilter(saved.statusFilter || 'all');
+        setPaymentFilter(saved.paymentFilter || 'all'); setDateFrom(saved.dateFrom || ''); setDateTo(saved.dateTo || '');
+        setSortBy(saved.sortBy || ''); setLocationFilter(saved.locationFilter || 'all'); setNeedsActionFilter(!!saved.needsActionFilter);
+      }
+      if (saved.scrollY && !params.has('tab')) pendingScrollRestore.current = saved.scrollY;
+    } catch { /* storage may be unavailable */ }
+    setNavigationReady(true);
+  }, [clientId]);
+  useEffect(() => {
+    if (!clientId || !navigationReady) return;
+    const save = () => { if (pendingScrollRestore.current !== null) return; try { sessionStorage.setItem(`qg:jobs:${clientId}`, JSON.stringify({activeTab,searchQuery,statusFilter,paymentFilter,dateFrom,dateTo,sortBy,locationFilter,needsActionFilter,scrollY:window.scrollY})); } catch {} };
+    save(); window.addEventListener('scroll', save, {passive:true});
+    return () => window.removeEventListener('scroll', save);
+  }, [clientId,navigationReady,activeTab,searchQuery,statusFilter,paymentFilter,dateFrom,dateTo,sortBy,locationFilter,needsActionFilter]);
+
+  useEffect(() => {
+    if (loading || !navigationReady || pendingScrollRestore.current === null) return;
+    const target = pendingScrollRestore.current;
+    requestAnimationFrame(() => { window.scrollTo(0, target); pendingScrollRestore.current = null; });
+  }, [loading, navigationReady, jobs.length]);
+
   const cancelledRef = useRef(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialLoadDone = useRef(false);
@@ -223,7 +253,8 @@ export default function JobManagement() {
 
     if (activeTab !== 'all' && activeTab !== 'drafts' && activeTab !== 'scheduled' && activeTab !== 'featured') {
       const statuses = STATUS_FILTERS[activeTab];
-      if (statuses && statuses.length > 0) {
+      if (activeTab === 'applications_open') query = query.or('status.eq.awaiting_guard_selection,and(status.eq.open,applications_count.gt.0)');
+      else if (statuses && statuses.length > 0) {
         query = query.in('status', statuses);
       }
     }
@@ -278,7 +309,10 @@ export default function JobManagement() {
 
     try {
       const query = buildJobQuery();
-      const { data: jobsData, count } = await query;
+      const [{ data: jobsData, count, error }, summary] = await Promise.all([query, supabase.from('jobs').select('id, status, applications_count, assigned_count, number_of_guards, is_featured, is_draft, publish_at, start_date, special_instructions').eq('client_id', clientId).eq('is_deleted', false)]);
+      if (summary.error) throw summary.error;
+      setSummaryJobs((summary.data || []) as ClientJob[]);
+      if (error) throw error;
 
       setHasMore((count || 0) > JOBS_PER_PAGE);
 
@@ -291,7 +325,7 @@ export default function JobManagement() {
         const [txRes, cancelRes, refundRes] = await Promise.all([
           supabase.from('transactions').select('job_id, status').in('job_id', jobIds).order('created_at', { ascending: false }),
           supabase.schema('app').from('job_cancellations').select('job_id, status, reason').in('job_id', jobIds),
-          supabase.schema('app').from('refund_requests').select('job_id, status').in('job_id', jobIds),
+          supabase.schema('app').from('refund_requests').select('job_id, status').in('job_id', jobIds).order('created_at', { ascending: false }),
         ]);
         (txRes.data || []).forEach((t: any) => { if (!pmap[t.job_id]) pmap[t.job_id] = t.status; });
         (cancelRes.data || []).forEach((c: any) => { cMap[c.job_id] = c; });
@@ -346,7 +380,8 @@ export default function JobManagement() {
 
       if (activeTab !== 'all' && activeTab !== 'drafts' && activeTab !== 'scheduled' && activeTab !== 'featured') {
         const statuses = STATUS_FILTERS[activeTab];
-        if (statuses && statuses.length > 0) query = query.in('status', statuses);
+        if (activeTab === 'applications_open') query = query.or('status.eq.awaiting_guard_selection,and(status.eq.open,applications_count.gt.0)');
+        else if (statuses && statuses.length > 0) query = query.in('status', statuses);
       }
       if (activeTab === 'featured') query = query.eq('is_featured', true);
       if (activeTab === 'scheduled') query = query.eq('is_draft', true).gt('publish_at', new Date().toISOString());
@@ -363,25 +398,27 @@ export default function JobManagement() {
       const allIds = [...jobs, ...moreJobs].map((j: any) => j.id);
       const newIds = moreJobs.map((j: any) => j.id);
       let pmap = { ...paymentMap };
+      const cMap: Record<string, any> = {};
+      const rMap: Record<string, string> = {};
 
       if (newIds.length > 0) {
         const [txRes, cancelRes, refundRes] = await Promise.all([
           supabase.from('transactions').select('job_id, status').in('job_id', allIds).order('created_at', { ascending: false }),
           supabase.schema('app').from('job_cancellations').select('job_id, status, reason').in('job_id', allIds),
-          supabase.schema('app').from('refund_requests').select('job_id, status').in('job_id', allIds),
+          supabase.schema('app').from('refund_requests').select('job_id, status').in('job_id', allIds).order('created_at', { ascending: false }),
         ]);
+        (cancelRes.data || []).forEach((c: any) => { cMap[c.job_id] = c; });
+        (refundRes.data || []).forEach((row: any) => { if (!rMap[row.job_id]) rMap[row.job_id] = row.status; });
         pmap = {};
         (txRes.data || []).forEach((t: any) => { if (!pmap[t.job_id]) pmap[t.job_id] = t.status; });
         setPaymentMap(pmap);
       }
 
-      const cMap: Record<string, any> = {};
-
       const formattedMore = moreJobs.map((job: any) => ({
         ...job,
         assigned_count: job.job_assignments?.length || 0,
         cancellation_status: cMap[job.id]?.status,
-        refund_status: undefined,
+        refund_status: rMap[job.id],
       }));
 
       setJobs(prev => [...prev, ...formattedMore]);
@@ -438,9 +475,9 @@ export default function JobManagement() {
   }, [clientId, doSilentRefresh]);
 
   useEffect(() => {
-    if (!clientId || !initialLoadDone.current) return;
+    if (!clientId || !navigationReady || !initialLoadDone.current) return;
     loadJobs();
-  }, [activeTab, statusFilter, paymentFilter, dateFrom, dateTo, searchQuery, sortBy, locationFilter, needsActionFilter]);
+  }, [navigationReady, activeTab, statusFilter, paymentFilter, dateFrom, dateTo, searchQuery, sortBy, locationFilter, needsActionFilter]);
 
   useEffect(() => {
     if (toast) {
@@ -475,7 +512,7 @@ export default function JobManagement() {
 
     if (paymentFilter !== 'all') {
       const ps = paymentMap[job.id] || 'none';
-      if (ps !== paymentFilter) return false;
+      if (paymentLabel(ps) !== paymentLabel(paymentFilter)) return false;
     }
 
     if (needsActionFilter && getAttentionItems(job).length === 0) return false;
@@ -708,17 +745,18 @@ export default function JobManagement() {
   };
 
   const stats = {
-    total: jobs.length,
+    total: summaryJobs.length,
     drafts: drafts.length,
-    featured: jobs.filter(j => j.is_featured).length,
-    scheduled: jobs.filter(j => j.is_draft && j.publish_at && new Date(j.publish_at) > new Date()).length,
-    posted: jobs.filter(j => ['open', 'pending'].includes(j.status)).length,
-    applications: jobs.filter(j => j.status === 'awaiting_guard_selection').length,
-    awaitingPayment: jobs.filter(j => j.status === 'awaiting_payment').length,
-    active: jobs.filter(j => j.status === 'in_progress').length,
-    completed: jobs.filter(j => j.status === 'completed').length,
-    cancelled: jobs.filter(j => j.status === 'cancelled').length,
-    needsAction: jobs.filter(j => getAttentionItems(j).length > 0).length,
+    featured: summaryJobs.filter(j => j.is_featured).length,
+    scheduled: summaryJobs.filter(j => j.is_draft && j.publish_at && new Date(j.publish_at) > new Date()).length,
+    posted: summaryJobs.filter(j => ['open', 'pending'].includes(j.status)).length,
+    applications: summaryJobs.filter(j => j.status === 'awaiting_guard_selection' || (j.status === 'open' && (j.applications_count || 0) > 0)).length,
+    awaitingPayment: summaryJobs.filter(j => ['awaiting_payment','payment_pending'].includes(j.status)).length,
+    confirmed: summaryJobs.filter(j => j.status === 'confirmed').length,
+    active: summaryJobs.filter(j => ['in_progress','active'].includes(j.status)).length,
+    completed: summaryJobs.filter(j => j.status === 'completed').length,
+    cancelled: summaryJobs.filter(j => j.status === 'cancelled').length,
+    needsAction: summaryJobs.filter(j => getAttentionItems(j).length > 0).length,
   };
 
   const getTabCount = (key: string) => {
@@ -729,6 +767,7 @@ export default function JobManagement() {
     if (key === 'posted') return stats.posted;
     if (key === 'applications_open') return stats.applications;
     if (key === 'awaiting_payment') return stats.awaitingPayment;
+    if (key === 'confirmed') return stats.confirmed;
     if (key === 'active') return stats.active;
     if (key === 'completed') return stats.completed;
     if (key === 'cancelled') return stats.cancelled;

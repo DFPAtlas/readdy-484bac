@@ -25,6 +25,7 @@ export default function UsageLimitWidget({
   audience,
   compact = false,
 }: UsageLimitWidgetProps) {
+  const validPeriodEnd = periodEnd && !Number.isNaN(new Date(periodEnd).getTime());
   const isUnlimited = limit === null;
   const pct = isUnlimited ? 0 : Math.min(Math.round((used / (limit || 1)) * 100), 100);
   const isNearLimit = !isUnlimited && pct >= 80 && pct < 100;
@@ -115,7 +116,7 @@ export default function UsageLimitWidget({
           <i className={`ri-infinity-line text-2xl ${textColor}`}></i>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">No monthly limit</p>
           <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
-            Resets {new Date(periodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+            Resets {validPeriodEnd ? new Date(periodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'date unavailable'}
           </p>
         </div>
       ) : (
@@ -132,7 +133,7 @@ export default function UsageLimitWidget({
           </div>
           <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
             <span>{pct}% used</span>
-            <span>Resets {new Date(periodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+            <span>Resets {validPeriodEnd ? new Date(periodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'date unavailable'}</span>
           </div>
         </>
       )}
