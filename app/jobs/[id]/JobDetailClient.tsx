@@ -852,7 +852,11 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                   </div>
                 </div>
 
-                {hasApplied ? (
+                {job.status !== "open" ? (
+                  <div className="mt-6 rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-slate-300" role="status">
+                    This job is no longer accepting applications.
+                  </div>
+                ) : hasApplied ? (
                   <div className="w-full bg-emerald-500/10 text-emerald-400 py-4 rounded-lg font-bold text-lg mt-6 whitespace-nowrap flex items-center justify-center gap-2 border border-emerald-500/20">
                     <i className="ri-checkbox-circle-line"></i>
                     {(() => {
