@@ -12,7 +12,7 @@ const faqs = [
   { question: 'Is SIA licence verification required?', answer: 'Yes. All security guards must hold a valid SIA licence. Every guard must pass an initial SIA licence check before they can take work through QuickGuard. We are also developing an AI agent to re-check licence status weekly and flag suspended, revoked or expired licences for review.', icon: 'ri-verified-badge-line' },
   { question: 'How does payment work?', answer: 'Clients review the agreed guard pay, plan service fee and any eligible promotion, then pay securely via Stripe before the booking is confirmed. Funds are held with Stripe and released to the guard after completion and the applicable release checks. All transactions are encrypted and processed through our secure platform.', icon: 'ri-secure-payment-line' },
   { question: 'Can I cancel or edit a job after posting?', answer: 'Yes. You can edit job details or cancel a posting from your client dashboard before guards are assigned. Once guards are assigned, please contact support for assistance.', icon: 'ri-edit-2-line' },
-  { question: 'How long does guard verification take?', answer: 'SIA licence verification is typically completed within 24–48 hours. You will receive an email notification once your profile has been reviewed and approved.', icon: 'ri-time-line' },
+  { question: 'How long does guard verification take?', answer: 'Verification timing can vary depending on the licence check and whether manual review is required. You will receive an email notification once your profile has been reviewed and approved.', icon: 'ri-time-line' },
   { question: 'What subscription plans are available?', answer: 'We offer flexible plans for clients of all sizes. Visit our Pricing page to compare features and choose the plan that best suits your business needs.', icon: 'ri-price-tag-3-line' },
   { question: 'How do I raise a complaint?', answer: 'You can submit a complaint directly from your job detail page. Our team reviews all complaints promptly and will keep you updated on the resolution progress.', icon: 'ri-feedback-line' },
 ];
@@ -108,7 +108,7 @@ export default function HelpContent() {
                     </div>
                     {article.trending && (
                       <span className="flex items-center gap-1 bg-amber-500/10 text-amber-400 text-xs font-semibold px-2 py-1 rounded-full border border-amber-400/20">
-                        <i className="ri-fire-line text-xs" /> Trending
+                        <i className="ri-star-line text-xs" /> Featured
                       </span>
                     )}
                   </div>
