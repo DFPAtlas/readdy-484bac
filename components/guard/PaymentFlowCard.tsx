@@ -273,7 +273,7 @@ export default function PaymentFlowCard({ guardId, guardUserId }: Props) {
                     )}
                   </div>
                   <Link
-                    href={`/guard/jobs/${job.jobId}`}
+                    href={`/guard/jobs/detail?id=${job.jobId}`}
                     className="px-3 py-1.5 border border-[#1a2b4a] text-slate-400 rounded-lg text-[11px] font-semibold hover:bg-[#162036] transition-colors whitespace-nowrap flex-shrink-0"
                   >
                     View Details

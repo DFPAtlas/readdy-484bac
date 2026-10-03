@@ -68,7 +68,7 @@ export default function RecommendedJobsPanel({ jobs, guard, onApply, hasApplied 
               <span className="flex items-center gap-1"><i className="ri-calendar-line text-slate-600"></i>{job.start_date ? new Date(job.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'N/A'}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Link href={`/guard/jobs/${job.id}`} className="flex-1 text-center px-3 py-2.5 border border-[#1e2d4d] text-slate-300 rounded-xl text-xs font-semibold hover:bg-[#162036] hover:border-[#2a3e5f] transition-all whitespace-nowrap">Details</Link>
+              <Link href={`/guard/jobs/detail?id=${job.id}`} className="flex-1 text-center px-3 py-2.5 border border-[#1e2d4d] text-slate-300 rounded-xl text-xs font-semibold hover:bg-[#162036] hover:border-[#2a3e5f] transition-all whitespace-nowrap">Details</Link>
               {hasApplied(job.id) ? (
                 <button disabled className="flex-1 text-center px-3 py-2.5 bg-[#162036] text-slate-500 border border-[#1a2b4a] rounded-xl text-xs font-semibold cursor-not-allowed whitespace-nowrap">Applied</button>
               ) : (

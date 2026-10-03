@@ -146,7 +146,10 @@ export default function CancelJobModal({ job, clientId, onClose, onSuccess }: Ca
       onSuccess();
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to cancel job. Please try again.');
+      const message = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+        ? err.message
+        : 'Failed to cancel job. Please try again.';
+      setError(message);
     } finally {
       setConfirming(false);
     }

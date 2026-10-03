@@ -300,7 +300,7 @@ export default function GuardJobInvitesPage() {
                         </p>
                       </div>
                       <div className="flex flex-col gap-2 flex-shrink-0">
-                        <Link href={`/jobs/${job.id}`} className="px-4 py-2 bg-[#162036] text-slate-300 text-sm font-medium rounded-xl border border-[#1e2d4d] hover:border-teal-500/20 transition-colors whitespace-nowrap text-center">
+                        <Link href={`/jobs/detail?id=${job.id}`} className="px-4 py-2 bg-[#162036] text-slate-300 text-sm font-medium rounded-xl border border-[#1e2d4d] hover:border-teal-500/20 transition-colors whitespace-nowrap text-center">
                           View Job
                         </Link>
                         {isAccepted && (

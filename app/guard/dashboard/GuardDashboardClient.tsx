@@ -1386,7 +1386,7 @@ export default function GuardDashboardClient() {
                             <p className="text-sm text-slate-400 mt-2">Payment: <span className="font-medium text-slate-200">{assignment.payment_status.replace('_', ' ')}</span></p>
                           )}
                         </div>
-                        <Link href={`/guard/jobs/${(assignment.jobs as any)?.id}`} className="px-4 py-2 border border-[#1a2b4a] text-slate-300 rounded-lg hover:bg-[#162036] whitespace-nowrap">
+                        <Link href={`/guard/jobs/detail?id=${(assignment.jobs as any)?.id}`} className="px-4 py-2 border border-[#1a2b4a] text-slate-300 rounded-lg hover:bg-[#162036] whitespace-nowrap">
                           View Details
                         </Link>
                       </div>
@@ -1423,7 +1423,7 @@ export default function GuardDashboardClient() {
                             <div className="flex items-center gap-2"><i className="ri-money-pound-circle-line text-slate-500"></i><span className="text-slate-300">{job.payment_amount ? `£${Number(job.payment_amount).toFixed(2)}` : `£${(job.jobs as any)?.hourly_rate}/hr`}</span></div>
                           </div>
                         </div>
-                        <Link href={`/guard/jobs/${(job.jobs as any)?.id}`} className="px-4 py-2 border border-[#1a2b4a] text-slate-300 rounded-lg hover:bg-[#162036] whitespace-nowrap">
+                        <Link href={`/guard/jobs/detail?id=${(job.jobs as any)?.id}`} className="px-4 py-2 border border-[#1a2b4a] text-slate-300 rounded-lg hover:bg-[#162036] whitespace-nowrap">
                           View Details
                         </Link>
                       </div>
@@ -1471,7 +1471,7 @@ export default function GuardDashboardClient() {
                             </div>
                             <p className="text-xs text-slate-500 mt-3">Applied on {new Date(app.applied_at).toLocaleDateString()}</p>
                           </div>
-                          <Link href={`/guard/jobs/${(app.jobs as any)?.id}`} className="px-4 py-2 border border-[#1a2b4a] text-slate-300 rounded-lg hover:bg-[#162036] whitespace-nowrap">
+                          <Link href={`/guard/jobs/detail?id=${(app.jobs as any)?.id}`} className="px-4 py-2 border border-[#1a2b4a] text-slate-300 rounded-lg hover:bg-[#162036] whitespace-nowrap">
                             View Details
                           </Link>
                         </div>
@@ -1574,7 +1574,7 @@ export default function GuardDashboardClient() {
                               </div>
                             </div>
                             <div className="flex gap-3">
-                              <Link href={`/guard/jobs/${job.id}`} className="px-4 py-2 border border-[#1a2b4a] text-slate-300 rounded-lg hover:bg-[#162036] whitespace-nowrap">View Details</Link>
+                              <Link href={`/guard/jobs/detail?id=${job.id}`} className="px-4 py-2 border border-[#1a2b4a] text-slate-300 rounded-lg hover:bg-[#162036] whitespace-nowrap">View Details</Link>
                               {hasApplied || isAdmin ? (
                                 <button disabled className="px-4 py-2 bg-[#162036] text-slate-500 rounded-lg cursor-not-allowed whitespace-nowrap">{isAdmin ? 'Apply Disabled' : 'Already Applied'}</button>
                               ) : (

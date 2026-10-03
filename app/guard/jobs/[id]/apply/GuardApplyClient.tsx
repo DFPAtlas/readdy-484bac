@@ -160,7 +160,7 @@ export default function GuardApplyClient({ jobId }: { jobId: string }) {
       } catch { /* non-blocking */ }
 
       showToast('Application submitted successfully!', 'success');
-      setTimeout(() => router.push(`/guard/jobs/${jobId}`), 1500);
+      setTimeout(() => router.push(`/guard/jobs/detail?id=${jobId}`), 1500);
     } catch (err: any) {
       showToast('Failed to apply: ' + (err.message || 'Unknown error'), 'error');
     } finally {
@@ -220,7 +220,7 @@ export default function GuardApplyClient({ jobId }: { jobId: string }) {
 
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-3 mb-8">
-            <Link href={`/guard/jobs/${jobId}`} className="text-slate-400 hover:text-white transition-colors">
+            <Link href={`/guard/jobs/detail?id=${jobId}`} className="text-slate-400 hover:text-white transition-colors">
               <i className="ri-arrow-left-line text-xl"></i>
             </Link>
             <h1 className="text-2xl font-bold text-white">Apply for Job</h1>
@@ -257,7 +257,7 @@ export default function GuardApplyClient({ jobId }: { jobId: string }) {
             >
               {submitting ? 'Submitting...' : 'Submit Application'}
             </button>
-            <Link href={`/guard/jobs/${jobId}`} className="flex-1 bg-[#162036] text-slate-300 py-3 rounded-xl font-semibold hover:bg-[#1a2642] transition-colors whitespace-nowrap text-center">
+            <Link href={`/guard/jobs/detail?id=${jobId}`} className="flex-1 bg-[#162036] text-slate-300 py-3 rounded-xl font-semibold hover:bg-[#1a2642] transition-colors whitespace-nowrap text-center">
               Cancel
             </Link>
           </div>
