@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { allAdminRows } from '@/lib/adminData';
+import { paymentTotals } from '@/lib/financeAmounts';
 
 interface StatsData {
   totalJobPayments: number;
@@ -12,12 +14,8 @@ interface StatsData {
   releasedPayouts: number;
   disputedPayments: number;
   refundedPayments: number;
-  platformFees: number;
-  stripeFees: number;
-  netRevenue: number;
-  vatEstimate: number;
-  totalGuardsAssigned: number;
-  totalAgreedAmount: number;
+  refundedAmount: number;
+  remainingFunds: number;
 }
 
 interface StatsCardsProps {
@@ -35,67 +33,46 @@ export default function StatsCards({ onRefresh, lastUpdated }: StatsCardsProps) 
     releasedPayouts: 0,
     disputedPayments: 0,
     refundedPayments: 0,
-    platformFees: 0,
-    stripeFees: 0,
-    netRevenue: 0,
-    vatEstimate: 0,
-    totalGuardsAssigned: 0,
-    totalAgreedAmount: 0,
+    refundedAmount: 0,
+    remainingFunds: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadStats = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const { data: jobsData } = await supabase
-        .from('jobs')
-        .select('agreed_amount, payment_status, platform_fee, guard_payout_amount, status, is_deleted')
-        .eq('is_deleted', false);
+      const { data: jobsData } = await allAdminRows(() => supabase.from('jobs')
+        .select('id, agreed_amount, payment_status, status')
+        .eq('is_deleted', false).not('payment_status', 'is', null).order('id'));
 
-      const { count: pendingApprovalCount } = await supabase
+      const { count: pendingApprovalCount, error: approvalError } = await supabase
         .from('job_completion_requests')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
 
-      const { count: disputedCount } = await supabase
+      const { count: disputedCount, error: disputeError } = await supabase
         .from('disputes')
         .select('*', { count: 'exact', head: true })
         .in('status', ['open', 'under_review']);
 
-      const { data: transData } = await supabase
-        .from('transactions')
-        .select('amount, status')
-        .eq('status', 'completed');
-
-      const { data: subPaymentsData } = await supabase
-        .from('subscription_payments')
-        .select('amount, status')
-        .eq('status', 'succeeded');
-
-      const { data: assignedData } = await supabase
-        .from('job_assignments')
-        .select('guard_id', { count: 'exact' });
+      if (approvalError) throw approvalError;
+      if (disputeError) throw disputeError;
+      const { data: transData } = await allAdminRows(() => supabase.from('transactions')
+        .select('job_id, amount, status, refunded, refund_amount')
+        .eq('transaction_type', 'job_payment').order('id'));
+      const jobIds = new Set(jobsData.map(job => job.id));
+      const totals = paymentTotals(transData.filter(payment => jobIds.has(payment.job_id)));
 
       const jobs = jobsData || [];
-      const totalAgreedAmount = jobs.reduce((s, j) => s + (Number(j.agreed_amount) || 0), 0);
       const fundedJobs = jobs.filter((j) => j.payment_status === 'funded').length;
       const unpaidJobs = jobs.filter((j) => !j.payment_status || j.payment_status === 'unpaid').length;
       const readyToRelease = jobs.filter((j) => j.payment_status === 'completed').length;
-      const releasedPayouts = jobs.filter((j) => j.payment_status === 'released').length;
+      const releasedPayouts = jobs.filter((j) => ['released', 'paid_out'].includes(j.payment_status)).length;
       const refundedPayments = jobs.filter((j) => j.payment_status === 'refunded').length;
-      const platformFees = jobs.reduce((s, j) => s + (Number(j.platform_fee) || 0), 0);
-
-      const transAmount = (transData || []).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-      const subAmount = (subPaymentsData || []).reduce((s, p) => s + (Number(p.amount) || 0), 0);
-      const totalJobPayments = transAmount + subAmount;
-
-      const estimateStripeFee = (amount: number) => Math.max(amount * 0.015 + 0.20, 0.20);
-      const stripeFees = estimateStripeFee(totalJobPayments);
-      const netRevenue = totalJobPayments - platformFees - stripeFees;
-      const vatEstimate = netRevenue * 0.2;
-
       setStats({
-        totalJobPayments,
+        totalJobPayments: totals.collected,
         fundedJobs,
         unpaidJobs,
         pendingApproval: pendingApprovalCount ?? 0,
@@ -103,15 +80,11 @@ export default function StatsCards({ onRefresh, lastUpdated }: StatsCardsProps) 
         releasedPayouts,
         disputedPayments: disputedCount ?? 0,
         refundedPayments,
-        platformFees,
-        stripeFees,
-        netRevenue,
-        vatEstimate,
-        totalGuardsAssigned: (assignedData as any)?.length || 0,
-        totalAgreedAmount,
+        refundedAmount: totals.refunded,
+        remainingFunds: totals.remaining,
       });
     } catch (err) {
-      console.error('Failed to load payment stats:', err);
+      setError(err instanceof Error ? err.message : 'Unable to load payment summary');
     } finally {
       setLoading(false);
     }
@@ -119,11 +92,11 @@ export default function StatsCards({ onRefresh, lastUpdated }: StatsCardsProps) 
 
   useEffect(() => {
     loadStats();
-  }, []);
+  }, [lastUpdated]);
 
   const cards = [
     {
-      label: 'Total Job Payments',
+      label: 'Job Payments Collected',
       value: stats.totalJobPayments,
       format: 'currency',
       icon: 'ri-money-pound-circle-line',
@@ -195,40 +168,12 @@ export default function StatsCards({ onRefresh, lastUpdated }: StatsCardsProps) 
       ring: 'ring-rose-500/20',
     },
     {
-      label: 'Platform Fees',
-      value: stats.platformFees,
-      format: 'currency',
-      icon: 'ri-percent-line',
-      color: 'text-indigo-400',
-      bg: 'bg-indigo-500/10',
-      ring: 'ring-indigo-500/20',
+      label: 'Job Payments Refunded', value: stats.refundedAmount, format: 'currency',
+      icon: 'ri-refund-line', color: 'text-rose-400', bg: 'bg-rose-500/10', ring: 'ring-rose-500/20',
     },
     {
-      label: 'Stripe Fees',
-      value: stats.stripeFees,
-      format: 'currency',
-      icon: 'ri-bank-card-line',
-      color: 'text-violet-400',
-      bg: 'bg-violet-500/10',
-      ring: 'ring-violet-500/20',
-    },
-    {
-      label: 'Net Revenue',
-      value: stats.netRevenue,
-      format: 'currency',
-      icon: 'ri-bar-chart-line',
-      color: 'text-teal-400',
-      bg: 'bg-teal-500/10',
-      ring: 'ring-teal-500/20',
-    },
-    {
-      label: 'VAT Estimate',
-      value: stats.vatEstimate,
-      format: 'currency',
-      icon: 'ri-calculator-line',
-      color: 'text-cyan-400',
-      bg: 'bg-cyan-500/10',
-      ring: 'ring-cyan-500/20',
+      label: 'Remaining Job Funds', value: stats.remainingFunds, format: 'currency',
+      icon: 'ri-money-pound-circle-line', color: 'text-teal-400', bg: 'bg-teal-500/10', ring: 'ring-teal-500/20',
     },
   ];
 
@@ -251,7 +196,7 @@ export default function StatsCards({ onRefresh, lastUpdated }: StatsCardsProps) 
           )}
         </div>
         <button
-          onClick={() => { loadStats(); onRefresh?.(); }}
+          onClick={() => { if (onRefresh) onRefresh(); else void loadStats(); }}
           disabled={loading}
           className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-[#1a2b4a] transition-all whitespace-nowrap cursor-pointer disabled:opacity-50"
         >
@@ -262,6 +207,8 @@ export default function StatsCards({ onRefresh, lastUpdated }: StatsCardsProps) 
         </button>
       </div>
 
+      <p className="text-xs text-slate-400 mb-4">Job payments only. Remaining funds are before fees and guard payouts; they are not platform revenue.</p>
+      {error && <p role="alert" className="text-rose-300 mb-4">Payment summary unavailable: {error}</p>}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
         {cards.map((card) => (
           <div
@@ -274,7 +221,7 @@ export default function StatsCards({ onRefresh, lastUpdated }: StatsCardsProps) 
               </div>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{card.label}</span>
             </div>
-            {loading ? (
+            {error ? <p className="text-slate-400">Unavailable</p> : loading ? (
               <div className="h-6 bg-white/5 rounded animate-pulse w-20"></div>
             ) : (
               <p className={`text-lg font-extrabold ${card.color} leading-tight`}>
