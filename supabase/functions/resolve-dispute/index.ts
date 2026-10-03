@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
+import { claimFinancialOperation, finishFinancialOperation, holdFinancialOperation, verifyRefundSafety, type FinancialOperation } from '../_shared/financialOperations.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const CORS_ALLOWLIST = [
@@ -55,6 +56,8 @@ serve(async (req) => {
   const stripe = new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' });
   const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
 
+  let operation: FinancialOperation | null = null;
+  let stripeStarted = false;
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -124,13 +127,11 @@ serve(async (req) => {
       });
     }
 
-    if (dispute.status !== 'open' && dispute.status !== 'under_review') {
-      return new Response(JSON.stringify({ error: 'Dispute is already resolved' }), {
-        status: 409,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const operationKey = `dispute:${dispute_id}:${resolution}:${resolution === 'resolved_client_partial' ? Math.round(Number(refund_amount) * 100) : 'all'}`;
+    operation = await claimFinancialOperation(supabase, dispute.job_id, operationKey, resolution.startsWith('resolved_client_') ? 'refund' : resolution === 'resolved_guard' ? 'payout' : 'dispute', user.id);
+    if (operation.replayed) return new Response(JSON.stringify(operation.result), {status: 200, headers: {...corsHeaders, 'Content-Type': 'application/json'}});
 
+    if (!['open','under_review'].includes(dispute.status)) throw {status: 409, message: 'Dispute is already resolved'};
     const job = dispute.jobs;
     const guard = dispute.guards;
     const clientUserId = dispute.clients?.user_id;
@@ -141,35 +142,22 @@ serve(async (req) => {
     let actualRefundAmount = 0;
 
     if (resolution === 'resolved_client_refund' || resolution === 'resolved_client_partial') {
-      const { data: assignments, error: assignmentError } = await supabase.from('job_assignments')
-        .select('payment_status, payout_released, stripe_transfer_id').eq('job_id', job.id);
-      const { data: payouts, error: payoutError } = await supabase.from('guard_payouts')
-        .select('status').eq('job_id', job.id);
-      if (assignmentError || payoutError) throw new Error('Unable to verify payout safety');
-      const protectedStates = ['payout_pending', 'payout_processing', 'paid_out', 'paid', 'client_released'];
-      if (['payout_approved', 'paid_out'].includes(job.status) ||
-          protectedStates.includes(job.payment_status) ||
-          (assignments || []).some((a: any) => protectedStates.includes(a.payment_status) || a.payout_released || a.stripe_transfer_id) ||
-          (payouts || []).some((p: any) => !['failed', 'cancelled'].includes(p.status))) {
-        return new Response(JSON.stringify({ error: 'Refund blocked: guard payout has started. Finance recovery review required.' }),
-          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-      const { data: transaction } = await supabase
+      await verifyRefundSafety(supabase, job);
+      const { data: transaction, error: transactionError } = await supabase
         .from('transactions')
         .select('id, amount, currency, stripe_payment_intent, stripe_charge_id, refunded, refund_amount')
         .eq('job_id', job.id)
         .eq('client_id', job.client_id)
+        .eq('transaction_type', 'job_payment')
         .not('stripe_payment_intent', 'is', null)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
+      if (transactionError || !transaction) throw {status: 409, message: 'Verified job payment could not be loaded'};
       const paymentIntentId = transaction?.stripe_payment_intent || job.stripe_payment_intent_id;
       if (!paymentIntentId) {
-        return new Response(JSON.stringify({ error: 'No Stripe payment intent found for refund' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        throw {status: 400, message: 'No Stripe payment intent found for refund'};
       }
 
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -182,18 +170,12 @@ serve(async (req) => {
       }
 
       if (!charge) {
-        return new Response(JSON.stringify({ error: 'Unable to resolve the Stripe charge for this payment' }), {
-          status: 409,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        throw {status: 409, message: 'Unable to resolve the Stripe charge for this payment'};
       }
 
       const maxRefundablePence = Math.max(0, charge.amount - charge.amount_refunded);
       if (maxRefundablePence <= 0) {
-        return new Response(JSON.stringify({ error: 'This payment has already been fully refunded' }), {
-          status: 409,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        throw {status: 409, message: 'This payment has already been fully refunded'};
       }
 
       const requestedPence = resolution === 'resolved_client_refund'
@@ -201,15 +183,10 @@ serve(async (req) => {
         : Math.round(Number(refund_amount || 0) * 100);
 
       if (!Number.isFinite(requestedPence) || requestedPence <= 0 || requestedPence > maxRefundablePence) {
-        return new Response(JSON.stringify({
-          error: 'Invalid refund amount',
-          maxRefundable: maxRefundablePence / 100,
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        throw {status: 400, message: `Refund must be between £0.01 and £${(maxRefundablePence / 100).toFixed(2)}`};
       }
 
+      stripeStarted = true;
       const refund = await stripe.refunds.create({
         charge: charge.id,
         amount: requestedPence,
@@ -228,26 +205,20 @@ serve(async (req) => {
       stripeRefundId = refund.id;
       actualRefundAmount = requestedPence / 100;
 
-      if (transaction?.id) {
-        const cumulativeRefund = Number(transaction.refund_amount || 0) + actualRefundAmount;
-        const fullRefund = cumulativeRefund >= Number(transaction.amount || 0) - 0.005;
-        await supabase.from('transactions').update({
-          stripe_refund_id: refund.id,
-          refunded: fullRefund,
-          refund_amount: cumulativeRefund,
-          refunded_at: now,
-          status: fullRefund ? 'refunded' : 'partially_refunded',
-          updated_at: now,
-        }).eq('id', transaction.id);
-      }
+      if (!['succeeded','pending'].includes(refund.status || '')) throw new Error('Refund requires finance review');
+      const {error: recordError} = await supabase.rpc('record_financial_refund', {
+        p_operation_id: operation.id, p_transaction_id: transaction.id, p_dispute_id: dispute_id,
+        p_refund_id: refund.id, p_cumulative_refund: (charge.amount_refunded + requestedPence) / 100,
+        p_refund_amount: actualRefundAmount, p_succeeded: refund.status === 'succeeded',
+        p_role: admin.role, p_resolution: resolution, p_notes: admin_notes || 'Admin dispute refund',
+      });
+      if (recordError) throw new Error('Stripe refund submitted; database reconciliation required');
+      return new Response(JSON.stringify({success: true, disputeId: dispute_id, resolution, stripeRefundId: refund.id, refundAmount: actualRefundAmount, status: refund.status}), {status: 200, headers: {...corsHeaders, 'Content-Type': 'application/json'}});
     }
 
     if (resolution === 'resolved_guard') {
       if (!guard?.stripe_account_id || guard.stripe_connect_status !== 'verified') {
-        return new Response(JSON.stringify({ error: 'Guard Stripe Connect account is not verified for payout' }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        throw {status: 403, message: 'Guard Stripe Connect account is not verified for payout'};
       }
 
       const payoutPence = job.guard_payout_amount != null
@@ -259,19 +230,41 @@ serve(async (req) => {
         : 0;
 
       if (payoutPence <= 0) {
-        return new Response(JSON.stringify({ error: 'Invalid guard payout amount' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        throw {status: 400, message: 'Invalid guard payout amount'};
       }
 
+      const {data: assignment, error: assignmentError} = await supabase.from('job_assignments')
+        .select('id,status,payment_status,payout_released,stripe_transfer_id').eq('job_id',job.id).eq('guard_id',guard.id).maybeSingle();
+      if (assignmentError || !assignment || assignment.status !== 'completed' || assignment.payout_released || assignment.stripe_transfer_id) throw {status: 409, message: 'Completed, unpaid guard assignment required'};
+      const {data: payment, error: paymentError} = await supabase.from('transactions').select('stripe_payment_intent,refunded,refund_amount,status')
+        .eq('job_id',job.id).eq('transaction_type','job_payment').order('created_at',{ascending:false}).limit(1).maybeSingle();
+      if (paymentError || !payment?.stripe_payment_intent || payment.refunded || Number(payment.refund_amount) > 0 || payment.status !== 'completed') throw {status:409,message:'Refunded or unverified payment requires finance review; payout blocked'};
+      const intent = await stripe.paymentIntents.retrieve(payment.stripe_payment_intent, {expand:['latest_charge']});
+      const charge = typeof intent.latest_charge === 'object' ? intent.latest_charge as Stripe.Charge : null;
+      const {data: payouts, error: payoutsError} = await supabase.from('guard_payouts').select('status,net_amount,stripe_transfer_id').eq('job_id',job.id);
+      if (payoutsError || !charge || !charge.paid || charge.amount_refunded > 0 || (payouts || []).some(p => !['failed','cancelled'].includes(p.status))) throw {status:409,message:'Existing payout or refund requires finance review'};
+      if (payoutPence > charge.amount - charge.amount_refunded) throw {status:409,message:'Payout exceeds available client funds'};
+      // Reserve local processing records before Stripe can send its transfer webhook.
+      stripeStarted = true;
+      const {data: payoutRecord,error: payoutReserveError}=await supabase.from('guard_payouts').insert({
+        assignment_id:assignment.id,guard_id:guard.id,job_id:job.id,amount:payoutPence/100,
+        fee_deducted:platformFeePence/100,net_amount:payoutPence/100,status:'processing',payout_method:'stripe_connect',
+        idempotency_key:`quickguard:dispute-payout:${dispute_id}:${payoutPence}`,created_at:now,updated_at:now,
+      }).select('id').single();
+      if(payoutReserveError || !payoutRecord) throw new Error('Payout reservation requires reconciliation');
+      const {error: assignmentReserveError}=await supabase.from('job_assignments').update({payment_status:'payout_processing',updated_at:now}).eq('id',assignment.id);
+      if(assignmentReserveError) throw new Error('Payout assignment reservation requires reconciliation');
+      const {error: jobReserveError}=await supabase.from('jobs').update({status:'payout_approved',payment_status:'payout_processing',disputed:false,disputed_at:null,disputed_reason:null,updated_at:now}).eq('id',job.id);
+      if(jobReserveError) throw new Error('Payout job reservation requires reconciliation');
       const transfer = await stripe.transfers.create({
         amount: payoutPence,
         currency: job.currency || 'gbp',
         destination: guard.stripe_account_id,
+        source_transaction: charge.id,
         description: `QuickGuard payout — dispute resolved in guard's favour`,
         metadata: {
           jobId: job.id,
+          assignmentId: assignment.id,
           disputeId: dispute_id,
           guardId: guard.id,
           resolution: 'resolved_guard',
@@ -282,31 +275,23 @@ serve(async (req) => {
 
       stripeTransferId = transfer.id;
 
-      await supabase.from('guard_payouts').insert({
-        guard_id: guard.id,
-        job_id: job.id,
-        amount: payoutPence / 100,
-        fee_deducted: platformFeePence / 100,
-        net_amount: payoutPence / 100,
-        status: 'processing',
-        payout_method: 'stripe_connect',
-        stripe_transfer_id: transfer.id,
-        reference_number: transfer.id,
-        created_at: now,
-        updated_at: now,
-      });
+      const {error: payoutWriteError}=await supabase.from('guard_payouts').update({stripe_transfer_id:transfer.id,reference_number:transfer.id,updated_at:now}).eq('id',payoutRecord.id);
+      if(payoutWriteError) throw new Error('Transfer submitted; payout reconciliation required');
+      const {error: assignmentWriteError}=await supabase.from('job_assignments').update({stripe_transfer_id:transfer.id,updated_at:now}).eq('id',assignment.id);
+      if(assignmentWriteError) throw new Error('Transfer submitted; assignment reconciliation required');
     }
 
     if (resolution === 'resolved_cancelled') {
-      await supabase.from('jobs').update({
+      const {error: jobWriteError} = await supabase.from('jobs').update({
         disputed: false,
         disputed_at: null,
         disputed_reason: null,
         updated_at: now,
       }).eq('id', job.id);
+      if (jobWriteError) throw jobWriteError;
     }
 
-    await supabase.from('disputes').update({
+    const {error: disputeWriteError} = await supabase.from('disputes').update({
       status: resolution,
       resolution,
       admin_notes: admin_notes || null,
@@ -317,20 +302,20 @@ serve(async (req) => {
       resolved_at: now,
       updated_at: now,
     }).eq('id', dispute_id);
+    if (disputeWriteError) throw disputeWriteError;
 
-    await supabase.from('payment_audit_logs').insert({
-      job_id: job.id,
-      guard_id: guard?.id || null,
-      action: 'dispute_resolved',
-      previous_status: 'disputed',
-      new_status: resolution,
-      amount: actualRefundAmount,
-      platform_fee: job.platform_fee,
-      performed_by: admin.id,
-      stripe_reference: stripeRefundId || stripeTransferId,
-      notes: admin_notes || `Admin resolved dispute: ${resolution}`,
+    const { error: auditError } = await supabase.from('payment_audit_logs').insert({
+      job_id: job.id, guard_id: guard?.id || null, client_id: job.client_id,
+      from_status: 'disputed', to_status: resolution,
+      changed_by: user.id, changed_by_role: admin.role,
+      reason: admin_notes || `Admin resolved dispute: ${resolution}`,
+      event_type: 'dispute_resolved', reference_type: 'dispute', reference_id: dispute_id,
+      metadata: { refund_amount: actualRefundAmount, platform_fee: job.platform_fee, stripe_refund_id: stripeRefundId, stripe_transfer_id: stripeTransferId },
       created_at: now,
     });
+    if (auditError) throw new Error('Dispute resolution audit could not be recorded');
+
+    await finishFinancialOperation(supabase, operation.id, {success:true,disputeId:dispute_id,resolution,stripeRefundId,stripeTransferId,refundAmount:actualRefundAmount});
 
     if (guard?.user_id) {
       await supabase.from('notifications').insert([{
@@ -374,9 +359,10 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: any) {
+    if (operation && !operation.replayed) await holdFinancialOperation(supabase, operation.id, stripeStarted);
     console.error('[ResolveDispute] ERROR:', error?.type || error?.code || error?.message || 'unknown');
-    return new Response(JSON.stringify({ error: 'Failed to resolve dispute' }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: stripeStarted ? 'Payment operation submitted or uncertain; finance reconciliation required. Do not repeat the money movement.' : error?.message || 'Failed to resolve dispute' }), {
+      status: error?.status || 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

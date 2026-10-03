@@ -87,11 +87,11 @@ export default function MonthlySnapshots({ snapshots, loading, onRefresh }: Prop
     <div className="bg-[#111d35] rounded-2xl border border-[#1e2d4a] shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-[#1e2d4a] flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold text-white">Monthly Snapshots</h3>
+          <h3 className="text-sm font-bold text-white">Monthly Payment Snapshots</h3>
           <p className="text-xs text-slate-400 mt-0.5">Historical financial records</p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-400">{snapshots.length} records</span>
+          <span className="text-xs text-slate-400">{snapshots.length} records · payment cohorts, estimated fees/costs</span>
           <button
             onClick={handleGenerate}
             disabled={generating}

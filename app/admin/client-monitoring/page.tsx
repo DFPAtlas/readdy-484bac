@@ -441,7 +441,7 @@ export default function ClientMonitoringPage() {
         <ClientMonitoringTable
           clients={paginated}
           loading={loading}
-          onSelectClient={(c) => setSelectedClient(c)}
+          onSelectClient={(c) => setSelectedClient(paginated.find(client => client.id === c.id) || null)}
         />
 
         <Pagination

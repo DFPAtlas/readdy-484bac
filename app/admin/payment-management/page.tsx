@@ -369,7 +369,7 @@ export default function AdminPaymentManagementPage() {
                 <i className="ri-flask-line text-xl"></i>
               </div>
               <div>
-                <h1 className="text-lg font-bold text-white leading-tight tracking-tight">Payment Flow Test Console</h1>
+                <h1 className="text-lg font-bold text-white leading-tight tracking-tight">Sandbox Payment Test Console</h1>
                 <p className="text-[11px] text-slate-500 font-medium">Admin-only Stripe test sandbox</p>
               </div>
             </div>
@@ -685,7 +685,7 @@ export default function AdminPaymentManagementPage() {
                   <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-teal-500/10 ring-1 ring-teal-500/20">
                     <i className="ri-history-line text-lg text-teal-400"></i>
                   </div>
-                  <h2 className="text-lg font-bold text-white">Action Timeline</h2>
+                  <h2 className="text-lg font-bold text-white">Local Test Notes</h2>
                 </div>
                 <button
                   onClick={() => { setTimeline([]); saveTimelineToStorage([]); }}
@@ -695,6 +695,7 @@ export default function AdminPaymentManagementPage() {
                 </button>
               </div>
 
+              <p className="mb-3 text-sm text-slate-300">These notes are saved only in this browser. They are not the shared payment audit or proof of launch readiness. <Link href="/admin/activity-log" className="text-teal-300 underline">Open the shared activity log</Link>.</p>
               <div ref={timelineRef} className="max-h-80 overflow-y-auto pr-1 space-y-2">
                 {timeline.length === 0 ? (
                   <div className="text-center py-10">

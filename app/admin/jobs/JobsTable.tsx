@@ -1,22 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { adminJobStatusBadge } from '@/lib/adminJobStatus';
 import { JobRow } from './useAdminJobs';
 
-const statusConfig: Record<string, { label: string; bg: string; text: string; ring: string; icon: string }> = {
-  open: { label: 'Open', bg: 'bg-emerald-500/10', text: 'text-emerald-400', ring: 'ring-emerald-500/20', icon: 'ri-checkbox-circle-line' },
-  in_progress: { label: 'In Progress', bg: 'bg-sky-500/10', text: 'text-sky-400', ring: 'ring-sky-500/20', icon: 'ri-loader-4-line' },
-  completed: { label: 'Completed', bg: 'bg-slate-500/10', text: 'text-slate-400', ring: 'ring-slate-500/20', icon: 'ri-check-double-line' },
-  cancelled: { label: 'Cancelled', bg: 'bg-red-500/10', text: 'text-red-400', ring: 'ring-red-500/20', icon: 'ri-close-circle-line' },
-  paused: { label: 'Paused', bg: 'bg-amber-500/10', text: 'text-amber-400', ring: 'ring-amber-500/20', icon: 'ri-pause-circle-line' },
-  draft: { label: 'Draft', bg: 'bg-slate-500/10', text: 'text-slate-400', ring: 'ring-slate-500/20', icon: 'ri-draft-line' },
-  pending: { label: 'Pending', bg: 'bg-purple-500/10', text: 'text-purple-400', ring: 'ring-purple-500/20', icon: 'ri-time-line' },
-  awaiting_payment: { label: 'Awaiting Payment', bg: 'bg-orange-500/10', text: 'text-orange-400', ring: 'ring-orange-500/20', icon: 'ri-money-pound-circle-line' },
-  awaiting_guard_selection: { label: 'Awaiting Selection', bg: 'bg-pink-500/10', text: 'text-pink-400', ring: 'ring-pink-500/20', icon: 'ri-user-search-line' },
-  review_pending: { label: 'Review Pending', bg: 'bg-indigo-500/10', text: 'text-indigo-400', ring: 'ring-indigo-500/20', icon: 'ri-star-line' },
-  review_submitted: { label: 'Review Submitted', bg: 'bg-teal-500/10', text: 'text-teal-400', ring: 'ring-teal-500/20', icon: 'ri-star-half-line' },
-  closed: { label: 'Closed', bg: 'bg-emerald-500/10', text: 'text-emerald-400', ring: 'ring-emerald-500/20', icon: 'ri-lock-line' },
-};
+
 
 const urgencyConfig: Record<string, { label: string; bg: string; text: string; icon: string }> = {
   immediate: { label: 'Immediate', bg: 'bg-red-500/10', text: 'text-red-400', icon: 'ri-flashlight-line' },
@@ -50,7 +38,7 @@ export default function JobsTable({
   onToggleSelectAll, onToggleSelectJob, onOpenDetail, onOpenStatus,
   onOpenFlag, onUnflag, onOpenDelete, onRetry, onPageChange,
 }: JobsTableProps) {
-  const getStatusBadge = (status: string) => statusConfig[status] || statusConfig.open;
+  const getStatusBadge = (status: string) => adminJobStatusBadge(status);
   const getUrgencyBadge = (urgency: string | null) => urgency ? (urgencyConfig[urgency] || null) : null;
 
   const formatDate = (dateString: string) => {
@@ -199,7 +187,7 @@ export default function JobsTable({
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          <Link href={`/jobs/${job.id}`} target="_blank" rel="noopener noreferrer"
+                          <Link href={`/jobs/detail?id=${job.id}`} target="_blank" rel="noopener noreferrer"
                             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-teal-500/10 text-slate-500 hover:text-teal-400 transition-all cursor-pointer" title="View public page">
                             <div className="w-4 h-4 flex items-center justify-center"><i className="ri-eye-line text-sm"></i></div>
                           </Link>

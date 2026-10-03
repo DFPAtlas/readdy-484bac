@@ -46,8 +46,8 @@ async function getAccessToken(): Promise<string> {
 
 function StatusBadge({ status, positive = 'active', negative = 'inactive' }: { status: string | boolean; positive?: string; negative?: string }) {
   const s = typeof status === 'boolean' ? (status ? positive : negative) : status;
-  const isGood = s === 'active' || s === 'completed' || s === 'approved' || s === 'provisioned' || s === positive || s === true;
-  const isBad = s === 'missing' || s === 'incomplete' || s === 'rejected' || s === 'pending' || s === negative || s === false;
+  const isGood = s === 'active' || s === 'completed' || s === 'approved' || s === 'provisioned' || s === positive;
+  const isBad = s === 'missing' || s === 'incomplete' || s === 'rejected' || s === 'pending' || s === negative;
   const cls = isGood
     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
     : isBad

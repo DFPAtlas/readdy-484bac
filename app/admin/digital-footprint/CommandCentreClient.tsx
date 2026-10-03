@@ -66,6 +66,7 @@ type ProjectRow = {
 };
 
 interface DeploymentInfo {
+  app_slug?: string | null;
   id: string | null;
   github_url: string | null;
   branch_name: string | null;
@@ -78,6 +79,7 @@ interface DeploymentInfo {
 }
 
 interface BackupInfo {
+  app_slug?: string | null;
   id: string | null;
   backup_type: string | null;
   backup_status: string | null;

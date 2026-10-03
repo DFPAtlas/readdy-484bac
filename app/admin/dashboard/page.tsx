@@ -1,4 +1,6 @@
 'use client';
+import {allAdminRows} from '@/lib/adminData';
+import { collectedStatuses, paymentTotals } from '@/lib/financeAmounts';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
@@ -269,20 +271,20 @@ export default function AdminDashboard() {
         supabase.from('guard_payouts').select('*', { count: 'exact', head: true }).eq('status', 'held'),
 
         // Monthly revenue — subscription_payments is the source of truth for subscription revenue
-        // Only count succeeded payments that have not been refunded
-        supabase.from('subscription_payments').select('amount').eq('status', 'succeeded').eq('refunded', false).gte('created_at', monthStartIso),
+        // Include collected payments and subtract their cumulative refunds.
+        allAdminRows(() => supabase.from('subscription_payments').select('amount, status, refunded, refund_amount').in('status', collectedStatuses).gte('created_at', monthStartIso).order('id')),
 
         // Monthly revenue — transactions is the source for non-subscription revenue (job payments, PAYG, etc.)
-        // Only count completed transactions that have not been refunded
+        // Include collected payments and subtract their cumulative refunds.
         // Exclude transaction_type = 'subscription' to prevent double-counting with subscription_payments
-        supabase.from('transactions').select('amount').eq('status', 'completed').eq('refunded', false).or('transaction_type.neq.subscription,transaction_type.is.null').gte('created_at', monthStartIso),
+        allAdminRows(() => supabase.from('transactions').select('amount, status, refunded, refund_amount').in('status', collectedStatuses).or('transaction_type.neq.subscription,transaction_type.is.null').gte('created_at', monthStartIso).order('id')),
 
         supabase.from('job_assignments').select('assigned_at, jobs!inner(created_at)').not('assigned_at', 'is', null).gte('assigned_at', monthStartIso),
 
         // Previous month — only for monthly metrics (new jobs, revenue, match time)
         supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false).gte('created_at', prevMonthStartIso).lt('created_at', prevMonthEndIso),
-        supabase.from('subscription_payments').select('amount').eq('status', 'succeeded').eq('refunded', false).gte('created_at', prevMonthStartIso).lt('created_at', prevMonthEndIso),
-        supabase.from('transactions').select('amount').eq('status', 'completed').eq('refunded', false).or('transaction_type.neq.subscription,transaction_type.is.null').gte('created_at', prevMonthStartIso).lt('created_at', prevMonthEndIso),
+        allAdminRows(() => supabase.from('subscription_payments').select('amount, status, refunded, refund_amount').in('status', collectedStatuses).gte('created_at', prevMonthStartIso).lt('created_at', prevMonthEndIso).order('id')),
+        allAdminRows(() => supabase.from('transactions').select('amount, status, refunded, refund_amount').in('status', collectedStatuses).or('transaction_type.neq.subscription,transaction_type.is.null').gte('created_at', prevMonthStartIso).lt('created_at', prevMonthEndIso).order('id')),
         supabase.from('job_assignments').select('assigned_at, jobs!inner(created_at)').not('assigned_at', 'is', null).gte('assigned_at', prevMonthStartIso).lt('assigned_at', prevMonthEndIso),
 
         supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
@@ -323,10 +325,10 @@ export default function AdminDashboard() {
       // 2. transactions: source for non-subscription revenue (job payments, PAYG, service fees)
       // We exclude subscription-type transactions to prevent double-counting.
       const subPayments = monthlyRevenueSubRes.data ?? [];
-      const subscriptionRevenue = subPayments.reduce((sum, r: any) => sum + (Number(r.amount) || 0), 0);
+      const subscriptionRevenue = paymentTotals(subPayments).remaining;
 
       const transPayments = monthlyRevenueTransRes.data ?? [];
-      const transactionRevenue = transPayments.reduce((sum, r: any) => sum + (Number(r.amount) || 0), 0);
+      const transactionRevenue = paymentTotals(transPayments).remaining;
 
       const monthlyRevenue = subscriptionRevenue + transactionRevenue;
 
@@ -340,8 +342,8 @@ export default function AdminDashboard() {
       const prevSubPayments = prevMonthlyRevenueSubRes.data ?? [];
       const prevTransPayments = prevMonthlyRevenueTransRes.data ?? [];
       const prevMonthlyRevenue =
-        prevSubPayments.reduce((sum, r: any) => sum + (Number(r.amount) || 0), 0) +
-        prevTransPayments.reduce((sum, r: any) => sum + (Number(r.amount) || 0), 0);
+        paymentTotals(prevSubPayments).remaining +
+        paymentTotals(prevTransPayments).remaining;
 
       const calcMatchTime = (rows: any[]) => {
         if (rows.length === 0) return null;

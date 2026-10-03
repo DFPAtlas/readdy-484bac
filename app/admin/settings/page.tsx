@@ -129,7 +129,7 @@ export default function AdminSettingsPage() {
         action_description: `Maintenance mode turned ${newValue ? 'ON' : 'OFF'}`,
         entity_type: 'settings',
         details: { mode: newValue },
-      }).catch(() => {});
+      }).then(() => undefined, () => undefined);
     } catch {
       showToast('Failed to update maintenance mode', 'error');
     } finally {
@@ -167,7 +167,7 @@ export default function AdminSettingsPage() {
         action_description: `Scheduled maintenance from ${schedule.start} to ${schedule.end}`,
         entity_type: 'settings',
         details: { start: schedule.start, end: schedule.end, message: schedule.message },
-      }).catch(() => {});
+      }).then(() => undefined, () => undefined);
 
       if (scheduleForm.notify) {
         sendMaintenanceNotification(scheduleForm.message);
@@ -226,7 +226,7 @@ export default function AdminSettingsPage() {
           startTime: new Date(scheduleForm.start).toISOString(),
           endTime: new Date(scheduleForm.end).toISOString(),
         },
-      }).catch(() => {});
+      }).then(() => undefined, () => undefined);
     } catch {
       showToast('Failed to send maintenance notification email', 'error');
     } finally {
@@ -248,7 +248,7 @@ export default function AdminSettingsPage() {
         action_description: 'Scheduled maintenance cancelled',
         entity_type: 'settings',
         details: {},
-      }).catch(() => {});
+      }).then(() => undefined, () => undefined);
     } catch {
       showToast('Failed to cancel scheduled maintenance', 'error');
     } finally {

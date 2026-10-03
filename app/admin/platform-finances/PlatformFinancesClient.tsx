@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import {allAdminRows} from '@/lib/adminData';
+import { isCollected, paymentAmounts } from '@/lib/financeAmounts';
 import { supabase } from '@/lib/supabase';
 import FinanceOverviewCards from './FinanceOverviewCards';
 import StripePaymentsTable from './StripePaymentsTable';
@@ -15,6 +17,7 @@ import CustomerAnalytics from './CustomerAnalytics';
 import FinancialHealthScore from './FinancialHealthScore';
 import AlertsPanel from './AlertsPanel';
 import MonthlySnapshots from './MonthlySnapshots';
+import FinancialOperationsPanel from './FinancialOperationsPanel';
 import ConnectPayoutsPanel from './ConnectPayoutsPanel';
 
 function getDateRange(filter: string, customStart?: string, customEnd?: string): { start: string; end: string } {
@@ -64,6 +67,8 @@ interface Payment {
   status: string;
   invoice_id: string;
   refunded: boolean;
+  refund_amount: number;
+  remaining_amount: number;
 }
 
 interface Cost {
@@ -146,6 +151,7 @@ interface AlertItem {
 }
 
 export default function PlatformFinancesClient() {
+  const [section, setSection] = useState('payments');
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState('this_month');
   const [customStart, setCustomStart] = useState('');
@@ -182,28 +188,18 @@ export default function PlatformFinancesClient() {
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
       const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
 
-      const { data: subPayments } = await supabase
-        .from('subscription_payments')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const {data: subPayments} = await allAdminRows(() => supabase.from('subscription_payments').select('*').order('created_at', {ascending:false}).order('id'));
 
-      const { data: transactions } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const {data: transactions, error: transactionsError} = await allAdminRows(() => supabase.from('transactions').select('*').order('created_at', {ascending:false}).order('id'));
+
+      if (transactionsError) throw transactionsError;
 
       const { count: activeSubCount } = await supabase
         .from('subscriptions')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'active');
 
-      const { data: allSubs } = await supabase
-        .from('subscriptions')
-        .select('id, status, plan_amount, stripe_price_id, billing_interval, created_at, cancelled_at, trial_end_date, current_period_end, next_payment_date')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const {data: allSubs} = await allAdminRows(() => supabase.from('subscriptions').select('id, status, plan_amount, stripe_price_id, billing_interval, created_at, cancelled_at, trial_end_date, current_period_end, next_payment_date').order('created_at', {ascending:false}).order('id'));
 
       const { data: plansData } = await supabase
         .from('plans')
@@ -254,8 +250,8 @@ export default function PlatformFinancesClient() {
         .gte('cancelled_at', yearStart);
 
       const subIds = (subPayments || []).map((p: any) => p.subscription_id).filter(Boolean);
-      let subMap: Record<string, any> = {};
-      let clientMap: Record<string, any> = {};
+      const subMap: Record<string, any> = {};
+      const clientMap: Record<string, any> = {};
 
       if (subIds.length > 0) {
         const { data: subs } = await supabase
@@ -311,7 +307,9 @@ export default function PlatformFinancesClient() {
           plan: sub?.plan_name || 'Subscription',
           amount: Number(p.amount),
           stripe_fee: fee,
-          net_amount: Number(p.amount) - fee,
+          net_amount: paymentAmounts(p, fee).net,
+          refund_amount: paymentAmounts(p, fee).refunded,
+          remaining_amount: paymentAmounts(p, fee).remaining,
           status: p.status,
           invoice_id: p.stripe_invoice_id || '',
           refunded: p.refunded || false,
@@ -329,7 +327,9 @@ export default function PlatformFinancesClient() {
           plan: t.transaction_type || 'Job Payment',
           amount: Number(t.amount),
           stripe_fee: fee,
-          net_amount: Number(t.amount) - fee,
+          net_amount: paymentAmounts(t, fee).net,
+          refund_amount: paymentAmounts(t, fee).refunded,
+          remaining_amount: paymentAmounts(t, fee).remaining,
           status: t.status,
           invoice_id: t.stripe_invoice_id || '',
           refunded: t.refunded || false,
@@ -390,16 +390,14 @@ export default function PlatformFinancesClient() {
     setPayments(filtered);
   }, [allPayments, dateFilter, customStart, customEnd]);
 
-  const monthlyRevenue = payments
-    .filter((p) => p.status === 'succeeded' || p.status === 'completed')
-    .reduce((sum, p) => sum + p.amount, 0);
+  const collected = payments.reduce((sum, p) => sum + paymentAmounts(p).collected, 0);
+  const monthlyRevenue = payments.filter(p => p.plan !== 'job_payment' && isCollected(p.status)).reduce((sum,p) => sum + p.remaining_amount, 0);
   const monthlyCosts = costs.reduce((sum, c) => sum + Number(c.monthly_cost), 0);
   const stripeFees = payments
-    .filter((p) => p.status === 'succeeded' || p.status === 'completed')
+    .filter((p) => p.plan !== 'job_payment' && isCollected(p.status))
     .reduce((sum, p) => sum + p.stripe_fee, 0);
-  const refunds = payments
-    .filter((p) => p.refunded)
-    .reduce((sum, p) => sum + p.amount, 0);
+  const refunds = payments.reduce((sum, p) => sum + p.refund_amount, 0);
+  const remaining = collected - refunds;
   const failedPayments = payments
     .filter((p) => p.status === 'failed')
     .reduce((sum, p) => sum + p.amount, 0);
@@ -431,7 +429,7 @@ export default function PlatformFinancesClient() {
         const d = new Date(p.date);
         return d >= new Date(now.getFullYear(), now.getMonth() - 1, 1) && d <= new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
       })
-      .filter((p) => p.status === 'succeeded' || p.status === 'completed')
+      .filter((p) => isCollected(p.status))
       .reduce((sum, p) => sum + p.amount, 0);
     const mrrGrowth = prevMonthRevenue > 0 ? (monthlyRevenue - prevMonthRevenue) / prevMonthRevenue : 0;
 
@@ -471,7 +469,7 @@ export default function PlatformFinancesClient() {
     const prevRevenue = allPayments
       .filter((p) => {
         const d = new Date(p.date);
-        return d >= prevMonthStart && d <= prevMonthEnd && (p.status === 'succeeded' || p.status === 'completed');
+        return d >= prevMonthStart && d <= prevMonthEnd && (isCollected(p.status));
       })
       .reduce((sum, p) => sum + p.amount, 0);
     const revenueGrowth = prevRevenue > 0 ? (monthlyRevenue - prevRevenue) / prevRevenue : 0;
@@ -479,23 +477,23 @@ export default function PlatformFinancesClient() {
     const currentNewUsers = (guardsCount.thisMonth || 0) + (clientsCount.thisMonth || 0);
     const customerGrowth = prevNewUsers > 0 ? (currentNewUsers - prevNewUsers) / prevNewUsers : 0;
     const totalPayments = allPayments.length;
-    const successfulPayments = allPayments.filter((p) => p.status === 'succeeded' || p.status === 'completed').length;
+    const successfulPayments = allPayments.filter((p) => isCollected(p.status)).length;
     const paymentSuccessRate = totalPayments > 0 ? (successfulPayments / totalPayments) * 100 : 0;
     const activeSubs = allSubscriptions.filter((s) => s.status === 'active').length;
     const totalSubs = allSubscriptions.length;
     const subscriptionRetention = totalSubs > 0 ? (activeSubs / totalSubs) * 100 : 0;
-    return { revenueGrowth, customerGrowth, paymentSuccessRate, subscriptionRetention };
+    return { revenueGrowth, customerGrowth, paymentSuccessRate, subscriptionRetention, sufficientHistory: prevRevenue > 0 && prevNewUsers > 0 && totalSubs > 0 && totalPayments > 0 };
   }, [allPayments, monthlyRevenue, guardsCount, clientsCount, allSubscriptions]);
 
   const alerts = useMemo(() => {
     const list: AlertItem[] = [];
-    const totalSucceeded = allPayments.filter((p) => p.status === 'succeeded' || p.status === 'completed').length;
+    const totalSucceeded = allPayments.filter((p) => isCollected(p.status)).length;
     const failedCount = allPayments.filter((p) => p.status === 'failed').length;
     const totalFees = allPayments
-      .filter((p) => p.status === 'succeeded' || p.status === 'completed')
+      .filter((p) => isCollected(p.status))
       .reduce((sum, p) => sum + p.stripe_fee, 0);
     const totalRevenue = allPayments
-      .filter((p) => p.status === 'succeeded' || p.status === 'completed')
+      .filter((p) => isCollected(p.status))
       .reduce((sum, p) => sum + p.amount, 0);
 
     if (totalRevenue > 0 && totalFees / totalRevenue > 0.03) {
@@ -524,7 +522,7 @@ export default function PlatformFinancesClient() {
     const prevRevenue = allPayments
       .filter((p) => {
         const d = new Date(p.date);
-        return d >= prevMonthStart && d <= prevMonthEnd && (p.status === 'succeeded' || p.status === 'completed');
+        return d >= prevMonthStart && d <= prevMonthEnd && (isCollected(p.status));
       })
       .reduce((sum, p) => sum + p.amount, 0);
     if (prevRevenue > 0 && monthlyRevenue < prevRevenue * 0.9) {
@@ -583,8 +581,8 @@ export default function PlatformFinancesClient() {
       const d = new Date(p.date);
       const key = d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
       if (months[key]) {
-        if (p.status === 'succeeded' || p.status === 'completed') {
-          months[key].revenue += p.amount;
+        if (isCollected(p.status)) {
+          if (p.plan !== 'job_payment') months[key].revenue += p.remaining_amount;
           months[key].stripe_fees += p.stripe_fee;
         }
       }
@@ -642,7 +640,7 @@ export default function PlatformFinancesClient() {
     setToast({ message: 'Cost deleted', type: 'success' });
   };
 
-  const handleSaveCost = async (form: Cost) => {
+  const handleSaveCost = async (form: Omit<Cost, 'id'> & {id?: string}) => {
     setIsSavingCost(true);
     try {
       if (editingCost) {
@@ -680,7 +678,7 @@ export default function PlatformFinancesClient() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-white">Platform Finances</h1>
-                <p className="text-xs text-slate-400">Monitor revenue, costs, and tax estimates</p>
+                <p className="text-xs text-slate-400">Payments, refunds and platform finances</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -711,6 +709,18 @@ export default function PlatformFinancesClient() {
           />
         </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[['Payments collected', collected], ['Refunded', refunds], ['Remaining before fees / payouts', remaining]].map(([label, value]) => (
+            <div key={String(label)} className="rounded-2xl border border-[#1e2d4a] bg-[#111d35] p-6"><p className="text-sm text-slate-300">{label}</p><p className="mt-2 text-3xl font-bold text-white">{loading ? '…' : Number(value).toLocaleString('en-GB', {style: 'currency', currency: 'GBP'})}</p></div>
+          ))}
+        </div>
+        <p className="text-sm text-slate-300">For payments created in the selected period, including their refunds to date. Remaining funds include guard money and are not platform profit or the Stripe balance. Stripe fees below are estimates.</p>
+        <nav aria-label="Finance sections" className="flex flex-wrap gap-3">
+          {[['payments','Payments & refunds'], ['analytics','Analytics & history'], ['costs','Costs & estimates']].map(([key,label]) => <button key={key} onClick={() => setSection(key)} aria-pressed={section === key} className={`rounded-xl px-5 py-3 text-sm font-semibold ${section === key ? 'bg-teal-600 text-white' : 'bg-[#111d35] text-slate-300 border border-[#1e2d4a]'}`}>{label}</button>)}
+        </nav>
+        {section === 'payments' && <div className="space-y-6"><StripePaymentsTable payments={payments} loading={loading} /><FinancialOperationsPanel />
+          <ConnectPayoutsPanel key={`${dateFilter}:${loading}`} /></div>}
+        {section === 'costs' && <div className="space-y-6">
         <FinanceOverviewCards
           monthlyRevenue={monthlyRevenue}
           monthlyCosts={monthlyCosts}
@@ -723,7 +733,9 @@ export default function PlatformFinancesClient() {
           loading={loading}
         />
 
-        <ConnectPayoutsPanel />
+        </div>}
+
+        {section === 'analytics' && <div className="space-y-8">
 
         <div className="space-y-2">
           <h2 className="text-sm font-bold text-white uppercase tracking-wider">Business KPIs</h2>
@@ -749,33 +761,12 @@ export default function PlatformFinancesClient() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <StripePaymentsTable payments={payments} loading={loading} />
-          </div>
-          <div>
-            <TaxEstimatePanel
-              grossRevenue={monthlyRevenue}
-              netRevenue={monthlyRevenue - stripeFees}
-              vatEstimate={vatEstimate}
-              runningCosts={monthlyCosts}
-              estimatedProfit={estimatedProfit}
-            />
-          </div>
-        </div>
-
-        <RunningCostsTable
-          costs={costs}
-          loading={loading}
-          onAdd={handleAddCost}
-          onEdit={handleEditCost}
-          onDelete={handleDeleteCost}
-        />
-
-        <div className="space-y-2">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider">Historical Data</h2>
-          <MonthlySnapshots snapshots={snapshots} loading={loading} onRefresh={fetchData} />
-        </div>
+        <MonthlySnapshots snapshots={snapshots} loading={loading} onRefresh={fetchData} />
+        </div>}
+        {section === 'costs' && <div className="space-y-6">
+          <TaxEstimatePanel grossRevenue={monthlyRevenue} netRevenue={monthlyRevenue - stripeFees} vatEstimate={vatEstimate} runningCosts={monthlyCosts} estimatedProfit={estimatedProfit} />
+          <RunningCostsTable costs={costs} loading={loading} onAdd={handleAddCost} onEdit={handleEditCost} onDelete={handleDeleteCost} />
+        </div>}
 
         <CostFormModal
           open={costModalOpen}

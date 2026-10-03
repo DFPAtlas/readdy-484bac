@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
+import { claimFinancialOperation, finishFinancialOperation, holdFinancialOperation, type FinancialOperation } from '../_shared/financialOperations.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const CORS_ALLOWLIST = [
@@ -123,8 +124,12 @@ serve(async (req: Request) => {
     return corsResponse(origin, err.status, { error: err.message });
   }
 
+  let operation: FinancialOperation | null = null;
+  let stripeStarted = false;
   try {
     const assignment = await loadAssignment(supabase, validated.assignmentId, validated.jobId);
+    operation = await claimFinancialOperation(supabase, assignment.job_id, `payout:${assignment.id}:v1`, 'payout', validated.adminUserId);
+    if (operation.replayed) return corsResponse(origin,200,operation.result);
     const guard = await loadGuard(supabase, assignment.guard_id);
     const job = await loadJob(supabase, assignment.job_id);
 
@@ -134,6 +139,8 @@ serve(async (req: Request) => {
     const existingPayout = await checkExistingPayout(supabase, validated.assignmentId);
 
     const { grossPence, feePence, netPence } = derivePayoutAmounts(assignment);
+
+    const chargeId = await validateAvailableFunds(stripe, supabase, job.id, job.client_id, netPence, assignment.id);
 
     await verifyStripeConnectAccount(stripe, supabase, guard, validated.assignmentId, job.id, netPence);
 
@@ -159,6 +166,8 @@ serve(async (req: Request) => {
       }
     } else {
       idempotencyKey = `guard-payout:${validated.assignmentId}:${IDEMPOTENCY_VERSION}:${crypto.randomUUID()}`;
+      // Persisted processing writes require review if a later step fails.
+      stripeStarted = true;
       payoutRecord = await createPayoutRecord(supabase, {
         guardId: guard.id,
         assignmentId: validated.assignmentId,
@@ -177,8 +186,10 @@ serve(async (req: Request) => {
       now,
     });
 
+    stripeStarted = true;
     const transfer = await createStripeTransfer(stripe, supabase, {
       netAmountPence: netPence,
+      chargeId,
       destinationAccount: guard.stripe_account_id!,
       jobTitle: job.job_title || 'Job',
       guardName: guard.full_name || guard.id,
@@ -213,6 +224,8 @@ serve(async (req: Request) => {
       now,
       recovered,
     });
+
+    await finishFinancialOperation(supabase, operation.id, {success:true,transferId:transfer.id,netAmount:(netPence/100).toFixed(2),message:'Transfer submitted to Stripe'});
 
     let emailSent = false;
     let emailFailureReason: string | null = null;
@@ -257,6 +270,7 @@ serve(async (req: Request) => {
 
       if (!emailSent) {
         await supabase.from('payment_audit_logs').insert({
+          to_status: 'payout_processing',
           event_type: 'payout_receipt_email_failed',
           reference_type: 'guard_payout',
           reference_id: payoutRecord.id,
@@ -268,7 +282,7 @@ serve(async (req: Request) => {
             transfer_id: transfer.id,
           },
           created_at: now,
-        }).catch(() => {});
+        }).then(() => undefined, () => undefined);
       }
     }
 
@@ -288,8 +302,9 @@ serve(async (req: Request) => {
       message,
     });
   } catch (e: unknown) {
+    if (operation && !operation.replayed) await holdFinancialOperation(supabase, operation.id, stripeStarted);
     const err = e as { status: number; message: string };
-    return corsResponse(origin, err.status, { error: err.message });
+    return corsResponse(origin, err.status || 500, { error: stripeStarted ? 'Payout submitted or uncertain; finance reconciliation required. Do not repeat the transfer.' : err.message || 'Unable to process payout' });
   }
 });
 
@@ -363,6 +378,10 @@ async function authenticateAndValidate(
     throw { status: 403, message: 'Finance administrator access required' };
   }
 
+  let claims: {aal?: string};
+  try {const payload = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'); claims=JSON.parse(atob(payload+'='.repeat((4-payload.length%4)%4)));} catch {throw {status:401,message:'Invalid session'};}
+  if (claims.aal !== 'aal2') throw {status:403,message:'MFA required for guard payouts'};
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -385,7 +404,7 @@ async function authenticateAndValidate(
   return {
     assignmentId,
     jobId,
-    adminUserId: adminUser.id,
+    adminUserId: user.id,
     adminRole: adminUser.role,
     adminEmail: user.email || '',
   };
@@ -605,19 +624,21 @@ async function verifyStripeConnectAccount(
 ): Promise<void> {
   if (!guard.stripe_account_id) {
     await supabase.from('payment_audit_logs').insert({
-      event_type: 'payout_blocked_no_stripe_account',
+      to_status: 'payout_processing',
+          event_type: 'payout_blocked_no_stripe_account',
       reference_type: 'guard_payout',
       reference_id: assignmentId,
       details: { guard_id: guard.id, job_id: jobId, net_amount_pence: netAmountPence },
       created_at: new Date().toISOString(),
-    }).catch(() => {});
+    }).then(() => undefined, () => undefined);
 
     throw { status: 400, message: 'Payout setup required' };
   }
 
   if (!guard.stripe_payouts_enabled || !guard.stripe_charges_enabled) {
     await supabase.from('payment_audit_logs').insert({
-      event_type: 'payout_blocked_payouts_disabled',
+      to_status: 'payout_processing',
+          event_type: 'payout_blocked_payouts_disabled',
       reference_type: 'guard_payout',
       reference_id: assignmentId,
       details: {
@@ -628,14 +649,15 @@ async function verifyStripeConnectAccount(
         stripe_charges_enabled: guard.stripe_charges_enabled,
       },
       created_at: new Date().toISOString(),
-    }).catch(() => {});
+    }).then(() => undefined, () => undefined);
 
     throw { status: 400, message: 'Payout setup required' };
   }
 
   if (guard.stripe_account_status !== 'ready') {
     await supabase.from('payment_audit_logs').insert({
-      event_type: 'payout_blocked_status_not_ready',
+      to_status: 'payout_processing',
+          event_type: 'payout_blocked_status_not_ready',
       reference_type: 'guard_payout',
       reference_id: assignmentId,
       details: {
@@ -644,7 +666,7 @@ async function verifyStripeConnectAccount(
         stripe_account_status: guard.stripe_account_status,
       },
       created_at: new Date().toISOString(),
-    }).catch(() => {});
+    }).then(() => undefined, () => undefined);
 
     throw { status: 400, message: 'Payout setup required' };
   }
@@ -662,7 +684,8 @@ async function verifyStripeConnectAccount(
 
     if (notReady) {
       await supabase.from('payment_audit_logs').insert({
-        event_type: 'payout_blocked_stripe_verification_failed',
+        to_status: 'payout_processing',
+          event_type: 'payout_blocked_stripe_verification_failed',
         reference_type: 'guard_payout',
         reference_id: assignmentId,
         details: {
@@ -675,7 +698,7 @@ async function verifyStripeConnectAccount(
           requirements_due: requirementsDue,
         },
         created_at: new Date().toISOString(),
-      }).catch(() => {});
+      }).then(() => undefined, () => undefined);
 
       throw { status: 400, message: 'Payout setup required' };
     }
@@ -743,11 +766,12 @@ async function markProcessing(
     now: string;
   },
 ): Promise<void> {
-  await supabase
+  const {error} = await supabase
     .from('job_assignments')
     .update({ payment_status: 'payout_processing', updated_at: params.now })
     .eq('id', params.assignmentId)
     .eq('status', 'completed');
+  if (error) throw new Error('Assignment processing state could not be recorded');
 }
 
 async function createStripeTransfer(
@@ -755,6 +779,7 @@ async function createStripeTransfer(
   supabase: ReturnType<typeof createClient>,
   params: {
     netAmountPence: number;
+    chargeId: string;
     destinationAccount: string;
     jobTitle: string;
     guardName: string;
@@ -769,6 +794,7 @@ async function createStripeTransfer(
     const transfer = await stripe.transfers.create({
       amount: params.netAmountPence,
       currency: 'gbp',
+      source_transaction: params.chargeId,
       destination: params.destinationAccount,
       description: `QuickGuard payout: ${params.jobTitle} (Guard: ${params.guardName})`,
       metadata: {
@@ -794,7 +820,7 @@ async function createStripeTransfer(
         updated_at: new Date().toISOString(),
       })
       .eq('id', params.payoutRecordId)
-      .catch(() => {});
+      .then(() => undefined, () => undefined);
 
     await supabase.from('job_assignments')
       .update({
@@ -802,10 +828,11 @@ async function createStripeTransfer(
         updated_at: new Date().toISOString(),
       })
       .eq('id', params.assignmentId)
-      .catch(() => {});
+      .then(() => undefined, () => undefined);
 
     await supabase.from('payment_audit_logs').insert({
-      event_type: 'payout_transfer_failed',
+      to_status: 'payout_processing',
+          event_type: 'payout_transfer_failed',
       reference_type: 'guard_payout',
       reference_id: params.payoutRecordId,
       details: {
@@ -817,7 +844,7 @@ async function createStripeTransfer(
         idempotency_key: params.idempotencyKey,
       },
       created_at: new Date().toISOString(),
-    }).catch(() => {});
+    }).then(() => undefined, () => undefined);
 
     throw { status: 500, message: 'Unable to process payout' };
   }
@@ -852,7 +879,8 @@ async function recordTransferCreated(
     safeLog('payout transfer record update error', payoutErr.message);
 
     await supabase.from('payment_audit_logs').insert({
-      event_type: 'payout_transfer_record_db_failed',
+      to_status: 'payout_processing',
+          event_type: 'payout_transfer_record_db_failed',
       reference_type: 'guard_payout',
       reference_id: params.payoutRecordId,
       details: {
@@ -862,7 +890,7 @@ async function recordTransferCreated(
         recovered: params.recovered,
       },
       created_at: params.now,
-    }).catch(() => {});
+    }).then(() => undefined, () => undefined);
 
     throw { status: 500, message: 'Unable to process payout' };
   }
@@ -879,7 +907,8 @@ async function recordTransferCreated(
     safeLog('assignment transfer id update error', assignErr.message);
 
     await supabase.from('payment_audit_logs').insert({
-      event_type: 'payout_assignment_transfer_update_failed',
+      to_status: 'payout_processing',
+          event_type: 'payout_assignment_transfer_update_failed',
       reference_type: 'guard_payout',
       reference_id: params.payoutRecordId,
       details: {
@@ -889,7 +918,8 @@ async function recordTransferCreated(
         recovered: params.recovered,
       },
       created_at: params.now,
-    }).catch(() => {});
+    }).then(() => undefined, () => undefined);
+    throw new Error('Transfer submitted; assignment reconciliation required');
   }
 }
 
@@ -912,7 +942,9 @@ async function logAudit(
     recovered: boolean;
   },
 ): Promise<void> {
-  await supabase.from('payment_audit_logs').insert({
+  const {error} = await supabase.from('payment_audit_logs').insert({
+    job_id: params.jobId, assignment_id: params.assignmentId, guard_id: params.guardId,
+    to_status: 'payout_processing', from_status: 'payout_pending',
     event_type: params.recovered ? 'guard_payout_recovered' : 'guard_payout_initiated',
     reference_type: 'guard_payout',
     reference_id: params.assignmentId,
@@ -930,9 +962,8 @@ async function logAudit(
       recovered: params.recovered,
     },
     created_at: params.now,
-  }).catch((e: unknown) => {
-    safeLog('audit log insert error', e instanceof Error ? e.message : 'unknown');
   });
+  if (error) throw new Error('Transfer submitted; audit reconciliation required');
 }
 
 function buildPayoutReceiptHtml(params: {
@@ -955,4 +986,19 @@ function buildPayoutReceiptHtml(params: {
     : 0;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Payout Receipt</title></head><body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background-color:#f3f4f6;"><table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:40px 20px;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.1);"><tr><td style="background:linear-gradient(135deg,#10B981 0%,#059669 100%);padding:40px 30px;text-align:center;"><h1 style="margin:0;color:#fff;font-size:28px;font-weight:bold;">QuickGuard</h1><p style="margin:10px 0 0;color:#D1FAE5;font-size:16px;">Payout Receipt</p></td></tr><tr><td style="padding:40px 30px;"><div style="background:linear-gradient(135deg,#ECFDF5 0%,#D1FAE5 100%);border:2px solid #10B981;border-radius:10px;padding:30px;text-align:center;margin-bottom:30px;"><p style="margin:0;color:#047857;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Net Payout</p><p style="margin:10px 0 0;color:#065F46;font-size:42px;font-weight:bold;">\u00A3${params.netAmount.toFixed(2)}</p></div><p style="margin:0 0 20px;color:#374151;font-size:16px;line-height:1.6;">Hi <strong>${params.guardName}</strong>,</p><p style="margin:0 0 30px;color:#374151;font-size:16px;line-height:1.6;">Your payment for <strong>${params.jobTitle}</strong> has been transferred to your connected account.</p><table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:30px;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden;"><tr><td style="padding:14px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;"><strong style="color:#374151;">Job Title</strong></td><td style="padding:14px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;text-align:right;color:#6B7280;">${params.jobTitle}</td></tr><tr><td style="padding:14px;border-bottom:1px solid #E5E7EB;"><strong style="color:#374151;">Gross Amount</strong></td><td style="padding:14px;border-bottom:1px solid #E5E7EB;text-align:right;color:#6B7280;">\u00A3${params.grossAmount.toFixed(2)}</td></tr><tr><td style="padding:14px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;"><strong style="color:#374151;">Platform Fee (${feePercent}%)</strong></td><td style="padding:14px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;text-align:right;color:#6B7280;">\u00A3${params.feeAmount.toFixed(2)}</td></tr><tr><td style="padding:16px;background:#F0FDF4;"><strong style="color:#065F46;font-size:18px;">Net Payout</strong></td><td style="padding:16px;background:#F0FDF4;text-align:right;"><strong style="color:#10B981;font-size:22px;">\u00A3${params.netAmount.toFixed(2)}</strong></td></tr><tr><td style="padding:14px;border-bottom:1px solid #E5E7EB;"><strong style="color:#374151;">Transfer ID</strong></td><td style="padding:14px;border-bottom:1px solid #E5E7EB;text-align:right;color:#6B7280;font-family:monospace;font-size:12px;">${params.transferId}</td></tr><tr><td style="padding:14px;background:#F9FAFB;"><strong style="color:#374151;">Date &amp; Time</strong></td><td style="padding:14px;background:#F9FAFB;text-align:right;color:#6B7280;">${dateStr} at ${timeStr}</td></tr></table><div style="background:#DBEAFE;border-left:4px solid #2563EB;padding:16px;margin-bottom:30px;border-radius:4px;"><p style="margin:0;color:#1E40AF;font-size:14px;line-height:1.6;"><strong>Payment Timing:</strong> Funds typically arrive in your bank account within 1-3 business days depending on your bank.</p></div><p style="margin:30px 0 0;color:#6B7280;font-size:14px;text-align:center;">Questions? Contact us at <a href="mailto:support@quickguard.uk" style="color:#1a237e;">support@quickguard.uk</a></p></td></tr><tr><td style="background:#111827;padding:20px 30px;text-align:center;"><p style="margin:0;color:#9CA3AF;font-size:12px;">&copy; ${new Date().getFullYear()} QuickGuard. All rights reserved. This is an automated receipt.</p></td></tr></table></td></tr></table></body></html>`;
+}
+
+async function validateAvailableFunds(stripe: Stripe, db: ReturnType<typeof createClient>, jobId: string, clientId: string, payoutPence: number, assignmentId: string): Promise<string> {
+  const {data: payment, error} = await db.from('transactions').select('stripe_payment_intent,status,refunded,refund_amount')
+    .eq('job_id',jobId).eq('client_id',clientId).eq('transaction_type','job_payment').order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if (error || !payment?.stripe_payment_intent || payment.status !== 'completed' || payment.refunded || Number(payment.refund_amount) > 0) throw {status:409,message:'Refunded or unverified payment requires finance review; payout blocked'};
+  const intent = await stripe.paymentIntents.retrieve(payment.stripe_payment_intent, {expand:['latest_charge']});
+  const charge = typeof intent.latest_charge === 'object' ? intent.latest_charge as Stripe.Charge : null;
+  if (!charge || !charge.paid || charge.amount_refunded > 0 || intent.status !== 'succeeded') throw {status:409,message:'Refunded or unverified Stripe charge; payout blocked'};
+  const {data: payouts,error: payoutError} = await db.from('guard_payouts').select('assignment_id,net_amount,status').eq('job_id',jobId);
+  if (payoutError) throw new Error('Unable to verify available funds');
+  const committedPence = (payouts || []).filter(p => p.assignment_id !== assignmentId && !['failed','cancelled'].includes(p.status))
+    .reduce((total,p) => total + Math.round(Number(p.net_amount || 0) * 100),0);
+  if (!Number.isSafeInteger(payoutPence) || payoutPence <= 0 || committedPence + payoutPence > charge.amount - charge.amount_refunded) throw {status:409,message:'Guard payout exceeds available client funds'};
+  return charge.id;
 }

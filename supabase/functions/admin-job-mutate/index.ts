@@ -38,7 +38,7 @@ serve(async (req) => {
   if (getAal(jwt) !== 'aal2') {
     return new Response(JSON.stringify({ error: 'Multi-factor authentication required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
-  const { data: adminUser } = await supabase.from('admin_users').select('id, full_name, email, is_active').eq('user_id', user.id).maybeSingle();
+  const { data: adminUser } = await supabase.from('admin_users').select('id, full_name, email, role, is_active').eq('user_id', user.id).maybeSingle();
   if (!adminUser || !adminUser.is_active) {
     return new Response(JSON.stringify({ error: 'Admin access required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
@@ -85,8 +85,9 @@ serve(async (req) => {
     if (action === 'status_change') {
       const { jobId, newStatus, note } = body;
       if (!jobId || !newStatus) throw new Error('jobId and newStatus required');
-      const { data: job } = await supabase.from('jobs').select('id, job_title, status').eq('id', jobId).maybeSingle();
+      const { data: job } = await supabase.from('jobs').select('id, job_title, status, payment_status').eq('id', jobId).maybeSingle();
       if (!job) throw new Error('Job not found');
+      if (!['open','draft','pending','cancelled'].includes(newStatus) || !['open','draft','pending','awaiting_guard_selection'].includes(job.status) || !['unpaid','payment_pending',null].includes(job.payment_status)) throw new Error('Funded and operational jobs must use the booking, completion or cancellation workflow');
       const { error } = await supabase.from('jobs').update({ status: newStatus, updated_at: now }).eq('id', jobId);
       if (error) throw error;
       await supabase.from('admin_activity_log').insert({
@@ -192,11 +193,12 @@ serve(async (req) => {
       let actionType = '';
       let actionDesc = '';
       if (bulkAction === 'delete') { updatePayload = { is_deleted: true, deleted_at: now }; actionType = 'bulk_job_deleted'; actionDesc = `Bulk deleted ${ids.length} jobs`; }
-      else if (bulkAction === 'close') { updatePayload.status = 'completed'; actionType = 'bulk_job_closed'; actionDesc = `Bulk closed ${ids.length} jobs`; }
+      else if (bulkAction === 'close') { updatePayload.status = 'closed'; actionType = 'bulk_job_closed'; actionDesc = `Bulk closed ${ids.length} jobs`; }
       else if (bulkAction === 'pause') { updatePayload.status = 'paused'; actionType = 'bulk_job_paused'; actionDesc = `Bulk paused ${ids.length} jobs`; }
       else if (bulkAction === 'open') { updatePayload.status = 'open'; actionType = 'bulk_job_reopened'; actionDesc = `Bulk reopened ${ids.length} jobs`; }
       else if (bulkAction === 'flag') { updatePayload.risk_level = 'suspicious'; actionType = 'bulk_job_flagged'; actionDesc = `Bulk flagged ${ids.length} jobs`; }
       else { throw new Error('Invalid bulk action'); }
+      if (['close','pause','open'].includes(bulkAction)) throw new Error('Bulk lifecycle status changes are disabled; use each booking workflow');
       const { error } = await supabase.from('jobs').update(updatePayload).in('id', ids);
       if (error) throw error;
       await supabase.from('admin_activity_log').insert({
@@ -208,22 +210,9 @@ serve(async (req) => {
     }
 
     if (action === 'update_payment_status') {
-      const { jobId, newPaymentStatus, reason } = body;
-      if (!jobId || !newPaymentStatus) throw new Error('jobId and newPaymentStatus required');
-      const { data: job } = await supabase.from('jobs').select('id, job_title, payment_status').eq('id', jobId).maybeSingle();
-      if (!job) throw new Error('Job not found');
-      const oldStatus = job.payment_status || 'unpaid';
-      const { error } = await supabase.from('jobs').update({ payment_status: newPaymentStatus, updated_at: now }).eq('id', jobId);
-      if (error) throw error;
-      await supabase.from('payment_audit_logs').insert({ job_id: jobId, from_status: oldStatus, to_status: newPaymentStatus, changed_by_role: 'admin', reason: reason || `Admin ${action} from ${oldStatus} to ${newPaymentStatus}` });
-      await supabase.from('admin_activity_log').insert({
-        admin_username: adminUser.email || 'admin', admin_name: adminName,
-        action_type: 'payment_status_changed',
-        action_description: `Changed payment status of "${job.job_title}" from ${oldStatus} to ${newPaymentStatus}`,
-        target_type: 'job', target_name: job.job_title,
-        metadata: { jobId, from: oldStatus, to: newPaymentStatus, reason: reason || '', adminId },
+      return new Response(JSON.stringify({ error: 'Manual payment status changes are disabled. Use the verified completion, payout or dispute refund workflow.' }), {
+        status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
-      return new Response(JSON.stringify({ success: true, message: 'Payment status updated' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     return new Response(JSON.stringify({ error: 'Invalid action' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

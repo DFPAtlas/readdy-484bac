@@ -217,7 +217,7 @@ export default function LiveTestChecklistPage() {
         body: { action: 'recheck', checkId: id },
       });
       if (error) throw new Error((await extractEdgeError(error)) || 'Recheck failed');
-      const fresh = (data.checks || []).map(normalize);
+      const fresh: ReturnType<typeof normalize>[] = (data.checks || []).map(normalize);
       setChecks((prev) => prev.map((c) => fresh.find((f) => f.id === c.id) || c));
     } catch (err: any) {
       setError(err?.message || 'Recheck failed');

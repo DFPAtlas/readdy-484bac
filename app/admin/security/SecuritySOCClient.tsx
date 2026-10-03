@@ -399,7 +399,7 @@ export default function SecuritySOCClient() {
         <PasswordResetTable events={resetEvents} />
       </div>
 
-      <EmergencyControls settings={emergencySettings} onSettingChange={fetchEmergencySettings} />
+      <EmergencyControls settings={emergencySettings || {}} onSettingChange={fetchEmergencySettings} />
 
       <SecurityToolsPanel
         infrastructure={infrastructure}

@@ -2,11 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { adminFunction } from '@/lib/adminFunction';
+import { paymentTotals } from '@/lib/financeAmounts';
 import DisputeFilterTabs from './DisputeFilterTabs';
 import DisputeCard from './DisputeCard';
 import DisputeResolveModal from './DisputeResolveModal';
 
 interface Dispute {
+  remaining_amount: number;
   id: string;
   job_id: string;
   client_id: string;
@@ -42,7 +45,7 @@ const statusBadge: Record<string, string> = {
 const statusLabel: Record<string, string> = {
   open: 'Open',
   under_review: 'Under Review',
-  resolved_guard: 'Resolved — Guard Paid',
+  resolved_guard: 'Resolved — Transfer Submitted',
   resolved_client_refund: 'Resolved — Full Refund',
   resolved_client_partial: 'Resolved — Partial Refund',
   resolved_cancelled: 'Resolved — Cancelled',
@@ -71,7 +74,11 @@ export default function DisputesPanel() {
         `)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setDisputes(data || []);
+      const jobIds = [...new Set((data || []).map(d => d.job_id))];
+      const payments = jobIds.length ? await supabase.from('transactions').select('job_id,amount,status,refunded,refund_amount').eq('transaction_type','job_payment').in('job_id',jobIds) : {data:[],error:null};
+      if (payments.error) throw payments.error;
+      setDisputes((data || []).map(d => ({...d, remaining_amount: paymentTotals((payments.data || []).filter(p => p.job_id === d.job_id)).remaining})));
+
     } catch (err: any) {
       console.error('Failed to load disputes:', err);
       setToast({ message: 'Failed to load disputes', type: 'error' });
@@ -96,25 +103,9 @@ export default function DisputesPanel() {
     if (!selected) return;
     setResolving(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resolve-dispute`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token || ''}`,
-          },
-          body: JSON.stringify({
-            dispute_id: selected.id,
-            resolution,
-            refund_amount: parseFloat(refundAmount || '0'),
-            admin_notes: adminNotes,
-          }),
-        }
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to resolve dispute');
+      await adminFunction('resolve-dispute', {
+        dispute_id:selected.id,resolution,refund_amount:Number(refundAmount || '0'),admin_notes:adminNotes,
+      });
       setToast({ message: 'Dispute resolved successfully', type: 'success' });
       setSelected(null);
       setAdminNotes('');
@@ -194,7 +185,7 @@ export default function DisputesPanel() {
           venueCity={selected.jobs?.venue_city}
           clientName={selected.clients?.company_name || 'Unknown Client'}
           guardName={selected.guards?.full_name || 'Unknown Guard'}
-          amount={selected.jobs?.agreed_amount || 0}
+          amount={selected.remaining_amount}
           createdAt={selected.created_at}
           reason={selected.reason}
           details={selected.details}

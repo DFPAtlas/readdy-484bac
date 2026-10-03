@@ -18,8 +18,8 @@ function formatCurrency(n: number): string {
   return new Intl.NumberFormat('en-GB', {
     style: 'currency',
     currency: 'GBP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(n);
 }
 
@@ -46,7 +46,7 @@ export default function FinanceOverviewCards({
 }: Props) {
   const cards = [
     {
-      label: 'Monthly Revenue',
+      label: 'Subscription receipts after refunds',
       value: formatCurrency(monthlyRevenue),
       icon: 'ri-money-pound-circle-line',
       color: 'text-emerald-400',
@@ -54,7 +54,7 @@ export default function FinanceOverviewCards({
       trend: null,
     },
     {
-      label: 'Monthly Costs',
+      label: 'Monthly running cost rate',
       value: formatCurrency(monthlyCosts),
       icon: 'ri-price-tag-3-line',
       color: 'text-red-400',
@@ -62,7 +62,7 @@ export default function FinanceOverviewCards({
       trend: null,
     },
     {
-      label: 'Profit / Loss',
+      label: 'Estimated surplus (before guard payouts)',
       value: formatCurrency(profitLoss),
       icon: 'ri-line-chart-line',
       color: profitLoss >= 0 ? 'text-teal-400' : 'text-red-400',

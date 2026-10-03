@@ -11,6 +11,8 @@ interface Payment {
   amount: number;
   stripe_fee: number;
   net_amount: number;
+  refund_amount: number;
+  remaining_amount: number;
   status: string;
   invoice_id: string;
 }
@@ -74,14 +76,14 @@ export default function AdvancedExport({ payments, costs, monthlyData, dateRange
   };
 
   const exportRevenueReport = () => {
-    const headers = 'Date,Customer,Email,Plan,Amount,Stripe Fee,Net Amount,Status,Invoice ID\n';
+    const headers = 'Date,Customer,Email,Plan,Amount,Refunded,Remaining,Estimated Stripe Fee,After Refunds and Estimated Fee Amount,Status,Invoice ID\n';
     const rows = payments
       .map((p) => {
         const date = new Date(p.date).toLocaleDateString('en-GB');
         const customer = `"${(p.customer || '').replace(/"/g, '""')}"`;
         const email = `"${(p.email || '').replace(/"/g, '""')}"`;
         const plan = `"${(p.plan || '').replace(/"/g, '""')}"`;
-        return `${date},${customer},${email},${plan},${p.amount},${p.stripe_fee},${p.net_amount},${p.status},${p.invoice_id}`;
+        return `${date},${customer},${email},${plan},${p.amount},${p.refund_amount},${p.remaining_amount},${p.stripe_fee},${p.net_amount},${p.status},${p.invoice_id}`;
       })
       .join('\n');
     download(

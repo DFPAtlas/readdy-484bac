@@ -6,7 +6,7 @@ import { useAdminAuth } from '@/hooks/useAdminAuth';
 
 interface BackupInfo {
   id: string | null;
-  app_slug?: string;
+  app_slug?: string | null;
   backup_type: string | null;
   backup_status: string | null;
   backup_location: string | null;

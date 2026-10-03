@@ -1,3 +1,4 @@
+import {paymentTotals, isCollected} from '../../../lib/financeAmounts.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
@@ -60,8 +61,20 @@ export default async function handler(req: Request) {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
+    db: {schema:'app'},
   });
 
+  // Scheduled calls use service-role auth; manual generation requires finance MFA.
+  const authorization=req.headers.get('Authorization');
+  if (authorization !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`) {
+    const token=authorization?.replace(/^Bearer /,'');
+    if (!token) return new Response(JSON.stringify({error:'Authentication required'}),{status:401,headers:corsHeaders});
+    const {data:{user},error}=await supabase.auth.getUser(token);
+    if (error || !user) return new Response(JSON.stringify({error:'Authentication required'}),{status:401,headers:corsHeaders});
+    const {data:admin}=await supabase.from('admin_users').select('role,is_active').eq('user_id',user.id).maybeSingle();
+    let aal=null;try{const p=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');aal=JSON.parse(atob(p+'='.repeat((4-p.length%4)%4))).aal;}catch{}
+    if (!admin?.is_active || !['super_admin','finance_admin'].includes(admin.role) || aal!=='aal2') return new Response(JSON.stringify({error:'Finance admin MFA required'}),{status:403,headers:corsHeaders});
+  }
   try {
     const now = new Date();
     const targetMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
@@ -87,57 +100,24 @@ export default async function handler(req: Request) {
     const prevMonthStart = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() - 1, 1));
     const prevMonthEnd = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth(), 1));
 
-    const { data: revenueData, error: revenueError } = await supabase.rpc('get_monthly_revenue', {
-      month_start: start,
-      month_end: end,
-    });
-
-    let grossRevenue = 0;
-    if (revenueError || !revenueData) {
-      const { data: payments, error: paymentsError } = await supabase
-        .from('subscription_payments')
-        .select('amount')
-        .gte('paid_at', start)
-        .lt('paid_at', end)
-        .eq('status', 'succeeded');
-
-      if (paymentsError) throw paymentsError;
-      grossRevenue = (payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    } else {
-      grossRevenue = Number(revenueData) || 0;
+    const payments:any[]=[];
+    for (const table of ['subscription_payments','transactions']) {
+      for(let offset=0;;offset+=500){
+        let query=supabase.from(table).select('id,amount,status,refunded,refund_amount').gte('created_at',start).lt('created_at',end).order('id');
+        if(table==='transactions')query=query.or('transaction_type.neq.subscription,transaction_type.is.null');
+        const {data,error}=await query.range(offset,offset+499);
+        if(error)throw error;
+        payments.push(...(data || []));
+        if((data || []).length<500)break;
+      }
     }
-
-    const { data: refundsData, error: refundsError } = await supabase
-      .from('subscription_payments')
-      .select('refund_amount')
-      .gte('refunded_at', start)
-      .lt('refunded_at', end)
-      .eq('refunded', true);
-
-    if (refundsError) throw refundsError;
-    const refunds = (refundsData || []).reduce((sum, p) => sum + (Number(p.refund_amount) || 0), 0);
-
-    const { data: failedData, error: failedError } = await supabase
-      .from('subscription_payments')
-      .select('id')
-      .gte('failed_at', start)
-      .lt('failed_at', end)
-      .eq('status', 'failed');
-
-    if (failedError) throw failedError;
-    const failedPayments = (failedData || []).length;
-
-    const { data: totalPaymentsData, error: totalPaymentsError } = await supabase
-      .from('subscription_payments')
-      .select('id')
-      .gte('created_at', start)
-      .lt('created_at', end);
-
-    if (totalPaymentsError) throw totalPaymentsError;
-    const totalPayments = (totalPaymentsData || []).length;
-    const failedPaymentRate = totalPayments > 0 ? failedPayments / totalPayments : 0;
-    const paymentSuccessRate = totalPayments > 0 ? 1 - failedPaymentRate : 1;
-
+    const totals=paymentTotals(payments);
+    const grossRevenue=totals.collected;
+    const refunds=totals.refunded;
+    const failedPayments=payments.filter(p=>p.status==='failed').length;
+    const totalPayments=payments.length;
+    const failedPaymentRate=totalPayments>0?failedPayments/totalPayments:0;
+    const paymentSuccessRate=totalPayments>0?payments.filter(p=>isCollected(p.status)).length/totalPayments:0;
     const { data: runningCostsData, error: runningCostsError } = await supabase
       .from('platform_costs')
       .select('monthly_cost');
@@ -145,14 +125,14 @@ export default async function handler(req: Request) {
     if (runningCostsError) throw runningCostsError;
     const runningCosts = (runningCostsData || []).reduce((sum, c) => sum + (Number(c.monthly_cost) || 0), 0);
 
-    const successfulPaymentsCount = (totalPaymentsData || []).filter(
-      (p: any) => !failedData?.some((f: any) => f.id === p.id)
-    ).length;
-
-    const stripeFees = (grossRevenue * 0.015) + (successfulPaymentsCount * 0.20);
-    const netRevenue = Math.max(0, grossRevenue - stripeFees);
-    const vatEstimate = netRevenue * 0.20;
-    const estimatedProfit = netRevenue - runningCosts - vatEstimate;
+    const successfulPaymentsCount=payments.filter(p=>isCollected(p.status)).length;
+    const stripeFees=Math.round((grossRevenue*0.015+successfulPaymentsCount*0.20)*100)/100;
+    const netRevenue=Math.round((grossRevenue-refunds-stripeFees)*100)/100;
+    const vatEstimate = Math.max(0, netRevenue) * 0.20;
+    const {data:payouts,error:payoutError}=await supabase.from('guard_payouts').select('net_amount,status').gte('created_at',start).lt('created_at',end);
+    if(payoutError)throw payoutError;
+    const guardFunds=(payouts || []).filter(p=>!['failed','cancelled'].includes(p.status)).reduce((sum,p)=>sum+Number(p.net_amount || 0),0);
+    const estimatedProfit = netRevenue - guardFunds - runningCosts - vatEstimate;
 
     const { data: activeSubs, error: activeSubsError } = await supabase
       .from('subscriptions')

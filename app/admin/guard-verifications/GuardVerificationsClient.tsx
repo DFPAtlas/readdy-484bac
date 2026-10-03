@@ -26,6 +26,7 @@ import { useAdminAuth } from '@/hooks/useAdminAuth';
 type DetailTab = 'overview' | 'licence' | 'documents' | 'professional' | 'availability' | 'account';
 
 interface VerificationChecks {
+  [key: string]: boolean;
   personal_info: boolean;
   sia_license: boolean;
   documents: boolean;
@@ -193,7 +194,7 @@ export default function GuardVerificationsClient() {
   const openGuardDetails = (guard: GuardVerification) => {
     setDetailLoading(true);
     setSelectedGuard(guard);
-    setVerificationChecks(guard.verification_checks || { ...defaultChecks });
+    setVerificationChecks({...defaultChecks, ...guard.verification_checks});
     setDetailTab('overview');
     setTimeout(() => setDetailLoading(false), 250);
   };
