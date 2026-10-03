@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import BackToTop from '@/components/BackToTop';
 import Footer from '@/components/Footer';
 import NavSidebar from '@/components/NavSidebar';
@@ -25,6 +26,27 @@ const categories = [
   { label: 'Client Help Portal', icon: 'ri-dashboard-line', color: 'bg-teal-500/10 text-teal-400 border-teal-400/20', href: '/client/help' },
   { label: 'Account & Profile', icon: 'ri-account-circle-line', color: 'bg-pink-500/10 text-pink-400 border-pink-400/20', href: '/guide/client' },
   { label: 'Contact Support', icon: 'ri-customer-service-2-line', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-400/20', href: '/contact' },
+];
+
+const visualGuides = [
+  {
+    title: 'Client Dashboard',
+    description: 'See where to find jobs, payments, profile setup and QuickGuard AI support.',
+    image: '/help/client-dashboard.webp',
+    href: '/guide/client',
+  },
+  {
+    title: 'Post a Security Job',
+    description: 'Follow the guided job-posting flow from job basics through review and posting.',
+    image: '/help/post-a-job.webp',
+    href: '/guide/client',
+  },
+  {
+    title: 'Manage Your Jobs',
+    description: 'Track confirmed bookings, payment status, cancellations and refunds from My Jobs.',
+    image: '/help/client-my-jobs.webp',
+    href: '/client/help',
+  },
 ];
 
 const popularArticles = [
@@ -163,6 +185,39 @@ export default function HelpContent() {
               </div>
             </div>
           </Link>
+        </div>
+
+        <div className="mb-16">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h2 className="text-2xl font-bold text-white">Visual Quick Start</h2>
+              <p className="text-slate-400 text-sm mt-1">Use these screenshots to recognise the main client screens before you start.</p>
+            </div>
+          </div>
+          <div className="grid md:grid-cols-3 gap-5 mt-6">
+            {visualGuides.map((guide) => (
+              <Link key={guide.title} href={guide.href} className="group">
+                <div className="h-full bg-[#111d35] border border-slate-700/50 rounded-2xl overflow-hidden hover:border-teal-500/30 transition-all duration-200">
+                  <div className="relative aspect-video bg-[#0e1628]">
+                    <Image
+                      src={guide.image}
+                      alt={guide.title}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 33vw"
+                      className="object-cover object-top"
+                    />
+                  </div>
+                  <div className="p-5">
+                    <h3 className="font-bold text-white text-sm mb-2 group-hover:text-teal-400 transition-colors">{guide.title}</h3>
+                    <p className="text-slate-400 text-xs leading-relaxed">{guide.description}</p>
+                    <div className="flex items-center gap-1 text-teal-400 text-xs font-semibold mt-4">
+                      Open guide <i className="ri-arrow-right-line" />
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
 
         <div className="mb-16">
