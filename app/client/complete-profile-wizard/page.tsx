@@ -235,7 +235,7 @@ export default function ClientCompleteProfileWizard() {
         if (formData[field.field_key] !== undefined) profilePayload[field.field_key] = formData[field.field_key];
       });
       const billingEmail = String(profilePayload.billing_email || '').trim();
-      if (billingEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(billingEmail)) {
+      if (billingEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(billingEmail)) {
         setError('Please enter a valid billing email address.');
         setSaving(false);
         setCurrentStep(5);
