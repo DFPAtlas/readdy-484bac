@@ -67,7 +67,15 @@ function CallbackContent() {
     }
 
     if (next) {
-      const safeNext = sanitizeRedirectPath(next, 'guard', '/guard/dashboard');
+      const [{ data: clientProfile }, { data: guardProfile }] = await Promise.all([
+        supabase.from('clients').select('user_id').eq('user_id', userId).maybeSingle(),
+        supabase.from('guards').select('user_id').eq('user_id', userId).maybeSingle(),
+      ]);
+      const redirectRole = next.startsWith('/client/') && clientProfile ? 'client'
+        : next.startsWith('/guard/') && guardProfile ? 'guard'
+        : clientProfile ? 'client' : guardProfile ? 'guard' : null;
+      if (!redirectRole) throw new Error('No dashboard profile is available for this account.');
+      const safeNext = sanitizeRedirectPath(next, redirectRole);
       setStatus('success');
       setMessage('Authenticated! Redirecting...');
       setTimeout(() => { router.push(safeNext); }, 1500);
