@@ -105,7 +105,7 @@ const steps = [
     description: 'Work your shift and receive secure payment directly to your bank account.',
     paymentSteps: [
       { icon: 'ri-briefcase-line', label: 'Complete the Shift', desc: 'Finish your assigned security duties professionally' },
-      { icon: 'ri-bank-card-line', label: 'Client Processes Payment', desc: 'Client reviews and releases payment through the platform' },
+      { icon: 'ri-bank-card-line', label: 'Client Processes Payment', desc: 'Client pays securely through QuickGuard before the booking is confirmed' },
       { icon: 'ri-lock-line', label: 'Secure Bank Transfer', desc: 'Payment is transferred to your registered bank account' },
       { icon: 'ri-mail-check-line', label: 'Email Confirmation', desc: 'You receive a payment confirmation with full details' },
     ],
