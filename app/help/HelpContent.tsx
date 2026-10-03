@@ -9,10 +9,10 @@ import NavSidebar from '@/components/NavSidebar';
 const faqs = [
   { question: 'How do I get started as a Client?', answer: 'Register as a client, complete your profile, and post your first job. You can browse verified guards, review applications, and hire the best match for your security needs.', icon: 'ri-user-add-line' },
   { question: 'How do I get started as a Guard?', answer: 'Register as a guard, upload your SIA licence, and complete your profile. Once verified, you can browse available jobs and submit applications directly through the platform.', icon: 'ri-shield-user-line' },
-  { question: 'Is SIA licence verification required?', answer: 'Yes. All security guards must hold a valid SIA licence. Every guard is SIA-verified before joining, and we are developing an AI agent to check guards’ SIA licence status weekly and flag suspended, revoked or expired licences for review.', icon: 'ri-verified-badge-line' },
-  { question: 'How does payment work?', answer: 'Clients review the agreed guard pay, plan service fee and any eligible promotion, then pay securely via Stripe before the booking is confirmed. Funds are held with Stripe and released to the guard after completion. All transactions are encrypted and processed through our secure platform.', icon: 'ri-secure-payment-line' },
+  { question: 'Is SIA licence verification required?', answer: 'Yes. All security guards must hold a valid SIA licence. Every guard must pass an initial SIA licence check before they can take work through QuickGuard. We are also developing an AI agent to re-check licence status weekly and flag suspended, revoked or expired licences for review.', icon: 'ri-verified-badge-line' },
+  { question: 'How does payment work?', answer: 'Clients review the agreed guard pay, plan service fee and any eligible promotion, then pay securely via Stripe before the booking is confirmed. Funds are held with Stripe and released to the guard after completion and the applicable release checks. All transactions are encrypted and processed through our secure platform.', icon: 'ri-secure-payment-line' },
   { question: 'Can I cancel or edit a job after posting?', answer: 'Yes. You can edit job details or cancel a posting from your client dashboard before guards are assigned. Once guards are assigned, please contact support for assistance.', icon: 'ri-edit-2-line' },
-  { question: 'How long does guard verification take?', answer: 'SIA licence verification is typically completed within 24–48 hours. You will receive an email notification once your profile has been reviewed and approved.', icon: 'ri-time-line' },
+  { question: 'How long does guard verification take?', answer: 'Verification timing can vary depending on the licence check and whether manual review is required. You will receive an email notification once your profile has been reviewed and approved.', icon: 'ri-time-line' },
   { question: 'What subscription plans are available?', answer: 'We offer flexible plans for clients of all sizes. Visit our Pricing page to compare features and choose the plan that best suits your business needs.', icon: 'ri-price-tag-3-line' },
   { question: 'How do I raise a complaint?', answer: 'You can submit a complaint directly from your job detail page. Our team reviews all complaints promptly and will keep you updated on the resolution progress.', icon: 'ri-feedback-line' },
 ];
@@ -28,12 +28,12 @@ const categories = [
 ];
 
 const popularArticles = [
-  { title: 'How to Post Your First Security Job', excerpt: 'A step-by-step walkthrough for clients posting their first job — from job details to guard selection.', category: 'Getting Started', categoryColor: 'bg-teal-500/10 text-teal-400 border-teal-400/20', icon: 'ri-file-add-line', views: '12.4k', href: '/guide/client', trending: true },
-  { title: 'SIA Licence Verification Explained', excerpt: 'Understand how our automated SIA licence check works and what to do if your verification is delayed.', category: 'Guard Verification', categoryColor: 'bg-purple-500/10 text-purple-400 border-purple-400/20', icon: 'ri-shield-check-line', views: '9.8k', href: '/guide/guard', trending: true },
-  { title: 'Understanding Subscription Plans', excerpt: 'Compare our Starter, Professional, and Enterprise plans to find the right fit for your business.', category: 'Payments & Billing', categoryColor: 'bg-blue-500/10 text-blue-400 border-blue-400/20', icon: 'ri-price-tag-3-line', views: '8.1k', href: '/pricing', trending: false },
-  { title: 'How Guards Get Paid', excerpt: 'Learn about payout schedules, bank detail setup, and how earnings are calculated per assignment.', category: 'Payments & Billing', categoryColor: 'bg-blue-500/10 text-blue-400 border-blue-400/20', icon: 'ri-money-pound-circle-line', views: '7.5k', href: '/guide/guard', trending: false },
-  { title: 'Selecting & Hiring the Right Guard', excerpt: 'Tips on reviewing guard profiles, ratings, and experience to make the best hiring decision.', category: 'Job Management', categoryColor: 'bg-orange-500/10 text-orange-400 border-orange-400/20', icon: 'ri-user-search-line', views: '6.9k', href: '/guide/client', trending: true },
-  { title: 'How to Raise a Complaint', excerpt: "If something goes wrong on a job, here's how to submit a complaint and what happens next.", category: 'Account & Profile', categoryColor: 'bg-pink-500/10 text-pink-400 border-pink-400/20', icon: 'ri-feedback-line', views: '5.3k', href: '/guide/client', trending: false },
+  { title: 'How to Post Your First Security Job', excerpt: 'A step-by-step walkthrough for clients posting their first job — from job details to guard selection.', category: 'Getting Started', categoryColor: 'bg-teal-500/10 text-teal-400 border-teal-400/20', icon: 'ri-file-add-line', views: 'Guide', href: '/guide/client', trending: true },
+  { title: 'SIA Licence Verification Explained', excerpt: 'Understand how our automated SIA licence check works and what to do if your verification is delayed.', category: 'Guard Verification', categoryColor: 'bg-purple-500/10 text-purple-400 border-purple-400/20', icon: 'ri-shield-check-line', views: 'Guide', href: '/guide/guard', trending: true },
+  { title: 'Understanding Subscription Plans', excerpt: 'Compare Free, Starter, Pro, and Enterprise options to find the right fit for your business.', category: 'Payments & Billing', categoryColor: 'bg-blue-500/10 text-blue-400 border-blue-400/20', icon: 'ri-price-tag-3-line', views: 'Guide', href: '/pricing', trending: false },
+  { title: 'How Guards Get Paid', excerpt: 'Learn about payout schedules, bank detail setup, and how earnings are calculated per assignment.', category: 'Payments & Billing', categoryColor: 'bg-blue-500/10 text-blue-400 border-blue-400/20', icon: 'ri-money-pound-circle-line', views: 'Guide', href: '/guide/guard', trending: false },
+  { title: 'Selecting & Hiring the Right Guard', excerpt: 'Tips on reviewing guard profiles, ratings, and experience to make the best hiring decision.', category: 'Job Management', categoryColor: 'bg-orange-500/10 text-orange-400 border-orange-400/20', icon: 'ri-user-search-line', views: 'Guide', href: '/guide/client', trending: true },
+  { title: 'How to Raise a Complaint', excerpt: "If something goes wrong on a job, here's how to submit a complaint and what happens next.", category: 'Account & Profile', categoryColor: 'bg-pink-500/10 text-pink-400 border-pink-400/20', icon: 'ri-feedback-line', views: 'Guide', href: '/guide/client', trending: false },
 ];
 
 export default function HelpContent() {
@@ -69,7 +69,7 @@ export default function HelpContent() {
             Help Centre
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">How can we help you?</h1>
-          <p className="text-slate-400 text-lg mb-8">Search our knowledge base or browse guides below</p>
+          <p className="text-slate-400 text-lg mb-8">Search FAQs or browse QuickGuard guides below</p>
           <div className="relative max-w-xl mx-auto">
             <div className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center">
               <i className="ri-search-line text-slate-500 text-lg" />
@@ -93,9 +93,9 @@ export default function HelpContent() {
               <div className="w-9 h-9 bg-amber-500/10 border border-amber-400/20 rounded-xl flex items-center justify-center">
                 <i className="ri-fire-line text-amber-400 text-lg" />
               </div>
-              <h2 className="text-2xl font-bold text-white">Popular Articles</h2>
+              <h2 className="text-2xl font-bold text-white">Featured Articles</h2>
             </div>
-            <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">Most visited this month</span>
+            <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">Featured QuickGuard guides</span>
           </div>
           <p className="text-slate-400 text-sm mb-7 pl-12">Quick answers to the topics our users visit most</p>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -108,7 +108,7 @@ export default function HelpContent() {
                     </div>
                     {article.trending && (
                       <span className="flex items-center gap-1 bg-amber-500/10 text-amber-400 text-xs font-semibold px-2 py-1 rounded-full border border-amber-400/20">
-                        <i className="ri-fire-line text-xs" /> Trending
+                        <i className="ri-star-line text-xs" /> Featured
                       </span>
                     )}
                   </div>
@@ -120,7 +120,7 @@ export default function HelpContent() {
                       <div className="w-4 h-4 flex items-center justify-center">
                         <i className="ri-eye-line text-xs" />
                       </div>
-                      <span>{article.views} views</span>
+                      <span>{article.views}</span>
                     </div>
                   </div>
                 </div>
