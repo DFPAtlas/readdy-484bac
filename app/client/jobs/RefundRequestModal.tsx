@@ -40,8 +40,9 @@ export default function RefundRequestModal({ job, transaction, cancellation, onC
   const [step, setStep] = useState(1);
 
   const paidAmount = transaction?.amount || 0;
-  const platformFee = paidAmount * 0.15;
-  const estimatedRefundable = paidAmount - platformFee;
+  const breakdown = transaction?.metadata?.breakdown || {};
+  const recordedPlatformFee = Number(breakdown.platformFee ?? transaction?.metadata?.platform_fee ?? 0);
+  const hasRecordedPlatformFee = Number.isFinite(recordedPlatformFee) && recordedPlatformFee > 0;
 
   const handleSubmit = async () => {
     setError('');
@@ -182,12 +183,14 @@ export default function RefundRequestModal({ job, transaction, cancellation, onC
                   <p className="text-sm font-semibold text-slate-300 mb-2">Payment Summary</p>
                   <div className="space-y-1.5 text-sm">
                     <div className="flex justify-between"><span className="text-slate-500">Amount Paid</span><span className="text-slate-200">£{paidAmount.toFixed(2)}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Platform Fee</span><span className="text-slate-200">-£{platformFee.toFixed(2)}</span></div>
-                    <div className="flex justify-between pt-1 border-t border-[#1e2d4d]"><span className="text-white font-semibold">Estimated Refundable</span><span className="text-teal-400 font-bold">£{estimatedRefundable.toFixed(2)}</span></div>
+                    {hasRecordedPlatformFee && (
+                      <div className="flex justify-between"><span className="text-slate-500">Recorded Service Fee</span><span className="text-slate-200">£{recordedPlatformFee.toFixed(2)}</span></div>
+                    )}
+                    <div className="flex justify-between pt-1 border-t border-[#1e2d4d]"><span className="text-white font-semibold">Maximum Request</span><span className="text-teal-400 font-bold">£{paidAmount.toFixed(2)}</span></div>
                   </div>
                   <p className="text-[10px] text-slate-500 mt-2">
                     <i className="ri-information-line mr-0.5"></i>
-                    Refund eligibility depends on cancellation timing and policy. Actual refund may differ.
+                    The final refundable amount is calculated server-side from the original Stripe charge, prior refunds, cancellation policy, and payout state.
                   </p>
                 </div>
               )}
