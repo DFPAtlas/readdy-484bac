@@ -10,6 +10,7 @@ import { useSidebar } from '@/lib/SidebarContext';
 import type React from 'react';
 import NotificationBadge from '@/components/NotificationBadge';
 import BrandLogo from '@/components/BrandLogo';
+import { planLabel } from '@/lib/client-journey';
 
 interface PortalSidebarProps {
   role: 'client' | 'guard' | 'company';
@@ -198,7 +199,7 @@ export default function PortalSidebar({
             <div className="min-w-0">
               <p className="text-white text-sm font-semibold truncate">{displayName}</p>
               <span className={`text-xs ${accentColor === 'emerald' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-teal-500/15 text-teal-300'} px-2 py-0.5 rounded-full font-medium border ${accentColor === 'emerald' ? 'border-emerald-500/25' : 'border-teal-500/25'}`}>
-                {subtitle}
+                {role === 'client' ? planLabel(subtitle) : subtitle}
               </span>
             </div>
           )}
