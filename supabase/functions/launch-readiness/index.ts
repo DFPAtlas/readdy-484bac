@@ -104,28 +104,41 @@ const RETIREMENT_REGISTER: RetirementRecord[] = [
   {
     slug: "create-admin-martin",
     name: "Create Admin Martin",
-    classification: "needs_verification",
+    classification: "retired_disabled",
     replacement: "admin-register",
-    lastInvocation: "2026-03-01 (one-off — created martin.hewett@quickguard.uk, super_admin, still active)",
-    knownCallers: "None in code. One-time admin bootstrap confirmed: admin_users row martin.hewett@quickguard.uk exists (created 2026-03-01).",
+    lastInvocation: "None — returns 410 Gone (retired P0 Security Repair 01, 2026-09-15)",
+    knownCallers: "None in code. Historically bootstrapped martin.hewett@quickguard.uk (2026-03-01); now retired.",
     cronWebhook: "None. No cron/webhook/n8n reference.",
-    securityRisk: "HIGH — one-off admin creation endpoint, live-only, code unverifiable in repo.",
-    reviewer: "Dependency audit + DB invocation inspection",
-    reviewDate: "2026-08-26",
-    evidence: "Live-only (no repo directory). DB inspection: admin_registration_audit is empty (bypassed admin-register audit), and admin_users contains martin.hewett@quickguard.uk (super_admin, created 2026-03-01) — confirming the function was invoked once to bootstrap Martin. No recent invocations, errors, or scheduled callers found.",
+    securityRisk: "Resolved — replaced with fail-closed 410 handler; no DB/Auth/service-role access.",
+    reviewer: "P0 Security Repair 01",
+    reviewDate: "2026-09-15",
+    evidence: "Redeployed as fail-closed retirement handler (returns HTTP 410 Gone with only the retirement error). No service-role client, no DB read/write, no Auth administration. Fixed credentials removed from source. Verified via endpoint probe.",
   },
   {
     slug: "set-martin-password",
     name: "Set Martin Password",
-    classification: "needs_verification",
+    classification: "retired_disabled",
     replacement: "admin-change-password",
-    lastInvocation: "Unknown — password stored in auth; no DB audit trail",
-    knownCallers: "None in code. One-time password bootstrap for martin.hewett@quickguard.uk.",
+    lastInvocation: "None — returns 410 Gone (retired P0 Security Repair 01, 2026-09-15)",
+    knownCallers: "None in code. One-time password bootstrap for martin.hewett@quickguard.uk; now retired.",
     cronWebhook: "None. No cron/webhook/n8n reference.",
-    securityRisk: "HIGH — one-off password-set endpoint, live-only, code unverifiable in repo.",
-    reviewer: "Dependency audit + DB invocation inspection",
-    reviewDate: "2026-08-26",
-    evidence: "Live-only (no repo directory). No DB audit trail exists for password sets (auth-managed). No recent invocations, errors, or scheduled callers found. Replacement admin-change-password is super_admin-gated.",
+    securityRisk: "Resolved — replaced with fail-closed 410 handler; no fixed password/hash logic.",
+    reviewer: "P0 Security Repair 01",
+    reviewDate: "2026-09-15",
+    evidence: "Redeployed as fail-closed retirement handler (returns HTTP 410 Gone with only the retirement error). Fixed password/hash logic removed from source. No service-role client, no DB read/write, no Auth administration. Verified via endpoint probe.",
+  },
+  {
+    slug: "debug-admin-lookup",
+    name: "Debug Admin Lookup",
+    classification: "retired_disabled",
+    replacement: null,
+    lastInvocation: "None — returns 410 Gone (retired P0 Security Repair 01, 2026-09-15)",
+    knownCallers: "None in code. Legacy debug endpoint; now retired.",
+    cronWebhook: "None. No cron/webhook/n8n reference.",
+    securityRisk: "Resolved — replaced with fail-closed 410 handler; no admin data returned.",
+    reviewer: "P0 Security Repair 01",
+    reviewDate: "2026-09-15",
+    evidence: "Redeployed as fail-closed retirement handler (returns HTTP 410 Gone with only the retirement error). Reveals no admin ID, email, role, hash, or account status. No DB read/write. Verified via endpoint probe.",
   },
   {
     slug: "connect-guard-payout",
@@ -304,7 +317,8 @@ Deno.serve(async (req: Request) => {
             geocodeNote = "Geocode function returned no coordinates.";
           }
         } else {
-          geocodeNote = `Geocode function returned HTTP ${res.status}.`;
+          const failure = await res.json().catch(() => ({}));
+          geocodeNote = `Geocode function returned HTTP ${res.status}${failure.code ? ` (${failure.code})` : ""}. ${failure.hint || ""}`.trim();
         }
       } catch (e) {
         geocodeNote = "Geocode function unreachable: " + (e as Error).message;
@@ -375,31 +389,41 @@ Deno.serve(async (req: Request) => {
     checks.push(auto("edge_functions", "critical", "Required Edge Functions deployed & healthy",
       healthOk ? "pass" : "fail", healthNote));
 
-    let rlsOk = false;
-    let rlsNote = "RLS coverage could not be verified automatically.";
+    let rlsStatus: Check["status"] = "not_verified";
+    let rlsNote = "RLS table inventory could not be verified automatically.";
     try {
-      const { data: tables } = await supabaseAdmin.rpc("security_audit_tables");
-      const appTables = (tables || []).filter((t: any) => t.schema_name === "app");
-      const withoutRLS = appTables.filter((t: any) => !t.rls_enabled);
-      rlsOk = withoutRLS.length === 0;
-      rlsNote = rlsOk
-        ? `RLS enabled on all ${appTables.length} app tables.`
-        : `RLS missing on: ${withoutRLS.map((t: any) => t.table_name).join(", ")}`;
-    } catch { /* rpc unavailable */ }
-    checks.push(auto("rls_policies", "critical", "RLS policies prevent unauthorised access", rlsOk ? "pass" : "not_verified", rlsNote));
+      const { data: tables, error } = await supabaseQ.rpc("launch_rls_inventory");
+      if (error) {
+        rlsNote = `RLS audit query failed (${error.code || "unknown"}); coverage is unverified.`;
+      } else {
+        const appTables = (tables || []).filter((t: any) => t.schema_name === "app");
+        const withoutRLS = appTables.filter((t: any) => !t.rls_enabled);
+        if (appTables.length > 0) {
+          rlsStatus = withoutRLS.length ? "fail" : "pass";
+          rlsNote = withoutRLS.length
+            ? `RLS missing on: ${withoutRLS.map((t: any) => t.table_name).join(", ")}`
+            : `RLS enabled on all ${appTables.length} app tables. Policy effectiveness requires separate access tests.`;
+        } else {
+          rlsNote = "RLS audit returned no app tables; coverage is unverified.";
+        }
+      }
+    } catch { /* unavailable audits must never pass */ }
+    checks.push(auto("rls_policies", "critical", "RLS enabled on application tables", rlsStatus, rlsNote));
+    checks.push(auto("rls_policy_effectiveness", "critical", "RLS policies prevent unauthorised access", "not_verified",
+      "Table coverage alone does not prove policy effectiveness. Verify anonymous and cross-account access before sign-off."));
 
-    const proto = req.headers.get("x-forwarded-proto") || "";
-    const host = req.headers.get("host") || "";
-    const isDev = host.includes("localhost") || host.includes("127.0.0.1");
-    let domainStatus: Check["status"] = "pass";
-    let domainNote = `Serving over HTTPS at ${host || "unknown host"}.`;
-    if (isDev) {
-      domainStatus = "not_verified";
-      domainNote = "Running on a localhost/dev host — verify the production domain and HTTPS separately.";
-    } else if (proto && proto !== "https") {
-      domainStatus = "fail";
-      domainNote = "Not serving over HTTPS.";
-    }
+    let domainStatus: Check["status"] = "not_verified";
+    let domainNote = "Production HTTPS could not be verified.";
+    try {
+      const response = await fetch("https://quickguard.uk", { signal: AbortSignal.timeout(10000), redirect: "follow" });
+      const destination = new URL(response.url);
+      const html = await response.text();
+      const validDestination = destination.protocol === "https:" && ["quickguard.uk", "www.quickguard.uk"].includes(destination.hostname);
+      domainStatus = response.ok && validDestination && /quickguard/i.test(html) ? "pass" : "fail";
+      domainNote = domainStatus === "pass"
+        ? "Verified https://quickguard.uk responds successfully over HTTPS with QuickGuard content."
+        : `Production site verification failed (HTTP ${response.status}); check HTTPS, redirects and site content.`;
+    } catch { /* network failures remain unverified */ }
     checks.push(auto("production_domain", "critical", "Production domain & HTTPS working", domainStatus, domainNote));
 
     const needsVerification = RETIREMENT_REGISTER.filter((r) => r.classification === "needs_verification");
@@ -412,6 +436,22 @@ Deno.serve(async (req: Request) => {
       ? `${needsVerification.length} retired function(s) still need human verification: ${needsVerification.map((r) => r.slug).join(", ")}. ${safelyRemovable.length} confirmed safely removable (reviewed).`
       : `All retired functions reviewed. ${safelyRemovable.length} safely removable, ${keptDisabled.length} kept disabled, ${active.length} active.`;
     checks.push(auto("retired_functions", "warning", "Retired Edge Functions reviewed & classified", retiredStatus, retiredNote));
+
+    const retiredBootstrapSlugs = ["create-admin-martin", "set-martin-password", "debug-admin-lookup"];
+    const bootstrapProbes = await Promise.all(retiredBootstrapSlugs.map(async (slug) => {
+      try {
+        const res = await invokeFunction(slug, {});
+        return { slug, status: res.status, retired: res.status === 410 || res.status === 404 };
+      } catch {
+        return { slug, status: 0, retired: false };
+      }
+    }));
+    const stillReachable = bootstrapProbes.filter((p) => !p.retired);
+    checks.push(auto("bootstrap_endpoints_retired", "critical", "Legacy admin bootstrap endpoints return 404/410",
+      stillReachable.length === 0 ? "pass" : "fail",
+      stillReachable.length === 0
+        ? "create-admin-martin, set-martin-password and debug-admin-lookup all return HTTP 404/410 with no privileged action."
+        : `Still reachable: ${stillReachable.map((p) => `${p.slug}(${p.status})`).join(", ")}`));
 
     return checks;
   }
@@ -474,14 +514,13 @@ Deno.serve(async (req: Request) => {
         checks = checks.filter((c) => c.id === body.checkId);
       }
       checks = await applySignoffs(checks);
-      const proto = req.headers.get("x-forwarded-proto") || "";
-      const host = req.headers.get("host") || "";
+      const domainCheck = autoChecks.find((c) => c.id === "production_domain");
       return new Response(JSON.stringify({
         timestamp: nowIso(),
         environment: {
-          host,
-          https: proto === "https" || (!host.includes("localhost") && !host.includes("127.0.0.1")),
-          isDev: host.includes("localhost") || host.includes("127.0.0.1"),
+          host: "quickguard.uk",
+          https: domainCheck?.status === "pass",
+          isDev: false,
         },
         checks,
         retirement_register: RETIREMENT_REGISTER,
