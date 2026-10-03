@@ -2,12 +2,15 @@
 
 
 import { useState, useEffect } from 'react';
+import { paymentAmounts } from '@/lib/financeAmounts';
 import { supabase } from '@/lib/supabase';
 
 interface UnifiedPayment {
   id: string;
   type: 'job' | 'subscription';
   amount: number;
+  refund_amount: number;
+  remaining_amount: number;
   status: string;
   created_at: string;
   description: string;
@@ -117,6 +120,8 @@ export default function AdminPaymentsPage() {
           return {
             id: t.id,
             type: 'job' as const,
+            refund_amount: paymentAmounts(t).refunded,
+            remaining_amount: paymentAmounts(t).remaining,
             amount: Number(t.amount) || 0,
             status: t.status,
             created_at: t.created_at,
@@ -134,13 +139,15 @@ export default function AdminPaymentsPage() {
           return {
             id: s.id,
             type: 'subscription' as const,
+            refund_amount: paymentAmounts(s).refunded,
+            remaining_amount: paymentAmounts(s).remaining,
             amount: Number(s.amount) || 0,
             status: s.status,
             created_at: s.created_at,
             description: s.billing_reason || 'Subscription',
             payer: client?.company_name || client?.contact_name || 'Unknown',
-            job_title: null,
-            guard_name: null,
+            job_title: undefined,
+            guard_name: undefined,
             client_name: client?.company_name || client?.contact_name,
             gateway: 'Stripe',
             metadata: s,
@@ -166,6 +173,7 @@ export default function AdminPaymentsPage() {
       case 'pending': return 'bg-amber-50 text-amber-700 ring-1 ring-amber-100';
       case 'processing': return 'bg-sky-50 text-sky-700 ring-1 ring-sky-100';
       case 'failed': return 'bg-red-50 text-red-700 ring-1 ring-red-100';
+      case 'partially_refunded':
       case 'refunded': return 'bg-orange-50 text-orange-700 ring-1 ring-orange-100';
       default: return 'bg-slate-50 text-slate-600 ring-1 ring-slate-100';
     }
@@ -416,6 +424,10 @@ export default function AdminPaymentsPage() {
                   <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${getStatusStyle(selectedPayment.status)}`}>{selectedPayment.status.toUpperCase()}</span>
                   <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ring-1 ${selectedPayment.type === 'job' ? 'bg-sky-500/10 text-sky-400 ring-sky-500/20' : 'bg-indigo-500/10 text-indigo-400 ring-indigo-500/20'}`}>{selectedPayment.type === 'job' ? 'Job Payment' : 'Subscription'}</span>
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 rounded-xl bg-[#0d1b33] p-4">
+                <div><p className="text-sm text-slate-300">Refunded</p><p className="text-xl font-semibold text-rose-300">{formatCurrency(selectedPayment.refund_amount)}</p></div>
+                <div><p className="text-sm text-slate-300">Remaining before fees</p><p className="text-xl font-semibold text-white">{formatCurrency(selectedPayment.remaining_amount)}</p></div>
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between"><span className="text-sm text-slate-400">Date</span><span className="text-sm font-medium text-white">{new Date(selectedPayment.created_at).toLocaleString('en-GB')}</span></div>

@@ -84,7 +84,7 @@ export default function AlertsPanel({ alerts, loading }: Props) {
         <div>
           <h3 className="text-sm font-bold text-white">Platform Alerts</h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            {alerts.length === 0 ? 'All clear — no alerts right now' : `${alerts.length} alert${alerts.length > 1 ? 's' : ''} requiring attention`}
+            {alerts.length === 0 ? 'No configured alerts triggered' : `${alerts.length} alert${alerts.length > 1 ? 's' : ''} requiring attention`}
           </p>
         </div>
         {alerts.length > 0 && (
@@ -100,8 +100,8 @@ export default function AlertsPanel({ alerts, loading }: Props) {
               <i className="ri-check-line text-emerald-400 text-xl"></i>
             </div>
           </div>
-          <p className="text-sm text-slate-400 font-medium">All systems healthy</p>
-          <p className="text-xs text-slate-500">No alerts detected for this period</p>
+          <p className="text-sm text-slate-400 font-medium">No configured finance alerts</p>
+          <p className="text-xs text-slate-500">This does not establish overall platform or financial health.</p>
         </div>
       ) : (
         <div className="divide-y divide-[#1e2d4a]">

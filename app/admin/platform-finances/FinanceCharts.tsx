@@ -105,7 +105,7 @@ export default function FinanceCharts({ monthlyData, loading }: Props) {
               <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={formatShortCurrency} />
               <Tooltip
-                formatter={(value: number) => [formatCurrency(value), 'Revenue']}
+                formatter={(value: any) => [formatCurrency(value), 'Revenue']}
                 contentStyle={{ borderRadius: '12px', border: '1px solid #1e2d4a', fontSize: '13px', backgroundColor: '#111d35', color: '#e2e8f0' }}
               />
               <Area type="monotone" dataKey="revenue" stroke="#14b8a6" strokeWidth={2} fill="url(#revGrad)" />
@@ -122,7 +122,7 @@ export default function FinanceCharts({ monthlyData, loading }: Props) {
               <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={formatShortCurrency} />
               <Tooltip
-                formatter={(value: number) => [formatCurrency(value), '']}
+                formatter={(value: any) => [formatCurrency(value), '']}
                 contentStyle={{ borderRadius: '12px', border: '1px solid #1e2d4a', fontSize: '13px', backgroundColor: '#111d35', color: '#e2e8f0' }}
               />
               <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', color: '#94a3b8' }} />
@@ -147,7 +147,7 @@ export default function FinanceCharts({ monthlyData, loading }: Props) {
               <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={formatShortCurrency} />
               <Tooltip
-                formatter={(value: number) => [formatCurrency(value), 'Profit']}
+                formatter={(value: any) => [formatCurrency(value), 'Profit']}
                 contentStyle={{ borderRadius: '12px', border: '1px solid #1e2d4a', fontSize: '13px', backgroundColor: '#111d35', color: '#e2e8f0' }}
               />
               <Area type="monotone" dataKey="profit" stroke="#6366f1" strokeWidth={2} fill="url(#profGrad)" />
@@ -183,7 +183,7 @@ export default function FinanceCharts({ monthlyData, loading }: Props) {
               <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v.toFixed(0)}%`} />
               <Tooltip
-                formatter={(value: number) => [`${value.toFixed(1)}%`, 'Conversion Rate']}
+                formatter={(value: any) => [`${value.toFixed(1)}%`, 'Conversion Rate']}
                 contentStyle={{ borderRadius: '12px', border: '1px solid #1e2d4a', fontSize: '13px', backgroundColor: '#111d35', color: '#e2e8f0' }}
               />
               <Bar dataKey="conversionRate" name="Conversion Rate" fill="#14b8a6" radius={[4, 4, 0, 0]} />

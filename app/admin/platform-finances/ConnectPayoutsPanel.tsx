@@ -62,7 +62,7 @@ export default function ConnectPayoutsPanel() {
 
         setStats([
           {
-            label: 'Total Job Value',
+            label: 'All-time agreed guard pay (includes cancelled jobs)',
             value: `£${totalJobValue.toFixed(2)}`,
             icon: 'ri-briefcase-line',
             color: 'text-teal-400',
@@ -70,7 +70,7 @@ export default function ConnectPayoutsPanel() {
             border: 'border-teal-400/20',
           },
           {
-            label: 'Platform Fees Earned',
+            label: 'Fees on funded jobs (before refund allocation)',
             value: `£${platformFeesEarned.toFixed(2)}`,
             icon: 'ri-percent-line',
             color: 'text-emerald-400',
@@ -78,7 +78,7 @@ export default function ConnectPayoutsPanel() {
             border: 'border-emerald-400/20',
           },
           {
-            label: 'Guard Payouts Pending',
+            label: 'Queued guard payout records',
             value: `£${pendingPayouts.toFixed(2)}`,
             icon: 'ri-time-line',
             color: 'text-amber-400',

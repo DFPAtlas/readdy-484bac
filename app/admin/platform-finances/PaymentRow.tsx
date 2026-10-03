@@ -26,6 +26,8 @@ interface Payment {
   amount: number;
   stripe_fee: number;
   net_amount: number;
+  refund_amount: number;
+  remaining_amount: number;
   status: string;
   invoice_id: string;
 }
@@ -49,11 +51,13 @@ export default function PaymentRow({ payment }: Props) {
       <td className="px-4 py-3 text-sm text-slate-400">{payment.email}</td>
       <td className="px-4 py-3 text-sm text-slate-400">{payment.plan}</td>
       <td className="px-4 py-3 text-sm font-medium text-white">{formatCurrency(payment.amount)}</td>
-      <td className="px-4 py-3 text-sm text-slate-400">{formatCurrency(payment.stripe_fee)}</td>
-      <td className="px-4 py-3 text-sm font-medium text-emerald-400">{formatCurrency(payment.net_amount)}</td>
+      <td className="px-4 py-3 text-sm text-rose-300">{formatCurrency(payment.refund_amount)}</td>
+      <td className="px-4 py-3 text-sm text-white">{formatCurrency(payment.remaining_amount)}</td>
+      <td className="px-4 py-3 text-sm text-slate-300">{formatCurrency(payment.stripe_fee)}</td>
+      <td className="px-4 py-3 text-sm font-medium text-slate-200">{formatCurrency(payment.net_amount)}</td>
       <td className="px-4 py-3">
         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusColor}`}>
-          {payment.status}
+          {payment.status.replaceAll("_", " ")}
         </span>
       </td>
       <td className="px-4 py-3 text-sm text-slate-500 font-mono">{payment.invoice_id || '-'}</td>

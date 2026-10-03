@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 
 interface HealthMetrics {
+  sufficientHistory?: boolean;
   revenueGrowth: number;
   customerGrowth: number;
   paymentSuccessRate: number;
@@ -100,6 +101,7 @@ export default function FinancialHealthScore({ metrics, loading }: Props) {
     );
   }
 
+  if (!metrics.sufficientHistory) return <div className="bg-[#111d35] rounded-2xl border border-[#1e2d4a] p-6"><h3 className="text-lg font-semibold text-white">Financial health</h3><p className="mt-3 text-slate-300">Not enough history to calculate a meaningful score yet. New activity does not indicate poor financial health.</p></div>;
   return (
     <div className="bg-[#111d35] rounded-2xl border border-[#1e2d4a] shadow-sm p-5">
       <div className="mb-6">

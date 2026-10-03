@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PaymentRow from './PaymentRow';
 
 interface Payment {
@@ -12,6 +12,8 @@ interface Payment {
   amount: number;
   stripe_fee: number;
   net_amount: number;
+  refund_amount: number;
+  remaining_amount: number;
   status: string;
   invoice_id: string;
 }
@@ -23,6 +25,7 @@ interface Props {
 
 export default function StripePaymentsTable({ payments, loading }: Props) {
   const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [payments]);
   const perPage = 20;
   const totalPages = Math.max(1, Math.ceil(payments.length / perPage));
   const paged = payments.slice((page - 1) * perPage, page * perPage);
@@ -40,10 +43,12 @@ export default function StripePaymentsTable({ payments, loading }: Props) {
               <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase">Date</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase">Customer</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase">Email</th>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase">Plan</th>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase">Amount</th>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase">Stripe Fee</th>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase">Net</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase">Payment type</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase">Collected</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-300 uppercase">Refunded</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-300 uppercase">Remaining</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase">Estimated fee</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase">After refunds & est. fee</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase">Status</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase">Invoice ID</th>
             </tr>
@@ -52,14 +57,14 @@ export default function StripePaymentsTable({ payments, loading }: Props) {
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="animate-pulse">
-                  <td colSpan={9} className="px-4 py-4">
+                  <td colSpan={11} className="px-4 py-4">
                     <div className="h-4 bg-[#1a2b4a] rounded w-full"></div>
                   </td>
                 </tr>
               ))
             ) : paged.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-sm text-slate-400">
+                <td colSpan={11} className="px-4 py-12 text-center text-sm text-slate-400">
                   No payments found for this period
                 </td>
               </tr>

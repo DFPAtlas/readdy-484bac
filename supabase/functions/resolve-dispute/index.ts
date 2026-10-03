@@ -318,19 +318,16 @@ serve(async (req) => {
       updated_at: now,
     }).eq('id', dispute_id);
 
-    await supabase.from('payment_audit_logs').insert({
-      job_id: job.id,
-      guard_id: guard?.id || null,
-      action: 'dispute_resolved',
-      previous_status: 'disputed',
-      new_status: resolution,
-      amount: actualRefundAmount,
-      platform_fee: job.platform_fee,
-      performed_by: admin.id,
-      stripe_reference: stripeRefundId || stripeTransferId,
-      notes: admin_notes || `Admin resolved dispute: ${resolution}`,
+    const { error: auditError } = await supabase.from('payment_audit_logs').insert({
+      job_id: job.id, guard_id: guard?.id || null, client_id: job.client_id,
+      from_status: 'disputed', to_status: resolution,
+      changed_by: user.id, changed_by_role: admin.role,
+      reason: admin_notes || `Admin resolved dispute: ${resolution}`,
+      event_type: 'dispute_resolved', reference_type: 'dispute', reference_id: dispute_id,
+      metadata: { refund_amount: actualRefundAmount, platform_fee: job.platform_fee, stripe_refund_id: stripeRefundId, stripe_transfer_id: stripeTransferId },
       created_at: now,
     });
+    if (auditError) throw new Error('Dispute resolution audit could not be recorded');
 
     if (guard?.user_id) {
       await supabase.from('notifications').insert([{
