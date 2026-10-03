@@ -20,7 +20,7 @@ const DEMO_TABS = [
       { icon: 'ri-user-add-line', title: 'Create Your Profile', desc: 'Register in minutes, upload your SIA licence, and set your availability across the UK.' },
       { icon: 'ri-notification-3-line', title: 'Get Instant Job Alerts', desc: 'Receive real-time notifications for jobs that match your skills, location, and schedule.' },
       { icon: 'ri-send-plane-line', title: 'Apply with One Click', desc: 'Apply to multiple jobs instantly. Your verified SIA badge builds instant client trust.' },
-      { icon: 'ri-bank-card-line', title: 'Get Paid Securely', desc: 'Receive your full agreed pay after the shift is confirmed complete. No guard commission — standard payouts are covered by the client booking service fee.' },
+      { icon: 'ri-bank-card-line', title: 'Get Paid Securely', desc: 'Receive your full agreed pay after the shift is confirmed complete. No guard commission — standard payouts are covered by the client service fee.' },
     ],
   },
   {
@@ -600,11 +600,11 @@ export default function HowItWorksClient() {
               >
                 View Pricing
               </Link>
-              <p className="text-slate-400 mb-6 mt-3 text-sm">Booking service fee from 5% to 15% by plan. Guard services are paid separately for each booking.</p>
+              <p className="text-slate-400 mb-6 mt-3 text-sm">Service fee from 5% to 15% by plan. Guard services are paid separately for each booking.</p>
               <ul className="text-sm text-slate-400 space-y-2 text-left list-none p-0 m-0">
                 {[
                   'Free, Starter, Pro and Enterprise plans',
-                  'Booking service fee from 15% down to 5%',
+                  'Service fee from 15% down to 5%',
                   'Payment held with Stripe until release',
                   '24/7 AI support'
                 ].map((item) => (
