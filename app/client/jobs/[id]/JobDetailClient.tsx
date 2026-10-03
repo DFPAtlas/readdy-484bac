@@ -933,6 +933,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
       {showCancelModal && (
         <CancelJobModal
+          clientId={clientId}
           job={job}
           onClose={() => setShowCancelModal(false)}
           onSuccess={() => {
