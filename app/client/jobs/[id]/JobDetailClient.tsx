@@ -667,7 +667,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
               <i className="ri-close-circle-fill text-red-500 text-lg"></i>
             </div>
             <p className="text-sm font-medium text-red-400">
-              Job cancelled successfully. You can request a refund from the Cancellation tab.
+              Job cancelled. Check the Cancellation tab for your refund request status. A pending request is not a completed refund.
             </p>
             <button onClick={() => setCancelSuccess(false)} className="ml-auto w-5 h-5 flex items-center justify-center cursor-pointer">
               <i className="ri-close-line text-red-500"></i>

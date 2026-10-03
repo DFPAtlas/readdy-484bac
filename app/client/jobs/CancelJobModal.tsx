@@ -60,87 +60,16 @@ export default function CancelJobModal({ job, clientId, onClose, onSuccess }: Ca
 
     setConfirming(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token;
-
-      const cid = clientId;
-      if (!cid) throw new Error('Client not found');
-
-      // Insert cancellation record
-      const { data: cancellationData, error: cancelError } = await supabase
-        .schema('app')
-        .from('job_cancellations')
-        .insert({
-          job_id: job.id,
-          client_id: cid,
-          reason: reason,
-          notes: notes.trim() || null,
-          preferred_resolution: preferredResolution,
-          contact_preference: contactPreference,
-          status: 'cancelled',
-          cancelled_at: new Date().toISOString(),
-          cancelled_by: 'client',
-        })
-        .select('id')
-        .single();
-
+      const { data, error: cancelError } = await supabase.rpc('cancel_client_job', {
+        p_job_id: job.id,
+        p_reason: reason,
+        p_notes: notes.trim() || null,
+        p_resolution: preferredResolution,
+        p_contact: contactPreference,
+      });
       if (cancelError) throw cancelError;
-
-      // Update job status
-      const { error: updateError } = await supabase
-        .from('jobs')
-        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-        .eq('id', job.id);
-
-      if (updateError) throw updateError;
-
-      // Create support ticket for certain resolutions
-      if (preferredResolution === 'admin_review' || preferredResolution === 'partial_refund') {
-        await supabase.from('support_tickets').insert({
-          client_id: cid,
-          related_job_id: job.id,
-          category: 'job_cancellation',
-          subject: `Job Cancellation: ${job.job_title}`,
-          description: `Client cancelled job "${job.job_title}".\nReason: ${reason}\nPreferred resolution: ${preferredResolution}\nNotes: ${notes || 'N/A'}`,
-          priority: preferredResolution === 'admin_review' ? 'high' : 'normal',
-          status: 'open',
-        });
-      }
-
-      // Notify client
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from('notifications').insert({
-          user_id: user.id,
-          user_type: 'client',
-          type: 'job_cancelled',
-          title: 'Job Cancelled',
-          message: `"${job.job_title}" has been cancelled.`,
-          link: `/client/jobs/${job.id}`,
-          is_read: false,
-        });
-      }
-
-      // Call edge function with session token
-      if (accessToken) {
-        try {
-          const efResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/cancel-job`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${accessToken}`,
-            },
-            body: JSON.stringify({
-              jobId: job.id,
-              cancelledBy: 'client',
-            }),
-          });
-          if (!efResponse.ok) {
-            console.warn('Edge function cancel-job returned:', efResponse.status);
-          }
-        } catch {
-          console.warn('Edge function cancel-job unreachable');
-        }
+      if (!data?.success || !data?.cancellationId) {
+        throw new Error('Cancellation was not confirmed. Refresh the booking before retrying.');
       }
 
       onSuccess();
