@@ -228,7 +228,7 @@ function SuccessContent() {
             If this stays pending, your payment may still be processing. You can safely return to the job — you will not be charged twice.
           </p>
           <Link
-            href={jobId ? `/client/jobs/${jobId}` : '/client/jobs'}
+            href={jobId ? `/client/jobs/detail?id=${encodeURIComponent(jobId)}` : '/client/jobs'}
             className="mt-3 inline-flex items-center gap-2 text-teal-400 hover:text-teal-300 text-sm font-medium transition-colors"
           >
             <i className="ri-arrow-left-line w-5 h-5 flex items-center justify-center" />
@@ -250,7 +250,7 @@ function SuccessContent() {
           <p className="text-slate-400 mb-6">{error}</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
-              href={jobId ? `/client/jobs/${jobId}/payment` : '/client/jobs'}
+              href={jobId ? `/client/jobs/payment?id=${encodeURIComponent(jobId)}` : '/client/jobs'}
               className="inline-flex items-center justify-center gap-2 bg-teal-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-teal-600 transition-all whitespace-nowrap"
             >
               <i className="ri-arrow-left-line w-5 h-5 flex items-center justify-center" />
@@ -283,7 +283,7 @@ function SuccessContent() {
           <p className="text-slate-500 text-sm mb-6">Your selected guards remain provisionally reserved. You can retry safely.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
-              href={jobId ? `/client/jobs/${jobId}/payment` : '/client/jobs'}
+              href={jobId ? `/client/jobs/payment?id=${encodeURIComponent(jobId)}` : '/client/jobs'}
               className="inline-flex items-center justify-center gap-2 bg-teal-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-teal-600 transition-all whitespace-nowrap"
             >
               <i className="ri-refresh-line w-5 h-5 flex items-center justify-center" />
@@ -382,7 +382,7 @@ function SuccessContent() {
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
-            href={jobId ? `/client/jobs/${jobId}` : '/client/jobs'}
+            href={jobId ? `/client/jobs/detail?id=${encodeURIComponent(jobId)}` : '/client/jobs'}
             className="bg-teal-500 hover:bg-teal-600 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-300 hover:scale-105 whitespace-nowrap shadow-lg inline-flex items-center justify-center gap-2"
           >
             <i className="ri-briefcase-line w-6 h-6 flex items-center justify-center" />
