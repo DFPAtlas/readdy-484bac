@@ -706,14 +706,27 @@ serve(async (req) => {
         if (!transaction) { console.log(`[EnhancedWebhook] No transaction for pi ${paymentIntentId}, likely subscription charge (already handled above)`); break; }
 
         const refundAmount = (charge.amount_refunded || 0) / 100;
-        await appSupabase.from('transactions').update({ status: 'refunded', updated_at: new Date().toISOString() }).eq('id', transaction.id);
+        const chargeAmount = (charge.amount || 0) / 100;
+        const isFullRefund = charge.amount_refunded >= charge.amount;
+        const refundState = isFullRefund ? 'refunded' : 'partially_refunded';
+        const refundId = (charge as any).refunds?.data?.[0]?.id || null;
+
+        await appSupabase.from('transactions').update({
+          status: refundState,
+          payment_status: refundState,
+          refunded: isFullRefund,
+          refund_amount: refundAmount,
+          refunded_at: new Date().toISOString(),
+          stripe_refund_id: refundId,
+          updated_at: new Date().toISOString(),
+        }).eq('id', transaction.id);
 
         if (transaction.job_id) {
-          await appSupabase.from('jobs').update({ payment_status: 'refunded', updated_at: new Date().toISOString() }).eq('id', transaction.job_id);
-          await appSupabase.from('job_assignments').update({ payment_status: 'refunded', updated_at: new Date().toISOString() }).eq('job_id', transaction.job_id);
+          await appSupabase.from('jobs').update({ payment_status: refundState, updated_at: new Date().toISOString() }).eq('id', transaction.job_id);
+          await appSupabase.from('job_assignments').update({ payment_status: refundState, updated_at: new Date().toISOString() }).eq('job_id', transaction.job_id);
         }
 
-        await appSupabase.from('payment_audit_logs').insert({ event_type: 'charge.refunded', stripe_event_id: charge.id, reference_type: 'transaction', reference_id: transaction.id, details: JSON.stringify({ charge_id: charge.id, payment_intent: paymentIntentId, refund_amount: refundAmount, currency: charge.currency, job_id: transaction.job_id, reason: (charge as any).refunds?.data?.[0]?.reason || 'unknown' }), created_at: new Date().toISOString() });
+        await appSupabase.from('payment_audit_logs').insert({ event_type: 'charge.refunded', stripe_event_id: charge.id, reference_type: 'transaction', reference_id: transaction.id, details: JSON.stringify({ charge_id: charge.id, payment_intent: paymentIntentId, refund_amount: refundAmount, charge_amount: chargeAmount, full_refund: isFullRefund, currency: charge.currency, job_id: transaction.job_id, reason: (charge as any).refunds?.data?.[0]?.reason || 'unknown' }), created_at: new Date().toISOString() });
 
         if (transaction.client_id) {
           await appSupabase.from('notifications').insert([{ user_id: transaction.client_id, title: 'Payment Refunded', message: `A refund of £${refundAmount.toFixed(2)} has been processed for your job payment.`, type: 'warning', related_id: transaction.job_id || undefined, is_read: false }]);
