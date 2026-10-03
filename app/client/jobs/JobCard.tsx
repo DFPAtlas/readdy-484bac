@@ -321,7 +321,7 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
                   </Link>
                 )}
                 {needsPayment && (
-                  <Link href={`/client/jobs/${job.id}/payment`}>
+                  <Link href={`/client/jobs/payment?id=${encodeURIComponent(job.id)}`}>
                     <button className="flex items-center gap-1.5 bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-orange-600 transition-colors cursor-pointer whitespace-nowrap">
                       <i className="ri-secure-payment-line"></i>Pay Now
                     </button>
@@ -530,7 +530,7 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
             </Link>
           )}
           {needsPayment && (
-            <Link href={`/client/jobs/${job.id}/payment`} className="flex-1 min-w-[80px]">
+            <Link href={`/client/jobs/payment?id=${encodeURIComponent(job.id)}`} className="flex-1 min-w-[80px]">
               <button className="w-full flex items-center justify-center gap-1 bg-orange-500 text-white px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap">
                 <i className="ri-secure-payment-line"></i>Pay
               </button>
