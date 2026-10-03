@@ -130,8 +130,35 @@ Deno.serve(async (req) => {
       });
     }
 
-    const subject = replaceVariables(template.subject || 'QuickGuard Notification', variables);
-    const bodyHtml = replaceVariables(template.body_html || '', variables);
+    // Only trusted transactional sends may create recipient-bound login links.
+    // Previews, multi-recipient sends and administrator templates never receive tokens.
+    const sendVariables = { ...variables };
+    if (isServiceRole && !dry_run && !is_test && recipients.length === 1 && variables.dashboard_url) {
+      const destination = new URL(variables.dashboard_url);
+      const role = destination.pathname === '/client/dashboard' ? 'client'
+        : destination.pathname === '/guard/dashboard' ? 'guard' : null;
+      if (destination.origin === 'https://quickguard.uk' && role && !destination.search && !destination.hash) {
+        const { data: profile } = await supabase.from(role === 'client' ? 'clients' : 'guards')
+          .select('user_id').eq('email', recipients[0]).maybeSingle();
+        if (profile?.user_id) {
+          const { data: identity, error: identityError } = await supabase.auth.admin.getUserById(profile.user_id);
+          if (identityError || identity.user?.email?.toLowerCase() !== recipients[0].toLowerCase()
+              || !identity.user?.email_confirmed_at) {
+            throw new Error('Dashboard link recipient identity could not be verified');
+          }
+          const { data: link, error: linkError } = await supabase.auth.admin.generateLink({
+            type: 'magiclink', email: identity.user.email!,
+          });
+          if (linkError || !link.properties?.hashed_token) throw new Error('Unable to create dashboard sign-in link');
+          // Fragment keeps the bearer credential out of HTTP request URLs and referrers.
+          sendVariables.dashboard_url = 'https://quickguard.uk/auth/email-dashboard#' +
+            new URLSearchParams({ token_hash: link.properties.hashed_token, role }).toString();
+        }
+      }
+    }
+
+    const subject = replaceVariables(template.subject || 'QuickGuard Notification', sendVariables);
+    const bodyHtml = replaceVariables(template.body_html || '', sendVariables);
     const unresolved = [...new Set((`${subject}\n${bodyHtml}`.match(/{{\s*[^{}]+\s*}}/g) || []))];
 
     if (unresolved.length > 0) {
