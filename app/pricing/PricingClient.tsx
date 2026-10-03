@@ -296,7 +296,7 @@ export default function PricingClient() {
             </div>
           </div>
           <p className="text-slate-400 mb-6 text-sm">{plan.description}</p>
-          <p className="text-sm text-teal-400 mb-4">{plan.audience === "client" ? (plan.bookingFee != null ? `${plan.bookingFee}% booking service fee. Payment processing included.` : "Booking service fee shown before checkout.") : "Keep your full agreed pay. No guard commission. Standard payouts included."}</p>
+          <p className="text-sm text-teal-400 mb-4">{plan.audience === "client" ? (plan.bookingFee != null ? `${plan.bookingFee}% service fee. Payment processing included.` : "Service fee shown before checkout.") : "Keep your full agreed pay. No guard commission. Standard payouts included."}</p>
 
           <div className="mb-6">
             <div className="flex items-baseline gap-2">
@@ -547,7 +547,7 @@ export default function PricingClient() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                { icon: 'ri-shield-check-line', title: 'Weekly automated SIA licence checks', desc: 'Every guard is SIA-verified before joining. Automated rechecks are scheduled within seven days of a successful check. Failed licence checks block new work; uncertain results and worker delays are flagged for admin review.' },
+                { icon: 'ri-shield-check-line', title: 'Weekly automated SIA licence checks', desc: 'Every guard must pass an initial SIA licence check before taking work through QuickGuard. Automated rechecks are scheduled within seven days of a successful check. Failed licence checks block new work; uncertain results and worker delays are flagged for admin review.' },
                 { icon: 'ri-safe-2-line', title: 'Held Job Payment Protection', desc: 'Your payment is held securely with Stripe and only released to the guard after the shift is marked complete.' },
                 { icon: 'ri-customer-service-2-line', title: '24/7 AI Dispute Support', desc: 'Our AI assistant is available 24/7 to help with dispute questions and common issues. Cases needing human review can be escalated to our team.' },
                 { icon: 'ri-bank-card-line', title: 'Payment Processing', desc: 'Stripe handles all card processing securely. The fee covers PCI-compliant infrastructure and fraud prevention.' },
