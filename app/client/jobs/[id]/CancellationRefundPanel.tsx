@@ -14,6 +14,8 @@ interface CancellationRefundPanelProps {
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
+  processing: { label: 'Processing', color: 'text-orange-400', icon: 'ri-hourglass-line' },
+  completed: { label: 'Completed', color: 'text-teal-400', icon: 'ri-checkbox-circle-line' },
   pending: { label: 'Pending', color: 'text-orange-400', icon: 'ri-hourglass-line' },
   approved: { label: 'Approved', color: 'text-emerald-400', icon: 'ri-check-double-line' },
   rejected: { label: 'Rejected', color: 'text-rose-400', icon: 'ri-forbid-line' },
@@ -26,13 +28,12 @@ export default function CancellationRefundPanel({ job, cancellation, refundReque
   const paidAmount = transaction?.amount || 0;
   const isCancelled = job.status === 'cancelled';
   const isRefunded = transaction?.refunded || false;
-  const hasPendingRefund = refundRequests.some((r) => r.status === 'pending');
-  const hasApprovedRefund = refundRequests.some((r) => r.status === 'approved' || r.status === 'processed');
+  const hasPendingRefund = refundRequests.some((r) => r.status === 'pending' || r.status === 'processing');
+  const hasApprovedRefund = refundRequests.some((r) => r.status === 'approved' || r.status === 'processed' || r.status === 'completed');
   const hasRejectedRefund = refundRequests.some((r) => r.status === 'rejected');
   const hasCredit = refundRequests.some((r) => r.status === 'credit_issued');
 
-  const platformFee = paidAmount * 0.15;
-  const estimatedRefundable = Math.max(0, paidAmount - platformFee);
+  const remainingPaid = Math.max(0, Number(paidAmount) - Number(transaction?.refund_amount || 0));
 
   return (
     <div className="bg-[#111d35] rounded-2xl border border-[#1e2d4d] p-5">
@@ -74,8 +75,8 @@ export default function CancellationRefundPanel({ job, cancellation, refundReque
               <p className="text-sm font-semibold text-slate-200 mb-2">Payment Summary</p>
               <div className="space-y-1.5 text-sm">
                 <div className="flex justify-between"><span className="text-slate-500">Amount Paid</span><span className="text-slate-200 font-semibold">£{paidAmount.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Platform Fee</span><span className="text-slate-200">£{platformFee.toFixed(2)}</span></div>
-                <div className="flex justify-between pt-1 border-t border-[#1e2d4d]"><span className="text-white font-semibold">Estimated Refundable</span><span className="text-teal-400 font-bold">£{estimatedRefundable.toFixed(2)}</span></div>
+                
+                <div className="flex justify-between pt-1 border-t border-[#1e2d4d]"><span className="text-white font-semibold">Remaining Payment</span><span className="text-teal-400 font-bold">£{remainingPaid.toFixed(2)}</span></div>
               </div>
               {isRefunded && (
                 <div className="mt-2 flex items-center gap-2 text-sm">
