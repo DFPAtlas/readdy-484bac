@@ -12,7 +12,7 @@ export default function SupportShortcuts() {
           </div>
           <div>
             <p className="font-semibold text-white text-sm">Contact Support</p>
-            <p className="text-xs text-slate-500 mt-0.5">Chat with our team</p>
+            <p className="text-xs text-slate-500 mt-0.5">24/7 AI help + escalation</p>
           </div>
           <div className="ml-auto w-5 h-5 flex items-center justify-center">
             <i className="ri-arrow-right-s-line text-slate-500 text-lg group-hover:text-teal-400 transition-colors" />
