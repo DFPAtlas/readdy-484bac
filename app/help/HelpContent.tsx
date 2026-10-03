@@ -69,7 +69,7 @@ export default function HelpContent() {
             Help Centre
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">How can we help you?</h1>
-          <p className="text-slate-400 text-lg mb-8">Search our knowledge base or browse guides below</p>
+          <p className="text-slate-400 text-lg mb-8">Search FAQs or browse QuickGuard guides below</p>
           <div className="relative max-w-xl mx-auto">
             <div className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center">
               <i className="ri-search-line text-slate-500 text-lg" />
@@ -93,7 +93,7 @@ export default function HelpContent() {
               <div className="w-9 h-9 bg-amber-500/10 border border-amber-400/20 rounded-xl flex items-center justify-center">
                 <i className="ri-fire-line text-amber-400 text-lg" />
               </div>
-              <h2 className="text-2xl font-bold text-white">Popular Articles</h2>
+              <h2 className="text-2xl font-bold text-white">Featured Articles</h2>
             </div>
             <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">Featured QuickGuard guides</span>
           </div>
