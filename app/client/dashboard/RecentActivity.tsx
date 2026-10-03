@@ -143,7 +143,7 @@ export default function RecentActivity({ clientId, limit = 5 }: RecentActivityPr
                       {activity.category}
                     </span>
                     {activity.job_title && activity.related_job_id && (
-                      <Link href={`/client/jobs/${activity.related_job_id}`}
+                      <Link href={`/client/jobs/detail?id=${encodeURIComponent(activity.related_job_id)}`}
                         className="text-xs text-teal-400 hover:text-teal-300 truncate cursor-pointer">
                         {activity.job_title}
                       </Link>
