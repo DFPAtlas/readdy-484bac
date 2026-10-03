@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { loadMapsEmbedKey } from '@/lib/maps-embed';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import DecisionBanner from '../launch-readiness/DecisionBanner';
 import CheckCard from '../launch-readiness/CheckCard';
@@ -28,15 +29,14 @@ async function extractEdgeError(error: any): Promise<string> {
   return typeof error?.message === 'string' ? error.message : 'Edge function request failed';
 }
 
-function makeMapsKeyCheck(): LaunchCheck {
-  const configured = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+function makeMapsKeyCheck(configured = false): LaunchCheck {
   return {
     id: 'maps_embed_key',
     category: 'critical',
-    label: 'NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is configured',
-    status: configured ? 'pass' : 'fail',
+    label: 'Authenticated Maps configuration loads',
+    status: configured ? 'pass' : 'not_verified',
     method: 'auto',
-    notes: configured ? 'Maps Embed API key is configured.' : 'NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is not set.',
+    notes: configured ? 'Map configuration loads; visually verify the preview for Google restrictions.' : 'Run the authenticated map configuration check.',
     instruction: null,
     lastChecked: new Date().toISOString(),
     verifiedBy: '',
@@ -133,6 +133,7 @@ export default function LiveTestChecklistPage() {
       });
       if (error) throw new Error((await extractEdgeError(error)) || 'Verification failed');
       const fresh = buildChecks(data.checks || []);
+      try { await loadMapsEmbedKey(); const index = fresh.findIndex(c => c.id === 'maps_embed_key'); fresh[index] = makeMapsKeyCheck(true); } catch { const index = fresh.findIndex(c => c.id === 'maps_embed_key'); fresh[index] = {...makeMapsKeyCheck(), status: 'fail', notes: 'Map configuration could not load.'}; }
       if (Array.isArray(data.retirement_register)) {
         setRetirementRegister(data.retirement_register);
       }
@@ -207,7 +208,9 @@ export default function LiveTestChecklistPage() {
 
   const recheck = useCallback(async (id: string) => {
     if (id === 'maps_embed_key') {
-      const fresh = makeMapsKeyCheck();
+      let fresh = makeMapsKeyCheck();
+      try { await loadMapsEmbedKey(); fresh = makeMapsKeyCheck(true); }
+      catch { fresh = {...fresh, status: 'fail', notes: 'Map configuration could not load. Check the function secret and session, then retry.'}; }
       setChecks((prev) => prev.map((c) => (c.id === id ? fresh : c)));
       return;
     }

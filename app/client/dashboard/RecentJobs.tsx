@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import BookingStatusBadge from '../jobs/BookingStatusBadge';
+import { nextJobAction, paymentLabel } from '@/lib/client-journey';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -8,10 +10,11 @@ import { supabase } from '@/lib/supabase';
 interface RecentJob {
   id: string;
   job_title: string;
-  venue_city: string;
-  postcode: string;
+  venue_city: string | null;
+  postcode: string | null;
   start_date: string;
   status: string;
+  payment_status?: string | null;
   applications_count: number;
   assigned_count: number;
   needs_payment: boolean;
@@ -22,18 +25,6 @@ interface RecentJob {
 interface RecentJobsProps {
   jobs: RecentJob[];
   loading?: boolean;
-}
-
-function statusBadge(status: string) {
-  const map: Record<string, { label: string; bg: string; color: string; border: string }> = {
-    draft: { label: 'Draft', bg: 'bg-slate-500/15', color: 'text-slate-500', border: 'border-slate-500/25' },
-    open: { label: 'Posted', bg: 'bg-blue-500/15', color: 'text-blue-500', border: 'border-blue-500/25' },
-    active: { label: 'Active', bg: 'bg-emerald-500/15', color: 'text-emerald-500', border: 'border-emerald-500/25' },
-    completed: { label: 'Completed', bg: 'bg-slate-500/15', color: 'text-slate-500', border: 'border-slate-500/25' },
-    payment_pending: { label: 'Payment Due', bg: 'bg-amber-500/15', color: 'text-amber-500', border: 'border-amber-500/25' },
-    cancelled: { label: 'Cancelled', bg: 'bg-red-500/15', color: 'text-red-500', border: 'border-red-500/25' },
-  };
-  return map[status] || map.open;
 }
 
 export default function RecentJobs({ jobs, loading = false }: RecentJobsProps) {
@@ -115,7 +106,6 @@ export default function RecentJobs({ jobs, loading = false }: RecentJobsProps) {
       ) : (
         <div className="space-y-3">
           {jobs.map((job) => {
-            const badge = statusBadge(job.status);
             return (
               <div
                 key={job.id}
@@ -126,9 +116,8 @@ export default function RecentJobs({ jobs, loading = false }: RecentJobsProps) {
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
                       {job.job_title}
                     </h3>
-                    <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full border ${badge.bg} ${badge.color} ${badge.border}`}>
-                      {badge.label}
-                    </span>
+                    <BookingStatusBadge status={job.status} size="sm" />
+                    <span className="text-xs text-slate-500 dark:text-slate-300">{paymentLabel(job.payment_status)}</span>
                     {job.needs_review && (
                       <span className="shrink-0 text-xs font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/25 px-2 py-0.5 rounded-full">
                         <i className="ri-star-line mr-0.5" />
@@ -163,57 +152,14 @@ export default function RecentJobs({ jobs, loading = false }: RecentJobsProps) {
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-wrap mt-1 sm:mt-0">
-                  <button
-                    onClick={() => router.push(`/client/jobs/detail?id=${encodeURIComponent(job.id)}`)}
-                    className="px-3 py-1.5 text-xs font-semibold bg-white dark:bg-[#111d35] border border-slate-200 dark:border-[#1e2d4d] rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#162036] transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    View Job
-                  </button>
-                  <button
-                    onClick={() => handleDuplicate(job)}
-                    className="px-3 py-1.5 text-xs font-semibold bg-[#162036] border border-[#1e2d4d] rounded-lg text-slate-300 hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    <i className="ri-file-copy-line mr-1"></i>Duplicate
-                  </button>
-                  <button
-                    onClick={() => handleSaveTemplate(job)}
-                    className="px-3 py-1.5 text-xs font-semibold bg-[#162036] border border-[#1e2d4d] rounded-lg text-slate-300 hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    <i className="ri-save-line mr-1"></i>Save Template
-                  </button>
-                  {job.applications_count > 0 && job.status !== 'completed' && job.status !== 'cancelled' && (
-                    <button
-                      onClick={() => router.push(`/client/jobs/applicants?id=${encodeURIComponent(job.id)}`)}
-                      className="px-3 py-1.5 text-xs font-semibold bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-500 hover:bg-blue-500/20 transition-colors cursor-pointer whitespace-nowrap"
-                    >
-                      Review Applicants
-                    </button>
-                  )}
-                  {job.assigned_count > 0 && job.status !== 'completed' && job.status !== 'cancelled' && (
-                    <button
-                      onClick={() => router.push(`/client/jobs/${job.id}/select-guards`)}
-                      className="px-3 py-1.5 text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-500 hover:bg-emerald-500/20 transition-colors cursor-pointer whitespace-nowrap"
-                    >
-                      Manage Guards
-                    </button>
-                  )}
-                  {job.needs_payment && (
-                    <button
-                      onClick={() => router.push(`/client/jobs/payment?id=${encodeURIComponent(job.id)}`)}
-                      className="px-3 py-1.5 text-xs font-semibold bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-500 hover:bg-amber-500/20 transition-colors cursor-pointer whitespace-nowrap"
-                    >
-                      Pay Now
-                    </button>
-                  )}
-                  {job.needs_review && (
-                    <button
-                      onClick={() => router.push(`/client/jobs/detail?id=${encodeURIComponent(job.id)}`)}
-                      className="px-3 py-1.5 text-xs font-semibold bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors cursor-pointer whitespace-nowrap"
-                    >
-                      <i className="ri-star-line mr-1" />
-                      Leave Review
-                    </button>
-                  )}
+                  <Link href={nextJobAction(job).href} className="px-4 py-2 text-sm font-semibold bg-teal-500 text-white rounded-lg hover:bg-teal-600">{nextJobAction(job).label}</Link>
+                  <details className="relative"><summary className="px-3 py-2 text-xs text-slate-500 cursor-pointer">More</summary>
+                    <div className="flex flex-col gap-2 p-2">
+                      <button onClick={() => handleDuplicate(job)}>Duplicate</button>
+                      <button onClick={() => handleSaveTemplate(job)}>Save Template</button>
+                      <Link href={`/client/payment-centre?tab=history&job=${encodeURIComponent(job.id)}`}>Payment details</Link>
+                    </div>
+                  </details>
                 </div>
               </div>
             );

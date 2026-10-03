@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 
 interface PipelineStage {
   label: string;
@@ -32,7 +33,7 @@ export default function JobPipeline({
     { label: 'Draft', count: draftCount, icon: 'ri-file-edit-line', color: 'text-slate-500' },
     { label: 'Posted', count: postedCount, icon: 'ri-send-plane-line', color: 'text-blue-500' },
     { label: 'Applications', count: applicationsCount, icon: 'ri-user-add-line', color: 'text-violet-500' },
-    { label: 'Selected', count: selectedCount, icon: 'ri-user-follow-line', color: 'text-indigo-500' },
+    { label: 'Confirmed Bookings', count: selectedCount, icon: 'ri-user-follow-line', color: 'text-indigo-500' },
     { label: 'Payment', count: paymentPendingCount, icon: 'ri-bank-card-line', color: 'text-amber-500' },
     { label: 'Active', count: activeCount, icon: 'ri-shield-check-line', color: 'text-emerald-500' },
     { label: 'Completed', count: completedCount, icon: 'ri-check-double-line', color: 'text-teal-500' },
@@ -56,7 +57,7 @@ export default function JobPipeline({
       <h2 className="text-base font-semibold text-white mb-4">Job Pipeline</h2>
       <div className="flex items-center gap-2 overflow-x-auto pb-2">
         {stages.map((stage, index) => (
-          <div key={stage.label} className="flex items-center gap-2 flex-shrink-0">
+          <Link href={`/client/jobs?tab=${["drafts","posted","applications_open","confirmed","awaiting_payment","active","completed"][index]}`} key={stage.label} className="flex items-center gap-2 flex-shrink-0">
             <div className="flex flex-col items-center gap-1.5">
               <div className="w-12 h-12 bg-[#162036] rounded-xl border border-[#1a2b4a] flex items-center justify-center">
                 <i className={`${stage.icon} text-xl ${stage.color}`} />
@@ -67,7 +68,7 @@ export default function JobPipeline({
             {index < stages.length - 1 && (
               <div className="w-4 h-px bg-[#1a2b4a] mb-5" />
             )}
-          </div>
+          </Link>
         ))}
       </div>
     </div>

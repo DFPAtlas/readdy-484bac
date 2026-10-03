@@ -79,7 +79,7 @@ export default function ActionRequiredPanel({ guard, unreadCount, applications, 
 
   return (
     <div className="mb-6 space-y-2">
-      <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Needs Attention</h2>
+      <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">What needs doing next?</h2>
       {visibleActions.map(action => {
         const c = colorStyles[action.color] || colorStyles.blue;
         return (

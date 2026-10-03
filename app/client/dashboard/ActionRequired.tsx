@@ -78,7 +78,7 @@ export default function ActionRequired({
       icon: 'ri-bank-card-line',
       iconBg: 'bg-amber-500/15',
       iconColor: 'text-amber-500',
-      href: '/client/payment-history',
+      href: '/client/jobs?tab=awaiting_payment',
       urgent: jobsAwaitingPayment > 0,
     },
     {
@@ -87,7 +87,7 @@ export default function ActionRequired({
       icon: 'ri-calendar-event-line',
       iconBg: 'bg-emerald-500/15',
       iconColor: 'text-emerald-500',
-      href: '/client/jobs/tracker',
+      href: '/client/jobs?tab=confirmed',
       urgent: jobsStartingSoon > 0,
     },
     {
@@ -123,7 +123,7 @@ export default function ActionRequired({
       icon: 'ri-shield-check-line',
       iconBg: 'bg-indigo-500/15',
       iconColor: 'text-indigo-500',
-      href: '/client/jobs/tracker',
+      href: '/client/jobs?tab=confirmed',
       urgent: pendingGuardConfirmations > 0,
     },
     {
@@ -132,7 +132,7 @@ export default function ActionRequired({
       icon: 'ri-error-warning-line',
       iconBg: 'bg-rose-500/15',
       iconColor: 'text-rose-500',
-      href: '/client/payment-history',
+      href: '/client/payment-centre?tab=history',
       urgent: failedPayments > 0,
     },
     {
@@ -141,7 +141,7 @@ export default function ActionRequired({
       icon: 'ri-login-circle-line',
       iconBg: 'bg-orange-500/15',
       iconColor: 'text-orange-500',
-      href: '/client/jobs/tracker',
+      href: '/client/jobs?tab=confirmed',
       urgent: guardsNotCheckedIn > 0,
     },
     {
@@ -150,7 +150,7 @@ export default function ActionRequired({
       icon: 'ri-time-line',
       iconBg: 'bg-amber-500/15',
       iconColor: 'text-amber-500',
-      href: '/client/jobs/tracker',
+      href: '/client/jobs?tab=confirmed',
       urgent: lateGuards > 0,
     },
     {
@@ -168,7 +168,7 @@ export default function ActionRequired({
       icon: 'ri-refresh-line',
       iconBg: 'bg-violet-500/15',
       iconColor: 'text-violet-500',
-      href: '/client/jobs/tracker',
+      href: '/client/jobs?tab=confirmed',
       urgent: jobsNeedingReplacement > 0,
     },
     {
@@ -177,7 +177,7 @@ export default function ActionRequired({
       icon: 'ri-alarm-warning-line',
       iconBg: 'bg-red-500/15',
       iconColor: 'text-red-500',
-      href: '/client/jobs/tracker',
+      href: '/client/jobs?tab=confirmed',
       urgent: emergencyReplacements > 0,
     },
     {
@@ -186,7 +186,7 @@ export default function ActionRequired({
       icon: 'ri-search-line',
       iconBg: 'bg-blue-500/15',
       iconColor: 'text-blue-500',
-      href: '/client/jobs/tracker',
+      href: '/client/jobs?tab=confirmed',
       urgent: replacementRequestsOpen > 0,
     },
     {
@@ -195,7 +195,7 @@ export default function ActionRequired({
       icon: 'ri-hourglass-line',
       iconBg: 'bg-orange-500/15',
       iconColor: 'text-orange-500',
-      href: '/client/jobs/tracker',
+      href: '/client/jobs?tab=confirmed',
       urgent: replacementAwaitingApproval > 0,
     },
     {
@@ -245,7 +245,7 @@ export default function ActionRequired({
     },
   ];
 
-  const totalActions = items.reduce((sum, i) => sum + i.count, 0);
+  const totalActions = items.filter(item => item.label !== 'Cancelled This Month').reduce((sum, i) => sum + i.count, 0);
 
   if (loading) {
     return (
@@ -272,13 +272,13 @@ export default function ActionRequired({
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-4">
         <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-        <h2 className="text-base font-semibold text-slate-900 dark:text-white">Action Required</h2>
+        <h2 className="text-base font-semibold text-slate-900 dark:text-white">Other Notifications</h2>
         <span className="bg-red-500/15 text-red-500 text-xs font-bold px-2 py-0.5 rounded-full border border-red-500/25">
           {totalActions}
         </span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {items.map((item) => (
+        {items.filter(item => item.count > 0 && item.label !== 'Cancelled This Month').map((item) => (
           <Link
             key={item.label}
             href={item.href}

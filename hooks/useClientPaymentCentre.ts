@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { paymentAmounts, paymentTotals, isCollected } from '@/lib/financeAmounts';
+import { planLabel } from '@/lib/client-journey';
 
 interface SpendingSummary {
   thisMonthSpend: number;
@@ -7,6 +9,7 @@ interface SpendingSummary {
   jobsPaid: number;
   outstandingAmount: number;
   refundsTotal: number;
+  netSpend: number;
 }
 
 interface BillingInfo {
@@ -41,6 +44,7 @@ export function useClientPaymentCentre() {
     jobsPaid: 0,
     outstandingAmount: 0,
     refundsTotal: 0,
+    netSpend: 0,
   });
   const [billingInfo, setBillingInfo] = useState<BillingInfo>({
     stripeCustomerId: null,
@@ -79,44 +83,32 @@ export function useClientPaymentCentre() {
         billingPortalLastOpened: client.stripe_billing_portal_last_opened_at || null,
         defaultPaymentMethod: client.stripe_customer_id ? 'Card on file' : null,
         subscriptionStatus: client.subscription_status || 'Free',
-        planName: client.plan_name || client.subscription_tier || 'Free',
+        planName: planLabel(client.plan_name || client.subscription_tier),
       });
 
-      const { data: transactions } = await supabase
+      const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
         .select('id, job_id, amount, status, created_at, receipt_url, invoice_url, refunded, refund_amount, refunded_at')
         .eq('client_id', client.id)
         .order('created_at', { ascending: false });
 
+      if (transactionsError) throw transactionsError;
       const txData = transactions || [];
-      let totalSpend = 0;
-      let thisMonthSpend = 0;
-      let jobsPaid = 0;
-      let outstanding = 0;
-      let refundsTotal = 0;
-
-      txData.forEach((t: any) => {
-        const amt = Number(t.amount) || 0;
-        if (t.status === 'completed' || t.status === 'succeeded') {
-          totalSpend += amt;
-          jobsPaid++;
-          const d = new Date(t.created_at);
-          if (d >= new Date(monthStart)) thisMonthSpend += amt;
-        } else if (t.status === 'pending' || t.status === 'pending_payment') {
-          outstanding += amt;
-        }
-        if (t.refunded) {
-          refundsTotal += Number(t.refund_amount) || 0;
-        }
-      });
-
-      setSpendingSummary({ thisMonthSpend, totalSpend, jobsPaid, outstandingAmount: outstanding, refundsTotal });
+      const totals = paymentTotals(txData);
+      const monthTotals = paymentTotals(txData.filter((t: any) => new Date(t.created_at) >= new Date(monthStart)));
+      const paidJobs = new Set(txData.filter((t: any) => isCollected(t.status)).map((t: any) => t.job_id));
+      const outstanding = txData.filter((t: any) => ['pending','pending_payment'].includes(t.status) && !paidJobs.has(t.job_id)).reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
+      setSpendingSummary({ thisMonthSpend: monthTotals.collected, totalSpend: totals.collected, jobsPaid: paidJobs.size, outstandingAmount: outstanding, refundsTotal: totals.refunded, netSpend: totals.remaining });
 
       const jobIds = txData.map((t: any) => t.job_id).filter(Boolean);
+      let refundMap: Record<string, string> = {};
       let jobsMap: Record<string, any> = {};
       let guardMap: Record<string, string> = {};
 
       if (jobIds.length > 0) {
+        const {data: requests, error: requestError} = await supabase.schema('app').from('refund_requests').select('job_id, status').in('job_id', jobIds).order('created_at', {ascending:false});
+        if (requestError) throw requestError;
+        (requests || []).forEach((request: any) => {if (!refundMap[request.job_id]) refundMap[request.job_id] = request.status;});
         const { data: jobsData } = await supabase
           .from('jobs')
           .select('id, job_title, payment_status')
@@ -152,7 +144,7 @@ export function useClientPaymentCentre() {
         amountPaid: Number(t.amount) || 0,
         paymentStatus: t.status,
         releaseStatus: jobsMap[t.job_id]?.payment_status || t.status,
-        refundStatus: t.refunded ? 'Refunded' : '—',
+        refundStatus: t.status === 'partially_refunded' ? `Partially refunded (£${paymentAmounts(t).refunded.toFixed(2)})` : paymentAmounts(t).refunded > 0 ? 'Refunded' : refundMap[t.job_id] === 'pending' ? 'Refund requested' : refundMap[t.job_id] === 'approved' ? 'Refund processing' : refundMap[t.job_id] === 'rejected' ? 'Refund declined' : '—',
         receiptUrl: t.receipt_url || null,
         invoiceUrl: t.invoice_url || null,
         jobId: t.job_id,

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { ClientJob } from '@/lib/client-types';
 import Link from 'next/link';
+import { paymentLabel } from '@/lib/client-journey';
+import BookingStatusBadge from './BookingStatusBadge';
 import ReviewStatusBadge from '@/components/reviews/ReviewStatusBadge';
 
 interface JobDetailDrawerProps {
@@ -175,7 +177,7 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
                 <p className="text-sm font-semibold text-amber-400">{unreviewedCount} guard{unreviewedCount !== 1 ? 's' : ''} awaiting review</p>
                 <p className="text-xs text-amber-400/80">Your feedback helps improve our guard matching.</p>
               </div>
-              <Link href={`/client/jobs/${job.id}`}>
+              <Link href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`}>
                 <button className="shrink-0 px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition-colors cursor-pointer whitespace-nowrap">
                   Review
                 </button>
@@ -243,7 +245,7 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
               </div>
             </div>
             {job.status === 'awaiting_guard_selection' && (job.applications_count || 0) > 0 && (
-              <Link href={`/client/jobs/${job.id}/select-guards`}>
+              <Link href={`/client/jobs/applicants?id=${encodeURIComponent(job.id)}`}>
                 <button className="w-full mt-3 bg-teal-500 text-white py-2 rounded-lg text-sm font-semibold hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap">
                   <i className="ri-user-search-line mr-1"></i>Review Applicants
                 </button>
@@ -330,7 +332,7 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
                   );
                 })}
               </div>
-              <Link href={`/client/jobs/${job.id}`}>
+              <Link href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`}>
                 <button className="w-full mt-3 bg-[#162036] text-slate-300 py-2 rounded-lg text-sm font-semibold border border-[#1e2d4d] hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap">
                   <i className="ri-user-settings-line mr-1"></i>Manage Selected Guards
                 </button>
@@ -345,7 +347,7 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
             </h3>
             {latestTransaction ? (
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-slate-500">Status</span><span className="font-semibold capitalize" style={{ color: latestTransaction.status === 'completed' ? '#34d399' : latestTransaction.status === 'failed' ? '#f87171' : '#fbbf24' }}>{latestTransaction.status}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Status</span><span className="font-semibold capitalize" style={{ color: latestTransaction.status === 'completed' ? '#34d399' : latestTransaction.status === 'failed' ? '#f87171' : '#fbbf24' }}>{paymentLabel(latestTransaction.status)}</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">Amount</span><span className="text-slate-200">£{latestTransaction.amount}</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">Date</span><span className="text-slate-200">{formatDateTime(latestTransaction.created_at)}</span></div>
                 {latestTransaction.payment_method && (
@@ -355,7 +357,7 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
                   <div className="bg-red-500/10 border border-red-500/25 rounded-lg p-3 mt-2">
                     <p className="text-sm text-red-400 font-semibold">Payment Failed</p>
                     <p className="text-xs text-red-400/80 mt-1">{latestTransaction.failure_reason || 'Your payment could not be processed.'}</p>
-                    <Link href={`/client/jobs/${job.id}/payment`}>
+                    <Link href={`/client/jobs/payment?id=${encodeURIComponent(job.id)}`}>
                       <button className="mt-2 bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors cursor-pointer whitespace-nowrap">
                         <i className="ri-refresh-line mr-1"></i>Retry Payment
                       </button>
@@ -363,7 +365,7 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
                   </div>
                 )}
                 {latestTransaction.status === 'pending' && (
-                  <Link href={`/client/jobs/${job.id}/payment`}>
+                  <Link href={`/client/jobs/payment?id=${encodeURIComponent(job.id)}`}>
                     <button className="w-full mt-2 bg-orange-500 text-white py-2 rounded-lg text-sm font-semibold hover:bg-orange-600 transition-colors cursor-pointer whitespace-nowrap">
                       <i className="ri-secure-payment-line mr-1"></i>Pay Now
                     </button>
@@ -374,7 +376,7 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
               <div className="text-center py-4">
                 <p className="text-sm text-slate-500">No payment recorded yet</p>
                 {job.status === 'awaiting_payment' && (
-                  <Link href={`/client/jobs/${job.id}/payment`}>
+                  <Link href={`/client/jobs/payment?id=${encodeURIComponent(job.id)}`}>
                     <button className="mt-2 bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-orange-600 transition-colors cursor-pointer whitespace-nowrap">
                       <i className="ri-secure-payment-line mr-1"></i>Pay Now
                     </button>
@@ -410,7 +412,7 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
               <i className="ri-tools-line text-teal-400"></i>Actions
             </h3>
             <div className="grid grid-cols-2 gap-2">
-              <Link href={`/client/jobs/${job.id}`}>
+              <Link href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`}>
                 <button className="w-full bg-[#111d35] text-slate-300 py-2.5 rounded-lg text-sm font-semibold border border-[#1e2d4d] hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap">
                   <i className="ri-eye-line mr-1"></i>Full Details
                 </button>
@@ -420,7 +422,7 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
                   <i className="ri-message-3-line mr-1"></i>Message
                 </button>
               </Link>
-              <Link href={`/client/jobs/${job.id}/payment`}>
+              <Link href={`/client/jobs/payment?id=${encodeURIComponent(job.id)}`}>
                 <button className="w-full bg-[#111d35] text-orange-400 py-2.5 rounded-lg text-sm font-semibold border border-[#1e2d4d] hover:bg-orange-500/10 transition-colors cursor-pointer whitespace-nowrap">
                   <i className="ri-secure-payment-line mr-1"></i>Payment
                 </button>

@@ -219,10 +219,12 @@ function PostJobContent() {
       }
     }
     setFormData(prev => ({ ...prev, [name]: newValue }));
-    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+    setErrors(prev => ({ ...prev, [name]: '', submit: '' }));
+    if (submitStatus === 'error') setSubmitStatus('idle');
   };
 
   const handleCheckboxChange = (licence: string) => {
+    setErrors(prev => ({...prev, specificLicences: '', submit: ''}));
     setFormData(prev => ({
       ...prev,
       specificLicences: prev.specificLicences.includes(licence)
@@ -394,9 +396,16 @@ function PostJobContent() {
     setActiveStep(1);
   };
 
+  useEffect(() => {
+    const invalid = Object.keys(errors).find(name => errors[name] && name !== 'submit' && stepFieldMap[activeStep]?.includes(name));
+    if (!invalid) return;
+    const element = document.querySelector<HTMLElement>(`[name="${invalid}"]`) || document.getElementById('validation-summary');
+    element?.scrollIntoView({behavior:'smooth', block:'center'}); element?.focus();
+  }, [activeStep, errors]);
+
   const validateStep = (step: number) => {
     const newErrors = getStepErrors(step, formData);
-    setErrors(prev => ({ ...prev, ...newErrors }));
+    setErrors(prev => ({ ...prev, ...Object.fromEntries((stepFieldMap[step] || []).map(field => [field, ""])), ...newErrors }));
     return Object.keys(newErrors).length === 0;
   };
 
@@ -473,13 +482,12 @@ function PostJobContent() {
           usage_check_failed: 'Could not verify job posting limits. Please try again.',
           insert_failed: result.message || 'Failed to create job. Please try again.',
         };
-        setErrors({ submit: errorMap[result.error] || result.message || 'Failed to post job.' });
+        const details = Array.isArray(result.details) ? result.details.filter((d: unknown) => typeof d === 'string').join('. ') : '';
+        setErrors({ submit: details || errorMap[result.error] || result.message || 'Failed to post job.' });
         setSubmitStatus('error');
 
         if (result.error === 'limit_reached') {
-          setTimeout(() => {
-            router.push('/upgrade?reason=job_limit_reached');
-          }, 2000);
+          // Keep the form and draft intact; the user can choose to upgrade.
         }
         return;
       }
@@ -487,7 +495,7 @@ function PostJobContent() {
       setPostSubmitWarnings(result.warnings || []);
 
       if (currentDraftId) {
-        supabase.schema('app').from('job_drafts').delete().eq('id', currentDraftId).then(() => {
+        Promise.resolve(supabase.schema('app').from('job_drafts').delete().eq('id', currentDraftId)).then(() => {
           setCurrentDraftId(null);
         }).catch(() => {});
       }
@@ -737,6 +745,7 @@ function PostJobContent() {
 
           <form onSubmit={e => e.preventDefault()} className="space-y-6">
             <FirstJobHelper step={activeStep} />
+          {Object.values(errors).some(Boolean) && <div id="validation-summary" tabIndex={-1} role="alert" className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-300"><p className="font-semibold">Please correct these details</p><ul className="list-disc pl-5 mt-2">{Object.entries(errors).filter(([,message]) => message).map(([field,message]) => <li key={field}><button type="button" className="text-left underline" onClick={() => { const step = Object.keys(stepFieldMap).find(step => stepFieldMap[Number(step)].includes(field)); if(step) setActiveStep(Number(step)); }}>{message}</button></li>)}</ul><p className="mt-2 text-sm">Your entered details have been kept.</p></div>}
             {activeStep === 1 && (
               <StepJobBasics
                 formData={formData}

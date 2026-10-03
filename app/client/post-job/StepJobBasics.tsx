@@ -47,12 +47,14 @@ export default function StepJobBasics({ formData, errors, onChange, onNext }: St
           <input
             type="text"
             name="jobTitle"
+              aria-invalid={!!errors.jobTitle}
+              aria-describedby={errors.jobTitle ? "error-jobTitle" : undefined}
             value={formData.jobTitle}
             onChange={onChange}
             placeholder="e.g., Door Supervisor for Nightclub Event"
             className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500"
           />
-          {errors.jobTitle && <p className="text-red-400 text-sm mt-1">{errors.jobTitle}</p>}
+          {errors.jobTitle && <p id="error-jobTitle" className="text-red-400 text-sm mt-1">{errors.jobTitle}</p>}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -61,6 +63,8 @@ export default function StepJobBasics({ formData, errors, onChange, onNext }: St
             <div className="relative">
               <select
                 name="securityType"
+              aria-invalid={!!errors.securityType}
+              aria-describedby={errors.securityType ? "error-securityType" : undefined}
                 value={formData.securityType}
                 onChange={onChange}
                 className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm pr-8 appearance-none"
@@ -72,7 +76,7 @@ export default function StepJobBasics({ formData, errors, onChange, onNext }: St
               </select>
               <i className="ri-arrow-down-s-line absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
             </div>
-            {errors.securityType && <p className="text-red-400 text-sm mt-1">{errors.securityType}</p>}
+            {errors.securityType && <p id="error-securityType" className="text-red-400 text-sm mt-1">{errors.securityType}</p>}
           </div>
 
           <div>
@@ -80,13 +84,15 @@ export default function StepJobBasics({ formData, errors, onChange, onNext }: St
             <input
               type="number"
               name="numberOfGuards"
+              aria-invalid={!!errors.numberOfGuards}
+              aria-describedby={errors.numberOfGuards ? "error-numberOfGuards" : undefined}
               value={formData.numberOfGuards}
               onChange={onChange}
               min="1"
               max="100"
               className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm"
             />
-            {errors.numberOfGuards && <p className="text-red-400 text-sm mt-1">{errors.numberOfGuards}</p>}
+            {errors.numberOfGuards && <p id="error-numberOfGuards" className="text-red-400 text-sm mt-1">{errors.numberOfGuards}</p>}
           </div>
         </div>
 
@@ -96,14 +102,17 @@ export default function StepJobBasics({ formData, errors, onChange, onNext }: St
           </label>
           <textarea
             name="jobDescription"
+              aria-invalid={!!errors.jobDescription}
+              aria-describedby={errors.jobDescription ? "error-jobDescription" : undefined}
             value={formData.jobDescription}
             onChange={onChange}
+            minLength={10}
             maxLength={500}
             rows={4}
             placeholder="Briefly describe the role, key responsibilities, and what you expect from guards..."
             className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm resize-none placeholder:text-slate-500"
           />
-          {errors.jobDescription && <p className="text-red-400 text-sm mt-1">{errors.jobDescription}</p>}
+          {errors.jobDescription && <p id="error-jobDescription" className="text-red-400 text-sm mt-1">{errors.jobDescription}</p>}
         </div>
 
         <div>
@@ -157,6 +166,8 @@ export default function StepJobBasics({ formData, errors, onChange, onNext }: St
                   <div className="relative">
                     <select
                       name="featuredDuration"
+              aria-invalid={!!errors.featuredDuration}
+              aria-describedby={errors.featuredDuration ? "error-featuredDuration" : undefined}
                       value={formData.featuredDuration}
                       onChange={onChange}
                       className="w-full px-3 py-2 bg-[#111d35] border border-[#1e2d4d] rounded-lg text-white text-xs pr-8 appearance-none"

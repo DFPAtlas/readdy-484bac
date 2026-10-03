@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { paymentTotals } from './financeAmounts';
 import type {
   Client,
   Job,
@@ -355,7 +356,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
 
   const stats: JobStat = {
     total_jobs: jobs.length,
-    active_jobs: jobs.filter(j => j.status === 'active' || j.status === 'open').length,
+    active_jobs: jobs.filter(j => ['active', 'in_progress'].includes(j.status)).length,
     completed_jobs: jobs.filter(j => j.status === 'completed').length,
     pending_payments: jobs.filter(j => j.status === 'payment_pending' || j.status === 'awaiting_payment').length,
   };
@@ -364,8 +365,8 @@ export async function getClientDashboardStats(clientId: string, userId: string):
   const pipelineData: PipelineData = {
     draftCount: jobs.filter(j => j.status === "draft").length,
     postedCount: jobs.filter(j => j.status === "open").length,
-    applicationsCount: jobs.filter(j => (j.applications_count || 0) > 0).length,
-    selectedCount: jobs.filter(j => (j.assigned_count || 0) > 0).length,
+    applicationsCount: jobs.filter(j => ["open", "awaiting_guard_selection"].includes(j.status) && (j.applications_count || 0) > 0).length,
+    selectedCount: jobs.filter(j => j.status === "confirmed").length,
     paymentPendingCount: jobs.filter(j => j.status === "payment_pending" || j.status === "awaiting_payment").length,
     activeCount: jobs.filter(j => j.status === "active" || j.status === "in_progress").length,
     completedCount: jobs.filter(j => j.status === "completed").length,
@@ -373,7 +374,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
 
   const jobsAwaitingPayment = stats.pending_payments;
   const jobsStartingSoon = jobs.filter(j => {
-    if (!j.start_date) return false;
+    if (!j.start_date || ['cancelled','completed','closed'].includes(j.status)) return false;
     const d = new Date(j.start_date);
     return d >= now && d <= in48h;
   }).length;
@@ -405,7 +406,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
       .eq('is_deleted', false)
       .in('status', ['open', 'awaiting_client', 'escalated', 'under_review']),
     supabase.from('subscription_payments').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'failed'),
-    supabase.from('transactions').select('amount').eq('client_id', clientId).gte('created_at', startOfMonth),
+    supabase.from('transactions').select('amount, status, refund_amount, refunded').eq('client_id', clientId).gte('created_at', startOfMonth),
     jobIds.length > 0
       ? supabase.from('job_assignments').select('guard_id').in('job_id', jobIds)
       : Promise.resolve({ data: [] }),
@@ -416,7 +417,8 @@ export async function getClientDashboardStats(clientId: string, userId: string):
   const unreadMessages = unreadMessagesRes.count || 0;
   const openTickets = (openTicketsRes.data || []) as { priority: string; status: string }[];
   const failedPayments = failedPaymentsRes.count || 0;
-  const txData = (txRes.data || []) as { amount: number }[];
+  if (txRes.error) throw txRes.error;
+  const txData = txRes.data || [];
   const distinctGuards = (distinctGuardsRes.data || []) as { guard_id: string }[];
 
   // Count attendance issues
@@ -476,13 +478,14 @@ export async function getClientDashboardStats(clientId: string, userId: string):
 
   let guardsAwaitingReview = 0;
   Object.keys(assignmentMap).forEach(jid => {
+    if (jobs.find(j => j.id === jid)?.status !== 'completed') return;
     const assigned = assignmentMap[jid].size;
     const reviewed = reviewMap[jid]?.size || 0;
     guardsAwaitingReview += Math.max(0, assigned - reviewed);
   });
 
   // Build recentJobs (top 5) using the same assignment/review maps
-  const recentJobs: RecentJobSummary[] = jobs.slice(0, 5).map(j => {
+  const recentJobs: RecentJobSummary[] = jobs.map(j => {
     const riAssigned = assignmentMap[j.id]?.size || 0;
     const riReviewed = reviewMap[j.id]?.size || 0;
     const needsPayment = (j.status === "payment_pending" || j.status === "awaiting_payment") && j.payment_status !== 'funded';
@@ -506,7 +509,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
   const urgentTickets = openTickets.filter(t => t.priority === 'urgent').length;
   const awaitingReplyTickets = openTickets.filter(t => t.status === 'awaiting_client').length;
 
-  const totalSpend = txData.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+  const totalSpend = paymentTotals(txData).collected;
   const totalGuardsHired = [...new Set(distinctGuards.map(a => a.guard_id))].length;
 
   // Safety counts
@@ -527,19 +530,17 @@ export async function getClientDashboardStats(clientId: string, userId: string):
   const [cancellationsRes, refundsRes, cancelledMonthRes] = await Promise.all([
     jobIds.length > 0
       ? supabase
-          .from('support_tickets')
+          .schema('app').from('job_cancellations')
           .select('id, status')
-          .eq('client_id', clientId)
-          .in('status', ['open', 'awaiting_client', 'escalated', 'under_review'])
-          .eq('category', 'cancellation')
+          .in('job_id', jobIds)
+          .in('status', ['requested', 'under_admin_review'])
       : Promise.resolve({ data: [] }),
     jobIds.length > 0
       ? supabase
-          .from('support_tickets')
+          .schema('app').from('refund_requests')
           .select('id, status')
-          .eq('client_id', clientId)
-          .in('status', ['open', 'awaiting_client', 'escalated', 'under_review'])
-          .eq('category', 'refund')
+          .in('job_id', jobIds)
+          .in('status', ['pending', 'approved'])
       : Promise.resolve({ data: [] }),
     supabase
       .from('jobs')

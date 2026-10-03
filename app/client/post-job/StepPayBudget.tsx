@@ -56,6 +56,8 @@ export default function StepPayBudget({ formData, errors, onChange, onNext, onBa
               <input
                 type="number"
                 name="hourlyRate"
+              aria-invalid={!!errors.hourlyRate}
+              aria-describedby={errors.hourlyRate ? "error-hourlyRate" : undefined}
                 value={formData.hourlyRate}
                 onChange={onChange}
                 min="10"
@@ -64,7 +66,7 @@ export default function StepPayBudget({ formData, errors, onChange, onNext, onBa
                 className="w-full pl-8 pr-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500"
               />
             </div>
-            {errors.hourlyRate && <p className="text-red-400 text-sm mt-1">{errors.hourlyRate}</p>}
+            {errors.hourlyRate && <p id="error-hourlyRate" className="text-red-400 text-sm mt-1">{errors.hourlyRate}</p>}
             <p className="text-xs text-slate-500 mt-1">Most UK security guards charge £12–£18/hr. Minimum is £10.00.</p>
           </div>
           <div>
@@ -138,12 +140,14 @@ export default function StepPayBudget({ formData, errors, onChange, onNext, onBa
               <input
                 type="text"
                 name="contactName"
+              aria-invalid={!!errors.contactName}
+              aria-describedby={errors.contactName ? "error-contactName" : undefined}
                 value={formData.contactName}
                 onChange={onChange}
                 placeholder="Your full name"
                 className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500"
               />
-              {errors.contactName && <p className="text-red-400 text-sm mt-1">{errors.contactName}</p>}
+              {errors.contactName && <p id="error-contactName" className="text-red-400 text-sm mt-1">{errors.contactName}</p>}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -151,24 +155,28 @@ export default function StepPayBudget({ formData, errors, onChange, onNext, onBa
                 <input
                   type="tel"
                   name="contactPhone"
+              aria-invalid={!!errors.contactPhone}
+              aria-describedby={errors.contactPhone ? "error-contactPhone" : undefined}
                   value={formData.contactPhone}
                   onChange={onChange}
                   placeholder="07XXX XXXXXX"
                   className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500"
                 />
-                {errors.contactPhone && <p className="text-red-400 text-sm mt-1">{errors.contactPhone}</p>}
+                {errors.contactPhone && <p id="error-contactPhone" className="text-red-400 text-sm mt-1">{errors.contactPhone}</p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Contact Email *</label>
                 <input
                   type="email"
                   name="contactEmail"
+              aria-invalid={!!errors.contactEmail}
+              aria-describedby={errors.contactEmail ? "error-contactEmail" : undefined}
                   value={formData.contactEmail}
                   onChange={onChange}
                   placeholder="your.email@example.com"
                   className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500"
                 />
-                {errors.contactEmail && <p className="text-red-400 text-sm mt-1">{errors.contactEmail}</p>}
+                {errors.contactEmail && <p id="error-contactEmail" className="text-red-400 text-sm mt-1">{errors.contactEmail}</p>}
               </div>
             </div>
           </div>

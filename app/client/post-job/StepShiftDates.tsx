@@ -66,22 +66,26 @@ export default function StepShiftDates({ formData, errors, onChange, onNext, onB
             <input
               type="date"
               name="startDate"
+              aria-invalid={!!errors.startDate}
+              aria-describedby={errors.startDate ? "error-startDate" : undefined}
               value={formData.startDate}
               onChange={onChange}
               className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm"
             />
-            {errors.startDate && <p className="text-red-400 text-sm mt-1">{errors.startDate}</p>}
+            {errors.startDate && <p id="error-startDate" className="text-red-400 text-sm mt-1">{errors.startDate}</p>}
           </div>
           <div>
             <label className="block text-sm font-semibold text-slate-300 mb-2">End Date *</label>
             <input
               type="date"
               name="endDate"
+              aria-invalid={!!errors.endDate}
+              aria-describedby={errors.endDate ? "error-endDate" : undefined}
               value={formData.endDate}
               onChange={onChange}
               className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm"
             />
-            {errors.endDate && <p className="text-red-400 text-sm mt-1">{errors.endDate}</p>}
+            {errors.endDate && <p id="error-endDate" className="text-red-400 text-sm mt-1">{errors.endDate}</p>}
           </div>
         </div>
 
@@ -91,22 +95,26 @@ export default function StepShiftDates({ formData, errors, onChange, onNext, onB
             <input
               type="time"
               name="startTime"
+              aria-invalid={!!errors.startTime}
+              aria-describedby={errors.startTime ? "error-startTime" : undefined}
               value={formData.startTime}
               onChange={onChange}
               className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm"
             />
-            {errors.startTime && <p className="text-red-400 text-sm mt-1">{errors.startTime}</p>}
+            {errors.startTime && <p id="error-startTime" className="text-red-400 text-sm mt-1">{errors.startTime}</p>}
           </div>
           <div>
             <label className="block text-sm font-semibold text-slate-300 mb-2">Finish Time *</label>
             <input
               type="time"
               name="endTime"
+              aria-invalid={!!errors.endTime}
+              aria-describedby={errors.endTime ? "error-endTime" : undefined}
               value={formData.endTime}
               onChange={onChange}
               className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm"
             />
-            {errors.endTime && <p className="text-red-400 text-sm mt-1">{errors.endTime}</p>}
+            {errors.endTime && <p id="error-endTime" className="text-red-400 text-sm mt-1">{errors.endTime}</p>}
           </div>
         </div>
 
@@ -124,6 +132,8 @@ export default function StepShiftDates({ formData, errors, onChange, onNext, onB
           <div className="relative">
             <select
               name="numberOfDays"
+              aria-invalid={!!errors.numberOfDays}
+              aria-describedby={errors.numberOfDays ? "error-numberOfDays" : undefined}
               value={formData.numberOfDays}
               onChange={onChange}
               className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm pr-8 appearance-none"
@@ -150,6 +160,8 @@ export default function StepShiftDates({ formData, errors, onChange, onNext, onB
           <input
             type="text"
             name="breakInfo"
+              aria-invalid={!!errors.breakInfo}
+              aria-describedby={errors.breakInfo ? "error-breakInfo" : undefined}
             value={formData.breakInfo}
             onChange={onChange}
             placeholder="e.g., 30 min unpaid break after 4 hours, 1 hour paid lunch"
@@ -205,6 +217,8 @@ export default function StepShiftDates({ formData, errors, onChange, onNext, onB
                 <input
                   type="text"
                   name="repeatFrequency"
+              aria-invalid={!!errors.repeatFrequency}
+              aria-describedby={errors.repeatFrequency ? "error-repeatFrequency" : undefined}
                   value={formData.repeatFrequency || ''}
                   onChange={onChange}
                   placeholder="e.g., Every Tuesday and Thursday, or Every other Monday"
@@ -216,6 +230,8 @@ export default function StepShiftDates({ formData, errors, onChange, onNext, onB
                 <input
                   type="date"
                   name="repeatEndDate"
+              aria-invalid={!!errors.repeatEndDate}
+              aria-describedby={errors.repeatEndDate ? "error-repeatEndDate" : undefined}
                   value={formData.repeatEndDate || ''}
                   onChange={onChange}
                   className="w-full px-4 py-3 bg-[#111d35] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm"

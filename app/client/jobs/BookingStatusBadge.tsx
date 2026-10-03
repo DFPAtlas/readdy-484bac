@@ -1,3 +1,4 @@
+import { bookingLabels } from '@/lib/client-journey';
 interface BookingStatusBadgeProps {
   status: string;
   size?: 'sm' | 'md' | 'lg';
@@ -6,10 +7,10 @@ interface BookingStatusBadgeProps {
 const statusConfig: Record<string, { bg: string; text: string; border: string; icon: string; label: string }> = {
   draft: { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/25', icon: 'ri-draft-line', label: 'Draft' },
   pending: { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/25', icon: 'ri-time-line', label: 'Pending' },
-  open: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/25', icon: 'ri-send-plane-line', label: 'Awaiting Applicants' },
-  awaiting_guard_selection: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/25', icon: 'ri-user-search-line', label: 'Awaiting Guard Selection' },
+  open: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/25', icon: 'ri-send-plane-line', label: 'Posted' },
+  awaiting_guard_selection: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/25', icon: 'ri-user-search-line', label: 'Applications' },
   awaiting_payment: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/25', icon: 'ri-secure-payment-line', label: 'Awaiting Payment' },
-  awaiting_client_confirmation: { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/25', icon: 'ri-file-shield-line', label: 'Awaiting Client Confirmation' },
+  awaiting_client_confirmation: { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/25', icon: 'ri-file-shield-line', label: 'Awaiting Confirmation' },
   awaiting_client_approval: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/25', icon: 'ri-hourglass-line', label: 'Awaiting Client Approval' },
   payout_approved: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/25', icon: 'ri-hourglass-line', label: 'Payout Pending' },
   paid_out: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/25', icon: 'ri-check-double-line', label: 'Paid Out' },
@@ -35,7 +36,7 @@ export default function BookingStatusBadge({ status, size = 'md' }: BookingStatu
   return (
     <span className={`${config.bg} ${config.text} ${config.border} ${sizeClasses[size]} rounded-full font-semibold border inline-flex items-center gap-1.5 whitespace-nowrap`}>
       <i className={`${config.icon} ${iconSize[size]}`}></i>
-      {config.label}
+      {bookingLabels[status] || config.label}
     </span>
   );
 }

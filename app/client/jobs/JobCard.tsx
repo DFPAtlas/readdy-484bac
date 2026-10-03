@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { nextJobAction, paymentLabel } from '@/lib/client-journey';
 import { useRouter } from 'next/navigation';
 import NeedsAttentionBadge, { getAttentionItems } from './NeedsAttentionBadge';
 import BookingStatusBadge from './BookingStatusBadge';
@@ -46,17 +47,15 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
   const attention = getAttentionItems(job);
   const isCancelled = job.status === 'cancelled';
   const isCompleted = job.status === 'completed';
-  const isActive = job.status === 'in_progress';
+  const isActive = ['in_progress','active'].includes(job.status);
   const isConfirmed = job.status === 'confirmed';
-  const needsConfirmation = job.status === 'awaiting_client_confirmation';
-  const needsSelection = job.status === 'awaiting_guard_selection';
-  const needsPayment = job.status === 'awaiting_payment';
   const isDisputed = job.status === 'disputed';
 
   const cancellationStatus = job.cancellation_status;
   const cancellationReason = job.cancellation_reason;
   const hasRefundPending = job.refund_status === 'pending';
-  const hasRefundApproved = job.refund_status === 'approved' || job.refund_status === 'processed';
+  const hasRefundApproved = paymentStatus === 'refunded' || job.payment_status === 'refunded' || job.refund_status === 'processed';
+  const nextAction = nextJobAction({...job, payment_status: paymentStatus || job.payment_status});
 
   const assigned = job.assigned_count || 0;
   const needed = job.number_of_guards || 1;
@@ -159,7 +158,7 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
                   {paymentStatus && (
                     <span className={`text-xs font-semibold ${paymentStatusConfig[paymentStatus]?.color || 'text-slate-400'}`}>
                       <i className="ri-secure-payment-line mr-1"></i>
-                      {paymentStatusConfig[paymentStatus]?.label || paymentStatus}
+                      {paymentLabel(paymentStatus)}
                     </span>
                   )}
                   {cancellationStatus && cancellationStatusConfig[cancellationStatus] && (
@@ -177,7 +176,7 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
                   {hasRefundApproved && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/25">
                       <i className="ri-check-double-line"></i>
-                      Refund Approved
+                      Refunded
                     </span>
                   )}
                   {job.booking_reference && (
@@ -247,12 +246,7 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
                   </span>
                 </span>
               )}
-              {needsConfirmation && (
-                <span className="flex items-center gap-1.5 text-sm text-violet-400">
-                  <i className="ri-file-shield-line text-violet-500"></i>
-                  <span className="font-semibold">Awaiting confirmation</span>
-                </span>
-              )}
+
               {isConfirmed && (
                 <span className="flex items-center gap-1.5 text-sm text-emerald-400">
                   <i className="ri-checkbox-circle-line text-emerald-500"></i>
@@ -269,7 +263,7 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
             </div>
 
             <div className="flex items-center justify-between pt-3 border-t border-[#1e2d4d]">
-              <div className="flex items-center gap-2">
+              <details className="relative"><summary className="text-xs text-slate-400 cursor-pointer">More actions</summary><div className="flex flex-wrap gap-2 mt-2">
                 <button
                   onClick={() => onOpenDetail(job)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#162036] text-slate-300 text-xs font-semibold border border-[#1e2d4d] hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap"
@@ -304,29 +298,13 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
                     <i className="ri-refresh-line"></i>Repost
                   </button>
                 )}
-              </div>
-              <div className="flex items-center gap-2">
-                {needsConfirmation && (
-                  <Link href={`/client/jobs/${job.id}/confirmation`}>
-                    <button className="flex items-center gap-1.5 bg-violet-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-violet-600 transition-colors cursor-pointer whitespace-nowrap">
-                      <i className="ri-file-shield-line"></i>Confirm Booking
-                    </button>
-                  </Link>
-                )}
-                {needsSelection && apps > 0 && (
-                  <Link href={`/client/jobs/${job.id}/select-guards`}>
-                    <button className="flex items-center gap-1.5 bg-teal-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap">
-                      <i className="ri-user-search-line"></i>Select Guards
-                    </button>
-                  </Link>
-                )}
-                {needsPayment && (
-                  <Link href={`/client/jobs/payment?id=${encodeURIComponent(job.id)}`}>
-                    <button className="flex items-center gap-1.5 bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-orange-600 transition-colors cursor-pointer whitespace-nowrap">
-                      <i className="ri-secure-payment-line"></i>Pay Now
-                    </button>
-                  </Link>
-                )}
+              </div></details>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Link href={nextAction.href} className="px-4 py-2 rounded-lg bg-teal-500 text-white text-xs font-semibold">{nextAction.label}</Link>
+                <Link href={`/client/payment-centre?tab=history&job=${encodeURIComponent(job.id)}`} className="text-xs text-teal-400">Payment details</Link>
+
+
+
                 {isActive && (
                   <button
                     onClick={() => onMarkComplete(job)}
@@ -342,14 +320,14 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
                   </button>
                 )}
                 {isCompleted && (
-                  <Link href={`/client/jobs/${job.id}`}>
+                  <Link href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`}>
                     <button className="flex items-center gap-1.5 bg-amber-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-amber-600 transition-colors cursor-pointer whitespace-nowrap">
                       <i className="ri-star-line"></i>Leave Review
                     </button>
                   </Link>
                 )}
-                {isCancelled && !hasRefundPending && !hasRefundApproved && (
-                  <Link href={`/client/jobs/${job.id}`}>
+                {isCancelled && !hasRefundPending && !hasRefundApproved && ['completed','succeeded','paid','partially_refunded'].includes(paymentStatus || '') && (
+                  <Link href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`}>
                     <button className="flex items-center gap-1.5 bg-violet-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-violet-600 transition-colors cursor-pointer whitespace-nowrap">
                       <i className="ri-refund-line"></i>Request Refund
                     </button>
@@ -402,7 +380,7 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
               {paymentStatus && (
                 <span className={`text-xs font-semibold ${paymentStatusConfig[paymentStatus]?.color || 'text-slate-400'}`}>
                   <i className="ri-secure-payment-line mr-0.5"></i>
-                  {paymentStatusConfig[paymentStatus]?.label || paymentStatus}
+                  {paymentLabel(paymentStatus)}
                 </span>
               )}
               {cancellationStatus && cancellationStatusConfig[cancellationStatus] && (
@@ -472,11 +450,7 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
           </div>
         )}
 
-        {needsConfirmation && (
-          <div className="mt-2 text-xs font-semibold text-violet-400">
-            <i className="ri-file-shield-line mr-1"></i>Awaiting your confirmation
-          </div>
-        )}
+
         {isConfirmed && (
           <div className="mt-2 text-xs font-semibold text-emerald-400">
             <i className="ri-checkbox-circle-line mr-1"></i>Booking confirmed
@@ -495,6 +469,8 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
         )}
 
         <div className="flex flex-wrap gap-2 pt-3 border-t border-[#1e2d4d]">
+          <Link href={nextAction.href} className="w-full text-center px-4 py-2 rounded-lg bg-teal-500 text-white text-sm font-semibold">{nextAction.label}</Link>
+          <Link href={`/client/payment-centre?tab=history&job=${encodeURIComponent(job.id)}`} className="w-full text-center text-xs text-teal-400">Payment details & refunds</Link>
           <button
             onClick={() => onOpenDetail(job)}
             className="flex-1 min-w-[80px] flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-[#162036] text-slate-300 text-xs font-semibold border border-[#1e2d4d] cursor-pointer whitespace-nowrap"
@@ -515,27 +491,9 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
           >
             <i className="ri-file-copy-line"></i>Copy
           </button>
-          {needsConfirmation && (
-            <Link href={`/client/jobs/${job.id}/confirmation`} className="flex-1 min-w-[80px]">
-              <button className="w-full flex items-center justify-center gap-1 bg-violet-500 text-white px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap">
-                <i className="ri-file-shield-line"></i>Confirm
-              </button>
-            </Link>
-          )}
-          {needsSelection && apps > 0 && (
-            <Link href={`/client/jobs/${job.id}/select-guards`} className="flex-1 min-w-[80px]">
-              <button className="w-full flex items-center justify-center gap-1 bg-teal-500 text-white px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap">
-                <i className="ri-user-search-line"></i>Select
-              </button>
-            </Link>
-          )}
-          {needsPayment && (
-            <Link href={`/client/jobs/payment?id=${encodeURIComponent(job.id)}`} className="flex-1 min-w-[80px]">
-              <button className="w-full flex items-center justify-center gap-1 bg-orange-500 text-white px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap">
-                <i className="ri-secure-payment-line"></i>Pay
-              </button>
-            </Link>
-          )}
+
+
+
           {isActive && (
             <button
               onClick={() => onMarkComplete(job)}
@@ -550,8 +508,8 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
               Complete
             </button>
           )}
-          {isCancelled && !hasRefundPending && !hasRefundApproved && (
-            <Link href={`/client/jobs/${job.id}`} className="flex-1 min-w-[80px]">
+          {isCancelled && !hasRefundPending && !hasRefundApproved && ['completed','succeeded','paid','partially_refunded'].includes(paymentStatus || '') && (
+            <Link href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`} className="flex-1 min-w-[80px]">
               <button className="w-full flex items-center justify-center gap-1 bg-violet-500 text-white px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap">
                 <i className="ri-refund-line"></i>Refund
               </button>

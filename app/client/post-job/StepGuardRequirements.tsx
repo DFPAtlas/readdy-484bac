@@ -51,6 +51,8 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
                 <input
                   type="radio"
                   name="siaLicenceRequired"
+              aria-invalid={!!errors.siaLicenceRequired}
+              aria-describedby={errors.siaLicenceRequired ? "error-siaLicenceRequired" : undefined}
                   value={val}
                   checked={formData.siaLicenceRequired === val}
                   onChange={onChange}
@@ -86,6 +88,8 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
           <div className="relative">
             <select
               name="experienceLevel"
+              aria-invalid={!!errors.experienceLevel}
+              aria-describedby={errors.experienceLevel ? "error-experienceLevel" : undefined}
               value={formData.experienceLevel}
               onChange={onChange}
               className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm pr-8 appearance-none"
@@ -98,7 +102,7 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
             </select>
             <i className="ri-arrow-down-s-line absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
           </div>
-          {errors.experienceLevel && <p className="text-red-400 text-sm mt-1">{errors.experienceLevel}</p>}
+          {errors.experienceLevel && <p id="error-experienceLevel" className="text-red-400 text-sm mt-1">{errors.experienceLevel}</p>}
         </div>
 
         <div>
@@ -109,6 +113,8 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
                 <input
                   type="radio"
                   name="uniformRequired"
+              aria-invalid={!!errors.uniformRequired}
+              aria-describedby={errors.uniformRequired ? "error-uniformRequired" : undefined}
                   value={val}
                   checked={formData.uniformRequired === val}
                   onChange={onChange}
@@ -122,6 +128,8 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
             <input
               type="text"
               name="uniformDetails"
+              aria-invalid={!!errors.uniformDetails}
+              aria-describedby={errors.uniformDetails ? "error-uniformDetails" : undefined}
               value={formData.uniformDetails}
               onChange={onChange}
               placeholder="Describe uniform requirements (e.g., Black suit, white shirt, hi-vis vest provided)"
@@ -138,6 +146,8 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
                 <input
                   type="radio"
                   name="drivingRequired"
+              aria-invalid={!!errors.drivingRequired}
+              aria-describedby={errors.drivingRequired ? "error-drivingRequired" : undefined}
                   value={val}
                   checked={formData.drivingRequired === val}
                   onChange={onChange}
@@ -157,6 +167,8 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
           <input
             type="text"
             name="dressCode"
+              aria-invalid={!!errors.dressCode}
+              aria-describedby={errors.dressCode ? "error-dressCode" : undefined}
             value={formData.dressCode}
             onChange={onChange}
             placeholder="e.g., Smart casual, black trousers, white shirt, black shoes"
@@ -170,6 +182,8 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
           </label>
           <textarea
             name="specialInstructions"
+              aria-invalid={!!errors.specialInstructions}
+              aria-describedby={errors.specialInstructions ? "error-specialInstructions" : undefined}
             value={formData.specialInstructions}
             onChange={onChange}
             maxLength={500}
@@ -186,6 +200,8 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
           </label>
           <textarea
             name="additionalRequirements"
+              aria-invalid={!!errors.additionalRequirements}
+              aria-describedby={errors.additionalRequirements ? "error-additionalRequirements" : undefined}
             value={formData.additionalRequirements}
             onChange={onChange}
             maxLength={500}
@@ -197,6 +213,7 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
         </div>
       </div>
 
+      {errors.specificLicences && <p role="alert" className="text-red-400 text-sm">{errors.specificLicences}</p>}
       <div className="flex justify-between mt-8">
         <button type="button" onClick={onBack} className="text-slate-400 hover:text-white font-semibold cursor-pointer whitespace-nowrap">
           <i className="ri-arrow-left-line mr-1"></i> Back
