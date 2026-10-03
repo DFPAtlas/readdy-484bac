@@ -202,13 +202,13 @@ export default function AnalyticsWidget({ clientId }: AnalyticsWidgetProps) {
             <i className="ri-bar-chart-grouped-line text-2xl text-slate-600"></i>
           </div>
           <p className="text-sm text-slate-400 mb-1">No analytics data yet</p>
-          <p className="text-xs text-slate-500 mb-4">Analytics will appear once you start posting jobs</p>
+          <p className="text-xs text-slate-500 mb-4">Charts will appear when activity is available for the selected reporting period.</p>
           <Link
             href="/client/post-job"
             className="inline-flex items-center gap-2 bg-teal-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap"
           >
             <i className="ri-add-line"></i>
-            Post Your First Job
+            Post a Job
           </Link>
         </div>
       </div>
