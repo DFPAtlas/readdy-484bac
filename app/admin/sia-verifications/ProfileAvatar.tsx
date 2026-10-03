@@ -14,12 +14,13 @@ export default function ProfileAvatar({ path }: ProfileAvatarProps) {
   useEffect(() => {
     if (!path) return;
 
+    const documentPath = path;
     let cancelled = false;
     async function loadSignedUrl() {
       try {
         const { data, error } = await supabase.storage
           .from('guard-profiles')
-          .createSignedUrl(path, 3600);
+          .createSignedUrl(documentPath, 3600);
         if (!cancelled) {
           if (error) setError(true);
           else setSignedUrl(data.signedUrl);

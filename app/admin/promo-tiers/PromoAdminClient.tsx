@@ -440,7 +440,7 @@ export default function PromoAdminClient() {
                           : 'bg-slate-100 dark:bg-[#162036] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#1a2642]'
                       }`}
                     >
-                      {t === 'all' ? 'All' : t.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      {t === 'all' ? 'All' : t.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                     </button>
                   ))}
                 </div>
@@ -545,7 +545,7 @@ export default function PromoAdminClient() {
                               {c.client_promo_tier === 'founding_client' && <i className="ri-shield-star-line text-xs"></i>}
                               {c.client_promo_tier === 'early_client' && <i className="ri-star-line text-xs"></i>}
                               {c.client_promo_tier === 'launch_client' && <i className="ri-rocket-line text-xs"></i>}
-                              {c.client_promo_tier?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              {c.client_promo_tier?.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                             </span>
                           </td>
                           <td className="py-3 px-2 text-slate-600 dark:text-slate-400">

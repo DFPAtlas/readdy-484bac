@@ -1095,7 +1095,7 @@ export default function SystemStatusClient() {
                           <td className="px-4 py-3"><span className="text-slate-400 text-[11px]">{row.retention}</span></td>
                           <td className="px-4 py-3 text-right">
                             <span className="text-slate-400 text-[11px]">
-                              {tableSizesLoading ? '…' : (tableSizes[row.table] || '-')}
+                              {tableSizesLoading ? '…' : (tableSizes?.[row.table] || '-')}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right">

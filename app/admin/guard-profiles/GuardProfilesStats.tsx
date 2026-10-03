@@ -5,8 +5,8 @@ interface StatsData {
   siaVerified: number;
   approved: number;
   pending: number;
-  rejected: number;
-  inactive: number;
+  rejected?: number;
+  inactive?: number;
   totalEarnings: number;
   avgRating: number;
 }

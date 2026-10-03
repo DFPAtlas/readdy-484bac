@@ -193,7 +193,7 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
             <CompareRow
               label="Hourly Rate"
               values={guards.map((g) => (
-                <span className={`font-semibold ${(g.hourly_rate || 0) === maxRate ? "text-teal-400" : "text-slate-300"}`}>
+                <span key={g.id} className={`font-semibold ${(g.hourly_rate || 0) === maxRate ? "text-teal-400" : "text-slate-300"}`}>
                   £{g.hourly_rate || "—"}
                   {(g.hourly_rate || 0) === maxRate && <i className="ri-arrow-up-line ml-1 text-teal-400"></i>}
                 </span>
@@ -203,7 +203,7 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
             <CompareRow
               label="Experience"
               values={guards.map((g) => (
-                <span className={`${(g.years_experience || 0) === maxExp ? "text-teal-400 font-semibold" : "text-slate-300"}`}>
+                <span key={g.id} className={`${(g.years_experience || 0) === maxExp ? "text-teal-400 font-semibold" : "text-slate-300"}`}>
                   {g.years_experience ? `${g.years_experience} years` : "—"}
                   {(g.years_experience || 0) === maxExp && g.years_experience ? <i className="ri-arrow-up-line ml-1 text-teal-400"></i> : null}
                 </span>
@@ -213,7 +213,7 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
             <CompareRow
               label="Rating"
               values={guards.map((g) => (
-                <div className="flex items-center gap-2">
+                <div key={g.id} className="flex items-center gap-2">
                   <StarRating rating={g.rating || 0} />
                   <span className={`text-sm ${(g.rating || 0) === maxRating ? "text-teal-400 font-semibold" : "text-slate-300"}`}>
                     {g.rating ? g.rating.toFixed(1) : "—"}
@@ -226,14 +226,14 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
             <CompareRow
               label="Reviews"
               values={guards.map((g) => (
-                <span className="text-slate-300">{g.total_reviews || 0} reviews</span>
+                <span key={g.id} className="text-slate-300">{g.total_reviews || 0} reviews</span>
               ))}
             />
 
             <CompareRow
               label="Jobs Completed"
               values={guards.map((g) => (
-                <span className={`${(g.total_jobs_completed || 0) === maxJobs ? "text-teal-400 font-semibold" : "text-slate-300"}`}>
+                <span key={g.id} className={`${(g.total_jobs_completed || 0) === maxJobs ? "text-teal-400 font-semibold" : "text-slate-300"}`}>
                   {g.total_jobs_completed || 0}
                   {(g.total_jobs_completed || 0) === maxJobs && g.total_jobs_completed ? <i className="ri-arrow-up-line ml-1 text-teal-400"></i> : null}
                 </span>
@@ -243,7 +243,7 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
             <CompareRow
               label="SIA Verified"
               values={guards.map((g) => (
-                <span className={`flex items-center gap-1.5 ${g.sia_verified ? "text-emerald-400" : "text-red-400"}`}>
+                <span key={g.id} className={`flex items-center gap-1.5 ${g.sia_verified ? "text-emerald-400" : "text-red-400"}`}>
                   <i className={`${g.sia_verified ? "ri-shield-check-line" : "ri-close-circle-line"}`}></i>
                   {g.sia_verified ? "Verified" : "Not Verified"}
                 </span>
@@ -255,7 +255,7 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
               values={guards.map((g) => {
                 const status = getSIAStatus(g.sia_expiry_date);
                 return (
-                  <span className={`${status.color}`}>
+                  <span key={g.id} className={`${status.color}`}>
                     {g.sia_expiry_date
                       ? new Date(g.sia_expiry_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
                       : "—"}
@@ -268,14 +268,14 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
             <CompareRow
               label="SIA Badge No"
               values={guards.map((g) => (
-                <span className="text-slate-300 font-mono text-xs">{g.sia_licence_number || "—"}</span>
+                <span key={g.id} className="text-slate-300 font-mono text-xs">{g.sia_licence_number || "—"}</span>
               ))}
             />
 
             <CompareRow
               label="Licence Types"
               values={guards.map((g) => (
-                <div className="flex flex-wrap gap-1">
+                <div key={g.id} className="flex flex-wrap gap-1">
                   {g.licence_types && g.licence_types.length > 0 ? (
                     g.licence_types.map((lic, i) => (
                       <span key={i} className="bg-[#162036] text-slate-400 px-2 py-0.5 rounded text-xs border border-[#1e2d4d]">
@@ -292,7 +292,7 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
             <CompareRow
               label="Distance"
               values={guards.map((g) => (
-                <span className={`${(g.distance_km ?? Infinity) === minDist ? "text-teal-400 font-semibold" : "text-slate-300"}`}>
+                <span key={g.id} className={`${(g.distance_km ?? Infinity) === minDist ? "text-teal-400 font-semibold" : "text-slate-300"}`}>
                   {g.distance_km !== null ? `${g.distance_km.toFixed(1)} km` : "—"}
                   {(g.distance_km ?? Infinity) === minDist && g.distance_km !== null ? <i className="ri-arrow-up-line ml-1 text-teal-400"></i> : null}
                 </span>
@@ -302,28 +302,28 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
             <CompareRow
               label="Location"
               values={guards.map((g) => (
-                <span className="text-slate-300">{g.location || "—"}</span>
+                <span key={g.id} className="text-slate-300">{g.location || "—"}</span>
               ))}
             />
 
             <CompareRow
               label="Postcode"
               values={guards.map((g) => (
-                <span className="text-slate-300 font-mono text-xs">{g.postcode || "—"}</span>
+                <span key={g.id} className="text-slate-300 font-mono text-xs">{g.postcode || "—"}</span>
               ))}
             />
 
             <CompareRow
               label="Availability"
               values={guards.map((g) => (
-                <span className="text-slate-300">{g.availability_status || "—"}</span>
+                <span key={g.id} className="text-slate-300">{g.availability_status || "—"}</span>
               ))}
             />
 
             <CompareRow
               label="Transport"
               values={guards.map((g) => (
-                <span className={`flex items-center gap-1.5 ${g.has_transport ? "text-emerald-400" : "text-slate-500"}`}>
+                <span key={g.id} className={`flex items-center gap-1.5 ${g.has_transport ? "text-emerald-400" : "text-slate-500"}`}>
                   <i className={`${g.has_transport ? "ri-car-line" : "ri-walk-line"}`}></i>
                   {g.has_transport ? "Has transport" : "No transport"}
                 </span>
@@ -333,7 +333,7 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
             <CompareRow
               label="Languages"
               values={guards.map((g) => (
-                <div className="flex flex-wrap gap-1">
+                <div key={g.id} className="flex flex-wrap gap-1">
                   {g.languages && g.languages.length > 0 ? (
                     g.languages.map((lang, i) => (
                       <span key={i} className="bg-[#162036] text-slate-400 px-2 py-0.5 rounded text-xs border border-[#1e2d4d]">
@@ -350,7 +350,7 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
             <CompareRow
               label="Specializations"
               values={guards.map((g) => (
-                <div className="flex flex-wrap gap-1">
+                <div key={g.id} className="flex flex-wrap gap-1">
                   {g.specializations && g.specializations.length > 0 ? (
                     g.specializations.map((spec, i) => (
                       <span key={i} className="bg-teal-500/10 text-teal-400 px-2 py-0.5 rounded text-xs border border-teal-500/25">
@@ -367,7 +367,7 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
             <CompareRow
               label="Bio"
               values={guards.map((g) => (
-                <p className="text-slate-400 text-xs leading-relaxed max-w-[200px]">
+                <p key={g.id} className="text-slate-400 text-xs leading-relaxed max-w-[200px]">
                   {g.bio || "—"}
                 </p>
               ))}
@@ -376,7 +376,7 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
             <CompareRow
               label="Applied"
               values={guards.map((g) => (
-                <span className="text-slate-400 text-xs">
+                <span key={g.id} className="text-slate-400 text-xs">
                   {g.applied_at
                     ? new Date(g.applied_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
                     : "—"}

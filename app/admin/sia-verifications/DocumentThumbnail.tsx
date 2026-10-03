@@ -19,17 +19,18 @@ export default function DocumentThumbnail({ path, label, bucket }: DocumentThumb
   useEffect(() => {
     if (!path) return;
 
+    const documentPath = path;
     let cancelled = false;
     async function loadSignedUrl() {
       setLoading(true);
       try {
         let url: string;
         if (bucket === 'sia-licences') {
-          url = await getSIALicenceSignedUrl(path, 3600);
+          url = await getSIALicenceSignedUrl(documentPath, 3600);
         } else {
           const { data, error } = await supabase.storage
             .from('guard-profiles')
-            .createSignedUrl(path, 3600);
+            .createSignedUrl(documentPath, 3600);
           if (error) throw error;
           url = data.signedUrl;
         }

@@ -8,8 +8,8 @@ const MAX_SIZE = 5 * 1024 * 1024;
 interface ImageUploadFieldProps {
   label: string;
   description?: string;
-  value: { base64: string; name: string } | null;
-  onChange: (file: { base64: string; name: string } | null) => void;
+  value: { base64: string; name: string; type: string } | null;
+  onChange: (file: { base64: string; name: string; type: string } | null) => void;
   error?: string;
   recommendedSize?: string;
 }
@@ -29,7 +29,7 @@ export default function ImageUploadField({ label, description, value, onChange, 
     }
     const reader = new FileReader();
     reader.onload = () => {
-      onChange({ base64: reader.result as string, name: file.name });
+      onChange({ base64: reader.result as string, name: file.name, type: file.type });
     };
     reader.readAsDataURL(file);
   };

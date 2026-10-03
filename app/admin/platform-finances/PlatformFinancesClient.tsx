@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import {allAdminRows} from '@/lib/adminData';
 import { isCollected, paymentAmounts } from '@/lib/financeAmounts';
 import { supabase } from '@/lib/supabase';
 import FinanceOverviewCards from './FinanceOverviewCards';
@@ -16,6 +17,7 @@ import CustomerAnalytics from './CustomerAnalytics';
 import FinancialHealthScore from './FinancialHealthScore';
 import AlertsPanel from './AlertsPanel';
 import MonthlySnapshots from './MonthlySnapshots';
+import FinancialOperationsPanel from './FinancialOperationsPanel';
 import ConnectPayoutsPanel from './ConnectPayoutsPanel';
 
 function getDateRange(filter: string, customStart?: string, customEnd?: string): { start: string; end: string } {
@@ -186,17 +188,9 @@ export default function PlatformFinancesClient() {
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
       const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
 
-      const { data: subPayments } = await supabase
-        .from('subscription_payments')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const {data: subPayments} = await allAdminRows(() => supabase.from('subscription_payments').select('*').order('created_at', {ascending:false}).order('id'));
 
-      const { data: transactions, error: transactionsError } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const {data: transactions, error: transactionsError} = await allAdminRows(() => supabase.from('transactions').select('*').order('created_at', {ascending:false}).order('id'));
 
       if (transactionsError) throw transactionsError;
 
@@ -205,11 +199,7 @@ export default function PlatformFinancesClient() {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'active');
 
-      const { data: allSubs } = await supabase
-        .from('subscriptions')
-        .select('id, status, plan_amount, stripe_price_id, billing_interval, created_at, cancelled_at, trial_end_date, current_period_end, next_payment_date')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const {data: allSubs} = await allAdminRows(() => supabase.from('subscriptions').select('id, status, plan_amount, stripe_price_id, billing_interval, created_at, cancelled_at, trial_end_date, current_period_end, next_payment_date').order('created_at', {ascending:false}).order('id'));
 
       const { data: plansData } = await supabase
         .from('plans')
@@ -260,8 +250,8 @@ export default function PlatformFinancesClient() {
         .gte('cancelled_at', yearStart);
 
       const subIds = (subPayments || []).map((p: any) => p.subscription_id).filter(Boolean);
-      let subMap: Record<string, any> = {};
-      let clientMap: Record<string, any> = {};
+      const subMap: Record<string, any> = {};
+      const clientMap: Record<string, any> = {};
 
       if (subIds.length > 0) {
         const { data: subs } = await supabase
@@ -728,7 +718,8 @@ export default function PlatformFinancesClient() {
         <nav aria-label="Finance sections" className="flex flex-wrap gap-3">
           {[['payments','Payments & refunds'], ['analytics','Analytics & history'], ['costs','Costs & estimates']].map(([key,label]) => <button key={key} onClick={() => setSection(key)} aria-pressed={section === key} className={`rounded-xl px-5 py-3 text-sm font-semibold ${section === key ? 'bg-teal-600 text-white' : 'bg-[#111d35] text-slate-300 border border-[#1e2d4a]'}`}>{label}</button>)}
         </nav>
-        {section === 'payments' && <div className="space-y-6"><StripePaymentsTable payments={payments} loading={loading} /><ConnectPayoutsPanel key={`${dateFilter}:${loading}`} /></div>}
+        {section === 'payments' && <div className="space-y-6"><StripePaymentsTable payments={payments} loading={loading} /><FinancialOperationsPanel />
+          <ConnectPayoutsPanel key={`${dateFilter}:${loading}`} /></div>}
         {section === 'costs' && <div className="space-y-6">
         <FinanceOverviewCards
           monthlyRevenue={monthlyRevenue}

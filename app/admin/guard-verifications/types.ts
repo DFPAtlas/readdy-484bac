@@ -6,7 +6,7 @@ export interface GuardVerification {
   date_of_birth: string;
   sia_licence_number: string;
   license_cardholder_name: string | null;
-  sia_expiry_date: string | null;
+  sia_expiry_date: string | null | undefined;
   sia_licence_front_url: string | null;
   sia_licence_back_url: string | null;
   sia_licence_uploaded_at: string | null;
@@ -242,7 +242,7 @@ export function getSiaCheckStatusText(sia_check_status: string | null, verificat
   }
 }
 
-export function formatDate(dateStr: string | null): string {
+export function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('en-GB', {
     day: '2-digit',
@@ -251,7 +251,7 @@ export function formatDate(dateStr: string | null): string {
   });
 }
 
-export function formatDateShort(dateStr: string | null): string {
+export function formatDateShort(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('en-GB', {
     day: '2-digit',

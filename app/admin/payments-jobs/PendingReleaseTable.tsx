@@ -391,16 +391,15 @@ export default function PendingReleaseTable() {
                         )}
                         {req.status === 'disputed' && (
                           <button
-                            onClick={() => {
-                              supabase
+                            onClick={async () => {
+                              const {error} = await supabase
                                 .from('job_completion_requests')
                                 .update({ status: 'pending', updated_at: new Date().toISOString() })
                                 .eq('id', req.id)
-                                .then(() => {
-                                  setRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'pending' } : r));
-                                  setToast({ message: 'Dispute cleared', type: 'success' });
-                                })
-                                .catch((err: any) => setToast({ message: err.message, type: 'error' }));
+                                ;
+                              if (error) {setToast({message:error.message,type:'error'}); return;}
+                              setRequests(prev => prev.map(r => r.id === req.id ? {...r,status:'pending'} : r));
+                              setToast({message:'Dispute cleared',type:'success'});
                             }}
                             disabled={processingId === req.id}
                             className="px-3 py-1.5 rounded-lg bg-sky-500/10 text-sky-400 text-xs font-bold hover:bg-sky-500/20 ring-1 ring-sky-500/20 whitespace-nowrap disabled:opacity-50 transition-all cursor-pointer"

@@ -57,7 +57,7 @@ export function useJobApplicants() {
       if (appErr) throw appErr;
 
       const guardIds = (appData || []).map((a: any) => a.guard_id).filter(Boolean);
-      let guardMap: Record<string, any> = {};
+      const guardMap: Record<string, any> = {};
       if (guardIds.length > 0) {
         const { data: guardsData } = await supabase
           .from('guards')

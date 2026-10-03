@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { adminJobStatusBadge } from '@/lib/adminJobStatus';
 import { JobRow } from './useAdminJobs';
 import { ApplicantRow } from './useJobApplicants';
 
@@ -14,20 +15,10 @@ interface JobDetailModalProps {
   onStatusClick: () => void;
 }
 
-const statusConfig: Record<string, { label: string; bg: string; text: string; ring: string; icon: string }> = {
-  open: { label: 'Open', bg: 'bg-emerald-500/10', text: 'text-emerald-400', ring: 'ring-emerald-500/20', icon: 'ri-checkbox-circle-line' },
-  in_progress: { label: 'In Progress', bg: 'bg-sky-500/10', text: 'text-sky-400', ring: 'ring-sky-500/20', icon: 'ri-loader-4-line' },
-  completed: { label: 'Completed', bg: 'bg-slate-500/10', text: 'text-slate-400', ring: 'ring-slate-500/20', icon: 'ri-check-double-line' },
-  cancelled: { label: 'Cancelled', bg: 'bg-red-500/10', text: 'text-red-400', ring: 'ring-red-500/20', icon: 'ri-close-circle-line' },
-  paused: { label: 'Paused', bg: 'bg-amber-500/10', text: 'text-amber-400', ring: 'ring-amber-500/20', icon: 'ri-pause-circle-line' },
-  draft: { label: 'Draft', bg: 'bg-slate-500/10', text: 'text-slate-400', ring: 'ring-slate-500/20', icon: 'ri-draft-line' },
-  pending: { label: 'Pending', bg: 'bg-purple-500/10', text: 'text-purple-400', ring: 'ring-purple-500/20', icon: 'ri-time-line' },
-  awaiting_payment: { label: 'Awaiting Payment', bg: 'bg-orange-500/10', text: 'text-orange-400', ring: 'ring-orange-500/20', icon: 'ri-money-pound-circle-line' },
-  awaiting_guard_selection: { label: 'Awaiting Selection', bg: 'bg-pink-500/10', text: 'text-pink-400', ring: 'ring-pink-500/20', icon: 'ri-user-search-line' },
-};
+
 
 export default function JobDetailModal({ job, applicants, applicantsLoading, onClose, onAccept, onDecline, onStatusClick }: JobDetailModalProps) {
-  const sb = statusConfig[job.status] || statusConfig.open;
+  const sb = adminJobStatusBadge(job.status);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -149,7 +140,7 @@ export default function JobDetailModal({ job, applicants, applicantsLoading, onC
           <div className="flex gap-3 pt-2">
             <button onClick={onClose}
               className="px-5 py-3 bg-[#1a2642] text-slate-300 rounded-xl text-sm font-bold hover:bg-[#1e2d4d] transition-all whitespace-nowrap cursor-pointer">Close</button>
-            <Link href={`/jobs/${job.id}`} target="_blank" rel="noopener noreferrer"
+            <Link href={`/jobs/detail?id=${job.id}`} target="_blank" rel="noopener noreferrer"
               className="px-5 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-all whitespace-nowrap text-center inline-flex items-center justify-center gap-2 cursor-pointer">
               <div className="w-4 h-4 flex items-center justify-center"><i className="ri-external-link-line text-sm"></i></div>View Public Page
             </Link>

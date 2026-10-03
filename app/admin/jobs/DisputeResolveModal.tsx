@@ -1,4 +1,5 @@
 'use client';
+import {useState} from 'react';
 
 interface DisputeResolveModalProps {
   jobTitle: string;
@@ -23,6 +24,9 @@ export default function DisputeResolveModal({
   reason, details, adminNotes, refundAmount, resolving,
   onAdminNotesChange, onRefundAmountChange, onResolve, onClose,
 }: DisputeResolveModalProps) {
+  const [confirmed, setConfirmed] = useState(false);
+  const partial = Number(refundAmount);
+  const validPartial = Number.isFinite(partial) && partial > 0 && partial <= amount;
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="bg-[#111d35] rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-[#1e2d4d] p-6">
@@ -47,7 +51,7 @@ export default function DisputeResolveModal({
             <div className="grid grid-cols-2 gap-2 text-sm text-slate-400 mt-3">
               <div className="flex items-center gap-2"><i className="ri-building-line"></i> {clientName}</div>
               <div className="flex items-center gap-2"><i className="ri-user-line"></i> {guardName}</div>
-              <div className="flex items-center gap-2"><i className="ri-money-pound-circle-line"></i> £{amount.toFixed(2)}</div>
+              <div className="flex items-center gap-2"><i className="ri-money-pound-circle-line"></i> £{amount.toFixed(2)} remaining refundable (database record)</div>
               <div className="flex items-center gap-2"><i className="ri-calendar-line"></i> {new Date(createdAt).toLocaleDateString('en-GB')}</div>
             </div>
           </div>
@@ -77,12 +81,13 @@ export default function DisputeResolveModal({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-white mb-2">Refund Amount (if applicable)</label>
+            <label className="block text-sm font-semibold text-white mb-2">Partial refund amount</label>
             <div className="flex items-center gap-2">
               <span className="text-lg font-bold text-white">£</span>
               <input
                 type="number"
-                min="0"
+                min="0.01"
+                max={amount}
                 step="0.01"
                 value={refundAmount}
                 onChange={(e) => onRefundAmountChange(e.target.value)}
@@ -93,26 +98,27 @@ export default function DisputeResolveModal({
           </div>
         </div>
 
+        <label className="mb-4 flex items-start gap-3 text-sm text-slate-300"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)} disabled={resolving} />I have reviewed the remaining funds and payout history. The selected action will submit a refund or transfer to Stripe.</label>
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => onResolve('resolved_guard')}
-            disabled={resolving}
+            disabled={resolving || !confirmed}
             className="px-4 py-3 bg-emerald-500 text-white rounded-xl font-semibold hover:bg-emerald-600 disabled:opacity-50 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
           >
             <i className="ri-check-line"></i>
-            Release to Guard
+            Submit Guard Transfer
           </button>
           <button
             onClick={() => onResolve('resolved_client_refund')}
-            disabled={resolving}
+            disabled={resolving || !confirmed || amount <= 0}
             className="px-4 py-3 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 disabled:opacity-50 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
           >
             <i className="ri-refund-line"></i>
-            Full Refund
+            Refund Remaining Funds
           </button>
           <button
             onClick={() => onResolve('resolved_client_partial')}
-            disabled={resolving}
+            disabled={resolving || !confirmed || !validPartial}
             className="px-4 py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 disabled:opacity-50 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
           >
             <i className="ri-refund-line"></i>
@@ -120,7 +126,7 @@ export default function DisputeResolveModal({
           </button>
           <button
             onClick={() => onResolve('resolved_cancelled')}
-            disabled={resolving}
+            disabled={resolving || !confirmed}
             className="px-4 py-3 bg-slate-500 text-white rounded-xl font-semibold hover:bg-slate-600 disabled:opacity-50 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
           >
             <i className="ri-close-line"></i>

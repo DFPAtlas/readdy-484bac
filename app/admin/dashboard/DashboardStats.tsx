@@ -152,7 +152,7 @@ export default function DashboardStats({
       bgColor: 'bg-rose-500/10',
       trend: openSupportTickets > 0 ? 'Action needed' : null,
       trendUp: null,
-      href: '/admin/complaints',
+      href: '/admin/support-tickets',
     },
     {
       label: 'New Users This Month',
@@ -165,14 +165,14 @@ export default function DashboardStats({
       href: '/admin/accounts',
     },
     {
-      label: 'Revenue This Month',
+      label: 'Retained Payments This Month',
       value: formatCurrency(monthlyRevenue),
       icon: 'ri-money-pound-circle-line',
       color: 'text-emerald-400',
       bgColor: 'bg-emerald-500/10',
       trend: null,
       trendUp: null,
-      href: '/admin/revenue-forecast',
+      href: '/admin/platform-finances',
     },
   ];
 

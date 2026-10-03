@@ -1,23 +1,6 @@
 'use client';
 
-interface Subscription {
-  id: string;
-  user_id: string;
-  plan_name: string;
-  plan_slug: string;
-  stripe_subscription_id: string | null;
-  stripe_customer_id: string | null;
-  status: string;
-  current_period_end: string;
-  current_period_start: string;
-  created_at: string;
-  cancel_at_period_end: boolean;
-  last_payment_date: string | null;
-  payment_status: string | null;
-  payment_failure_count: number;
-  last_payment_error: string | null;
-  billing_cycle: string | null;
-}
+import type {Subscription} from './types';
 
 interface UserInfo {
   id: string;
@@ -37,9 +20,9 @@ interface Props {
   subscriptions: Subscription[];
   users: Record<string, UserInfo> | undefined;
   plans: Plan[];
-  sortBy: 'period_end' | 'created' | 'status';
+  sortBy: 'period_end' | 'created_at' | 'status';
   sortDir: 'asc' | 'desc';
-  onToggleSort: (field: 'period_end' | 'created' | 'status') => void;
+  onToggleSort: (field: 'period_end' | 'created_at' | 'status') => void;
   onViewDetail: (sub: Subscription) => void;
   loading: boolean;
 }
@@ -120,7 +103,7 @@ export default function SubscriptionTable({
     );
   }
 
-  const SortIcon = ({ field }: { field: 'period_end' | 'created' | 'status' }) => {
+  const SortIcon = ({ field }: { field: 'period_end' | 'created_at' | 'status' }) => {
     if (sortBy !== field) return <i className="ri-arrow-up-down-line text-xs text-slate-600 ml-1"></i>;
     return sortDir === 'asc'
       ? <i className="ri-arrow-up-line text-xs text-teal-400 ml-1"></i>
@@ -142,8 +125,8 @@ export default function SubscriptionTable({
             </th>
             <th className="px-5 py-3 font-semibold text-slate-400">Days Left</th>
             <th className="px-5 py-3 font-semibold text-slate-400">Stripe</th>
-            <th className="px-5 py-3 font-semibold text-slate-400 cursor-pointer whitespace-nowrap" onClick={() => onToggleSort('created')}>
-              Created <SortIcon field="created" />
+            <th className="px-5 py-3 font-semibold text-slate-400 cursor-pointer whitespace-nowrap" onClick={() => onToggleSort('created_at')}>
+              Created <SortIcon field="created_at" />
             </th>
             <th className="px-5 py-3 font-semibold text-slate-400 text-right">Actions</th>
           </tr>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import {adminFunction} from '@/lib/adminFunction';
 import CompletionStatsCards from './CompletionStatsCards';
 import CompletionRequestsTable from './CompletionRequestsTable';
 
@@ -27,7 +28,7 @@ export default function CompletionRequestsPanel() {
   const loadRequests = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('job_completion_requests')
         .select(`
           id, job_id, guard_id, status, requested_at, dispute_reason, notes,
@@ -36,8 +37,9 @@ export default function CompletionRequestsPanel() {
         `)
         .order('requested_at', { ascending: false })
         .limit(100);
-      setRequests((data || []) as CompletionRequest[]);
-    } catch {}
+      if (error) throw error;
+      setRequests((data || []).map(r => ({...r, jobs: Array.isArray(r.jobs) ? r.jobs[0] || null : r.jobs, guards: Array.isArray(r.guards) ? r.guards[0] || null : r.guards})));
+    } catch (err) {setToast(err instanceof Error ? err.message : 'Unable to load completion requests');}
     setLoading(false);
   };
 
@@ -51,23 +53,9 @@ export default function CompletionRequestsPanel() {
   const handleAdminApprove = async (requestId: string) => {
     setProcessing(requestId);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/approve-job-completion`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${sessionData.session?.access_token ?? ''}`,
-          },
-          body: JSON.stringify({ requestId, action: 'admin_approve' }),
-        }
-      );
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed');
-
+      const data = await adminFunction('approve-job-completion', {requestId,action:'admin_approve'});
       if (data.payoutInitiated) {
-        setToast(data.message || 'Payment released successfully');
+        setToast(data.message || 'Completion approved; payout processing started');
       } else {
         setToast(data.payoutWarning || 'Completion approved but payout requires attention');
       }
@@ -89,7 +77,7 @@ export default function CompletionRequestsPanel() {
   };
 
   return (
-    <div className="mt-8">
+    <div id="completion-requests" className="mt-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-extrabold text-white">Job Completion Requests</h2>

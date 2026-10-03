@@ -72,7 +72,7 @@ export default function AccountTab({ guard, checked, onToggle }: AccountTabProps
             <InfoRow label="Licence Types" value={formatArray(guard.licence_types)} />
             <InfoRow label="SIA Type" value={guard.sia_licence_type} />
             <InfoRow label="Scraped Type" value={guard.sia_scraped_licence_type} />
-            <InfoRow label="Scraped Expiry" value={guard.sia_scraped_expiry_date} />
+            <InfoRow label="Scraped Expiry" value={guard.sia_scraped_expiry_date ?? null} />
             <InfoRow label="SIA Verified" value={guard.sia_verified ? 'Yes' : 'No'} highlight={guard.sia_verified === true} />
             <InfoRow label="SIA Verified At" value={formatDate(guard.sia_verified_at)} />
           </SectionCard>
@@ -82,8 +82,8 @@ export default function AccountTab({ guard, checked, onToggle }: AccountTabProps
             <InfoRow label="Account ID" value={guard.stripe_account_id ? `${guard.stripe_account_id.slice(0, 12)}...` : '—'} />
             <InfoRow label="Connect Status" value={guard.stripe_connect_status} highlight={guard.stripe_connect_status === 'active'} />
             <InfoRow label="Connect Reason" value={guard.stripe_connect_restricted_reason} />
-            <InfoRow label="Onboarded" value={formatDate(guard.stripe_connect_onboarded_at)} />
-            <InfoRow label="Connect Verified" value={formatDate(guard.stripe_connect_verified_at)} />
+            <InfoRow label="Onboarded" value={formatDate(guard.stripe_connect_onboarded_at ?? null)} />
+            <InfoRow label="Connect Verified" value={formatDate(guard.stripe_connect_verified_at ?? null)} />
           </SectionCard>
 
           {/* Subscription */}

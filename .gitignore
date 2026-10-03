@@ -7,3 +7,6 @@ uat-results/
 .env.*.local
 .auth/
 *.tsbuildinfo
+
+supabase/.temp/
+tsc-output.txt

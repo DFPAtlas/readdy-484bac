@@ -219,7 +219,7 @@ export default function DashboardControlCentre({
             <p className="text-2xl font-bold text-white mt-1">{activeSubscriptions}</p>
           </div>
           <div className="rounded-xl bg-[#0f1c34] border border-[#1a2b4a] p-4">
-            <p className="text-xs text-slate-500">Revenue this month</p>
+            <p className="text-xs text-slate-500">Payments after refunds (before fees/payouts)</p>
             <p className="text-2xl font-bold text-white mt-1">
               {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(monthlyRevenue)}
             </p>

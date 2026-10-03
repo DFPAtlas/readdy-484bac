@@ -24,7 +24,7 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: TypeScript check
         id: typescript
@@ -48,6 +48,12 @@ jobs:
       - name: Summarize TypeScript debt
         if: steps.typescript.outputs.exit_code != '0'
         run: echo "TypeScript debt remains; see typescript-report artifact. Production build will still be validated."
+
+      - name: Admin and financial type gate
+        run: npm run check:admin
+
+      - name: Financial regression tests
+        run: npm run test:unit
 
       - name: Next build
         run: npm run build

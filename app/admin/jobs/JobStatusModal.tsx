@@ -23,7 +23,7 @@ export default function JobStatusModal({ job, updating, onClose, onChangeStatus 
           <div className="w-14 h-14 flex items-center justify-center bg-sky-500/10 rounded-2xl mx-auto mb-4 ring-1 ring-sky-500/20">
             <div className="w-6 h-6 flex items-center justify-center"><i className="ri-edit-circle-line text-2xl text-sky-400"></i></div>
           </div>
-          <h2 className="text-xl font-extrabold text-white mb-1">Change Status</h2>
+          <h2 className="text-xl font-extrabold text-white mb-1">Moderate Job Status</h2>
           <p className="text-sm text-slate-400">{job.job_title}</p>
         </div>
         <div className="mb-4">
@@ -32,15 +32,7 @@ export default function JobStatusModal({ job, updating, onClose, onChangeStatus 
             <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)}
               className="w-full pl-4 pr-8 py-3 rounded-xl border border-[#1e2d4d] focus:ring-2 focus:ring-teal-500 focus:border-transparent text-sm font-medium text-white bg-[#0a1527] transition-all appearance-none cursor-pointer">
               <option value="">Select status...</option>
-              <option value="open">Open</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="paused">Paused</option>
-              <option value="draft">Draft</option>
-              <option value="pending">Pending</option>
-              <option value="awaiting_payment">Awaiting Payment</option>
-              <option value="awaiting_guard_selection">Awaiting Selection</option>
+              {['open','draft','pending','cancelled'].map(status => <option key={status} value={status}>{status}</option>)}
             </select>
             <div className="w-4 h-4 flex items-center justify-center absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
               <i className="ri-arrow-down-s-line text-sm"></i>
@@ -50,7 +42,7 @@ export default function JobStatusModal({ job, updating, onClose, onChangeStatus 
         <div className="mb-6">
           <label className="block text-sm font-bold text-slate-300 mb-2">Note (optional)</label>
           <textarea value={statusNote} onChange={(e) => setStatusNote(e.target.value)}
-            placeholder="Reason for status change..."
+            placeholder="Reason for pre-funding moderation..."
             maxLength={500}
             className="w-full px-4 py-3 rounded-xl border border-[#1e2d4d] focus:ring-2 focus:ring-teal-500 focus:border-transparent text-sm text-white bg-[#0a1527] resize-none h-24 placeholder:text-slate-500" />
           <p className="text-xs text-slate-500 mt-1">{statusNote.length}/500</p>

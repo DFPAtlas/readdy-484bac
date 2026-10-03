@@ -10,10 +10,14 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  {ignores: [".next/**", "node_modules/**", "supabase/.temp/**"]},
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: {
-      "@typescript-eslint/no-explicit-any": "off"
+      "@typescript-eslint/no-explicit-any": "off",
+      // Text punctuation and const style are reported without blocking deployment.
+      "react/no-unescaped-entities": "warn",
+      "prefer-const": "warn"
     }
   }
 ];

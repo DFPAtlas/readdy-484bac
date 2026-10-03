@@ -1,3 +1,4 @@
+async function requireAudit(write: PromiseLike<{error: unknown}>) {const result=await write;if(result.error) throw result.error;return result;}
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
@@ -320,14 +321,15 @@ serve(async (req) => {
           console.log(`[EnhancedWebhook] account.updated: No guard found for stripe_account_id=${stripeAccountId}`);
         }
 
-        await appSupabase.from('payment_audit_logs').insert({
+        await requireAudit(appSupabase.from('payment_audit_logs').insert({
+          to_status: status,
           event_type: 'account.updated',
           stripe_event_id: event.id,
           reference_type: 'guard',
           reference_id: guard?.id || stripeAccountId,
           details: JSON.stringify({ stripe_account_id: stripeAccountId, status, details_submitted: detailsSubmitted, charges_enabled: chargesEnabled, payouts_enabled: payoutsEnabled, transfers_active: transfersActive, requirements_due: requirementsDue, restricted_reason: restrictedReason }),
           created_at: now,
-        });
+        }));
         break;
       }
 
@@ -567,7 +569,8 @@ serve(async (req) => {
           await notifyGuardPayout(appSupabase, assignment.guard_id, assignment.job_id, assignment.id, transferId);
         }
 
-        await appSupabase.from('payment_audit_logs').insert({
+        await requireAudit(appSupabase.from('payment_audit_logs').insert({
+          job_id: jobId, assignment_id: assignment.id, to_status:'paid_out',
           event_type: 'transfer.created',
           stripe_event_id: event.id,
           reference_type: 'guard_payout',
@@ -583,7 +586,7 @@ serve(async (req) => {
             release_destination: 'stripe_connected_account',
           }),
           created_at: now,
-        });
+        }));
 
         break;
       }
@@ -601,7 +604,7 @@ serve(async (req) => {
         }
 
         await appSupabase.from('guard_payouts').update({ stripe_transfer_id: transferId, stripe_transfer_status: transfer.status, updated_at: now, transfer_webhook_updated_at: now }).eq('assignment_id', assignment.id);
-        await appSupabase.from('payment_audit_logs').insert({ event_type: 'transfer.updated', stripe_event_id: transfer.id, reference_type: 'guard_payout', reference_id: assignment.id, details: JSON.stringify({ transfer_id: transferId, transfer_status: transfer.status, assignment_id: assignment.id, sync_only: true }), created_at: now }).catch(() => {});
+        await requireAudit(appSupabase.from('payment_audit_logs').insert({to_status: assignment.payment_status || 'payout_processing', event_type: 'transfer.updated', stripe_event_id: event.id, reference_type: 'guard_payout', reference_id: assignment.id, details: JSON.stringify({ transfer_id: transferId, transfer_status: transfer.status, assignment_id: assignment.id, sync_only: true }), created_at: now }));
         break;
       }
 
@@ -665,7 +668,8 @@ serve(async (req) => {
           }
         }
 
-        await appSupabase.from('payment_audit_logs').insert({
+        await requireAudit(appSupabase.from('payment_audit_logs').insert({
+          job_id: assignment.job_id, assignment_id: assignment.id, to_status:'funded',
           event_type: 'transfer.reversed',
           stripe_event_id: event.id,
           reference_type: 'guard_payout',
@@ -680,13 +684,14 @@ serve(async (req) => {
             requires_finance_attention: true,
           }),
           created_at: now,
-        });
+        }));
 
         break;
       }
 
       case 'charge.refunded': {
-        const charge = event.data.object as Stripe.Charge;
+        // Read current Stripe state so a delayed event cannot overwrite a later refund.
+        const charge = await stripe.charges.retrieve((event.data.object as Stripe.Charge).id);
         console.log(`[EnhancedWebhook] Charge refunded: ${charge.id}, amount_refunded=${charge.amount_refunded}`);
         // Record successful reconciliation after all required writes complete.
         const paymentIntentId = charge.payment_intent as string;
@@ -695,14 +700,15 @@ serve(async (req) => {
           const { data: subPmt } = await appSupabase.from('subscription_payments').select('id, amount').eq('stripe_payment_intent_id', paymentIntentId).maybeSingle();
           if (subPmt) {
             const refundAmount = (charge.amount_refunded || 0) / 100;
-            await appSupabase.from('subscription_payments').update({ refunded: true, refund_amount: refundAmount, refunded_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', subPmt.id);
+            await appSupabase.from('subscription_payments').update({ refunded: charge.amount_refunded >= charge.amount, refund_amount: refundAmount, refunded_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', subPmt.id);
             console.log(`[EnhancedWebhook] Refund applied to subscription_payments id=${subPmt.id}`);
           }
         }
 
         if (!paymentIntentId) { console.log('[EnhancedWebhook] charge.refunded — no payment_intent, skipping'); break; }
 
-        const { data: transaction } = await appSupabase.from('transactions').select('id, job_id, client_id, amount, status').eq('stripe_payment_intent', paymentIntentId).maybeSingle();
+        const { data: transaction, error: transactionReadError } = await appSupabase.from('transactions').select('id, job_id, client_id, amount, status').eq('stripe_payment_intent', paymentIntentId).maybeSingle();
+        if (transactionReadError) throw transactionReadError;
         if (!transaction) { console.log(`[EnhancedWebhook] No transaction for pi ${paymentIntentId}, likely subscription charge (already handled above)`); break; }
 
         const refundAmount = (charge.amount_refunded || 0) / 100;
@@ -737,14 +743,27 @@ serve(async (req) => {
             .update({ status: 'cancelled', payment_status: 'refunded', updated_at: new Date().toISOString() }).eq('id', transaction.job_id);
           if (jobUpdateError) throw jobUpdateError;
         }
-        const { error: auditError } = await appSupabase.from('payment_audit_logs').insert({
+        const { error: auditError } = await requireAudit(appSupabase.from('payment_audit_logs').insert({
           job_id: transaction.job_id, to_status: refundState, from_status: transaction.status,
           event_type: 'charge.refunded', stripe_event_id: event.id, reference_type: 'transaction', reference_id: transaction.id,
           details: { charge_id: charge.id, payment_intent: paymentIntentId, refund_amount: refundAmount,
             charge_amount: chargeAmount, full_refund: isFullRefund, currency: charge.currency, job_id: transaction.job_id },
           created_at: new Date().toISOString()
-        });
+        }));
         if (auditError) throw auditError;
+        if (transaction.job_id && refundId) {
+          // Release only a known, recorded pending refund. Uncertain calls without a
+          // matching Stripe id remain held for manual reconciliation.
+          const {data: reconciledOperations,error: operationError} = await appSupabase.from('financial_operations')
+            .update({state:'completed',result:{success:true,stripeRefundId:refundId,refundId,status:'succeeded',cumulativeRefund:refundAmount},updated_at:new Date().toISOString()})
+            .eq('job_id',transaction.job_id).eq('kind','refund').eq('state','reconciliation_required')
+            .contains('result',{stripeRefundId:refundId}).select('id');
+          if (operationError) throw operationError;
+          if (reconciledOperations?.length) {
+            const {error: clearPendingError}=await appSupabase.from('jobs').update({disputed:false,disputed_at:null,disputed_reason:null,updated_at:new Date().toISOString()}).eq('id',transaction.job_id).eq('disputed_reason','Refund pending');
+            if(clearPendingError) throw clearPendingError;
+          }
+        }
         const { error: processedError } = await appSupabase.from('processed_stripe_events').upsert({
           stripe_event_id: event.id, event_type: event.type, processed_at: new Date().toISOString()
         }, { onConflict: 'stripe_event_id' });
