@@ -296,7 +296,7 @@ export default function PricingClient() {
             </div>
           </div>
           <p className="text-slate-400 mb-6 text-sm">{plan.description}</p>
-          <p className="text-sm text-teal-400 mb-4">{plan.audience === "client" ? (plan.bookingFee != null ? `${plan.bookingFee}% booking service fee. Payment processing included.` : "Booking service fee shown before checkout.") : "Keep your full agreed pay. No guard commission. Standard payouts included."}</p>
+          <p className="text-sm text-teal-400 mb-4">{plan.audience === "client" ? (plan.bookingFee != null ? `${plan.bookingFee}% service fee. Payment processing included.` : "Service fee shown before checkout.") : "Keep your full agreed pay. No guard commission. Standard payouts included."}</p>
 
           <div className="mb-6">
             <div className="flex items-baseline gap-2">
