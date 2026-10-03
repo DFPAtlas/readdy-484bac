@@ -131,7 +131,7 @@ export default function UpcomingShiftsPanel({ shifts, onConfirm, onCheckIn, onCh
                       <i className="ri-time-line mr-1"></i>Pending Approval
                     </span>
                   )}
-                  <Link href={`/jobs/${shift.job_id}`} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${variantClasses.slate}`}>View</Link>
+                  <Link href={`/jobs/detail?id=${shift.job_id}`} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${variantClasses.slate}`}>View</Link>
                 </div>
               </div>
             );
