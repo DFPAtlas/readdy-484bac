@@ -67,10 +67,15 @@ function CallbackContent() {
     }
 
     if (next) {
-      const [{ data: clientProfile }, { data: guardProfile }] = await Promise.all([
+      const [{ data: clientProfile, error: clientError }, { data: guardProfile, error: guardError }] = await Promise.all([
         supabase.from('clients').select('user_id').eq('user_id', userId).maybeSingle(),
         supabase.from('guards').select('user_id').eq('user_id', userId).maybeSingle(),
       ]);
+      if ((next.startsWith('/client/') && clientError) ||
+          (next.startsWith('/guard/') && guardError) ||
+          (!clientProfile && !guardProfile && (clientError || guardError))) {
+        throw new Error('Your dashboard profile could not be loaded. Please try signing in again.');
+      }
       const redirectRole = next.startsWith('/client/') && clientProfile ? 'client'
         : next.startsWith('/guard/') && guardProfile ? 'guard'
         : clientProfile ? 'client' : guardProfile ? 'guard' : null;
@@ -326,19 +331,11 @@ function CallbackContent() {
         let session = null;
         let lastError = '';
 
-        const { data: { session: existingSession }, error: existingError } = await supabase.auth.getSession();
-        if (existingSession) {
-          session = existingSession;
-          setDebugInfo('step:existing-session');
-        }
-        if (existingError) {
-          lastError = existingError.message;
-          setDebugInfo('step:getSession-error:' + existingError.message);
-          if (isInvalidTokenError(existingError)) {
-            await supabase.auth.signOut({ scope: 'local' });
-            setDebugInfo('step:cleared-stale-session');
-          }
-        }
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const incomingCode = params.get('code');
+        const hasIncomingTokens = hashParams.has('access_token') || hashParams.has('refresh_token');
+        const hashError = hashParams.get('error_description') || hashParams.get('error');
+        if (hashError) throw new Error(hashError);
 
         if (!session) {
           const code = params.get('code');
@@ -363,10 +360,10 @@ function CallbackContent() {
             const hashParams = new URLSearchParams(hash.replace('#', ''));
             const accessToken = hashParams.get('access_token');
             const refreshToken = hashParams.get('refresh_token');
-            if (accessToken) {
+            if (accessToken && refreshToken) {
               const { data: setData, error: setError } = await supabase.auth.setSession({
                 access_token: accessToken,
-                refresh_token: refreshToken || '',
+                refresh_token: refreshToken,
               });
               if (setData?.session) {
                 session = setData.session;
@@ -376,6 +373,27 @@ function CallbackContent() {
                 setDebugInfo('step:hash-fragment-error:' + setError.message);
               }
             }
+          }
+        }
+
+        // An incoming credential must never fall back to another saved account.
+        if (!session && (incomingCode || hasIncomingTokens)) {
+          throw new Error(lastError || 'This sign-in link could not be verified. Please request a new link.');
+        }
+
+        if (!session) {
+          const { data: { session: existingSession }, error: existingError } = await supabase.auth.getSession();
+          if (existingSession) {
+          session = existingSession;
+          setDebugInfo('step:existing-session');
+          }
+          if (existingError) {
+          lastError = existingError.message;
+          setDebugInfo('step:getSession-error:' + existingError.message);
+          if (isInvalidTokenError(existingError)) {
+          await supabase.auth.signOut({ scope: 'local' });
+          setDebugInfo('step:cleared-stale-session');
+          }
           }
         }
 
@@ -390,6 +408,13 @@ function CallbackContent() {
           throw new Error(lastError || 'No session could be established. Please try signing in again.');
         }
 
+        const { data: verified, error: verificationError } = await supabase.auth.getUser();
+        if (verificationError || !verified.user || verified.user.id !== session.user.id) {
+          throw new Error('Your sign-in session could not be verified. Please request a new link.');
+        }
+        session = { ...session, user: verified.user };
+        // Remove credentials from the address bar before loading dashboard data.
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
         clearTimeout(timeoutId);
         await handleRedirect(session, params, intent);
       } catch (err: any) {
