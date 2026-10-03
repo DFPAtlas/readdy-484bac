@@ -592,7 +592,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
               </Link>
             )}
             {job.status === 'awaiting_payment' && (
-              <Link href={`/client/jobs/${job.id}/payment`}>
+              <Link href={`/client/jobs/payment?id=${encodeURIComponent(job.id)}`}>
                 <button className="bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-600 transition-colors cursor-pointer whitespace-nowrap">
                   Pay Now
                 </button>
