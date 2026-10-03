@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { paymentAmounts } from '@/lib/financeAmounts';
+import RefundRequestQueue from '../payments-jobs/RefundRequestQueue';
 import { supabase } from '@/lib/supabase';
 
 interface UnifiedPayment {
@@ -344,6 +345,8 @@ export default function AdminPaymentsPage() {
             </div>
           </div>
         </div>
+
+        <RefundRequestQueue />
 
         {/* Table */}
         <div className="bg-[#111d35] rounded-2xl border border-[#1a2b4a] overflow-hidden">

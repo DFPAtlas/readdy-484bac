@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { supabase } from '@/lib/supabase';
+import RefundRequestQueue from './RefundRequestQueue';
 import StatsCards from './StatsCards';
 import PaymentOverviewTable from './PaymentOverviewTable';
 import PendingReleaseTable from './PendingReleaseTable';
@@ -12,9 +13,10 @@ import StripeWebhookLog from './StripeWebhookLog';
 import LiveIndicator from '@/components/LiveIndicator';
 import GuardPayoutTable from './GuardPayoutTable';
 
-type TabKey = 'overview' | 'pending' | 'disputes' | 'webhooks' | 'guardPayouts';
+type TabKey = 'overview' | 'pending' | 'disputes' | 'webhooks' | 'guardPayouts' | 'refunds';
 
 const tabs: { key: TabKey; label: string; icon: string }[] = [
+  { key: 'refunds', label: 'Refund Requests', icon: 'ri-refund-line' },
   { key: 'overview', label: 'Payment Overview', icon: 'ri-secure-payment-line' },
   { key: 'pending', label: 'Pending Release', icon: 'ri-hourglass-line' },
   { key: 'disputes', label: 'Disputes', icon: 'ri-alert-line' },
@@ -162,6 +164,7 @@ export default function PaymentsJobsPage() {
 
         {/* Tab Content */}
         <div className="bg-[#111d35] rounded-2xl border border-[#1a2b4a] p-6">
+          {activeTab === 'refunds' && <RefundRequestQueue key={lastUpdated?.getTime()} />}
           {activeTab === 'overview' && <PaymentOverviewTable />}
           {activeTab === 'pending' && <PendingReleaseTable />}
           {activeTab === 'disputes' && <DisputeAdminPanel />}

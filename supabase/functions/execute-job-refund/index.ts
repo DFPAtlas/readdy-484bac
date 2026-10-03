@@ -29,14 +29,26 @@ serve(async req => {
     if (aal(token)!=='aal2') return response(origin,403,{error:'MFA required'});
     const body=await req.json();
     const jobId=typeof body.jobId==='string'?body.jobId.trim():'';
+    const refundRequestId=typeof body.refundRequestId==='string'?body.refundRequestId.trim():null;
+    if (refundRequestId && body.disputeId) return response(origin,400,{error:'Choose one refund source'});
     const disputeId=typeof body.disputeId==='string'?body.disputeId.trim():null;
     if (!jobId) return response(origin,400,{error:'jobId required'});
-    operation=await claimFinancialOperation(db,jobId,`job-refund:${jobId}:${disputeId || 'approved-job'}:v2`,'refund',user.id);
+    operation=await claimFinancialOperation(db,jobId,`job-refund:${jobId}:${refundRequestId || disputeId || 'approved-job'}:v2`,'refund',user.id);
     if (operation.replayed) return response(origin,200,operation.result);
     const {data:job,error:jobError}=await db.from('jobs').select('id,client_id,status,payment_status').eq('id',jobId).maybeSingle();
     if (jobError || !job) throw {status:404,message:'Job not found'};
-    if (job.payment_status!=='refund_pending') throw {status:409,message:'Job is not authorised for refund'};
+    if (!refundRequestId && job.payment_status!=='refund_pending') throw {status:409,message:'Job is not authorised for refund'};
     let approvedAmount: number | null=null;
+    let requestTransactionId: string | null=null;
+    if (refundRequestId) {
+      const {data:request,error}=await db.from('refund_requests').select('id,job_id,client_id,transaction_id,requested_amount,status,type,stripe_refund_id,cancellation_id').eq('id',refundRequestId).maybeSingle();
+      if (error || !request || request.job_id!==jobId || request.client_id!==job.client_id || !request.transaction_id) throw {status:400,message:'Refund request does not match job payment'};
+      if (!['pending','approved'].includes(request.status) || request.stripe_refund_id) throw {status:409,message:'Refund request is not awaiting processing'};
+      const {data:cancellation,error:cancelError}=await db.from('job_cancellations').select('job_id,preferred_resolution').eq('id',request.cancellation_id).maybeSingle();
+      if (cancelError || !cancellation || cancellation.job_id!==jobId || cancellation.preferred_resolution!=='full_refund' || request.type!=='full' || job.status!=='cancelled' || !['funded','refund_pending'].includes(job.payment_status)) throw {status:409,message:'Only cancelled full-refund requests can be processed here; other resolutions need finance review'};
+      approvedAmount=Math.round(Number(request.requested_amount)*100);
+      requestTransactionId=request.transaction_id;
+    }
     let resolution='resolved_client_refund';
     if (disputeId) {
       const {data:dispute,error}=await db.from('disputes').select('id,job_id,status,refund_amount,stripe_refund_id').eq('id',disputeId).maybeSingle();
@@ -48,18 +60,20 @@ serve(async req => {
     await verifyRefundSafety(db,job);
     const {data:payment,error:paymentError}=await db.from('transactions').select('id,amount,stripe_payment_intent,status,refund_amount')
       .eq('job_id',jobId).eq('client_id',job.client_id).eq('transaction_type','job_payment').in('status',['completed','partially_refunded']).order('created_at',{ascending:false}).limit(1).maybeSingle();
-    if (paymentError || !payment?.stripe_payment_intent) throw {status:409,message:'Verified Stripe job payment not found'};
+    if (paymentError || (requestTransactionId && payment?.id!==requestTransactionId) || !payment?.stripe_payment_intent) throw {status:409,message:'Verified Stripe job payment not found'};
     const stripe=new Stripe(stripeKey,{apiVersion:'2023-10-16'});
     const intent=await stripe.paymentIntents.retrieve(payment.stripe_payment_intent,{expand:['latest_charge']});
     const charge=typeof intent.latest_charge==='object'?intent.latest_charge as Stripe.Charge:null;
     if (!charge || !charge.paid || intent.status!=='succeeded') throw {status:409,message:'Verified Stripe charge not found'};
     const remaining=charge.amount-charge.amount_refunded;
     const refundPence=approvedAmount ?? remaining;
+    if (refundRequestId && refundPence!==remaining) throw {status:409,message:'Request amount no longer matches remaining funds; finance review required'};
     if (!Number.isSafeInteger(refundPence) || refundPence <= 0 || refundPence > remaining) throw {status:400,message:'Refund amount exceeds remaining client funds'};
     stripeStarted=true;
-    const refund=await stripe.refunds.create({charge:charge.id,amount:refundPence,reason:'requested_by_customer',metadata:{jobId,disputeId:disputeId || '',transactionId:payment.id,operationId:operation.id}}, {idempotencyKey:`job-refund:${jobId}:${disputeId || 'approved-job'}:v2`});
+    const refund=await stripe.refunds.create({charge:charge.id,amount:refundPence,reason:'requested_by_customer',metadata:{jobId,disputeId:disputeId || '',transactionId:payment.id,operationId:operation.id}}, {idempotencyKey:`job-refund:${jobId}:${refundRequestId || disputeId || 'approved-job'}:v2`});
     if (!['succeeded','pending'].includes(refund.status || '')) throw new Error('Refund requires finance review');
-    const {error:recordError}=await db.rpc('record_financial_refund',{
+    const {error:recordError}=await db.rpc(refundRequestId ? 'record_requested_refund' : 'record_financial_refund',{
+      ...(refundRequestId ? {p_request_id:refundRequestId} : {}),
       p_operation_id:operation.id,p_transaction_id:payment.id,p_dispute_id:disputeId,p_refund_id:refund.id,
       p_cumulative_refund:(charge.amount_refunded+refundPence)/100,p_refund_amount:refundPence/100,
       p_succeeded:refund.status==='succeeded',p_role:admin.role,p_resolution:resolution,p_notes:'Approved job refund',
