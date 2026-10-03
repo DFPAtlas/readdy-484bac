@@ -24,15 +24,15 @@ export default function RefundEligibilityPanel({ job, transaction, cancellation,
   const hasPendingRefund = refundRequests.some((r) => r.status === 'pending');
   const hasApprovedRefund = refundRequests.some((r) => r.status === 'approved' || r.status === 'processed');
 
-  const platformFee = paidAmount * 0.15;
-  const estimatedRefundable = Math.max(0, paidAmount - platformFee);
+  const breakdown = transaction?.metadata?.breakdown || {};
+  const recordedPlatformFee = Number(breakdown.platformFee ?? transaction?.metadata?.platform_fee ?? 0);
+  const hasRecordedPlatformFee = Number.isFinite(recordedPlatformFee) && recordedPlatformFee > 0;
 
   const startDate = job.start_date ? new Date(job.start_date) : null;
   const now = new Date();
   const hoursUntilStart = startDate ? Math.max(0, (startDate.getTime() - now.getTime()) / (1000 * 60 * 60)) : 0;
 
-  // TODO: Replace with actual backend refund policy when available
-  let policyNote = 'Refund policy is reviewed case by case.';
+  let policyNote = 'Refund requests are reviewed against the original Stripe payment, cancellation timing, and any payout already released.';
   if (hoursUntilStart >= 48) policyNote = 'Cancellations 48+ hours before start may be eligible for full refund minus platform fees.';
   else if (hoursUntilStart >= 24) policyNote = 'Cancellations 24-48 hours before start may be eligible for partial refund.';
   else if (hoursUntilStart > 0) policyNote = 'Cancellations within 24 hours of start may be subject to limited refund.';
@@ -69,13 +69,15 @@ export default function RefundEligibilityPanel({ job, transaction, cancellation,
               <span className="text-emerald-400 font-semibold">£{refundAmount.toFixed(2)}</span>
             </div>
           )}
-          <div className="flex justify-between">
-            <span className="text-slate-500">Platform Fee</span>
-            <span className="text-slate-200">£{platformFee.toFixed(2)}</span>
-          </div>
+          {hasRecordedPlatformFee && (
+            <div className="flex justify-between">
+              <span className="text-slate-500">Recorded Service Fee</span>
+              <span className="text-slate-200">£{recordedPlatformFee.toFixed(2)}</span>
+            </div>
+          )}
           <div className="flex justify-between pt-2 border-t border-[#1e2d4d]">
-            <span className="text-white font-semibold">Estimated Refundable</span>
-            <span className="text-teal-400 font-bold">£{estimatedRefundable.toFixed(2)}</span>
+            <span className="text-white font-semibold">Maximum Request</span>
+            <span className="text-teal-400 font-bold">£{paidAmount.toFixed(2)}</span>
           </div>
         </div>
       </div>
