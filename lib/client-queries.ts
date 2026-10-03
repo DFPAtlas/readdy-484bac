@@ -406,7 +406,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
       .eq('is_deleted', false)
       .in('status', ['open', 'awaiting_client', 'escalated', 'under_review']),
     supabase.from('subscription_payments').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'failed'),
-    supabase.from('transactions').select('amount, status, refund_amount, refunded').eq('client_id', clientId).gte('created_at', startOfMonth),
+    supabase.from('transactions').select('job_id, amount, status, refund_amount, refunded, created_at').eq('client_id', clientId),
     jobIds.length > 0
       ? supabase.from('job_assignments').select('guard_id').in('job_id', jobIds)
       : Promise.resolve({ data: [] }),
@@ -496,7 +496,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
       postcode: j.postcode,
       start_date: j.start_date,
       status: j.status,
-      payment_status: j.payment_status,
+      payment_status: (() => { const totals = paymentTotals(txData.filter(t => t.job_id === j.id)); return totals.refunded > 0 ? (totals.remaining === 0 ? 'refunded' : 'partially_refunded') : j.payment_status; })(),
       agreed_amount: j.agreed_amount,
       applications_count: j.applications_count || 0,
       assigned_count: j.assigned_count || 0,
@@ -509,7 +509,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
   const urgentTickets = openTickets.filter(t => t.priority === 'urgent').length;
   const awaitingReplyTickets = openTickets.filter(t => t.status === 'awaiting_client').length;
 
-  const totalSpend = paymentTotals(txData).collected;
+  const totalSpend = paymentTotals(txData.filter(t => t.created_at >= startOfMonth)).collected;
   const totalGuardsHired = [...new Set(distinctGuards.map(a => a.guard_id))].length;
 
   // Safety counts
