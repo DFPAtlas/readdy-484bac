@@ -14,10 +14,12 @@
   import LiveIndicator from '@/components/LiveIndicator';
   import { useRouteGuard } from '@/hooks/useRouteGuard';
   import UpgradePrompt from '@/components/UpgradePrompt';
+  import BankPayoutTracker from './BankPayoutTracker';
 
   export default function GuardEarningsPage() {
     const [earnings, setEarnings] = useState<any[]>([]);
     const [payouts, setPayouts] = useState<any[]>([]);
+    const [guardId, setGuardId] = useState<string|null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'processing' | 'paid' | 'held'>('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -74,6 +76,7 @@
           .maybeSingle();
 
         if (guard) {
+          setGuardId(guard.id);
           const [assignmentsRes, payoutsRes] = await Promise.all([
             supabase
               .from('job_assignments')
@@ -385,6 +388,8 @@
                   </button>
                 </div>
               </div>
+
+              {guardId && <BankPayoutTracker guardId={guardId} />}
 
               <div className="bg-white dark:bg-[#111d35] rounded-xl border border-slate-200 dark:border-[#1e2d4d] p-1 mb-6 inline-flex">
                 <button
