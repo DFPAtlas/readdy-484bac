@@ -1,4 +1,4 @@
-import { bookingAmounts } from '@/supabase/functions/_shared/booking-policy';
+import { bookingAmounts } from '@/lib/booking-policy';
 
 // Client-side fee estimates use the same rounding as checkout.
 // Server-side is authoritative; this is for UI previews only

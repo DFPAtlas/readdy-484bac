@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { getBookingPolicy, applyClientPromotion } from '@/supabase/functions/_shared/booking-policy';
+import { getBookingPolicy, applyClientPromotion } from '@/lib/booking-policy';
 import DraftManager from './DraftManager';
 import TemplateManager from './TemplateManager';
 import SaveTemplateModal from './SaveTemplateModal';
