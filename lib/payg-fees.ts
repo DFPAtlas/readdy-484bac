@@ -1,4 +1,6 @@
-// Client-side fee calculation for PAYG tier
+import { bookingAmounts } from '@/supabase/functions/_shared/booking-policy';
+
+// Client-side fee estimates use the same rounding as checkout.
 // Server-side is authoritative; this is for UI previews only
 
 export interface FeeBreakdown {
@@ -23,6 +25,7 @@ export function calculatePaygFees(params: {
   numberOfGuards: number;
   numberOfDays: number;
   serviceFeePct?: number;
+  serviceFeeFixedPence?: number;
   promoDiscountPct?: number | null;
 }): FeeBreakdown {
   const {
@@ -31,14 +34,19 @@ export function calculatePaygFees(params: {
     numberOfGuards,
     numberOfDays,
     serviceFeePct = 15,
+    serviceFeeFixedPence = 0,
     promoDiscountPct = null,
   } = params;
 
-  const guardTotal = hourlyRate * hours * numberOfGuards * numberOfDays;
-  const rawFee = guardTotal * (serviceFeePct / 100);
+  const grossPerGuardPence = Math.max(0, Math.round(hourlyRate * hours * numberOfDays * 100));
+  const amounts = grossPerGuardPence > 0
+    ? bookingAmounts(grossPerGuardPence, serviceFeePct, serviceFeeFixedPence)
+    : { platformFeePence: 0 };
+  const guardTotal = grossPerGuardPence * numberOfGuards / 100;
+  const rawFee = amounts.platformFeePence * numberOfGuards / 100;
 
   let serviceFee = rawFee;
-  let serviceFeeLabel = `${serviceFeePct}%`;
+  let serviceFeeLabel = `${serviceFeePct}%${serviceFeeFixedPence ? ` + ${formatCurrency(serviceFeeFixedPence / 100)} per guard` : ''}`;
   let savings = 0;
 
   if (promoDiscountPct !== null && promoDiscountPct > 0) {
