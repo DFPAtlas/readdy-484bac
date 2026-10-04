@@ -13,7 +13,9 @@ interface StepReviewPostProps {
   submitting: boolean;
   submitStatus: 'idle' | 'submitting' | 'success' | 'error';
   errors: Record<string, string>;
-  paygServiceFeePct: number;
+  paygServiceFeePct: number | null;
+  serviceFeeFixedPence?: number;
+  pricingError?: string;
   onFieldChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
 }
 
@@ -84,6 +86,8 @@ export default function StepReviewPost({
   submitStatus,
   errors,
   paygServiceFeePct,
+  serviceFeeFixedPence = 0,
+  pricingError = '',
   onFieldChange,
 }: StepReviewPostProps) {
   const [sh, sm] = formData.startTime?.split(':').map(Number) || [0, 0];
@@ -92,12 +96,13 @@ export default function StepReviewPost({
   if (hours <= 0) hours += 24;
 
   const hasRate = formData.hourlyRate && formData.startTime && formData.endTime;
-  const fees = hasRate ? calculatePaygFees({
+  const fees = hasRate && paygServiceFeePct !== null ? calculatePaygFees({
     hourlyRate: parseFloat(formData.hourlyRate),
     hours,
     numberOfGuards: parseInt(formData.numberOfGuards) || 1,
     numberOfDays: parseInt(formData.numberOfDays) || 1,
     serviceFeePct: paygServiceFeePct,
+    serviceFeeFixedPence,
   }) : null;
 
   const isScheduled = !!formData.publishAt && new Date(formData.publishAt) > new Date();
@@ -179,6 +184,7 @@ export default function StepReviewPost({
 
           <Section title="Payment & Contact" icon="ri-money-pound-circle-line">
             <InfoRow label="Hourly Rate" value={formData.hourlyRate ? `£${formData.hourlyRate}/hr` : ''} />
+            {hasRate && paygServiceFeePct === null && <p className="text-sm text-slate-400">{pricingError || 'Loading booking estimate…'}</p>}
             {fees && (
               <>
                 <InfoRow label="Hours per Shift" value={`${fees.hours}h`} />
