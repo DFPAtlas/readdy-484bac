@@ -416,7 +416,8 @@ serve(async (req) => {
 
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription;
+        // Retry snapshots may predate activation; reconcile the current Stripe object.
+        const subscription = await stripe.subscriptions.retrieve((event.data.object as Stripe.Subscription).id);
         const period = subscriptionPeriod(subscription);
         const updateData: any = { status: subscription.status, current_period_start: period.start, current_period_end: period.end, cancel_at_period_end: subscription.cancel_at_period_end, updated_at: new Date().toISOString() };
         if (subscription.trial_start) updateData.trial_start = new Date(subscription.trial_start * 1000).toISOString();
@@ -437,7 +438,7 @@ serve(async (req) => {
           const profileUpdate: any = { subscription_status: subscription.status, updated_at: new Date().toISOString() };
           if (updateData.plan_slug) { profileUpdate.subscription_plan = updateData.plan_slug; profileUpdate.subscription_tier = updateData.plan_slug; profileUpdate.plan_slug = updateData.plan_slug; profileUpdate.plan_name = updateData.plan_name; }
           await appSupabase.from(table).update(profileUpdate).eq('user_id', subRecord.user_id);
-          const entUpdate: any = { subscription_status: subscription.status, current_period_end: new Date(subscription.current_period_end * 1000).toISOString(), cancel_at_period_end: subscription.cancel_at_period_end || false, updated_at: new Date().toISOString() };
+          const entUpdate: any = { subscription_status: subscription.status, current_period_end: period.end, cancel_at_period_end: subscription.cancel_at_period_end || false, updated_at: new Date().toISOString() };
           if (updateData.plan_slug) { entUpdate.plan_slug = updateData.plan_slug; entUpdate.plan_name = updateData.plan_name; entUpdate.monthly_price_pence = updateData.plan_amount || 0; }
           if (planFeatures !== null) entUpdate.features = planFeatures;
           await appSupabase.from('user_entitlements').update(entUpdate).eq('user_id', subRecord.user_id);
