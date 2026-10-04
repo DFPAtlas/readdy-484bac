@@ -189,8 +189,9 @@ function SuccessContent() {
   };
 
   const metadata = transaction?.metadata || {};
-  const guardFees = metadata?.guard_fees ?? 0;
-  const serviceFee = metadata?.service_fee ?? 0;
+  const guardFees = metadata?.guard_fees ?? metadata?.breakdown?.guardFees ?? 0;
+  // Checkout stores the client service fee as platform_fee; retain legacy receipts.
+  const serviceFee = metadata?.platform_fee ?? metadata?.breakdown?.platformFee ?? metadata?.service_fee ?? 0;
   const total = transaction?.amount ?? 0;
 
   if (status === 'loading') {
