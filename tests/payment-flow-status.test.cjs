@@ -52,3 +52,38 @@ test('zero amounts are preserved rather than replaced by another amount', () => 
   assert.equal(result.job_secured.amount, 0);
   assert.equal(result.guard_paid.amount, 0);
 });
+
+function loadReturnStatus() {
+  const source = fs.readFileSync('app/client/payment/success/page.tsx', 'utf8');
+  const start = source.indexOf('(jobData: JobSummary | null, assignmentData: AssignmentSummary[], txnData: Transaction | null): PageStatus =>');
+  const end = source.indexOf('\n    []', start);
+  const expression = source.slice(start, end).trim().replace(/,$/, '');
+  const code = 'const derive = ' + expression + ';';
+  let compiled;
+  try {
+    compiled = require('node:module').stripTypeScriptTypes(code);
+  } catch {
+    compiled = require('typescript').transpileModule(code, {
+      compilerOptions: { module: require('typescript').ModuleKind.CommonJS }
+    }).outputText;
+  }
+  const confirmation = (job, assignments) =>
+    job.status === 'confirmed' && job.payment_status === 'funded' &&
+    assignments.length > 0 && assignments.every(a => a.status === 'confirmed' && a.payment_status === 'funded')
+      ? 'confirmed' : job.payment_status === 'funded' ? 'reconciling' : 'awaiting_payment';
+  return new Function('computeBookingConfirmation', compiled + '; return derive;')(confirmation);
+}
+const deriveReturn = loadReturnStatus();
+const confirmedJob = {status: 'confirmed', payment_status: 'funded'};
+const confirmedAssignments = [{status: 'confirmed', payment_status: 'funded'}];
+test('checkout return cannot confirm a booking without its matching completed transaction', () => {
+  assert.equal(deriveReturn(confirmedJob, confirmedAssignments, null), 'reconciling');
+  assert.equal(deriveReturn(confirmedJob, confirmedAssignments, {status: 'pending'}), 'reconciling');
+  assert.equal(deriveReturn(confirmedJob, confirmedAssignments, {status: 'completed'}), 'paid');
+});
+test('checkout return waits for guards and reports failed payments', () => {
+  assert.equal(deriveReturn(confirmedJob, [], {status: 'completed'}), 'reconciling');
+  assert.equal(deriveReturn({status: 'awaiting_payment', payment_status: 'pending'}, [], {status: 'pending'}), 'confirming');
+  assert.equal(deriveReturn(confirmedJob, confirmedAssignments, {status: 'failed'}), 'failed');
+  assert.equal(deriveReturn(null, [], null), 'error');
+});
