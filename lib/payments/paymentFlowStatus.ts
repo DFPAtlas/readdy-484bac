@@ -42,9 +42,9 @@ const STAGE3_FAILED = ['failed', 'cancelled', 'reversed'];
 function normalizeStatus(status: string | null | undefined, completeList: string[], pendingList: string[], failedList: string[]): FlowStage {
   if (!status) return 'not_started';
   const s = status.toLowerCase().replace(/[\s_-]+/g, '_');
-  if (completeList.some(c => s.includes(c))) return 'complete';
-  if (failedList.some(f => s.includes(f))) return 'failed';
-  if (pendingList.some(p => s.includes(p))) return 'pending';
+  if (failedList.includes(s)) return 'failed';
+  if (pendingList.includes(s)) return 'pending';
+  if (completeList.includes(s)) return 'complete';
   return 'pending';
 }
 
@@ -117,8 +117,8 @@ export function getPaymentFlowStatus(data: FlowSourceData): PaymentFlowStatus {
     actionType = 'update_bank';
   }
 
-  const stage1Amount = data.jobAgreedAmount || data.assignmentPaymentAmount || data.jobGuardPayoutAmount;
-  const stage3Amount = data.payoutNetAmount || data.payoutAmount || data.jobGuardPayoutAmount || stage1Amount;
+  const stage1Amount = data.jobAgreedAmount ?? data.assignmentPaymentAmount ?? data.jobGuardPayoutAmount;
+  const stage3Amount = data.payoutNetAmount ?? data.payoutAmount ?? data.jobGuardPayoutAmount ?? stage1Amount;
 
   const stage1Tooltips: Record<FlowStage, string> = {
     complete: 'Client payment received and held by QuickGuard.',
