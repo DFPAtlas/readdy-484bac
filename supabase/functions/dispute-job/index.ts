@@ -82,53 +82,33 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'You can only dispute your own jobs' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    if (job.disputed) {
-      return new Response(JSON.stringify({ error: 'This job already has an active dispute' }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
 
     const { data: assignment } = await supabase
       .from('job_assignments')
-      .select('id, guard_id, status')
+      .select('id, job_id, guard_id, status')
       .eq('id', assignment_id)
       .maybeSingle();
 
-    if (!assignment) {
+    if (!assignment || assignment.job_id !== job.id) {
       return new Response(JSON.stringify({ error: 'Assignment not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const now = new Date().toISOString();
-
-    const { data: dispute } = await supabase.from('disputes').insert({
-      job_id: job.id,
-      client_id: client.id,
-      guard_id: assignment.guard_id,
-      assignment_id: assignment.id,
-      raised_by: 'client',
-      reason: reason,
-      details: details || null,
-      status: 'open',
-      created_at: now,
-      updated_at: now,
-    }).select().single();
-
-    await supabase.from('jobs').update({
-      disputed: true,
-      disputed_at: now,
-      disputed_reason: reason,
-      payment_status: 'disputed',
-      updated_at: now,
-    }).eq('id', job.id);
-
-    await supabase.from('payment_audit_logs').insert({
-      job_id: job.id,
-      guard_id: assignment.guard_id,
-      action: 'dispute_raised',
-      previous_status: job.payment_status,
-      new_status: 'disputed',
-      performed_by: client.id,
-      notes: `Client dispute: ${reason}`,
-      created_at: now,
+    const { data: recorded, error: recordError } = await supabase.rpc('raise_client_payment_dispute', {
+      p_user_id: user.id, p_job_id: job.id, p_assignment_id: assignment.id,
+      p_reason: reason, p_details: details || null,
     });
+    if (recordError) {
+      return new Response(JSON.stringify({ error: recordError.message }), {
+        status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!recorded?.disputeId) throw new Error('Dispute was not recorded');
+    const dispute = { id: recorded.disputeId };
+    if (recorded.replayed) {
+      return new Response(JSON.stringify({success: true, disputeId: dispute.id, status: 'open', replayed: true}), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const { data: guard } = await supabase
       .from('guards')
