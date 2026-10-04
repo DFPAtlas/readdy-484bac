@@ -70,14 +70,25 @@ serve(async (req) => {
       );
     }
 
-    await stripe.subscriptions.update(stripeSubscriptionId, {
+    const {data: local, error: lookupError} = await supabase.from('subscriptions')
+      .select('id, user_id').eq('stripe_subscription_id', stripeSubscriptionId).maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!local || local.user_id !== userId) {
+      return new Response(JSON.stringify({error: 'Subscription does not belong to this user'}), {
+        status: 404, headers: {...corsHeaders, 'Content-Type': 'application/json'},
+      });
+    }
+    const subscription = await stripe.subscriptions.update(stripeSubscriptionId, {
       cancel_at_period_end: true,
     });
-
-    await supabase
-      .from('subscriptions')
-      .update({ cancel_at_period_end: true })
-      .eq('stripe_subscription_id', stripeSubscriptionId);
+    const {error: subscriptionError} = await supabase.from('subscriptions')
+      .update({cancel_at_period_end: subscription.cancel_at_period_end, updated_at: new Date().toISOString()})
+      .eq('id', local.id);
+    if (subscriptionError) throw subscriptionError;
+    const {error: entitlementError} = await supabase.from('user_entitlements')
+      .update({cancel_at_period_end: subscription.cancel_at_period_end, updated_at: new Date().toISOString()})
+      .eq('user_id', userId).eq('stripe_subscription_id', stripeSubscriptionId);
+    if (entitlementError) throw entitlementError;
 
     await supabase.from('notifications').insert([{
       user_id: userId,

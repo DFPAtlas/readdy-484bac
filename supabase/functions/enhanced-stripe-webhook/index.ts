@@ -247,7 +247,7 @@ async function notifyGuardPayout(appSupabase: any, guardId: string, jobId: strin
     link: '/guard/dashboard#earnings',
     data: { job_id: jobId, assignment_id: assignmentId, transfer_id: transferId },
     created_at: new Date().toISOString(),
-  }).catch(() => {});
+  }).then(({error}) => { if (error) console.error('[EnhancedWebhook] Guard payout notification failed:', error.message); }, error => { console.error('[EnhancedWebhook] Guard payout notification failed:', error); });
 }
 
 serve(async (req) => {
@@ -707,7 +707,7 @@ serve(async (req) => {
       case 'charge.dispute.created':
       case 'charge.dispute.updated':
       case 'charge.dispute.closed': {
-        const dispute = event.data.object as any;
+        const dispute = await stripe.disputes.retrieve((event.data.object as any).id);
         const chargeId = stripeId(dispute.charge);
         if (!chargeId) throw new Error('Dispute charge missing');
         const charge = await stripe.charges.retrieve(chargeId);
