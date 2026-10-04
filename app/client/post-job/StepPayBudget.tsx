@@ -19,22 +19,25 @@ interface StepPayBudgetProps {
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onNext: () => void;
   onBack: () => void;
-  paygServiceFeePct: number;
+  paygServiceFeePct: number | null;
+  serviceFeeFixedPence?: number;
+  pricingError?: string;
 }
 
-export default function StepPayBudget({ formData, errors, onChange, onNext, onBack, paygServiceFeePct }: StepPayBudgetProps) {
+export default function StepPayBudget({ formData, errors, onChange, onNext, onBack, paygServiceFeePct, serviceFeeFixedPence = 0, pricingError = '' }: StepPayBudgetProps) {
   const [sh, sm] = formData.startTime?.split(':').map(Number) || [0, 0];
   const [eh, em] = formData.endTime?.split(':').map(Number) || [0, 0];
   let hours = (eh * 60 + em - sh * 60 - sm) / 60;
   if (hours <= 0) hours += 24;
 
   const hasRate = formData.hourlyRate && formData.startTime && formData.endTime;
-  const fees = hasRate ? calculatePaygFees({
+  const fees = hasRate && paygServiceFeePct !== null ? calculatePaygFees({
     hourlyRate: parseFloat(formData.hourlyRate),
     hours,
     numberOfGuards: parseInt(formData.numberOfGuards) || 1,
     numberOfDays: parseInt(formData.numberOfDays) || 1,
     serviceFeePct: paygServiceFeePct,
+    serviceFeeFixedPence,
   }) : null;
 
   return (
@@ -81,6 +84,7 @@ export default function StepPayBudget({ formData, errors, onChange, onNext, onBa
           </div>
         </div>
 
+        {hasRate && paygServiceFeePct === null && <p className="text-sm text-slate-400">{pricingError || 'Loading booking estimate…'}</p>}
         {fees && (
           <div className="bg-[#162036] rounded-2xl p-5 border border-[#1e2d4d]">
             <h4 className="text-sm font-bold text-white mb-3">Estimated Cost Breakdown</h4>
