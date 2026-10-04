@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { calculatePaygFees, formatCurrency } from '@/lib/payg-fees';
+import { getBookingPolicy, applyClientPromotion } from '@/supabase/functions/_shared/booking-policy';
 import DraftManager from './DraftManager';
 import TemplateManager from './TemplateManager';
 import SaveTemplateModal from './SaveTemplateModal';
@@ -105,20 +105,35 @@ function PostJobContent() {
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(1);
   const [toastMessage, setToastMessage] = useState('');
-  const [paygServiceFeePct, setPaygServiceFeePct] = useState(15);
+  const [paygServiceFeePct, setPaygServiceFeePct] = useState<number | null>(null);
+  const [serviceFeeFixedPence, setServiceFeeFixedPence] = useState(0);
+  const [pricingError, setPricingError] = useState('');
   const [startFrom, setStartFrom] = useState<'blank' | 'template' | 'site' | 'previous'>('blank');
 
   const clientId = clientData?.id || null;
 
   useEffect(() => {
-    const fetchPricingConfig = async () => {
-      const { data } = await supabase.from('pricing_config').select('payg_service_fee_pct').order('id', { ascending: true }).limit(1).maybeSingle();
-      if (data?.payg_service_fee_pct != null) {
-        setPaygServiceFeePct(Number(data.payg_service_fee_pct));
+    let cancelled = false;
+    setPaygServiceFeePct(null);
+    setPricingError('');
+    if (!userId || !clientId) return;
+    const loadPricing = async () => {
+      try {
+        const policy = await getBookingPolicy(supabase, userId);
+        const { data: client, error } = await supabase.from('clients').select('*').eq('id', clientId).single();
+        if (error || !client) throw new Error('Unable to verify booking promotion');
+        const effective = applyClientPromotion(policy, client);
+        if (!cancelled) {
+          setPaygServiceFeePct(effective.feePercent);
+          setServiceFeeFixedPence(effective.feeFixedPence);
+        }
+      } catch {
+        if (!cancelled) setPricingError('Booking estimate unavailable. The confirmed total will be shown before payment.');
       }
     };
-    fetchPricingConfig();
-  }, []);
+    loadPricing();
+    return () => { cancelled = true; };
+  }, [userId, clientId]);
 
   useEffect(() => {
     if (toastMessage) {
@@ -794,6 +809,8 @@ function PostJobContent() {
                 onNext={nextStep}
                 onBack={prevStep}
                 paygServiceFeePct={paygServiceFeePct}
+                serviceFeeFixedPence={serviceFeeFixedPence}
+                pricingError={pricingError}
               />
             )}
             {activeStep === 6 && (
@@ -808,6 +825,8 @@ function PostJobContent() {
                 submitStatus={submitStatus}
                 errors={errors}
                 paygServiceFeePct={paygServiceFeePct}
+                serviceFeeFixedPence={serviceFeeFixedPence}
+                pricingError={pricingError}
                 onFieldChange={handleChange}
               />
             )}
