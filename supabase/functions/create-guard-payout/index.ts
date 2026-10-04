@@ -129,7 +129,17 @@ serve(async (req: Request) => {
   try {
     const assignment = await loadAssignment(supabase, validated.assignmentId, validated.jobId);
     operation = await claimFinancialOperation(supabase, assignment.job_id, `payout:${assignment.id}:v1`, 'payout', validated.adminUserId);
-    if (operation.replayed) return corsResponse(origin,200,operation.result);
+    if (operation.replayed) {
+      const transferId = operation.result?.transferId;
+      if (typeof transferId !== 'string' || transferId !== assignment.stripe_transfer_id) {
+        throw { status: 409, message: 'Payout requires finance reconciliation' };
+      }
+      const transfer = await stripe.transfers.retrieve(transferId);
+      if (transfer.reversed || transfer.amount_reversed > 0) {
+        throw { status: 409, message: 'Transfer was reversed. Finance review required.' };
+      }
+      return corsResponse(origin,200,operation.result);
+    }
     const guard = await loadGuard(supabase, assignment.guard_id);
     const job = await loadJob(supabase, assignment.job_id);
 

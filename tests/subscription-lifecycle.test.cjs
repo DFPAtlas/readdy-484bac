@@ -53,3 +53,20 @@ test('Stripe disputed charge blocks payout even when local job has not received 
  const db={from(){const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,maybeSingle:async()=>({data:{stripe_payment_intent:'pi',status:'completed',refunded:false,refund_amount:0}})};return q}};
  await assert.rejects(fn({paymentIntents:{retrieve:async()=>({status:'succeeded',latest_charge:{id:'ch',paid:true,disputed:true,amount:8800,amount_refunded:0}})}},db,'job','client',8000,'assignment'),e=>e.status===409&&/Disputed/.test(e.message));
 });
+
+test('payout replay checks current Stripe reversal state before returning cached success',async()=>{
+ const src=fs.readFileSync('supabase/functions/create-guard-payout/index.ts','utf8');
+ const start=src.indexOf('    if (operation.replayed) {');
+ const block=src.slice(start,src.indexOf('    const guard =',start));
+ const run=new Function('stripe','assignment','operation','origin','corsResponse',compile(`return (async()=>{${block}})();`));
+ const operation={replayed:true,result:{success:true,transferId:'tr_fixture'}};
+ const assignment={stripe_transfer_id:'tr_fixture'};
+ const response=(_origin,status,body)=>({status,body});
+ for(const state of [{reversed:true,amount_reversed:8000},{reversed:false,amount_reversed:1000}]) {
+   await assert.rejects(run({transfers:{retrieve:async()=>state}},assignment,operation,null,response),e=>e.status===409&&/reversed/.test(e.message));
+ }
+ const ok=await run({transfers:{retrieve:async()=>({reversed:false,amount_reversed:0})}},assignment,operation,null,response);
+ assert.equal(ok.status,200);assert.equal(ok.body.transferId,'tr_fixture');
+ await assert.rejects(run({transfers:{retrieve:async()=>{throw new Error('Stripe unavailable')}}},assignment,operation,null,response),/Stripe unavailable/);
+ await assert.rejects(run({}, {stripe_transfer_id:'tr_other'},operation,null,response),e=>e.status===409);
+});
