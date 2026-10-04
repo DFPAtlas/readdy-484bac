@@ -680,7 +680,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
             <div className="flex items-center justify-between mt-4 flex-wrap gap-4">
               <div>
                 <h1 className="text-3xl font-bold text-white">Complete Payment</h1>
-                <p className="text-slate-400 mt-1">Review job details and process payment for completed services</p>
+                <p className="text-slate-400 mt-1">Review your selected guards and pay to confirm this booking</p>
               </div>
               <PaymentStatusBadge status={paymentStatus} size="lg" />
             </div>
@@ -916,7 +916,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
                       className="w-5 h-5 mt-0.5 text-teal-500 rounded border-[#1e2d4d]"
                     />
                     <span className="text-sm text-slate-300">
-                      I confirm that the security services have been completed satisfactorily and agree to the{" "}
+                      I authorise payment to confirm this booking and agree to the{" "}
                       <Link href="/terms" className="text-teal-400 hover:underline">Terms of Service</Link>{" "}
                       and{" "}
                       <Link href="/terms" className="text-teal-400 hover:underline">Payment Terms</Link>.
