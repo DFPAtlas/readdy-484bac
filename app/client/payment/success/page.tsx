@@ -58,35 +58,41 @@ function SuccessContent() {
   const loadData = useCallback(async () => {
     if (!jobId) return null;
 
-    const { data: jobData } = await supabase
+    const { data: jobData, error: jobError } = await supabase
       .from('jobs')
       .select('job_title, venue_name, venue_city, start_date, end_date, start_time, end_time, status, payment_status')
       .eq('id', jobId)
       .maybeSingle();
 
-    const { data: assignmentData } = await supabase
+    if (jobError) throw new Error('Unable to check your booking. Please refresh or contact support.');
+
+    const { data: assignmentData, error: assignmentError } = await supabase
       .from('job_assignments')
       .select('id, status, payment_status')
       .eq('job_id', jobId);
 
+    if (assignmentError) throw new Error('Unable to check guard confirmation. Please refresh or contact support.');
+
     let txnData: Transaction | null = null;
     if (sessionId) {
-      const { data: match } = await supabase
+      const { data: match, error: transactionError } = await supabase
         .from('transactions')
         .select('*')
         .eq('job_id', jobId)
         .eq('stripe_session_id', sessionId)
         .maybeSingle();
+      if (transactionError) throw new Error('Unable to check your payment. Please refresh or contact support.');
       if (match) txnData = match as Transaction;
     }
-    if (!txnData) {
-      const { data: latest } = await supabase
+    if (!sessionId) {
+      const { data: latest, error: transactionError } = await supabase
         .from('transactions')
         .select('*')
         .eq('job_id', jobId)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
+      if (transactionError) throw new Error('Unable to check your payment. Please refresh or contact support.');
       if (latest) txnData = latest as Transaction;
     }
 
@@ -106,7 +112,12 @@ function SuccessContent() {
         assignmentData
       );
 
-      if (confirmation === 'confirmed') return 'paid';
+      if (confirmation === 'confirmed') {
+        const paymentConfirmed = !!txnData && ['completed', 'succeeded', 'paid'].some(
+          value => txnData.status === value || txnData.payment_status === value
+        );
+        return paymentConfirmed ? 'paid' : 'reconciling';
+      }
       if (confirmation === 'reconciling') return 'reconciling';
       return 'confirming';
     },
@@ -121,50 +132,45 @@ function SuccessContent() {
     }
 
     let attempts = 0;
-    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
     const refresh = async () => {
-      const result = await loadData();
-      if (!result) return;
-
-      const { jobData, assignmentData, txnData } = result;
-      if (!jobData) {
+      try {
+        const result = await loadData();
+        if (cancelled || !result) return;
+        const { jobData, assignmentData, txnData } = result;
+        if (!jobData) {
+          setStatus('error');
+          setError('Job not found or unavailable to your account.');
+          return;
+        }
+        if (jobData.payment_status === 'refunded' || txnData?.status === 'refunded' || txnData?.payment_status === 'refunded' || txnData?.status === 'partially_refunded' || txnData?.payment_status === 'partially_refunded') {
+          setStatus('error');
+          setError('This payment has been refunded or partially refunded. Open the job payment page to review its current status.');
+          return;
+        }
+        setJob(jobData as JobSummary);
+        setAssignments((assignmentData || []) as AssignmentSummary[]);
+        setTransaction(txnData);
+        const next = deriveStatus(jobData as JobSummary, (assignmentData || []) as AssignmentSummary[], txnData);
+        setStatus(next);
+        attempts++;
+        setPollCount(attempts);
+        if (next !== 'paid' && next !== 'failed' && next !== 'error' && attempts < MAX_POLLS) {
+          timer = setTimeout(refresh, POLL_MS);
+        }
+      } catch (err) {
+        if (cancelled) return;
         setStatus('error');
-        setError('Job not found.');
-        return;
-      }
-
-      setJob(jobData as JobSummary);
-      setAssignments((assignmentData || []) as AssignmentSummary[]);
-      if (txnData) setTransaction(txnData as Transaction);
-
-      const next = deriveStatus(jobData as JobSummary, (assignmentData || []) as AssignmentSummary[], txnData as Transaction | null);
-      setStatus(next);
-
-      attempts++;
-      setPollCount(attempts);
-
-      if (next === 'paid' || next === 'failed' || next === 'error') {
-        if (intervalId) clearInterval(intervalId);
-        intervalId = null;
-      } else if (attempts >= MAX_POLLS) {
-        if (intervalId) clearInterval(intervalId);
-        intervalId = null;
+        setError(err instanceof Error ? err.message : 'Unable to check payment status. Please refresh or contact support.');
       }
     };
 
-    refresh();
-    intervalId = setInterval(() => {
-      if (attempts >= MAX_POLLS) {
-        if (intervalId) clearInterval(intervalId);
-        intervalId = null;
-        return;
-      }
-      refresh();
-    }, POLL_MS);
-
+    void refresh();
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      cancelled = true;
+      if (timer) clearTimeout(timer);
     };
   }, [jobId, loadData, deriveStatus]);
 
@@ -202,15 +208,17 @@ function SuccessContent() {
   if (status === 'confirming' || status === 'reconciling') {
     const isReconciling = status === 'reconciling';
     const iconClass = isReconciling ? 'border-amber-400' : 'border-amber-400';
-    const title = isReconciling ? 'Booking status is being reconciled' : 'Payment received — confirming your booking';
+    const title = pollCount >= MAX_POLLS
+      ? 'Payment confirmation is taking longer than expected'
+      : isReconciling ? 'Booking status is being reconciled' : 'Checking payment and booking status';
     const desc = isReconciling
-      ? 'Your payment was received but the booking state is still settling. This usually resolves within a few seconds.'
-      : 'Your payment was received. We are finalising your booking with the secure payment provider — this usually takes a few seconds.';
+      ? 'Your booking records are still being reconciled. We have not yet confirmed the complete booking.'
+      : 'We are waiting for confirmation from the secure payment provider. Returning from checkout alone does not confirm payment.';
 
     return (
       <div className="min-h-screen bg-[#0B1933] flex items-center justify-center px-6">
         <div className="text-center max-w-md mx-auto">
-          <div className={`w-16 h-16 border-4 ${iconClass} border-t-transparent rounded-full animate-spin mx-auto mb-6`} />
+          <div className={`w-16 h-16 border-4 ${iconClass} border-t-transparent rounded-full ${pollCount < MAX_POLLS ? 'animate-spin' : ''} mx-auto mb-6`} />
           <h1 className="text-2xl font-bold text-white mb-2">{title}</h1>
           <p className="text-slate-400 text-sm">{desc}</p>
           <p className="text-slate-500 text-xs mt-3">Checking {pollCount}/{MAX_POLLS}</p>
@@ -225,7 +233,7 @@ function SuccessContent() {
             Refresh Status
           </button>
           <p className="text-slate-500 text-xs mt-4">
-            If this stays pending, your payment may still be processing. You can safely return to the job — you will not be charged twice.
+            If this stays pending, your payment may still be processing. You can safely return to the job — check its payment status before attempting another payment.
           </p>
           <Link
             href={jobId ? `/client/jobs/detail?id=${encodeURIComponent(jobId)}` : '/client/jobs'}
