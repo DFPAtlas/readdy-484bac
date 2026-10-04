@@ -2,6 +2,7 @@ async function requireAudit(write: PromiseLike<{error: unknown}>) {const result=
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { invoiceReferences, invoiceOutcome, stripeId, subscriptionStatus } from '../_shared/invoice-lifecycle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://quickguard.uk',
@@ -246,7 +247,7 @@ async function notifyGuardPayout(appSupabase: any, guardId: string, jobId: strin
     link: '/guard/dashboard#earnings',
     data: { job_id: jobId, assignment_id: assignmentId, transfer_id: transferId },
     created_at: new Date().toISOString(),
-  }).catch(() => {});
+  }).then(({error}) => { if (error) console.error('[EnhancedWebhook] Guard payout notification failed:', error.message); }, error => { console.error('[EnhancedWebhook] Guard payout notification failed:', error); });
 }
 
 serve(async (req) => {
@@ -419,7 +420,7 @@ serve(async (req) => {
         // Retry snapshots may predate activation; reconcile the current Stripe object.
         const subscription = await stripe.subscriptions.retrieve((event.data.object as Stripe.Subscription).id);
         const period = subscriptionPeriod(subscription);
-        const updateData: any = { status: subscription.status, current_period_start: period.start, current_period_end: period.end, cancel_at_period_end: subscription.cancel_at_period_end, updated_at: new Date().toISOString() };
+        const updateData: any = { status: subscriptionStatus(subscription), current_period_start: period.start, current_period_end: period.end, cancel_at_period_end: subscription.cancel_at_period_end, updated_at: new Date().toISOString() };
         if (subscription.trial_start) updateData.trial_start = new Date(subscription.trial_start * 1000).toISOString();
         if (subscription.trial_end) { updateData.trial_end = new Date(subscription.trial_end * 1000).toISOString(); updateData.trial_end_date = new Date(subscription.trial_end * 1000).toISOString(); }
         const subscriptionItems = (subscription as any).items?.data;
@@ -431,17 +432,17 @@ serve(async (req) => {
           if (planMatch) { updateData.plan_slug = planMatch.slug; updateData.plan_name = planMatch.name; updateData.plan_amount = planMatch.monthly_price_pence; planFeatures = planMatch.features; newPlanSlug = planMatch.slug; newPlanName = planMatch.name; }
         }
         const { data: oldSub } = await appSupabase.from('subscriptions').select('plan_slug, plan_name, user_id, account_type').eq('stripe_subscription_id', subscription.id).maybeSingle();
-        await appSupabase.from('subscriptions').update(updateData).eq('stripe_subscription_id', subscription.id);
+        await requireAudit(appSupabase.from('subscriptions').update(updateData).eq('stripe_subscription_id', subscription.id));
         const { data: subRecord } = await appSupabase.from('subscriptions').select('user_id, account_type').eq('stripe_subscription_id', subscription.id).maybeSingle();
         if (subRecord?.user_id) {
           const table = subRecord.account_type === 'client' ? 'clients' : (subRecord.account_type === 'guard' ? 'guards' : 'clients');
-          const profileUpdate: any = { subscription_status: subscription.status, updated_at: new Date().toISOString() };
+          const profileUpdate: any = { subscription_status: subscriptionStatus(subscription), updated_at: new Date().toISOString() };
           if (updateData.plan_slug) { profileUpdate.subscription_plan = updateData.plan_slug; profileUpdate.subscription_tier = updateData.plan_slug; profileUpdate.plan_slug = updateData.plan_slug; profileUpdate.plan_name = updateData.plan_name; }
-          await appSupabase.from(table).update(profileUpdate).eq('user_id', subRecord.user_id);
-          const entUpdate: any = { subscription_status: subscription.status, current_period_end: period.end, cancel_at_period_end: subscription.cancel_at_period_end || false, updated_at: new Date().toISOString() };
+          await requireAudit(appSupabase.from(table).update(profileUpdate).eq('user_id', subRecord.user_id).eq('stripe_subscription_id', subscription.id));
+          const entUpdate: any = { subscription_status: subscriptionStatus(subscription), current_period_end: period.end, cancel_at_period_end: subscription.cancel_at_period_end || false, updated_at: new Date().toISOString() };
           if (updateData.plan_slug) { entUpdate.plan_slug = updateData.plan_slug; entUpdate.plan_name = updateData.plan_name; entUpdate.monthly_price_pence = updateData.plan_amount || 0; }
           if (planFeatures !== null) entUpdate.features = planFeatures;
-          await appSupabase.from('user_entitlements').update(entUpdate).eq('user_id', subRecord.user_id);
+          await requireAudit(appSupabase.from('user_entitlements').update(entUpdate).eq('user_id', subRecord.user_id).eq('stripe_subscription_id', subscription.id));
           if (oldSub && oldSub.plan_slug && newPlanSlug && oldSub.plan_slug !== newPlanSlug) {
             await logPlanChange(appSupabase, subRecord.user_id, oldSub.plan_slug, newPlanSlug, oldSub.plan_name, newPlanName || newPlanSlug, subRecord.account_type || 'unknown', 'webhook', true, subscription.id);
             await sendAdminAlert(supabaseUrl, supabaseKey, subRecord.user_id, oldSub.plan_slug, newPlanSlug, oldSub.plan_name, newPlanName || newPlanSlug, subRecord.account_type || 'unknown', 'webhook', true);
@@ -450,52 +451,57 @@ serve(async (req) => {
         break;
       }
 
-      case 'invoice.payment_succeeded': {
-        const invoice = event.data.object as Stripe.Invoice;
-        const subId = invoice.subscription as string;
-        const invoiceId = invoice.id;
-        const chargeId = invoice.charge as string;
-        const paymentIntentId = invoice.payment_intent as string;
-        const amountPaid = (invoice.amount_paid || 0) / 100;
-        const currency = invoice.currency || 'gbp';
-        const billingReason = invoice.billing_reason || 'subscription_cycle';
-        const periodStart = invoice.period_start ? new Date(invoice.period_start * 1000).toISOString() : null;
-        const periodEnd = invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null;
-        const invoiceUrl = invoice.hosted_invoice_url || invoice.invoice_pdf || null;
-
-        if (subId) {
-          await appSupabase.from('subscriptions').update({ last_payment_date: new Date(invoice.created * 1000).toISOString(), payment_status: 'succeeded', payment_failure_count: 0, last_payment_error: null, updated_at: new Date().toISOString() }).eq('stripe_subscription_id', subId);
-          const { data: sub } = await appSupabase.from('subscriptions').select('user_id, plan_name, id').eq('stripe_subscription_id', subId).maybeSingle();
-          const userId = sub?.user_id || null;
-          const subscriptionDbId = sub?.id || null;
-
-          if (amountPaid > 0) {
-            const { data: existingPayment } = await appSupabase.from('subscription_payments').select('id').eq('stripe_invoice_id', invoiceId).maybeSingle();
-            if (!existingPayment) {
-              await appSupabase.from('subscription_payments').insert({ subscription_id: subscriptionDbId, user_id: userId, stripe_payment_intent_id: paymentIntentId, stripe_invoice_id: invoiceId, stripe_charge_id: chargeId, amount: amountPaid, currency: currency, status: 'succeeded', billing_reason: billingReason, period_start: periodStart, period_end: periodEnd, paid_at: new Date().toISOString(), invoice_url: invoiceUrl, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-              console.log(`[EnhancedWebhook] Created subscription_payments record, invoice=${invoiceId}, amount=${amountPaid}`);
-            }
-          }
-
-          if (sub?.user_id) {
-            await appSupabase.from('notifications').insert([{ user_id: sub.user_id, title: 'Payment Received', message: `Your ${sub.plan_name || 'subscription'} payment was successful.`, type: 'success', is_read: false }]);
-            await appSupabase.from('user_entitlements').update({ subscription_status: 'active', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id);
-          }
-        }
-        break;
-      }
-
+      case 'invoice.payment_succeeded':
       case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice;
-        const subId = invoice.subscription as string;
-        const { data: sub } = await appSupabase.from('subscriptions').select('user_id, payment_failure_count, plan_name, id').eq('stripe_subscription_id', subId).maybeSingle();
-        if (sub) {
-          const newCount = (sub.payment_failure_count || 0) + 1;
-          const newStatus = newCount >= 3 ? 'canceled' : 'past_due';
-          await appSupabase.from('subscriptions').update({ status: newStatus, last_payment_error: 'Payment failed', payment_failure_count: newCount, updated_at: new Date().toISOString() }).eq('stripe_subscription_id', subId);
-          await appSupabase.from('notifications').insert([{ user_id: sub.user_id, title: 'Payment Failed', message: `Your ${sub.plan_name || 'subscription'} payment could not be processed. Please update your payment method.`, type: 'error', is_read: false }]);
-          await appSupabase.from('user_entitlements').update({ subscription_status: newStatus, updated_at: new Date().toISOString() }).eq('user_id', sub.user_id);
-          await appSupabase.from('subscription_payments').insert({ subscription_id: sub.id, user_id: sub.user_id, stripe_payment_intent_id: invoice.payment_intent as string || null, stripe_invoice_id: invoice.id, stripe_charge_id: invoice.charge as string || null, amount: (invoice.amount_due || 0) / 100, currency: invoice.currency || 'gbp', status: 'failed', billing_reason: invoice.billing_reason || 'subscription_cycle', period_start: invoice.period_start ? new Date(invoice.period_start * 1000).toISOString() : null, period_end: invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null, failed_at: new Date().toISOString(), failure_reason: 'Payment declined', created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+        const snapshot = event.data.object as any;
+        // Fetch current state so a delayed failure cannot undo a recovered payment.
+        const invoice = await stripe.invoices.retrieve(snapshot.id);
+        const references = invoiceReferences(invoice);
+        const subId = references.subscriptionId || invoiceReferences(snapshot).subscriptionId;
+        if (!subId) break; // Standalone invoices do not grant subscription access.
+        const { data: sub, error: subError } = await appSupabase.from('subscriptions')
+          .select('user_id, account_type, plan_name, id').eq('stripe_subscription_id', subId).maybeSingle();
+        if (subError) throw subError;
+        if (!sub) break;
+        const currentSubscription = await stripe.subscriptions.retrieve(subId);
+        const outcome = invoiceOutcome(invoice);
+        if (!outcome) break;
+        const now = new Date().toISOString();
+        const status = subscriptionStatus(currentSubscription);
+        const period = subscriptionPeriod(currentSubscription);
+        // Historical invoices belong in the ledger but must not change the latest payment state.
+        const isLatest = stripeId(currentSubscription.latest_invoice) === invoice.id;
+        const update: any = { status, current_period_start: period.start, current_period_end: period.end,
+          cancel_at_period_end: currentSubscription.cancel_at_period_end, updated_at: now };
+        if (isLatest) Object.assign(update, {
+          payment_status: outcome,
+          payment_failure_count: outcome === 'succeeded' ? 0 : invoice.attempt_count || 1,
+          last_payment_error: outcome === 'succeeded' ? null : 'Payment failed',
+          ...(outcome === 'succeeded' ? { last_payment_date: new Date(((invoice as any).status_transitions?.paid_at || invoice.created) * 1000).toISOString() } : {}),
+        });
+        await requireAudit(appSupabase.from('subscriptions').update(update).eq('id', sub.id));
+        const profileTable = sub.account_type === 'guard' ? 'guards' : 'clients';
+        await requireAudit(appSupabase.from(profileTable).update({subscription_status: status, updated_at: now})
+          .eq('user_id', sub.user_id).eq('stripe_subscription_id', subId));
+        await requireAudit(appSupabase.from('user_entitlements').update({ subscription_status: status,
+          current_period_end: period.end, cancel_at_period_end: currentSubscription.cancel_at_period_end, updated_at: now })
+          .eq('user_id', sub.user_id).eq('stripe_subscription_id', subId));
+        const amount = (outcome === 'succeeded' ? invoice.amount_paid : invoice.amount_due) / 100;
+        if (amount > 0) {
+          const { data: existing, error: paymentError } = await appSupabase.from('subscription_payments')
+            .select('id').eq('stripe_invoice_id', invoice.id).order('created_at').limit(1).maybeSingle();
+          if (paymentError) throw paymentError;
+          const payment = { subscription_id: sub.id, user_id: sub.user_id,
+            stripe_invoice_id: invoice.id, stripe_payment_intent_id: references.paymentIntentId,
+            stripe_charge_id: references.chargeId, amount, currency: invoice.currency || 'gbp',
+            status: outcome, billing_reason: invoice.billing_reason || 'subscription_cycle',
+            period_start: invoice.period_start ? new Date(invoice.period_start * 1000).toISOString() : null,
+            period_end: invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null,
+            paid_at: outcome === 'succeeded' ? new Date(((invoice as any).status_transitions?.paid_at || invoice.created) * 1000).toISOString() : null,
+            failed_at: outcome === 'failed' ? now : null, failure_reason: outcome === 'failed' ? 'Payment declined' : null,
+            invoice_url: invoice.hosted_invoice_url || invoice.invoice_pdf || null, updated_at: now };
+          await requireAudit(existing ? appSupabase.from('subscription_payments').update(payment).eq('id', existing.id)
+            : appSupabase.from('subscription_payments').insert({...payment, created_at: now}));
         }
         break;
       }
@@ -517,10 +523,10 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         const { data: sub } = await appSupabase.from('subscriptions').select('user_id, account_type').eq('stripe_subscription_id', subscription.id).maybeSingle();
         if (sub) {
-          await appSupabase.from('subscriptions').update({ status: 'cancelled', cancel_at_period_end: false, cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('stripe_subscription_id', subscription.id);
+          await requireAudit(appSupabase.from('subscriptions').update({ status: 'cancelled', cancel_at_period_end: false, cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('stripe_subscription_id', subscription.id));
           const table = sub.account_type === 'client' ? 'clients' : 'guards';
-          await appSupabase.from(table).update({ subscription_status: 'cancelled', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id);
-          await appSupabase.from('user_entitlements').update({ subscription_status: 'cancelled', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id);
+          await requireAudit(appSupabase.from(table).update({ subscription_status: 'cancelled', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id).eq('stripe_subscription_id', subscription.id));
+          await requireAudit(appSupabase.from('user_entitlements').update({ subscription_status: 'cancelled', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id).eq('stripe_subscription_id', subscription.id));
           await appSupabase.from('notifications').insert([{ user_id: sub.user_id, title: 'Subscription Cancelled', message: 'Your subscription has been cancelled. You can resubscribe anytime.', type: 'info', is_read: false }]);
         }
         break;
@@ -695,6 +701,35 @@ serve(async (req) => {
           created_at: now,
         }));
 
+        break;
+      }
+
+      case 'charge.dispute.created':
+      case 'charge.dispute.updated':
+      case 'charge.dispute.closed': {
+        const dispute = await stripe.disputes.retrieve((event.data.object as any).id);
+        const chargeId = stripeId(dispute.charge);
+        if (!chargeId) throw new Error('Dispute charge missing');
+        const charge = await stripe.charges.retrieve(chargeId);
+        const paymentIntentId = stripeId(charge.payment_intent);
+        if (!paymentIntentId) break;
+        const { data: transactions, error: txError } = await appSupabase.from('transactions')
+          .select('id, job_id').eq('stripe_payment_intent', paymentIntentId);
+        if (txError) throw txError;
+        const now = new Date().toISOString();
+        for (const transaction of transactions || []) {
+          if (!transaction.job_id) continue;
+          // A closed chargeback still needs finance review. Never clear an internal dispute here.
+          await requireAudit(appSupabase.from('jobs').update({ disputed: true,
+            disputed_at: now, disputed_reason: `Stripe dispute ${dispute.id}: ${dispute.status}`,
+            updated_at: now }).eq('id', transaction.job_id));
+          await requireAudit(appSupabase.from('payment_audit_logs').insert({
+            job_id: transaction.job_id, to_status: 'disputed', event_type: event.type,
+            stripe_event_id: event.id, reference_type: 'stripe_dispute', reference_id: transaction.id,
+            details: JSON.stringify({dispute_id: dispute.id, charge_id: chargeId,
+              status: dispute.status, requires_finance_review: true}), created_at: now,
+          }));
+        }
         break;
       }
 

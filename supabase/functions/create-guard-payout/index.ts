@@ -129,7 +129,17 @@ serve(async (req: Request) => {
   try {
     const assignment = await loadAssignment(supabase, validated.assignmentId, validated.jobId);
     operation = await claimFinancialOperation(supabase, assignment.job_id, `payout:${assignment.id}:v1`, 'payout', validated.adminUserId);
-    if (operation.replayed) return corsResponse(origin,200,operation.result);
+    if (operation.replayed) {
+      const transferId = operation.result?.transferId;
+      if (typeof transferId !== 'string' || transferId !== assignment.stripe_transfer_id) {
+        throw { status: 409, message: 'Payout requires finance reconciliation' };
+      }
+      const transfer = await stripe.transfers.retrieve(transferId);
+      if (transfer.reversed || transfer.amount_reversed > 0) {
+        throw { status: 409, message: 'Transfer was reversed. Finance review required.' };
+      }
+      return corsResponse(origin,200,operation.result);
+    }
     const guard = await loadGuard(supabase, assignment.guard_id);
     const job = await loadJob(supabase, assignment.job_id);
 
@@ -994,7 +1004,7 @@ async function validateAvailableFunds(stripe: Stripe, db: ReturnType<typeof crea
   if (error || !payment?.stripe_payment_intent || payment.status !== 'completed' || payment.refunded || Number(payment.refund_amount) > 0) throw {status:409,message:'Refunded or unverified payment requires finance review; payout blocked'};
   const intent = await stripe.paymentIntents.retrieve(payment.stripe_payment_intent, {expand:['latest_charge']});
   const charge = typeof intent.latest_charge === 'object' ? intent.latest_charge as Stripe.Charge : null;
-  if (!charge || !charge.paid || charge.amount_refunded > 0 || intent.status !== 'succeeded') throw {status:409,message:'Refunded or unverified Stripe charge; payout blocked'};
+  if (!charge || !charge.paid || charge.disputed || charge.amount_refunded > 0 || intent.status !== 'succeeded') throw {status:409,message:'Disputed, refunded or unverified Stripe charge; payout blocked'};
   const {data: payouts,error: payoutError} = await db.from('guard_payouts').select('assignment_id,net_amount,status').eq('job_id',jobId);
   if (payoutError) throw new Error('Unable to verify available funds');
   const committedPence = (payouts || []).filter(p => p.assignment_id !== assignmentId && !['failed','cancelled'].includes(p.status))

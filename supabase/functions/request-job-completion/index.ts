@@ -2,20 +2,34 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 
 serve(async (req) => {
-  const { jobId, assignmentId, notes } = await req.json();
+  const origin = req.headers.get('origin');
+  const allowed = ['https://quickguard.uk', 'https://www.quickguard.uk'];
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': origin && allowed.includes(origin) ? origin : allowed[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+  if (req.method === 'OPTIONS') return new Response('ok', {headers});
+  const respond = (body: any, status: number) => new Response(JSON.stringify(body), {status, headers});
+  if (req.method !== 'POST') return respond({error: 'Method not allowed'}, 405);
+  const body = await req.json().catch(() => null);
+  if (!body?.jobId || !body?.assignmentId) return respond({error: 'Job and assignment IDs are required'}, 400);
+  const { jobId, assignmentId, notes } = body;
 
   const authHeader = req.headers.get('Authorization');
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    { db: { schema: 'app' }, global: { headers: { Authorization: authHeader || '' } } }
+    { db: { schema: 'app' } }
   );
 
   const { data: { user } } = await supabase.auth.getUser(authHeader?.replace('Bearer ', '') || '');
-  if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+  if (!user) return respond({ error: 'Unauthorized' }, 401);
 
   const { data: guard } = await supabase.from('guards').select('id').eq('user_id', user.id).maybeSingle();
-  if (!guard) return new Response(JSON.stringify({ error: 'Guard not found' }), { status: 404 });
+  if (!guard) return respond({ error: 'Guard not found' }, 404);
 
   const { data: assignment } = await supabase
     .from('job_assignments')
@@ -23,37 +37,37 @@ serve(async (req) => {
     .eq('id', assignmentId)
     .eq('guard_id', guard.id)
     .maybeSingle();
-  if (!assignment) return new Response(JSON.stringify({ error: 'Assignment not found' }), { status: 404 });
+  if (!assignment) return respond({ error: 'Assignment not found' }, 404);
 
   if (assignment.job_id !== jobId) {
-    return new Response(JSON.stringify({ error: 'Assignment does not belong to this job' }), { status: 403 });
+    return respond({ error: 'Assignment does not belong to this job' }, 403);
   }
 
   if (assignment.status !== 'in_progress') {
-    return new Response(JSON.stringify({ error: 'You must check in before marking complete' }), { status: 400 });
+    return respond({ error: 'You must check in before marking complete' }, 400);
   }
 
   if (!assignment.check_in_time) {
-    return new Response(JSON.stringify({ error: 'You must check in before marking complete' }), { status: 400 });
+    return respond({ error: 'You must check in before marking complete' }, 400);
   }
 
   if (!assignment.check_out_time) {
-    return new Response(JSON.stringify({ error: 'You must check out before marking complete' }), { status: 400 });
+    return respond({ error: 'You must check out before marking complete' }, 400);
   }
 
   if (assignment.issue_reported || assignment.replacement_requested) {
-    return new Response(JSON.stringify({ error: 'An issue or replacement request is open for this shift. Please resolve it before marking complete.' }), { status: 409 });
+    return respond({ error: 'An issue or replacement request is open for this shift. Please resolve it before marking complete.' }, 409);
   }
 
   const { data: job } = await supabase.from('jobs').select('payment_status, client_id, job_title, disputed').eq('id', jobId).maybeSingle();
-  if (!job) return new Response(JSON.stringify({ error: 'Job not found' }), { status: 404 });
+  if (!job) return respond({ error: 'Job not found' }, 404);
 
   if (job.payment_status !== 'funded') {
-    return new Response(JSON.stringify({ error: 'Job must be funded before marking complete' }), { status: 400 });
+    return respond({ error: 'Job must be funded before marking complete' }, 400);
   }
 
   if (job.disputed) {
-    return new Response(JSON.stringify({ error: 'This job has an open dispute and cannot be marked complete.' }), { status: 409 });
+    return respond({ error: 'This job has an open dispute and cannot be marked complete.' }, 409);
   }
 
   const now = new Date().toISOString();
@@ -66,7 +80,7 @@ serve(async (req) => {
     .maybeSingle();
 
   if (existing && existing.status !== 'rejected') {
-    return new Response(JSON.stringify({ error: 'Completion request already exists' }), { status: 409 });
+    return respond({ error: 'Completion request already exists' }, 409);
   }
 
   const { data: request, error: insertError } = await supabase
@@ -83,7 +97,7 @@ serve(async (req) => {
     .single();
 
   if (insertError) {
-    return new Response(JSON.stringify({ error: insertError.message }), { status: 500 });
+    return respond({ error: insertError.message }, 500);
   }
 
   const { error: assignmentUpdateError } = await supabase.from('job_assignments').update({
@@ -94,7 +108,7 @@ serve(async (req) => {
 
   if (assignmentUpdateError) {
     await supabase.from('job_completion_requests').delete().eq('id', request.id);
-    return new Response(JSON.stringify({ error: 'Failed to update assignment completion state' }), { status: 500 });
+    return respond({ error: 'Failed to update assignment completion state' }, 500);
   }
 
   const { error: jobUpdateError } = await supabase.from('jobs').update({
@@ -109,7 +123,7 @@ serve(async (req) => {
       updated_at: now,
     }).eq('id', assignmentId).eq('job_id', jobId).eq('guard_id', guard.id);
     await supabase.from('job_completion_requests').delete().eq('id', request.id);
-    return new Response(JSON.stringify({ error: 'Failed to update job completion state' }), { status: 500 });
+    return respond({ error: 'Failed to update job completion state' }, 500);
   }
 
   try {
@@ -150,5 +164,5 @@ serve(async (req) => {
     }
   } catch { /* non-blocking */ }
 
-  return new Response(JSON.stringify({ success: true, requestId: request.id }), { status: 200 });
+  return respond({ success: true, requestId: request.id }, 200);
 });
