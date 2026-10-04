@@ -420,7 +420,7 @@ serve(async (req) => {
         // Retry snapshots may predate activation; reconcile the current Stripe object.
         const subscription = await stripe.subscriptions.retrieve((event.data.object as Stripe.Subscription).id);
         const period = subscriptionPeriod(subscription);
-        const updateData: any = { status: subscription.status, current_period_start: period.start, current_period_end: period.end, cancel_at_period_end: subscription.cancel_at_period_end, updated_at: new Date().toISOString() };
+        const updateData: any = { status: subscriptionStatus(subscription), current_period_start: period.start, current_period_end: period.end, cancel_at_period_end: subscription.cancel_at_period_end, updated_at: new Date().toISOString() };
         if (subscription.trial_start) updateData.trial_start = new Date(subscription.trial_start * 1000).toISOString();
         if (subscription.trial_end) { updateData.trial_end = new Date(subscription.trial_end * 1000).toISOString(); updateData.trial_end_date = new Date(subscription.trial_end * 1000).toISOString(); }
         const subscriptionItems = (subscription as any).items?.data;
@@ -432,17 +432,17 @@ serve(async (req) => {
           if (planMatch) { updateData.plan_slug = planMatch.slug; updateData.plan_name = planMatch.name; updateData.plan_amount = planMatch.monthly_price_pence; planFeatures = planMatch.features; newPlanSlug = planMatch.slug; newPlanName = planMatch.name; }
         }
         const { data: oldSub } = await appSupabase.from('subscriptions').select('plan_slug, plan_name, user_id, account_type').eq('stripe_subscription_id', subscription.id).maybeSingle();
-        await appSupabase.from('subscriptions').update(updateData).eq('stripe_subscription_id', subscription.id);
+        await requireAudit(appSupabase.from('subscriptions').update(updateData).eq('stripe_subscription_id', subscription.id));
         const { data: subRecord } = await appSupabase.from('subscriptions').select('user_id, account_type').eq('stripe_subscription_id', subscription.id).maybeSingle();
         if (subRecord?.user_id) {
           const table = subRecord.account_type === 'client' ? 'clients' : (subRecord.account_type === 'guard' ? 'guards' : 'clients');
-          const profileUpdate: any = { subscription_status: subscription.status, updated_at: new Date().toISOString() };
+          const profileUpdate: any = { subscription_status: subscriptionStatus(subscription), updated_at: new Date().toISOString() };
           if (updateData.plan_slug) { profileUpdate.subscription_plan = updateData.plan_slug; profileUpdate.subscription_tier = updateData.plan_slug; profileUpdate.plan_slug = updateData.plan_slug; profileUpdate.plan_name = updateData.plan_name; }
-          await appSupabase.from(table).update(profileUpdate).eq('user_id', subRecord.user_id);
-          const entUpdate: any = { subscription_status: subscription.status, current_period_end: period.end, cancel_at_period_end: subscription.cancel_at_period_end || false, updated_at: new Date().toISOString() };
+          await requireAudit(appSupabase.from(table).update(profileUpdate).eq('user_id', subRecord.user_id).eq('stripe_subscription_id', subscription.id));
+          const entUpdate: any = { subscription_status: subscriptionStatus(subscription), current_period_end: period.end, cancel_at_period_end: subscription.cancel_at_period_end || false, updated_at: new Date().toISOString() };
           if (updateData.plan_slug) { entUpdate.plan_slug = updateData.plan_slug; entUpdate.plan_name = updateData.plan_name; entUpdate.monthly_price_pence = updateData.plan_amount || 0; }
           if (planFeatures !== null) entUpdate.features = planFeatures;
-          await appSupabase.from('user_entitlements').update(entUpdate).eq('user_id', subRecord.user_id);
+          await requireAudit(appSupabase.from('user_entitlements').update(entUpdate).eq('user_id', subRecord.user_id).eq('stripe_subscription_id', subscription.id));
           if (oldSub && oldSub.plan_slug && newPlanSlug && oldSub.plan_slug !== newPlanSlug) {
             await logPlanChange(appSupabase, subRecord.user_id, oldSub.plan_slug, newPlanSlug, oldSub.plan_name, newPlanName || newPlanSlug, subRecord.account_type || 'unknown', 'webhook', true, subscription.id);
             await sendAdminAlert(supabaseUrl, supabaseKey, subRecord.user_id, oldSub.plan_slug, newPlanSlug, oldSub.plan_name, newPlanName || newPlanSlug, subRecord.account_type || 'unknown', 'webhook', true);
@@ -523,10 +523,10 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         const { data: sub } = await appSupabase.from('subscriptions').select('user_id, account_type').eq('stripe_subscription_id', subscription.id).maybeSingle();
         if (sub) {
-          await appSupabase.from('subscriptions').update({ status: 'cancelled', cancel_at_period_end: false, cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('stripe_subscription_id', subscription.id);
+          await requireAudit(appSupabase.from('subscriptions').update({ status: 'cancelled', cancel_at_period_end: false, cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('stripe_subscription_id', subscription.id));
           const table = sub.account_type === 'client' ? 'clients' : 'guards';
-          await appSupabase.from(table).update({ subscription_status: 'cancelled', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id);
-          await appSupabase.from('user_entitlements').update({ subscription_status: 'cancelled', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id);
+          await requireAudit(appSupabase.from(table).update({ subscription_status: 'cancelled', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id).eq('stripe_subscription_id', subscription.id));
+          await requireAudit(appSupabase.from('user_entitlements').update({ subscription_status: 'cancelled', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id).eq('stripe_subscription_id', subscription.id));
           await appSupabase.from('notifications').insert([{ user_id: sub.user_id, title: 'Subscription Cancelled', message: 'Your subscription has been cancelled. You can resubscribe anytime.', type: 'info', is_read: false }]);
         }
         break;
