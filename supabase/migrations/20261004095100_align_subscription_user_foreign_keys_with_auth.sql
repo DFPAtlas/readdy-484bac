@@ -1,0 +1,1 @@
+ALTER TABLE app.subscriptions DROP CONSTRAINT subscriptions_user_id_fkey, ADD CONSTRAINT subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id); ALTER TABLE app.subscription_payments DROP CONSTRAINT subscription_payments_user_id_fkey, ADD CONSTRAINT subscription_payments_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
