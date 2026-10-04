@@ -9,6 +9,14 @@ const corsHeaders = {
 };
 
 const STALE_CLAIM_MINUTES = 10;
+function subscriptionPeriod(subscription: any) {
+  const item = subscription.items?.data?.[0];
+  const start = subscription.current_period_start ?? item?.current_period_start;
+  const end = subscription.current_period_end ?? item?.current_period_end;
+  if (!Number.isFinite(start) || !Number.isFinite(end)) throw new Error('Subscription billing period missing');
+  return { start: new Date(start * 1000).toISOString(), end: new Date(end * 1000).toISOString() };
+}
+
 
 async function acquireStripeEventClaim(appSupabase: any, event: { id: string; type: string }): Promise<{ acquired: boolean; token: string | null }> {
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -354,8 +362,7 @@ serve(async (req) => {
           const subStatus = stripeSub.status;
           const trialStart = stripeSub.trial_start ? new Date(stripeSub.trial_start * 1000).toISOString() : null;
           const trialEnd = stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000).toISOString() : null;
-          const periodStart = new Date(stripeSub.current_period_start * 1000).toISOString();
-          const periodEnd = new Date(stripeSub.current_period_end * 1000).toISOString();
+          const { start: periodStart, end: periodEnd } = subscriptionPeriod(stripeSub);
           let stripePriceId: string | null = null;
           const subItems = stripeSub.items?.data;
           if (subItems && subItems.length > 0) stripePriceId = subItems[0].price?.id || null;
@@ -410,7 +417,8 @@ serve(async (req) => {
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
-        const updateData: any = { status: subscription.status, current_period_start: new Date(subscription.current_period_start * 1000).toISOString(), current_period_end: new Date(subscription.current_period_end * 1000).toISOString(), cancel_at_period_end: subscription.cancel_at_period_end, updated_at: new Date().toISOString() };
+        const period = subscriptionPeriod(subscription);
+        const updateData: any = { status: subscription.status, current_period_start: period.start, current_period_end: period.end, cancel_at_period_end: subscription.cancel_at_period_end, updated_at: new Date().toISOString() };
         if (subscription.trial_start) updateData.trial_start = new Date(subscription.trial_start * 1000).toISOString();
         if (subscription.trial_end) { updateData.trial_end = new Date(subscription.trial_end * 1000).toISOString(); updateData.trial_end_date = new Date(subscription.trial_end * 1000).toISOString(); }
         const subscriptionItems = (subscription as any).items?.data;
