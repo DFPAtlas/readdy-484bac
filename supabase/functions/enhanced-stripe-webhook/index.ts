@@ -722,7 +722,7 @@ serve(async (req) => {
           // A closed chargeback still needs finance review. Never clear an internal dispute here.
           await requireAudit(appSupabase.from('jobs').update({ disputed: true,
             disputed_at: now, disputed_reason: `Stripe dispute ${dispute.id}: ${dispute.status}`,
-            payment_status: 'disputed', updated_at: now }).eq('id', transaction.job_id));
+            updated_at: now }).eq('id', transaction.job_id));
           await requireAudit(appSupabase.from('payment_audit_logs').insert({
             job_id: transaction.job_id, to_status: 'disputed', event_type: event.type,
             stripe_event_id: event.id, reference_type: 'stripe_dispute', reference_id: transaction.id,
