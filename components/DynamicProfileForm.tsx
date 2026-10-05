@@ -26,7 +26,7 @@ const MULTI_SELECT_KEYS = ['security_needs', 'certifications', 'available_days']
 
 function isMultiSelect(field: WizardField): boolean {
   return MULTI_SELECT_KEYS.includes(field.field_key) ||
-    (field.help_text && field.help_text.toLowerCase().includes('select all'));
+    (field.help_text?.toLowerCase().includes('select all') ?? false);
 }
 
 export function useProfileWizardFields(wizardType: 'client_profile' | 'guard_profile') {

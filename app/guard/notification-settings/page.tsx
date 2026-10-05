@@ -95,7 +95,7 @@ export default function NotificationSettingsPage() {
         setInitials(
           (guardData.full_name || 'Guard')
             .split(' ')
-            .map(n => n[0])
+            .map((n: string) => n[0])
             .join('')
             .toUpperCase()
         );

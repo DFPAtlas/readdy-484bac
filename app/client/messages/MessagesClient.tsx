@@ -554,7 +554,7 @@ export default function MessagesClient() {
           currentUserType: 'client',
           jobId: activeConversation.job_id,
           otherUserId: activeConversation.other_user_id,
-          otherUserType: activeConversation.other_type === 'guard' ? 'guard' : activeConversation.other_type || 'guard',
+          otherUserType: activeConversation.other_type === 'client' || activeConversation.other_type === 'admin' || activeConversation.other_type === 'support' ? activeConversation.other_type : 'guard',
         });
         if (!perm.allowed) {
           setToast(perm.error || 'You do not have permission to message this guard for this job.');

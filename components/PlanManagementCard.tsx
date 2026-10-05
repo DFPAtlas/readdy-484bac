@@ -27,6 +27,7 @@ interface EntitlementData {
 }
 
 interface Plan {
+  features: string[] | null;
   slug: string;
   name: string;
   monthly_price_pence: number;
@@ -53,7 +54,7 @@ export default function PlanManagementCard({ userId, audience }: { userId: strin
 
     const { data: subData } = await supabase
       .from('subscriptions')
-      .select('stripe_subscription_id')
+      .select('stripe_subscription_id, plan_slug, current_period_end, cancel_at_period_end')
       .eq('user_id', userId)
       .maybeSingle();
 

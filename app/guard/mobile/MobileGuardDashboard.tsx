@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { oneRelation, requiredRelation } from '@/lib/relations';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -74,7 +75,7 @@ interface JobApplication {
     hourly_rate: number;
     clients: {
       company_name: string;
-    };
+    } | null;
   };
 }
 
@@ -86,10 +87,10 @@ interface ClientResponse {
   created_at: string;
   jobs: {
     job_title: string;
-  };
+  } | null;
   clients: {
     company_name: string;
-  };
+  } | null;
 }
 
 interface AvailableJob {
@@ -104,7 +105,7 @@ interface AvailableJob {
   status: string;
   clients: {
     company_name: string;
-  };
+  } | null;
   licence_required: string | null;
   number_of_guards: number | null;
 }
@@ -193,12 +194,12 @@ export default function MobileGuardDashboard() {
 
     const { data: assignmentsData } = await supabase
       .from('job_assignments')
-      .select('id, status, payment_amount, payment_status, assigned_at, check_in_time, check_out_time, jobs!inner (id, job_title, location, postcode, start_date, start_time, end_time, hourly_rate)')
+      .select('id, status, payment_amount, payment_status, assigned_at, check_in_time, check_out_time, jobs!inner (id, job_title, location:venue_city, postcode:venue_postcode, start_date, start_time, end_time, hourly_rate)')
       .eq('guard_id', guardData.id)
       .in('status', ['confirmed', 'in_progress', 'accepted'])
       .order('assigned_at', { ascending: false });
 
-    const allAssignments = (assignmentsData || []) as JobAssignment[];
+    const allAssignments = (assignmentsData || []).map(row => ({ ...row, jobs: requiredRelation(row.jobs) }));
     setAssignments(allAssignments);
 
     const upcoming = allAssignments
@@ -208,17 +209,20 @@ export default function MobileGuardDashboard() {
 
     const { data: appsData } = await supabase
       .from('job_applications')
-      .select('id, status, applied_at, jobs!inner (id, job_title, location, postcode, start_date, start_time, end_time, hourly_rate, clients (company_name))')
+      .select('id, status, applied_at, jobs!inner (id, job_title, location:venue_city, postcode:venue_postcode, start_date, start_time, end_time, hourly_rate, clients (company_name))')
       .eq('guard_id', guardData.id)
       .order('applied_at', { ascending: false });
-    setApplications((appsData || []) as JobApplication[]);
+    setApplications((appsData || []).map(row => {
+      const job = requiredRelation(row.jobs);
+      return { ...row, jobs: { ...job, clients: oneRelation(job.clients) } };
+    }));
 
     const { data: responsesData } = await supabase
       .from('client_responses')
       .select('id, response_type, message, is_read, created_at, jobs (job_title), clients (company_name)')
       .eq('guard_id', guardData.id)
       .order('created_at', { ascending: false });
-    setResponses((responsesData || []) as ClientResponse[]);
+    setResponses((responsesData || []).map(row => ({ ...row, jobs: oneRelation(row.jobs), clients: oneRelation(row.clients) })));
     setUnreadCount((responsesData || []).filter((r: any) => !r.is_read).length);
 
     const { data: jobsData } = await supabase
@@ -229,7 +233,7 @@ export default function MobileGuardDashboard() {
       .gte('start_date', today)
       .order('start_date', { ascending: true })
       .limit(30);
-    setAvailableJobs((jobsData || []) as AvailableJob[]);
+    setAvailableJobs((jobsData || []).map(row => ({ ...row, clients: oneRelation(row.clients) })));
 
     const { data: bankData } = await supabase
       .from('guard_bank_details')
@@ -481,7 +485,7 @@ export default function MobileGuardDashboard() {
   };
 
   const getActionItems = () => {
-    const items = [];
+    const items: Array<{ id: string; icon: string; text: string; subtext: string; color: string; bg: string; border: string; action: string }> = [];
     if (!guard) return items;
     const profilePercent = getProfilePercent();
     if (profilePercent < 100) {

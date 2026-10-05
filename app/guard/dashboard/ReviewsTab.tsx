@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { oneRelation } from '@/lib/relations';
 import { supabase } from '@/lib/supabase';
 
 interface Review {
@@ -72,7 +73,7 @@ export default function ReviewsTab({ guardId, rating, totalReviews }: ReviewsTab
       .eq('status', 'published')
       .order('created_at', { ascending: false });
 
-    if (!error) setReviews(data || []);
+    if (!error) setReviews((data || []).map(row => ({ ...row, jobs: oneRelation(row.jobs) })));
     setLoading(false);
   };
 

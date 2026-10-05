@@ -58,7 +58,7 @@ export interface JobApplication {
   id: string;
   status: string;
   applied_at: string;
-  jobs: NestedJob & { clients: { company_name: string } };
+  jobs: NestedJob & { clients: { company_name: string } | null };
 }
 
 export interface AvailableJob {
@@ -71,7 +71,7 @@ export interface AvailableJob {
   end_time: string;
   hourly_rate: number;
   status: string;
-  clients: { company_name: string };
+  clients: { company_name: string } | null;
   latitude: number | null;
   longitude: number | null;
 }
@@ -87,7 +87,7 @@ export interface ClientResponse {
   message: string;
   is_read: boolean;
   created_at: string;
-  jobs: { job_title: string } | null;
+  jobs: { id: string; job_title: string } | null;
   clients: { company_name: string } | null;
 }
 

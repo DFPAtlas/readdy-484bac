@@ -266,7 +266,7 @@ export function createClientRealtimeChannel(
   table: string,
   clientId: string,
   onEvent: () => void,
-  opts?: { event?: string; filter?: string; schema?: string }
+  opts?: { event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*'; filter?: string; schema?: string }
 ) {
   const schema = opts?.schema || "public";
   const event = opts?.event || "*";

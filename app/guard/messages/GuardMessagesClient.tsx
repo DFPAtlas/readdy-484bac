@@ -158,7 +158,7 @@ export default function GuardMessagesClient() {
 
       const { data: clients } = await supabase
         .from('clients')
-        .select('user_id, company_name, contact_name')
+        .select('id, user_id, company_name, contact_name')
         .in('user_id', otherUserIds);
 
       const { data: jobs } = jobIds.length > 0

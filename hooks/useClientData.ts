@@ -106,12 +106,11 @@ export function useRealtimeChannel({
   useEffect(() => {
     if (!enabled) return;
 
-    const config: Record<string, string> = { event, schema, table };
-    if (filter) config.filter = filter;
+    const config = { event, schema, table, ...(filter ? { filter } : {}) };
 
     const channel = supabase
       .channel(channelName)
-      .on('postgres_changes', config as Parameters<typeof channel.on>[1], () => {
+      .on('postgres_changes', config, () => {
         onEvent();
       })
       .subscribe();
@@ -134,7 +133,7 @@ interface MultiChannelOptions {
     table: string;
     schema?: string;
     filter?: string;
-    event?: string;
+    event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
   }>;
 }
 
@@ -143,16 +142,16 @@ export function useMultipleRealtimeChannels({ channels, enabled = true, onAnyEve
     if (!enabled || channels.length === 0) return;
 
     const subs = channels.map(ch => {
-      const config: Record<string, string> = {
-        event: ch.event || '*',
+      const config = {
+        event: ch.event || ('*' as const),
         schema: ch.schema || 'public',
         table: ch.table,
+        ...(ch.filter ? { filter: ch.filter } : {}),
       };
-      if (ch.filter) config.filter = ch.filter;
 
       return supabase
         .channel(ch.name)
-        .on('postgres_changes', config as Parameters<ReturnType<typeof supabase.channel>['on']>[1], () => {
+        .on('postgres_changes', config, () => {
           onAnyEvent();
         })
         .subscribe();

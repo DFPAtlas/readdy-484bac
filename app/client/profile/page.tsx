@@ -464,7 +464,7 @@ function ClientProfileInner() {
                 <CompanyProfileSection
                   profile={profile}
                   onUpdate={(updated) => {
-                    setProfile(updated);
+                    setProfile(current => current ? { ...current, ...updated } : current);
                     showMessage("success", "Company profile updated successfully");
                     setHealthData((h) => ({
                       ...h,

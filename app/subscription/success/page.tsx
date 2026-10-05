@@ -293,7 +293,7 @@ function SuccessContent() {
     : null;
 
   const steps = [
-    { label: 'Payment Verified', icon: 'ri-checkbox-circle-fill', done: phase !== 'verifying' || phase === 'error' },
+    { label: 'Payment Verified', icon: 'ri-checkbox-circle-fill', done: phase === 'updating' || phase === 'redirecting' },
     { label: 'Account Setup', icon: 'ri-user-settings-line', done: phase === 'redirecting' },
     { label: 'Redirecting', icon: 'ri-login-circle-line', done: false },
   ];
