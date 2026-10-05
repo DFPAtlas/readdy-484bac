@@ -8,12 +8,12 @@ interface Check { key: string; label: string; status: S; detail: string; }
 interface Result { agent: string; label: string; status: S; summary: string; checks: Check[]; }
 
 const AGENTS = [
- { key: "payments", label: "Payments", desc: "Webhooks, failed charges, payouts, subs", Icon: CreditCard },
- { key: "sia", label: "SIA Badges", desc: "Backlog, expired & expiring licences", Icon: ShieldCheck },
- { key: "jobs", label: "Jobs", desc: "Expiry, stuck payments, matching", Icon: Briefcase },
+ { key: "payments", label: "Payments", desc: "Charges, payouts and reconciliation", Icon: CreditCard },
+ { key: "sia", label: "SIA Badges", desc: "Queue, expired and expiring licences", Icon: ShieldCheck },
+ { key: "jobs", label: "Jobs", desc: "Adverts and stalled checkout", Icon: Briefcase },
 ];
 const DOT: Record<S, string> = { ok: "bg-emerald-500", warn: "bg-amber-500", fail: "bg-red-500" };
-const TXT: Record<S, string> = { ok: "text-emerald-700", warn: "text-amber-700", fail: "text-red-700" };
+const TXT: Record<S, string> = { ok: "text-emerald-400", warn: "text-amber-400", fail: "text-red-400" };
 const WORD: Record<S, string> = { ok: "Healthy", warn: "Attention", fail: "Failed" };
 
 export default function AgentsPage() {
@@ -38,7 +38,7 @@ export default function AgentsPage() {
   <div className="min-h-screen bg-[#0B1933]">
     <div className="mx-auto max-w-5xl p-6">
    <h1 className="text-2xl font-semibold text-white">Agents</h1>
-   <p className="mt-1 mb-6 text-sm text-slate-400">Live monitors. Green is OK, amber needs attention, red is a failure.</p>
+   <p className="mt-1 mb-6 text-sm text-slate-400">Read-only monitors. Data checks and worker heartbeats are reported separately.</p>
    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
     {AGENTS.map((a) => {
      const r = res[a.key]; const isRun = run[a.key]; const e = err[a.key]; const Icon = a.Icon;
