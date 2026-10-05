@@ -62,12 +62,13 @@ async function fetchPublishedJobs(now: Date): Promise<MetadataRoute.Sitemap> {
       { db: { schema: 'app' } }
     );
 
-    const { data: jobs } = await supabase
-      .from('jobs')
+    const { data: jobRows } = await supabase
+      .rpc('get_public_jobs')
       .select('id, updated_at')
       .eq('is_deleted', false)
       .in('status', ['open', 'awaiting_guard_selection'])
       .limit(500);
+    const jobs = Array.isArray(jobRows) ? jobRows : [];
 
     if (!jobs || jobs.length === 0) return [];
 
