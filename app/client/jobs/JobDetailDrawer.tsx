@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { loadClientJobAssignments } from '@/lib/client-job-assignments';
 import type { ClientJob } from '@/lib/client-types';
 import Link from 'next/link';
 import { paymentLabel } from '@/lib/client-journey';
@@ -34,10 +35,7 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
     setAssignmentsError(false);
     try {
       const [assignmentsRes, transactionsRes, reviewsRes, cancellationRes, refundRes] = await Promise.all([
-        supabase
-          .from('job_assignments')
-          .select('*, guards(id, full_name, profile_photo_url:profile_image_url, sia_licence_number, phone, average_rating:rating, total_reviews, total_jobs_completed)')
-          .eq('job_id', job.id),
+        loadClientJobAssignments(supabase, job.id),
         supabase
           .from('transactions')
           .select('*')
@@ -62,8 +60,7 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
           .eq('job_id', job.id)
           .order('created_at', { ascending: false }),
       ]);
-      setAssignmentsError(Boolean(assignmentsRes.error));
-      setAssignments(assignmentsRes.data || []);
+      setAssignments(assignmentsRes);
       setTransactions(transactionsRes.data || []);
       setCancellation(cancellationRes.data || null);
       setRefundRequests(refundRes.data || []);
