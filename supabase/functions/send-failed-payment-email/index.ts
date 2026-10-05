@@ -51,7 +51,7 @@ serve(async (req) => {
       venue: venue,
       amount: amount,
       failure_reason: payload.failure_reason || 'Your payment method was declined.',
-      retry_url: `${siteUrl}/client/jobs/${payload.job_id}/payment`,
+      retry_url: `${siteUrl}/client/jobs/payment?id=${encodeURIComponent(payload.job_id)}`,
       year: String(new Date().getFullYear()),
     };
 

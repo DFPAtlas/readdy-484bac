@@ -1,5 +1,6 @@
 'use client';
 
+import { normalizeJobLink } from '@/lib/job-links';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -214,7 +215,7 @@ export default function NotificationBell({ guardUserId }: NotificationBellProps)
                         <span className="text-[11px] text-slate-500">{timeAgo(n.created_at)}</span>
                         {n.link && (
                           <Link
-                            href={n.link}
+                            href={normalizeJobLink(n.link)}
                             onClick={() => {
                               markAsRead(n.id);
                               setOpen(false);

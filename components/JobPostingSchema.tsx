@@ -102,7 +102,7 @@ export function JobListSchema({ jobs }: JobListSchemaProps) {
         "@type": "JobPosting",
         "title": job.title,
         "description": job.description || `Security guard position in ${job.location}`,
-        "url": `${SITE_URL}/jobs/${job.id}`,
+        "url": `${SITE_URL}/jobs/detail?id=${encodeURIComponent(job.id)}`,
         "datePosted": new Date(job.created_at).toISOString().split('T')[0],
         "validThrough": new Date(job.end_date || job.start_date).toISOString(),
         "employmentType": "TEMPORARY",

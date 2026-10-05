@@ -436,7 +436,7 @@ export default function JobsNearMeFilter() {
                   <p className="text-sm text-slate-500">per hour</p>
                 </div>
                 <Link
-                  href={`/jobs/${job.id}`}
+                  href={`/jobs/detail?id=${encodeURIComponent(job.id)}`}
                   prefetch={false}
                   className="block bg-teal-500 text-slate-900 px-6 py-3 rounded-xl font-semibold hover:bg-teal-400 transition-all whitespace-nowrap text-center shadow-lg hover:shadow-teal-500/20"
                 >

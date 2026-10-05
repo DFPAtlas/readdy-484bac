@@ -310,7 +310,7 @@ export default function JobHistoryReport({ jobs, reportRange, onToast }: { jobs:
                     <div className="text-lg font-bold text-white">£{est.toFixed(2)}</div>
                     <div className="text-xs text-slate-500">Estimated total</div>
                     <Link
-                      href={`/client/jobs/${job.id}`}
+                      href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`}
                       className="text-teal-400 hover:text-teal-300 text-sm font-medium flex items-center gap-1 cursor-pointer"
                     >
                       View Details <i className="ri-arrow-right-line"></i>
@@ -370,7 +370,7 @@ export default function JobHistoryReport({ jobs, reportRange, onToast }: { jobs:
                       </td>
                       <td className="px-4 py-3">
                         <Link
-                          href={`/client/jobs/${job.id}`}
+                          href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`}
                           className="text-teal-400 hover:text-teal-300 text-sm font-medium cursor-pointer"
                         >
                           View

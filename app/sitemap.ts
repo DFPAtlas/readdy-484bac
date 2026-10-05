@@ -72,7 +72,7 @@ async function fetchPublishedJobs(now: Date): Promise<MetadataRoute.Sitemap> {
     if (!jobs || jobs.length === 0) return [];
 
     return jobs.map((job) => ({
-      url: `${BASE_URL}/jobs/${job.id}`,
+      url: `${BASE_URL}/jobs/detail?id=${encodeURIComponent(job.id)}`,
       lastModified: job.updated_at ? new Date(job.updated_at) : now,
       changeFrequency: 'daily' as ChangeFrequency,
       priority: 0.6,

@@ -1,5 +1,6 @@
 'use client';
 
+import { normalizeJobLink } from '@/lib/job-links';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -380,7 +381,7 @@ export default function MobileClientDashboard() {
                   </div>
                   <div className="space-y-2">
                     {needsActionJobs.slice(0, 2).map(job => (
-                      <Link key={job.id} href={`/client/jobs/${job.id}`} className="block bg-[#162036] rounded-lg p-3 border border-[#1e2d4d] cursor-pointer">
+                      <Link key={job.id} href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`} className="block bg-[#162036] rounded-lg p-3 border border-[#1e2d4d] cursor-pointer">
                         <p className="text-sm font-semibold text-white">{job.job_title}</p>
                         <p className="text-xs text-slate-500">
                           {job.status === 'awaiting_guard_selection' ? `${job.applications_count} applicants` : 'Payment required'}
@@ -415,7 +416,7 @@ export default function MobileClientDashboard() {
               jobs.map(job => {
                 const cfg = getJobStatusConfig(job.status);
                 return (
-                  <Link key={job.id} href={`/client/jobs/${job.id}`} className="block bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4 cursor-pointer">
+                  <Link key={job.id} href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`} className="block bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4 cursor-pointer">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-sm font-semibold text-white">{job.job_title}</p>
                       <span className={`text-[10px] font-semibold px-2 py-1 rounded-full border ${cfg.bg} ${cfg.color} ${cfg.border}`}>
@@ -503,7 +504,7 @@ export default function MobileClientDashboard() {
               </div>
             ) : (
               jobs.filter(j => j.assigned_guards > 0).map(job => (
-                <Link key={job.id} href={`/client/jobs/${job.id}`} className="block bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4 cursor-pointer mb-3">
+                <Link key={job.id} href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`} className="block bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4 cursor-pointer mb-3">
                   <p className="text-sm font-semibold text-white mb-1">{job.job_title}</p>
                   <div className="flex items-center gap-2 text-xs text-slate-500">
                     <span className="flex items-center gap-1 text-emerald-400">
@@ -597,7 +598,7 @@ export default function MobileClientDashboard() {
                         loadDashboard();
                       }
                       if (n.link) {
-                        router.push(n.link);
+                        router.push(normalizeJobLink(n.link));
                       }
                     }}
                   >

@@ -433,7 +433,7 @@ export default function PostJobWizard() {
             )}
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href={`/client/jobs/${jobId}`} className="bg-teal-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-teal-600 transition-colors whitespace-nowrap text-center">
+            <Link href={`/client/jobs/detail?id=${encodeURIComponent(jobId)}`} className="bg-teal-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-teal-600 transition-colors whitespace-nowrap text-center">
               View Job
             </Link>
             <Link href="/find-a-guard" className="bg-[#162036] text-slate-300 px-6 py-3 rounded-xl font-semibold hover:bg-[#1a2642] transition-colors border border-[#1e2d4d] whitespace-nowrap text-center">

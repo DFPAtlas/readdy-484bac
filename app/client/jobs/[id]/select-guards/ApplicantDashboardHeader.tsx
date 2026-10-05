@@ -50,7 +50,7 @@ export default function ApplicantDashboardHeader({
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-start gap-4">
             <Link
-              href={`/client/jobs/${job.id}`}
+              href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`}
               className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#162036] hover:bg-[#1a2642] transition-colors cursor-pointer flex-shrink-0 mt-1"
             >
               <i className="ri-arrow-left-line text-slate-400 text-base"></i>

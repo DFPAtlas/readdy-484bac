@@ -147,7 +147,7 @@ export default function TicketCard({ ticket, onOpen, selectable, selected, onTog
                 <i className="ri-eye-line"></i>View Details
               </button>
               {ticket.related_job_id && (
-                <Link href={`/client/jobs/${ticket.related_job_id}`}>
+                <Link href={`/client/jobs/detail?id=${encodeURIComponent(ticket.related_job_id)}`}>
                   <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#162036] text-teal-400 text-xs font-semibold border border-[#1e2d4d] hover:bg-teal-500/10 transition-colors cursor-pointer whitespace-nowrap">
                     <i className="ri-briefcase-line"></i>Go to Job
                   </button>
@@ -225,7 +225,7 @@ export default function TicketCard({ ticket, onOpen, selectable, selected, onTog
             <i className="ri-eye-line"></i>Details
           </button>
           {ticket.related_job_id && (
-            <Link href={`/client/jobs/${ticket.related_job_id}`} className="flex-1 min-w-[80px]">
+            <Link href={`/client/jobs/detail?id=${encodeURIComponent(ticket.related_job_id)}`} className="flex-1 min-w-[80px]">
               <button className="w-full flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-[#162036] text-teal-400 text-xs font-semibold border border-[#1e2d4d] cursor-pointer whitespace-nowrap">
                 <i className="ri-briefcase-line"></i>Job
               </button>

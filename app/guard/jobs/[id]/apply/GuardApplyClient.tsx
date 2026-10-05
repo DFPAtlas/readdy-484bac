@@ -152,7 +152,7 @@ export default function GuardApplyClient({ jobId }: { jobId: string }) {
               type: 'job_application',
               title: 'New Application Received',
               message: `${guardProfile?.full_name || 'A guard'} applied for "${job.job_title}".`,
-              link: `/client/jobs/${jobId}/select-guards`,
+              link: `/client/jobs/applicants?id=${encodeURIComponent(jobId)}`,
               is_read: false,
             });
           }

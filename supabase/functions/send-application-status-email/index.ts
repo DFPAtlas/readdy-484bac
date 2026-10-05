@@ -180,7 +180,7 @@ serve(async (req) => {
       location: location || 'TBC',
       hourly_rate: String(hourlyRate || 0),
       dashboard_url: `${siteUrl}/guard/dashboard`,
-      job_url: `${siteUrl}/jobs/${payload.job_id}`,
+      job_url: `${siteUrl}/jobs/detail?id=${encodeURIComponent(payload.job_id)}`,
       year: String(new Date().getFullYear()),
     };
 

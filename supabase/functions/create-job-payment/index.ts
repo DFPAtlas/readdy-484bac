@@ -295,7 +295,7 @@ serve(async (req) => {
         quantity: 1,
       }],
       success_url: `${appUrl}/client/payment/success?session_id={CHECKOUT_SESSION_ID}&job_id=${jobId}`,
-      cancel_url: `${appUrl}/client/jobs/${jobId}/payment?cancelled=1`,
+      cancel_url: `${appUrl}/client/jobs/payment?id=${encodeURIComponent(jobId)}&cancelled=1`,
       client_reference_id: clientData.id,
       metadata: {
         jobId,

@@ -111,7 +111,7 @@ export function PaymentRequiredBanner({ jobId, jobTitle, amount, paymentStatus }
           {processing ? 'Processing...' : 'Pay Now'}
         </button>
         <Link
-          href={`/client/jobs/${jobId}/payment`}
+          href={`/client/jobs/payment?id=${encodeURIComponent(jobId)}`}
           className="inline-flex items-center gap-1.5 bg-[#162036] text-slate-300 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap border border-[#1e2d4d]"
         >
           <i className="ri-file-list-3-line"></i>

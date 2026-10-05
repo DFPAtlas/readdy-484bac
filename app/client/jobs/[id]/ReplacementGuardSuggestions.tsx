@@ -309,7 +309,7 @@ export default function ReplacementGuardSuggestions({
                   )}
                   Approve
                 </button>
-                <Link href={`/client/jobs/${jobId}/select-guards`}>
+                <Link href={`/client/jobs/applicants?id=${encodeURIComponent(jobId)}`}>
                   <button className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-slate-300 bg-[#111d35] hover:bg-[#1a2642] px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap w-full">
                     <i className="ri-eye-line"></i>
                     View Profile

@@ -104,7 +104,7 @@ export default function RefundRequestModal({ job, transaction, cancellation, onC
         type: 'refund_request',
         title: 'Refund Request Submitted',
         message: `Your ${type} refund request for "${job.job_title}" has been submitted and is pending review.`,
-        link: `/client/jobs/${job.id}`,
+        link: `/client/jobs/detail?id=${encodeURIComponent(job.id)}`,
         is_read: false,
       });
 
