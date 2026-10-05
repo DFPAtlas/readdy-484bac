@@ -17,7 +17,7 @@ export default function Terms() {
             Legal terms and conditions for using the QuickGuard platform
           </p>
           <p className="text-sm text-slate-500 mt-4">
-            Last updated: 1 October 2026
+            Last updated: 5 October 2026
           </p>
         </div>
       </section>
@@ -193,7 +193,7 @@ export default function Terms() {
 
                 <h3 className="text-xl font-semibold text-white mb-3">Recurring Billing & Subscriptions:</h3>
                 <ul className="list-disc list-inside space-y-2 text-slate-400 mb-4">
-                  <li>Guard membership plans (£10, £20, £35/month) and client subscription plans (£49, £149/month) are billed automatically via Stripe on a recurring basis</li>
+                  <li>Guard membership plans (£10, £19, £29/month) and client subscription plans (£49, £99, £199/month) are billed automatically via Stripe on a recurring basis</li>
                   <li>Annual plans are charged once upfront for the 12-month period</li>
                   <li>You may cancel recurring subscriptions at any time through your account dashboard; cancellations take effect at the end of the current billing period</li>
                   <li>No partial refunds are issued for unused portions of a billing cycle unless required by law</li>
