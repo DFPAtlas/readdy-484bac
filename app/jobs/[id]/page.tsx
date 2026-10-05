@@ -37,11 +37,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       return {
         title,
         description,
-        alternates: { canonical: `https://quickguard.uk/jobs/${id}` },
+        alternates: { canonical: `https://quickguard.uk/jobs/detail?id=${encodeURIComponent(id)}` },
         openGraph: {
           title,
           description,
-          url: `https://quickguard.uk/jobs/${id}`,
+          url: `https://quickguard.uk/jobs/detail?id=${encodeURIComponent(id)}`,
           siteName: 'QuickGuard',
           type: 'website',
         },
@@ -51,7 +51,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title: 'Security Guard Job | QuickGuard UK',
     description: 'Find SIA-licensed security guard jobs across the UK on QuickGuard.',
-    alternates: { canonical: `https://quickguard.uk/jobs/${id}` },
+    alternates: { canonical: `https://quickguard.uk/jobs/detail?id=${encodeURIComponent(id)}` },
   };
 }
 

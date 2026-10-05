@@ -15,8 +15,8 @@ export default function ShareJobButton({ jobId, jobTitle, location }: ShareJobBu
   const ref = useRef<HTMLDivElement>(null);
 
   const jobUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/jobs/${jobId}`
-    : `/jobs/${jobId}`;
+    ? `${window.location.origin}/jobs/detail?id=${encodeURIComponent(jobId)}`
+    : `/jobs/detail?id=${encodeURIComponent(jobId)}`;
 
   const shareText = `Check out this security job: ${jobTitle} in ${location}`;
 

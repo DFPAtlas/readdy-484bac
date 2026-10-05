@@ -1,6 +1,7 @@
 
 'use client';
 
+import { normalizeJobLink } from '@/lib/job-links';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -95,7 +96,7 @@ export default function JobMatchToast({ guardUserId }: JobMatchToastProps) {
               <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{toast.message}</p>
               {toast.link && (
                 <Link
-                  href={toast.link}
+                  href={normalizeJobLink(toast.link)}
                   className="inline-block mt-2 text-xs font-medium text-teal-400 hover:text-teal-300 whitespace-nowrap"
                 >
                   View Job →

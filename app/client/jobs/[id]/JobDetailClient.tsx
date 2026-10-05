@@ -577,7 +577,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
               </button>
             )}
             {needsConfirmation && (
-              <Link href={`/client/jobs/${job.id}/confirmation`}>
+              <Link href={`/client/jobs/confirmation?id=${encodeURIComponent(job.id)}`}>
                 <button className="bg-violet-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-violet-600 transition-colors cursor-pointer whitespace-nowrap">
                   <i className="ri-file-shield-line mr-1"></i>
                   Confirm Booking
@@ -585,7 +585,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
               </Link>
             )}
             {job.status === 'awaiting_guard_selection' && (
-              <Link href={`/client/jobs/${job.id}/select-guards`}>
+              <Link href={`/client/jobs/applicants?id=${encodeURIComponent(job.id)}`}>
                 <button className="bg-teal-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap">
                   Select Guards
                 </button>
@@ -685,7 +685,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
               <p className="text-sm font-semibold text-violet-400">Booking awaiting your confirmation</p>
               <p className="text-xs text-violet-500">Payment is complete. Please review the details and confirm your booking.</p>
             </div>
-            <Link href={`/client/jobs/${job.id}/confirmation`}>
+            <Link href={`/client/jobs/confirmation?id=${encodeURIComponent(job.id)}`}>
               <button className="shrink-0 flex items-center gap-2 px-4 py-2 bg-violet-500 text-white rounded-xl text-sm font-semibold hover:bg-violet-600 transition-colors cursor-pointer whitespace-nowrap">
                 <i className="ri-file-shield-line"></i>
                 Review & Confirm
@@ -819,7 +819,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                 </div>
                 {needsConfirmation && (
                   <div className="mt-4">
-                    <Link href={`/client/jobs/${job.id}/confirmation`}>
+                    <Link href={`/client/jobs/confirmation?id=${encodeURIComponent(job.id)}`}>
                       <button className="flex items-center gap-2 px-5 py-3 bg-violet-500 text-white rounded-xl text-sm font-semibold hover:bg-violet-600 transition-colors cursor-pointer whitespace-nowrap">
                         <i className="ri-file-shield-line"></i>
                         Go to Confirmation Page

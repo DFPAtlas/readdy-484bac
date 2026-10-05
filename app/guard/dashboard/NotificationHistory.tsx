@@ -1,5 +1,6 @@
 'use client';
 
+import { normalizeJobLink } from '@/lib/job-links';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -482,7 +483,7 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
 
                             <div className="flex items-center gap-2 flex-shrink-0">
                               {n.link && !snoozed && (
-                                <Link href={n.link} className="px-3 py-1.5 bg-teal-500 text-white text-xs font-medium rounded-lg hover:bg-teal-600 whitespace-nowrap cursor-pointer">
+                                <Link href={normalizeJobLink(n.link)} className="px-3 py-1.5 bg-teal-500 text-white text-xs font-medium rounded-lg hover:bg-teal-600 whitespace-nowrap cursor-pointer">
                                   View
                                 </Link>
                               )}

@@ -75,7 +75,7 @@ export default function JobsClient() {
       const params = new URLSearchParams(window.location.search);
       const id = params.get('id');
       if (id) {
-        window.location.replace(`/jobs/${id}`);
+        window.location.replace(`/jobs/detail?id=${encodeURIComponent(id)}`);
       }
     }
   }, [showExpired]);
@@ -311,7 +311,7 @@ export default function JobsClient() {
         setSelectedJobId(jobId);
         setShowAuthModal(true);
       } else {
-        router.push(`/jobs/${jobId}`);
+        router.push(`/jobs/detail?id=${encodeURIComponent(jobId)}`);
       }
     } catch (error) {
       console.error('Error checking auth:', error);
@@ -919,7 +919,7 @@ export default function JobsClient() {
                             <p className="text-sm text-slate-500">per hour</p>
                           </div>
                           <Link
-                            href={`/jobs/${job.id}`}
+                            href={`/jobs/detail?id=${encodeURIComponent(job.id)}`}
                             onClick={(e) => {
                               e.preventDefault();
                               handleViewDetails(job.id);

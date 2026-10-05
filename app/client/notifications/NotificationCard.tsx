@@ -1,5 +1,6 @@
 'use client';
 
+import { normalizeJobLink } from '@/lib/job-links';
 import Link from 'next/link';
 import CategoryBadge from './CategoryBadge';
 import PriorityBadge from './PriorityBadge';
@@ -91,7 +92,7 @@ export default function NotificationCard({
         : 'bg-teal-50 dark:bg-teal-500/5 border-teal-200 dark:border-teal-500/20'
     } ${selectable && selected ? 'ring-2 ring-teal-500/30' : ''}`}>
       {link && !selectable ? (
-        <Link href={link} className="block">
+        <Link href={normalizeJobLink(link)} className="block">
           {inner}
         </Link>
       ) : (
@@ -115,7 +116,7 @@ export default function NotificationCard({
         )}
         {link && (
           <Link
-            href={link}
+            href={normalizeJobLink(link)}
             className="text-xs font-semibold text-blue-500 dark:text-blue-400 hover:text-blue-600 transition-colors cursor-pointer whitespace-nowrap"
           >
             <i className="ri-arrow-right-line mr-1"></i>

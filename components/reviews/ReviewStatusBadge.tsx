@@ -169,7 +169,7 @@ export function JobReviewBanner({
         </p>
       </div>
       <Link
-        href={`/client/jobs/${jobId}`}
+        href={`/client/jobs/detail?id=${encodeURIComponent(jobId)}`}
         className="shrink-0 px-4 py-2 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition-colors cursor-pointer whitespace-nowrap"
       >
         Leave Review

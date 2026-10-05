@@ -176,7 +176,7 @@ export default function GuardJobInvitesPage() {
                   type: 'job_application',
                   title: 'Invited Guard Applied',
                   message: `${guardName} accepted your invite and applied for "${jobRow.job_title}".`,
-                  link: `/client/jobs/${jobId}/select-guards`,
+                  link: `/client/jobs/applicants?id=${encodeURIComponent(jobId)}`,
                   is_read: false,
                 });
               }

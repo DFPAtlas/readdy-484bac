@@ -176,7 +176,7 @@ export default function SimilarJobs({ currentJobId, securityType, venueCity }: S
           return (
             <Link
               key={job.id}
-              href={`/jobs/${job.id}`}
+              href={`/jobs/detail?id=${encodeURIComponent(job.id)}`}
               className="group bg-[#111d35] rounded-xl border border-slate-700/50 p-5 hover:border-teal-500/40 hover:shadow-lg hover:shadow-teal-500/5 transition-all duration-200 flex flex-col cursor-pointer"
             >
               <div className="flex items-start justify-between mb-3">

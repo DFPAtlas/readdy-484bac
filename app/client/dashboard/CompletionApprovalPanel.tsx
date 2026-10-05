@@ -145,7 +145,7 @@ export default function CompletionApprovalPanel({ clientId }: Props) {
                     Dispute
                   </button>
                   <Link
-                    href={`/client/jobs/${req.job_id}`}
+                    href={`/client/jobs/detail?id=${encodeURIComponent(req.job_id)}`}
                     className="inline-flex items-center gap-2 px-4 py-2 border border-[#1e2d4d] text-slate-400 rounded-xl text-sm font-semibold hover:bg-[#162036] transition-colors cursor-pointer whitespace-nowrap"
                   >
                     <i className="ri-eye-line"></i>

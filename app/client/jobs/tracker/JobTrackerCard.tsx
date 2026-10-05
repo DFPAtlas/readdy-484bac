@@ -44,7 +44,7 @@ function getActionBanner(job: any) {
       icon: 'ri-user-search-line',
       iconColor: 'text-amber-600',
       text: `${job.applications_count} guard${job.applications_count !== 1 ? 's' : ''} applied — review and select now`,
-      cta: { label: 'Select Guards', href: `/client/jobs/${job.id}/select-guards`, color: 'bg-amber-500 hover:bg-amber-600 text-white' },
+      cta: { label: 'Select Guards', href: `/client/jobs/applicants?id=${encodeURIComponent(job.id)}`, color: 'bg-amber-500 hover:bg-amber-600 text-white' },
     };
   }
   if (job.status === 'awaiting_payment') {
@@ -53,7 +53,7 @@ function getActionBanner(job: any) {
       icon: 'ri-secure-payment-line',
       iconColor: 'text-orange-600',
       text: 'Guards are ready — complete payment to confirm the booking',
-      cta: { label: 'Pay Now', href: `/client/jobs/${job.id}/payment`, color: 'bg-orange-500 hover:bg-orange-600 text-white' },
+      cta: { label: 'Pay Now', href: `/client/jobs/payment?id=${encodeURIComponent(job.id)}`, color: 'bg-orange-500 hover:bg-orange-600 text-white' },
     };
   }
   if (job.status === 'awaiting_guard_selection' && job.applications_count === 0) {
@@ -213,7 +213,7 @@ export default function JobTrackerCard({ job, onRefresh }: JobTrackerCardProps) 
               </div>
               <p className="text-sm font-medium text-red-400">Guard attendance issue — request a replacement</p>
             </div>
-            <Link href={`/client/jobs/${job.id}`}>
+            <Link href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`}>
               <button className="bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap">
                 View Job
               </button>
@@ -264,7 +264,7 @@ export default function JobTrackerCard({ job, onRefresh }: JobTrackerCardProps) 
             </span>
           </div>
           <div className="flex gap-2">
-            <Link href={`/client/jobs/${job.id}`}>
+            <Link href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`}>
               <button className="flex items-center gap-1.5 bg-[#162036] text-slate-300 px-4 py-2 rounded-xl hover:bg-[#1a2642] transition-colors text-sm font-semibold whitespace-nowrap cursor-pointer border border-[#1e2d4d]">
                 <i className="ri-eye-line text-sm"></i>
                 View Details

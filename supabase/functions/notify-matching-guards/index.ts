@@ -338,7 +338,7 @@ serve(async (req) => {
             'guard',
             `New ${isDirectBooking ? 'Direct Booking' : 'Job'} Match`,
             `${job.job_title} at ${job.venue_city} — £${job.hourly_rate}/hr. Click to view.`,
-            `/jobs/${jobId}`
+            `/jobs/detail?id=${encodeURIComponent(jobId)}`
           );
           if (pushOk) pushCount++;
         }

@@ -294,7 +294,7 @@ export default function ReplacementNotificationsSection({ clientId }: Replacemen
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Link
-                      href={`/client/jobs/${req.job_id}`}
+                      href={`/client/jobs/detail?id=${encodeURIComponent(req.job_id)}`}
                       className="text-xs font-semibold text-teal-500 dark:text-teal-400 hover:text-teal-600 transition-colors whitespace-nowrap"
                     >
                       View Job
@@ -341,7 +341,7 @@ export default function ReplacementNotificationsSection({ clientId }: Replacemen
                     )}
                     <div className="flex items-center gap-2 pt-2">
                       <Link
-                        href={`/client/jobs/${req.job_id}`}
+                        href={`/client/jobs/detail?id=${encodeURIComponent(req.job_id)}`}
                         className="inline-flex items-center gap-1.5 bg-teal-500 text-white text-xs font-semibold px-3 py-2 rounded-lg hover:bg-teal-600 transition-colors"
                       >
                         <i className="ri-arrow-right-line"></i>
@@ -349,7 +349,7 @@ export default function ReplacementNotificationsSection({ clientId }: Replacemen
                       </Link>
                       {req.status === 'replacement_offered' || req.status === 'awaiting_client_approval' ? (
                         <Link
-                          href={`/client/jobs/${req.job_id}`}
+                          href={`/client/jobs/detail?id=${encodeURIComponent(req.job_id)}`}
                           className="inline-flex items-center gap-1.5 bg-violet-500 text-white text-xs font-semibold px-3 py-2 rounded-lg hover:bg-violet-600 transition-colors"
                         >
                           <i className="ri-user-follow-line"></i>

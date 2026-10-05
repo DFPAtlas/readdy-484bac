@@ -114,7 +114,7 @@ export default function ReplacementRequestModal({
         type: 'replacement_requested',
         title: 'Replacement Request Submitted',
         message: `Your request for a replacement guard for "${jobTitle}" has been received. We are working on finding a suitable replacement.`,
-        link: `/client/jobs/${jobId}`,
+        link: `/client/jobs/detail?id=${encodeURIComponent(jobId)}`,
         is_read: false,
       });
 

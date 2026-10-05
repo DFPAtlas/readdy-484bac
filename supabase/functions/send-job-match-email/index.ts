@@ -84,7 +84,7 @@ serve(async (req) => {
       job_time: `${payload.start_time} - ${payload.end_time}`,
       hourly_rate: payload.hourly_rate,
       venue_label_block: venueLabelBlock,
-      job_url: `${siteUrl}/jobs/${payload.job_id}`,
+      job_url: `${siteUrl}/jobs/detail?id=${encodeURIComponent(payload.job_id)}`,
       dashboard_url: `${siteUrl}/guard/dashboard`,
       year: String(new Date().getFullYear()),
     };
@@ -114,7 +114,7 @@ serve(async (req) => {
       title: isDirect ? 'Direct Booking Alert' : 'New Job Match',
       message: `${payload.job_title} — £${payload.hourly_rate}/hr • ${payload.distance_miles} miles away${venueLabel ? ` • ${venueLabel}` : ''}`,
       type: 'info', is_read: false,
-      link: `/jobs/${payload.job_id}`, created_at: new Date().toISOString(),
+      link: `/jobs/detail?id=${encodeURIComponent(payload.job_id)}`, created_at: new Date().toISOString(),
     });
 
     return new Response(JSON.stringify({ success: true, email_id: renderData.email_id }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

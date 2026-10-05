@@ -289,7 +289,7 @@ function ActivityLogContent() {
   const getConfig = (category: string) => CATEGORY_CONFIG[category] || CATEGORY_CONFIG.account;
 
   const getRelatedLink = (activity: ActivityEntry) => {
-    if (activity.related_job_id) return `/client/jobs/${activity.related_job_id}`;
+    if (activity.related_job_id) return `/client/jobs/detail?id=${encodeURIComponent(activity.related_job_id)}`;
     if (activity.related_ticket_id) return `/client/support`;
     if (activity.related_payment_id) return `/client/payment-history`;
     if (activity.related_guard_id) return `/client/jobs`;

@@ -319,7 +319,7 @@ export default function MobilePostJob() {
             <p className="text-xs text-slate-500 mt-1">Free-plan fee example: £{serviceFee()}. Your plan and eligible promotions determine the final fee before checkout.</p>
           </div>
           <div className="flex flex-col gap-3">
-            <Link href={`/client/jobs/${jobId}`} className="bg-teal-500 text-white py-3 rounded-xl font-semibold text-center text-sm whitespace-nowrap">
+            <Link href={`/client/jobs/detail?id=${encodeURIComponent(jobId)}`} className="bg-teal-500 text-white py-3 rounded-xl font-semibold text-center text-sm whitespace-nowrap">
               View Job
             </Link>
             <Link href="/client/mobile" className="bg-[#162036] text-slate-300 py-3 rounded-xl font-semibold text-center text-sm whitespace-nowrap border border-[#1e2d4d]">

@@ -139,7 +139,7 @@ serve(async (req) => {
         message: `${guardName} has marked "${job.job_title}" as complete. Please review and approve to release payment.`,
         type: 'warning',
         is_read: false,
-        link: `/client/jobs/${jobId}`,
+        link: `/client/jobs/detail?id=${encodeURIComponent(jobId)}`,
         data: { job_id: jobId, completion_request_id: request.id },
         created_at: now,
       });

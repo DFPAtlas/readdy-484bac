@@ -1,3 +1,5 @@
+import { normalizeJobLink } from './job-links';
+
 const BLOCKED_PATTERNS = [
   /\/admin\/guard(-|_)?test/i,
   /\/admin\/test(-|_)?guard/i,
@@ -36,7 +38,7 @@ export function sanitizeRedirectPath(path: string, userType: 'guard' | 'client' 
 
   for (const prefix of allowedPrefixes) {
     if (path.startsWith(prefix) || path === prefix.replace(/\/$/, '')) {
-      return path;
+      return normalizeJobLink(path);
     }
   }
 
