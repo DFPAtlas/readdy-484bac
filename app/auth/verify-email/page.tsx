@@ -9,10 +9,14 @@ function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get('email') || '';
   const userType = searchParams.get('role') || searchParams.get('type') || 'guard';
+  const [typedEmail, setTypedEmail] = useState('');
   const [resending, setResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
   const [resendError, setResendError] = useState('');
   const [countdown, setCountdown] = useState(0);
+
+  const effectiveEmail = email || typedEmail.trim();
+  const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(effectiveEmail);
 
   useEffect(() => {
     if (countdown > 0) {
@@ -22,7 +26,7 @@ function VerifyEmailContent() {
   }, [countdown]);
 
   const handleResendEmail = async () => {
-    if (countdown > 0 || !email) return;
+    if (countdown > 0 || !emailLooksValid) return;
 
     setResending(true);
     setResendError('');
@@ -35,7 +39,7 @@ function VerifyEmailContent() {
 
       const { error } = await supabase.auth.resend({
         type: 'signup',
-        email: email,
+        email: effectiveEmail,
         options: {
           emailRedirectTo: redirectUrl
         }
@@ -63,13 +67,21 @@ function VerifyEmailContent() {
           <h1 className="text-2xl font-bold text-white mb-3">Check Your Email</h1>
 
           <p className="text-slate-400 mb-2">
-            We've sent a verification link to:
+            {email ? "We've sent a verification link to:" : "Enter your email and we'll send you a new sign-in link."}
           </p>
 
-          {email && (
+          {email ? (
             <p className="text-lg font-semibold text-teal-400 mb-6 break-all">
               {email}
             </p>
+          ) : (
+            <input
+              type="email"
+              value={typedEmail}
+              onChange={(e) => setTypedEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full bg-[#0B1933] border border-slate-700/50 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-400/50 focus:ring-1 focus:ring-teal-400/30 mb-6 text-center"
+            />
           )}
 
           <div className="bg-[#0B1933] border border-slate-700/50 rounded-xl p-4 mb-6 text-left">
@@ -116,7 +128,7 @@ function VerifyEmailContent() {
           <div className="space-y-3">
             <button
               onClick={handleResendEmail}
-              disabled={resending || countdown > 0 || !email}
+              disabled={resending || countdown > 0 || !emailLooksValid}
               className="w-full bg-teal-500 hover:bg-teal-400 text-slate-900 py-3 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap hover:scale-[1.02] cursor-pointer"
             >
               {resending ? (
