@@ -18,6 +18,7 @@ interface JobDetailDrawerProps {
 export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDrawerProps) {
   const router = useRouter();
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [assignmentsError, setAssignmentsError] = useState(false);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [guardReviews, setGuardReviews] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -30,11 +31,12 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
 
   const loadDetails = async () => {
     setLoading(true);
+    setAssignmentsError(false);
     try {
       const [assignmentsRes, transactionsRes, reviewsRes, cancellationRes, refundRes] = await Promise.all([
         supabase
           .from('job_assignments')
-          .select('*, guards(id, full_name, profile_photo_url, sia_licence_number, phone, average_rating, total_reviews, total_jobs_completed)')
+          .select('*, guards(id, full_name, profile_photo_url:profile_image_url, sia_licence_number, phone, average_rating:rating, total_reviews, total_jobs_completed)')
           .eq('job_id', job.id),
         supabase
           .from('transactions')
@@ -60,6 +62,7 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
           .eq('job_id', job.id)
           .order('created_at', { ascending: false }),
       ]);
+      setAssignmentsError(Boolean(assignmentsRes.error));
       setAssignments(assignmentsRes.data || []);
       setTransactions(transactionsRes.data || []);
       setCancellation(cancellationRes.data || null);
@@ -71,6 +74,8 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
       });
       setGuardReviews(reviewMap);
     } catch {
+      setAssignmentsError(true);
+      setAssignments([]);
     } finally {
       setLoading(false);
     }
@@ -254,6 +259,14 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
           </div>
 
           {/* Selected Guards */}
+          {!loading && assignmentsError && (
+            <div role="alert" className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-4">
+              <p className="text-sm font-semibold text-amber-400">Selected guards could not be loaded.</p>
+              <button onClick={loadDetails} className="mt-2 px-3 py-1.5 bg-[#162036] text-slate-200 rounded-lg text-xs font-semibold border border-[#1e2d4d] hover:bg-[#1a2642] transition-colors cursor-pointer">
+                Try again
+              </button>
+            </div>
+          )}
           {assignments.length > 0 && (
             <div className="bg-[#162036] rounded-xl border border-[#1e2d4d] p-4">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">

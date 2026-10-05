@@ -92,7 +92,19 @@ async function logSiaVerification(
   }
 ) {
   try {
-    await supabase.from("sia_verifications").insert(entry);
+    const { status, ...attempt } = entry;
+    // A queued/failed attempt is not a completed licence verification.
+    const { error } = await supabase.from("sia_verifications").insert({
+      ...attempt,
+      verification_status: status,
+      verification_method: "automatic_queue",
+      verified: null,
+      license_status: null,
+      verified_at: null,
+    });
+    if (error) {
+      console.error("Failed to log sia verification:", error.code, error.message);
+    }
   } catch (err) {
     console.error("Failed to log sia verification:", err);
   }
