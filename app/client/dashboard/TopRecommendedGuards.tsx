@@ -2,16 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 
-interface RecommendedGuard {
-  id: string;
-  full_name: string;
-  sia_licence_number: string;
-  rating: number;
-  total_reviews: number;
-  years_experience: number;
-  location: string;
-  profile_image_url: string | null;
-}
+import type { RecommendedGuard } from '@/lib/client-types';
 
 interface TopRecommendedGuardsProps {
   guards: RecommendedGuard[];

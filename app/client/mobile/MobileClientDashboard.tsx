@@ -3,6 +3,7 @@
 import { normalizeJobLink } from '@/lib/job-links';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { oneRelation } from '@/lib/relations';
 import { supabase } from '@/lib/supabase';
 import MobileInstallPrompt from '@/components/MobileInstallPrompt';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
@@ -52,12 +53,12 @@ interface Applicant {
   applied_at: string;
   guard: {
     full_name: string;
-    years_experience: number;
-    rating: number;
-  };
+    years_experience: number | null;
+    rating: number | null;
+  } | null;
   job: {
     job_title: string;
-  };
+  } | null;
 }
 
 interface SubscriptionInfo {
@@ -138,7 +139,7 @@ export default function MobileClientDashboard() {
       .eq('status', 'pending')
       .order('applied_at', { ascending: false })
       .limit(20);
-    setApplicants((appsData || []) as Applicant[]);
+    setApplicants((appsData || []).map(row => ({ ...row, guard: oneRelation(row.guard), job: oneRelation(row.job) })));
 
     const { data: notifData } = await supabase
       .from('notifications')
@@ -158,7 +159,7 @@ export default function MobileClientDashboard() {
 
   useEffect(() => {
     if (!client?.id) return;
-    const channels = [];
+    const channels: ReturnType<typeof supabase.channel>[] = [];
     channels.push(
       supabase
         .channel('client-mobile-jobs')

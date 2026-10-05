@@ -39,7 +39,7 @@ export default function GuardUsageWidget({ guardId, refreshTrigger }: Props) {
     );
   }
 
-  if (!limitData) {
+  if (!limitData || limitData.used === undefined || limitData.limit === undefined || limitData.remaining === undefined || !limitData.planSlug) {
     return (
       <div className="bg-[#111d35] rounded-2xl border border-[#1a2b4a] shadow-sm p-6">
         <p className="text-sm text-slate-400">Unable to load usage data.</p>
@@ -58,8 +58,8 @@ export default function GuardUsageWidget({ guardId, refreshTrigger }: Props) {
 
   const barColor = isAtLimit ? '#ef4444' : isWarnZone ? '#f59e0b' : '#14b8a6';
 
-  const resetLabel = limitData.resetDate
-    ? new Date(limitData.resetDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  const resetLabel = limitData.periodEnd
+    ? new Date(limitData.periodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : 'N/A';
 
   return (

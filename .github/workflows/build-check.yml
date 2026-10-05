@@ -34,7 +34,7 @@ jobs:
           npx tsc --noEmit 2>&1 | tee tsc-output.txt
           code=${PIPESTATUS[0]}
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
-          exit 0
+          exit "$code"
 
       - name: Upload TypeScript report
         if: always()
@@ -44,10 +44,6 @@ jobs:
           path: tsc-output.txt
           if-no-files-found: error
           retention-days: 7
-
-      - name: Summarize TypeScript debt
-        if: steps.typescript.outputs.exit_code != '0'
-        run: echo "TypeScript debt remains; see typescript-report artifact. Production build will still be validated."
 
       - name: Admin and financial type gate
         run: npm run check:admin

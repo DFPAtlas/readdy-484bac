@@ -308,7 +308,7 @@ export default function AnalyticsWidget({ clientId }: AnalyticsWidgetProps) {
                     <Tooltip
                       contentStyle={{ backgroundColor: '#111d35', border: '1px solid #1e2d4d', borderRadius: '12px', color: '#e2e8f0', fontSize: '12px' }}
                       labelStyle={{ color: '#94a3b8', fontWeight: 600 }}
-                      formatter={(value: number) => [`£${value.toFixed(2)}`, 'Spend']}
+                      formatter={(value) => [typeof value === 'number' ? `£${value.toFixed(2)}` : '—', 'Spend']}
                     />
                     <Area type="monotone" dataKey="spend" stroke="#10B981" strokeWidth={2} fill="url(#spendGradient)" dot={{ fill: '#10B981', r: 3 }} activeDot={{ fill: '#10B981', r: 5 }} />
                   </AreaChart>

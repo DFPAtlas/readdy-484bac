@@ -32,7 +32,7 @@ interface UseCaseData {
 export default function UseCasePage({ data }: { data: UseCaseData }) {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [jsEnabled, setJsEnabled] = useState(false);
-  const [isVisible, setIsVisible] = useState<Record<string, boolean>>();
+  const [isVisible, setIsVisible] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setJsEnabled(true);

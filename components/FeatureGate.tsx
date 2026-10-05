@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { hasFeature } from '@/lib/entitlements';
+import { hasFeature, type FeatureKey } from '@/lib/entitlements';
 import { logClientActivity } from '@/lib/client-activity';
 import { supabase } from '@/lib/supabase';
 
 interface FeatureGateProps {
-  feature: string;
+  feature: FeatureKey;
   children: React.ReactNode;
   fallback?: React.ReactNode;
   loading?: React.ReactNode;

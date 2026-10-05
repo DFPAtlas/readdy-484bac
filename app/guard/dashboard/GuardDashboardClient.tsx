@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { oneRelation, requiredRelation } from '@/lib/relations';
 import { supabase } from '@/lib/supabase';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import Link from 'next/link';
@@ -25,6 +26,7 @@ import { useUsageLimits } from '@/hooks/useUsageLimits';
 import UsageLimitWidget from '@/components/UsageLimitWidget';
 
 interface UserEntitlement {
+  cancel_at_period_end: boolean;
   plan_slug: string;
   plan_name: string;
   subscription_status: string;
@@ -364,7 +366,10 @@ export default function GuardDashboardClient() {
         .in('status', ['confirmed', 'in_progress', 'pending', 'awaiting_payment', 'selected'])
         .order('assigned_at', { ascending: false });
       if (error) throw error;
-      const all = data || [];
+      const all = (data || []).map(row => {
+        const job = requiredRelation(row.jobs);
+        return { ...row, jobs: { ...job, location: job.venue_city, postcode: job.venue_postcode } };
+      });
       traceLog('loadJobAssignments', { count: all.length });
       setAssignments(all);
       const today = new Date().toISOString().split('T')[0];
@@ -414,7 +419,13 @@ export default function GuardDashboardClient() {
         .order('applied_at', { ascending: false });
       if (error) throw error;
       traceLog('loadJobApplications', { count: (data || []).length });
-      setApplications(data || []);
+      setApplications((data || []).map(row => {
+        const job = requiredRelation(row.jobs);
+        return {
+          ...row,
+          jobs: { ...job, location: job.venue_city, postcode: job.venue_postcode, clients: oneRelation(job.clients) },
+        };
+      }));
     } catch {
       traceLog('loadJobApplications', { error: true });
       setDataErrors(prev => [...prev, 'job_applications']);
@@ -438,6 +449,7 @@ export default function GuardDashboardClient() {
           is_read,
           created_at,
           jobs (
+            id,
             job_title
           ),
           clients (
@@ -448,7 +460,7 @@ export default function GuardDashboardClient() {
         .order('created_at', { ascending: false });
       if (error) throw error;
       traceLog('loadClientResponses', { count: (data || []).length });
-      setResponses(data || []);
+      setResponses((data || []).map(row => ({ ...row, jobs: oneRelation(row.jobs), clients: oneRelation(row.clients) })));
       setUnreadCount(data?.filter(r => !r.is_read).length || 0);
     } catch {
       traceLog('loadClientResponses', { error: true });
@@ -520,7 +532,7 @@ export default function GuardDashboardClient() {
         .order('start_date', { ascending: true })
         .range(from, to);
       if (error) throw error;
-      const fetched = data || [];
+      const fetched = (data || []).map(row => ({ ...row, clients: oneRelation(row.clients) }));
       traceLog('loadAvailableJobs', { page, count: fetched.length });
       if (page === 0) {
         setAvailableJobs(fetched);
@@ -1203,8 +1215,8 @@ export default function GuardDashboardClient() {
           <DashboardHeader guard={guard} isAdmin={isAdmin} guardUserId={guardUserId} onLogout={handleLogout} />
 
           {guard && !isAdmin && (
-            <ProfileHeroCard 
-              guard={guard} 
+            <ProfileHeroCard
+              guard={guard}
               planName={userEntitlement?.plan_name}
               subscriptionStatus={userEntitlement?.subscription_status}
             />

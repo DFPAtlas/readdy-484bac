@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { hasFeature } from '@/lib/entitlements';
+import { hasFeature, type FeatureKey } from '@/lib/entitlements';
 import { logClientActivity } from '@/lib/client-activity';
 import { useSafeRouter } from './useSafeRouter';
 
-const ROUTE_FEATURES: Record<string, string> = {
+const ROUTE_FEATURES: Record<string, FeatureKey> = {
   '/client/post-job': 'client.post_job',
   '/client/jobs/payment': 'client.escrow_payments',
   '/client/jobs/tracker': 'client.job_tracker',
@@ -18,11 +18,11 @@ const ROUTE_FEATURES: Record<string, string> = {
   '/client/team-access': 'client.team_access',
 };
 
-const DYNAMIC_ROUTE_FEATURES: Record<string, string> = {
+const DYNAMIC_ROUTE_FEATURES: Record<string, FeatureKey> = {
   '/client/jobs/[id]/payment': 'client.escrow_payments',
 };
 
-function matchFeature(pathname: string): string | null {
+function matchFeature(pathname: string): FeatureKey | null {
   const exact = ROUTE_FEATURES[pathname];
   if (exact) return exact;
 

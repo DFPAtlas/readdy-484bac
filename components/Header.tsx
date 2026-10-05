@@ -52,7 +52,7 @@ export default function Header() {
   const [showRoleSwitchModal, setShowRoleSwitchModal] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const megaMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const profileDropdownRef = useRef<HTMLLIElement>(null);
   const pathname = usePathname();
   const router = useSafeRouter();
 

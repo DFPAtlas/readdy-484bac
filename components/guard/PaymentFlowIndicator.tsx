@@ -52,7 +52,7 @@ export default function PaymentFlowIndicator({ flow, compact }: Props) {
           status={flow.guard_paid.status}
           label={flow.guard_paid.label}
           tooltip={flow.guard_paid.tooltip}
-          detail={compact ? undefined : (flow.guard_paid.amount !== null ? formatFlowAmount(flow.guard_paid.amount, flow.guard_paid.currency) : undefined)}
+          detail={compact ? undefined : (flow.guard_paid.amount !== null ? formatFlowAmount(flow.guard_paid.amount, flow.job_secured.currency) : undefined)}
         />
       </div>
 

@@ -477,7 +477,7 @@ export default function SupportPage() {
               Refresh
             </button>
             <button
-              onClick={handleOpenCreate}
+              onClick={() => handleOpenCreate()}
               className="flex items-center gap-2 bg-teal-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap"
             >
               <i className="ri-add-line"></i>
@@ -657,7 +657,7 @@ export default function SupportPage() {
                 {searchQuery ? 'Try a different search term or clear your filters' : 'Create a new ticket if you need help with a payment, job, or account issue'}
               </p>
               {!searchQuery && (
-                <button onClick={handleOpenCreate} className="inline-flex items-center gap-2 bg-teal-500 text-white text-sm font-semibold px-6 py-3 rounded-xl hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap">
+                <button onClick={() => handleOpenCreate()} className="inline-flex items-center gap-2 bg-teal-500 text-white text-sm font-semibold px-6 py-3 rounded-xl hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap">
                   <i className="ri-add-line"></i>Create Ticket
                 </button>
               )}
