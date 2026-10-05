@@ -193,30 +193,66 @@ async function handleReferral(supabase: any, userId: string, email: string, acco
   }
 }
 
-async function sendWelcomeEmail(supabaseUrl: string, supabaseServiceKey: string, userId: string, accountType: string, userEmail: string, userName: string): Promise<boolean> {
+async function findAuthUserByEmail(supabase: any, email: string): Promise<any | null> {
+  const target = email.toLowerCase().trim();
   try {
-    const res = await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
+    for (let page = 1; page <= 20; page++) {
+      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
+      if (error) {
+        console.error('[register-magic-link] listUsers failed:', error.message);
+        return null;
+      }
+      const users = data?.users || [];
+      const match = users.find((u: any) => (u.email || '').toLowerCase() === target);
+      if (match) return match;
+      if (users.length < 1000) break;
+    }
+  } catch (err) {
+    console.error('[register-magic-link] Failed to look up user by email:', err);
+  }
+  return null;
+}
+
+async function sendVerificationEmail(supabase: any, supabaseUrl: string, supabaseServiceKey: string, userId: string, email: string, fullName: string, role: string): Promise<boolean> {
+  try {
+    const { data: link, error: linkError } = await supabase.auth.admin.generateLink({
+      type: 'magiclink',
+      email,
+    });
+    if (linkError || !link?.properties?.hashed_token) {
+      console.error(`[register-magic-link] generateLink failed for ${email}: ${linkError?.message || 'no token'}`);
+      return false;
+    }
+    const verify_url = 'https://quickguard.uk/auth/email-dashboard#' + new URLSearchParams({
+      token_hash: link.properties.hashed_token,
+      role,
+    }).toString();
+    const res = await fetch(`${supabaseUrl}/functions/v1/render-email-template`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${supabaseServiceKey}`,
       },
       body: JSON.stringify({
-        user_id: userId,
-        account_type: accountType,
-        user_email: userEmail,
-        user_name: userName,
+        template_slug: 'signup_verification',
+        to: email,
+        variables: {
+          user_name: fullName || 'there',
+          verify_url,
+          year: String(new Date().getFullYear()),
+        },
+        related_user_id: userId,
       }),
     });
     if (!res.ok) {
       const errText = await res.text();
-      console.error(`[register-magic-link] Welcome email send failed (${res.status}): ${errText}`);
+      console.error(`[register-magic-link] Verification email send failed (${res.status}): ${errText}`);
       return false;
     }
-    console.log(`[register-magic-link] Welcome email sent to ${userEmail}`);
+    console.log(`[register-magic-link] Verification email sent to ${email}`);
     return true;
   } catch (err) {
-    console.error('[register-magic-link] Failed to send welcome email:', err);
+    console.error('[register-magic-link] Failed to send verification email:', err);
     return false;
   }
 }
@@ -233,7 +269,7 @@ Deno.serve(async (req) => {
     });
   }
   try {
-    const { email, role, first_name, last_name, wizard_data, referral_code, source } = await req.json();
+    const { email, role, first_name, last_name, wizard_data, referral_code, source, tax_disclaimer_accepted } = await req.json();
     if (!email || !role) {
       return new Response(JSON.stringify({ error: 'Email and role are required' }), {
         status: 400,
@@ -280,7 +316,7 @@ Deno.serve(async (req) => {
     const { data: userData, error: userError } = await supabase.auth.admin.createUser({
       email: normalizedEmail,
       password,
-      email_confirm: true,
+      email_confirm: false,
       user_metadata: {
         role: normalizedRole,
         first_name: first_name || '',
@@ -292,7 +328,17 @@ Deno.serve(async (req) => {
       },
     });
     if (userError) {
-      if (userError.message?.toLowerCase().includes('already') || userError.message?.toLowerCase().includes('exists')) {
+      const looksExisting = userError.message?.toLowerCase().includes('already') || userError.message?.toLowerCase().includes('exists');
+      if (looksExisting) {
+        const existingUser = await findAuthUserByEmail(supabase, normalizedEmail);
+        if (existingUser && !existingUser.email_confirmed_at) {
+          const existingName = `${existingUser.user_metadata?.first_name || ''} ${existingUser.user_metadata?.last_name || ''}`.trim();
+          await sendVerificationEmail(supabase, supabaseUrl, supabaseServiceKey, existingUser.id, normalizedEmail, existingName || fullName, normalizedRole);
+          return new Response(JSON.stringify({ success: true, verification_sent: true }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
         return new Response(JSON.stringify({ error: 'An account with this email already exists. Please sign in instead.' }), {
           status: 409,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -390,24 +436,22 @@ Deno.serve(async (req) => {
         .catch(err => console.error('[register-magic-link] Referral handling failed:', err));
     }
 
-    const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (sessionError) {
-      throw new Error('Failed to create session: ' + sessionError.message);
+    if (tax_disclaimer_accepted === true) {
+      const { error: taxError } = await supabase.from('tax_disclaimers_accepted').insert({
+        user_id: userId,
+        user_type: normalizedRole,
+        disclaimer_type: 'general',
+        accepted_at: new Date().toISOString(),
+      });
+      if (taxError) console.error('[register-magic-link] Tax disclaimer insert error:', taxError.message);
     }
 
-    const welcomeSent = await sendWelcomeEmail(supabaseUrl, supabaseServiceKey, userId, role, email, fullName);
-    if (!welcomeSent) {
-      console.error(`[register-magic-link] Welcome email did not complete for ${email}; will retry via queue/health check if configured.`);
+    const verificationSent = await sendVerificationEmail(supabase, supabaseUrl, supabaseServiceKey, userId, normalizedEmail, fullName, normalizedRole);
+    if (!verificationSent) {
+      console.error(`[register-magic-link] Verification email did not complete for ${normalizedEmail}; will retry via queue/health check if configured.`);
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      session: sessionData.session,
-      user: sessionData.user,
-    }), {
+    return new Response(JSON.stringify({ success: true, verification_sent: true }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -160,6 +160,7 @@ export default function GuardRegister() {
             wizard_data: formData,
             referral_code: typeof window !== 'undefined' ? (localStorage.getItem('qg_referral_code') || sessionStorage.getItem('qg_referral_code') || '') : '',
             source: 'qg_launch_rewards',
+            tax_disclaimer_accepted: taxDisclaimerAccepted,
           }),
         }
       );
@@ -170,30 +171,8 @@ export default function GuardRegister() {
         throw new Error(result.error || result.message || `Registration failed (${response.status})`);
       }
 
-      if (!result?.session) {
-        throw new Error('Registration failed: No session returned');
-      }
-
-      await supabase.auth.signOut({ scope: 'local' });
-      await supabase.auth.setSession({
-        access_token: result.session.access_token,
-        refresh_token: result.session.refresh_token,
-      });
-
-      if (taxDisclaimerAccepted) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await supabase.from('tax_disclaimers_accepted').insert({
-            user_id: user.id,
-            user_type: 'guard',
-            disclaimer_type: 'general',
-            accepted_at: new Date().toISOString(),
-          });
-        }
-      }
-
       setSentEmail(email);
-      router.push('/guard/complete-profile-wizard');
+      router.push('/auth/verify-email?email=' + encodeURIComponent(email) + '&role=guard');
     } catch (err: any) {
       setError(err.message || 'Failed to create account');
       setLoading(false);
@@ -383,7 +362,7 @@ export default function GuardRegister() {
                 <div className="w-5 h-5 flex items-center justify-center mt-0.5">
                   <i className="ri-check-line text-emerald-400 text-sm" />
                 </div>
-                <p className="text-sm text-emerald-300">Account created successfully! You are now logged in.</p>
+                <p className="text-sm text-emerald-300">Account created. Check your email to confirm and sign in.</p>
               </div>
             )}
 
