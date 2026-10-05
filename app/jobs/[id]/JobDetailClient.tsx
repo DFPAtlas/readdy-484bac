@@ -11,7 +11,6 @@ import { sendPushToUser } from "@/lib/push-notifications";
 
 interface Job {
   id: string;
-  client_id: string;
   job_title: string;
   job_description: string;
   security_type: string;
@@ -26,8 +25,6 @@ interface Job {
   required_license_type?: string | null;
   experience_level: string | null;
   venue_name: string;
-  venue_address_line1: string;
-  venue_address_line2: string | null;
   venue_city: string;
   venue_postcode: string;
   uniform_required: boolean;
@@ -41,10 +38,8 @@ interface Job {
   clients: {
     id: string;
     company_name: string;
-    email: string;
     first_name?: string;
     last_name?: string;
-    phone?: string;
   } | null;
 }
 
@@ -62,6 +57,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   const router = useSafeRouter();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [guardProfile, setGuardProfile] = useState<any>(null);
   const [userType, setUserType] = useState<string | null>(null);
@@ -147,12 +143,13 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
     const fetchJobDetails = async () => {
       if (cancelled) return;
+      setLoading(true);
+      setLoadError(false);
       try {
         const { data: jobData, error: jobError } = await supabase
-          .from("jobs")
+          .rpc("get_public_jobs")
           .select(`
             id,
-            client_id,
             job_title,
             job_description,
             security_type,
@@ -166,8 +163,6 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
             required_licence_types,
             experience_level,
             venue_name,
-            venue_address_line1,
-            venue_address_line2,
             venue_city,
             venue_postcode,
             uniform_required,
@@ -179,14 +174,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
             views,
             created_at,
             is_deleted,
-            clients (
-              id,
-              company_name,
-              email,
-              first_name,
-              last_name,
-              phone
-            )
+            clients
           `)
           .eq("id", jobId)
           .eq("is_deleted", false)
@@ -196,6 +184,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
         if (jobError) {
           console.error("Supabase error:", jobError);
+          setLoadError(true);
           setJob(null);
           return;
         }
@@ -212,6 +201,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       } catch (error) {
         if (cancelled) return;
         console.error("Error fetching job details:", error);
+        setLoadError(true);
         setJob(null);
       } finally {
         if (!cancelled) setLoading(false);
@@ -510,12 +500,13 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
             <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20">
               <i className="ri-file-search-line text-4xl text-red-400"></i>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-3">Job Not Found</h1>
-            <p className="text-slate-400 mb-2 text-lg">This job listing is no longer available.</p>
+            <h1 className="text-3xl font-bold text-white mb-3">{loadError ? "Job could not be loaded" : "Job Not Found"}</h1>
+            <p className="text-slate-400 mb-2 text-lg">{loadError ? "Please try again in a moment." : "This job listing is no longer available."}</p>
             <p className="text-slate-500 text-sm mb-8">
-              It may have been filled, removed, or the link may be incorrect. Browse our current openings below.
+              {loadError ? "A temporary connection problem prevented loading this job." : "It may have been filled, removed, or the link may be incorrect. Browse our current openings below."}
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              {loadError && <button onClick={() => window.location.reload()} className="text-teal-400 underline">Try Again</button>}
               <Link
                 href="/jobs"
                 className="inline-flex items-center justify-center gap-2 bg-teal-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-teal-400 transition-colors whitespace-nowrap cursor-pointer"
@@ -715,8 +706,6 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                   <div>
                     <p className="font-semibold text-white">Address</p>
                     <p className="text-slate-300">
-                      {job.venue_address_line1}
-                      {job.venue_address_line2 && <><br />{job.venue_address_line2}</>}
                       <br />
                       {job.venue_city}, {job.venue_postcode}
                     </p>

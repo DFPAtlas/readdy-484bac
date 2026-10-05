@@ -36,8 +36,8 @@ export default function SimilarJobs({ currentJobId, securityType, venueCity }: S
     const fetchSimilarJobs = async () => {
       if (cancelled) return;
       try {
-        const { data: byTypeAndCity } = await supabase
-          .from('jobs')
+        const { data: typeAndCityData } = await supabase
+          .rpc('get_public_jobs')
           .select('id, job_title, security_type, venue_name, venue_city, hourly_rate, start_date, start_time, end_time, urgency, sia_licence_required, number_of_guards, created_at')
           .neq('id', currentJobId)
           .eq('status', 'open')
@@ -46,6 +46,7 @@ export default function SimilarJobs({ currentJobId, securityType, venueCity }: S
           .eq('venue_city', venueCity)
           .order('created_at', { ascending: false })
           .limit(4);
+        const byTypeAndCity: SimilarJob[] = Array.isArray(typeAndCityData) ? typeAndCityData : [];
         if (cancelled) return;
 
         if (byTypeAndCity && byTypeAndCity.length >= 3) {
@@ -54,8 +55,8 @@ export default function SimilarJobs({ currentJobId, securityType, venueCity }: S
           return;
         }
 
-        const { data: byType } = await supabase
-          .from('jobs')
+        const { data: typeData } = await supabase
+          .rpc('get_public_jobs')
           .select('id, job_title, security_type, venue_name, venue_city, hourly_rate, start_date, start_time, end_time, urgency, sia_licence_required, number_of_guards, created_at')
           .neq('id', currentJobId)
           .eq('status', 'open')
@@ -63,14 +64,15 @@ export default function SimilarJobs({ currentJobId, securityType, venueCity }: S
           .eq('security_type', securityType)
           .order('created_at', { ascending: false })
           .limit(4);
+        const byType: SimilarJob[] = Array.isArray(typeData) ? typeData : [];
         if (cancelled) return;
 
         const combined = byType || [];
         const existing = new Set(combined.map((j) => j.id));
 
         if (combined.length < 4) {
-          const { data: byCity } = await supabase
-            .from('jobs')
+          const { data: cityData } = await supabase
+            .rpc('get_public_jobs')
             .select('id, job_title, security_type, venue_name, venue_city, hourly_rate, start_date, start_time, end_time, urgency, sia_licence_required, number_of_guards, created_at')
             .neq('id', currentJobId)
             .eq('status', 'open')
@@ -78,6 +80,7 @@ export default function SimilarJobs({ currentJobId, securityType, venueCity }: S
             .eq('venue_city', venueCity)
             .order('created_at', { ascending: false })
             .limit(4);
+        const byCity: SimilarJob[] = Array.isArray(cityData) ? cityData : [];
           if (cancelled) return;
 
           (byCity || []).forEach((j) => {

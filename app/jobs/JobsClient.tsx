@@ -46,6 +46,7 @@ export default function JobsClient() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState('');
@@ -136,9 +137,11 @@ export default function JobsClient() {
   };
 
   const fetchJobs = async () => {
+    setLoading(true);
+    setLoadError(false);
     try {
       let query = supabase
-        .from('jobs')
+        .rpc('get_public_jobs')
         .select(`
           id,
           job_title,
@@ -161,11 +164,7 @@ export default function JobsClient() {
           is_featured,
           is_urgent,
           expires_at,
-          clients!jobs_client_id_fkey (
-            company_name,
-            client_promo_tier,
-            founding_client_badge
-          )
+          clients
         `)
         .eq('is_deleted', false)
         .order('created_at', { ascending: false })
@@ -202,6 +201,7 @@ export default function JobsClient() {
       }
     } catch (error) {
       console.error('Error fetching jobs:', error);
+      setLoadError(true);
       setJobs([]);
     } finally {
       setLoading(false);
@@ -505,7 +505,7 @@ export default function JobsClient() {
                 <div className="mb-6 p-4 bg-[#0e1628] border border-slate-700/50 rounded-xl">
                   <label className="flex items-center justify-between cursor-pointer">
                     <span className="text-sm font-semibold text-slate-300">
-                      Show Expired / Archived
+                      Show Expired Jobs
                     </span>
                     <div className="relative inline-flex items-center">
                       <input
@@ -517,7 +517,7 @@ export default function JobsClient() {
                       <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-teal-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500"></div>
                     </div>
                   </label>
-                  <p className="text-xs text-slate-500 mt-2">Include past start dates &amp; non-open statuses</p>
+                  <p className="text-xs text-slate-500 mt-2">Include past start dates</p>
                 </div>
 
                 <div className="mb-6">
@@ -768,6 +768,12 @@ export default function JobsClient() {
                       </div>
                     </div>
                   ))}
+                </div>
+              ) : loadError ? (
+                <div role="alert" className="bg-[#111d35] rounded-2xl p-12 text-center">
+                  <h3 className="text-xl font-bold text-white mb-2">Jobs could not be loaded</h3>
+                  <p className="text-slate-400 mb-4">Please try again in a moment.</p>
+                  <button onClick={() => void fetchJobs()} className="text-teal-400 underline">Try Again</button>
                 </div>
               ) : filteredJobs.length === 0 ? (
                 <div className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-12 text-center" role="status" aria-live="polite">
