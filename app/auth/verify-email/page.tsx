@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -33,22 +32,29 @@ function VerifyEmailContent() {
     setResendSuccess(false);
 
     try {
-      const redirectUrl = userType === 'guard'
-        ? `${window.location.origin}/auth/confirm?role=guard&new=true`
-        : `${window.location.origin}/auth/confirm?role=client&new=true&wizard=true`;
-
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: effectiveEmail,
-        options: {
-          emailRedirectTo: redirectUrl
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/resend-verification-link`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            email: effectiveEmail,
+            role: userType,
+          }),
         }
-      });
+      );
 
-      if (error) throw error;
-
-      setResendSuccess(true);
-      setCountdown(60);
+      if (response.status === 200) {
+        setResendSuccess(true);
+        setCountdown(60);
+      } else if (response.status === 429) {
+        setResendError('Too many requests. Please wait an hour and try again.');
+      } else {
+        setResendError('Failed to resend email. Please try again.');
+      }
     } catch (err: any) {
       setResendError(err.message || 'Failed to resend email. Please try again.');
     } finally {

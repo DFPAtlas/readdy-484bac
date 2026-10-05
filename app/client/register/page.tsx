@@ -145,6 +145,7 @@ export default function ClientRegister() {
             wizard_data: formData,
             referral_code: typeof window !== 'undefined' ? (localStorage.getItem('qg_referral_code') || sessionStorage.getItem('qg_referral_code') || '') : '',
             source: 'qg_launch_rewards',
+            tax_disclaimer_accepted: taxDisclaimerAccepted,
           }),
         }
       );
@@ -155,28 +156,8 @@ export default function ClientRegister() {
         throw new Error(result.error || result.message || `Registration failed (${response.status})`);
       }
 
-      if (!result?.session) {
-        throw new Error('Registration failed: No session returned');
-      }
-
-      await supabase.auth.signOut({ scope: 'local' });
-      await supabase.auth.setSession({
-        access_token: result.session.access_token,
-        refresh_token: result.session.refresh_token,
-      });
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user && taxDisclaimerAccepted) {
-        await supabase.from('tax_disclaimers_accepted').insert({
-          user_id: user.id,
-          user_type: 'client',
-          disclaimer_type: 'general',
-          accepted_at: new Date().toISOString(),
-        });
-      }
-
       setSentEmail(email);
-      router.push('/client/complete-profile-wizard');
+      router.push('/auth/verify-email?email=' + encodeURIComponent(email) + '&role=client');
     } catch (err: any) {
       console.error('Registration error:', err);
       setError(err.message || 'Failed to create account. Please try again.');
@@ -331,7 +312,7 @@ export default function ClientRegister() {
               <div className="w-5 h-5 flex items-center justify-center mt-0.5">
                 <i className="ri-check-line text-emerald-400 text-sm" />
               </div>
-              <p className="text-sm text-emerald-300">Account created successfully! You are now logged in.</p>
+              <p className="text-sm text-emerald-300">Account created. Check your email to confirm and sign in.</p>
             </div>
           )}
 
