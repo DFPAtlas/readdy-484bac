@@ -50,6 +50,7 @@ export default function AttendancePanel({ job, assignments, clientId, onMessageG
     assignmentId?: string;
     guardName?: string;
     guardId?: string;
+    preferredGuard?: { id: string; fullName: string };
   } | null>(null);
 
   const handleReport = async () => {
@@ -192,6 +193,15 @@ export default function AttendancePanel({ job, assignments, clientId, onMessageG
           jobId={job.id}
           job={job}
           currentAssignments={assignments}
+          onRequestReplacement={(guardId, guardName) => {
+            const affected = noShowOrLate.length === 1 ? noShowOrLate[0] : undefined;
+            setReplacementModal({
+              assignmentId: affected?.id,
+              guardId: affected?.guard_id || affected?.guards?.id || undefined,
+              guardName: affected?.guards?.full_name || undefined,
+              preferredGuard: { id: guardId, fullName: guardName },
+            });
+          }}
           onRequestMore={() => router.push('/client/support?new=guard_no_show&job=' + job.id)}
         />
       )}
@@ -358,6 +368,12 @@ export default function AttendancePanel({ job, assignments, clientId, onMessageG
           assignmentId={replacementModal.assignmentId}
           guardName={replacementModal.guardName}
           guardId={replacementModal.guardId}
+          preferredGuard={replacementModal.preferredGuard}
+          assignmentOptions={replacementModal.preferredGuard ? noShowOrLate.map(a => ({
+            id: a.id,
+            guardId: a.guard_id || a.guards?.id || undefined,
+            guardName: a.guards?.full_name || 'Assigned guard',
+          })) : undefined}
           clientId={clientId}
           onClose={() => setReplacementModal(null)}
           onSuccess={handleReplacementSuccess}

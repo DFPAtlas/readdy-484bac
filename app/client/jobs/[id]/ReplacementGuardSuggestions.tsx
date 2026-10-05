@@ -25,7 +25,7 @@ interface ReplacementGuardSuggestionsProps {
   jobId: string;
   job: any;
   currentAssignments: any[];
-  onApproveReplacement?: (guardId: string) => void;
+  onRequestReplacement: (guardId: string, guardName: string) => void;
   onRequestMore?: () => void;
 }
 
@@ -33,22 +33,23 @@ export default function ReplacementGuardSuggestions({
   jobId,
   job,
   currentAssignments,
-  onApproveReplacement,
+  onRequestReplacement,
   onRequestMore,
 }: ReplacementGuardSuggestionsProps) {
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<Guard[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [approving, setApproving] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   const loadSuggestions = async () => {
-    if (loaded) return;
     setLoading(true);
+    setError('');
     try {
       const guards = await fetchSuggestions();
       setSuggestions(guards);
       setLoaded(true);
     } catch {
+      setError('Replacement suggestions could not be loaded. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -56,118 +57,106 @@ export default function ReplacementGuardSuggestions({
 
   const fetchSuggestions = async (): Promise<Guard[]> => {
     const results: Guard[] = [];
-    const currentGuardIds = currentAssignments.map(a => a.guards?.id).filter(Boolean);
+    const currentGuardIds = currentAssignments.map(a => a.guard_id || a.guards?.id).filter(Boolean);
     const requiredLicenceType = job?.required_license_type || job?.required_licence_types?.[0];
-    const venueCity = job?.venue_city || job?.venue_name;
 
-    // 1. Previously shortlisted guards who weren't selected
-    try {
-      const { data: applicants } = await supabase
-        .from('job_applications')
-        .select('guard_id')
-        .eq('job_id', jobId)
-        .not('guard_id', 'in', `(${currentGuardIds.join(',') || '00000000-0000-0000-0000-000000000000'})`)
-        .limit(3);
+    // 1. Previous applicants who are not currently assigned
+    const { data: applicants, error: applicantsError } = await supabase
+      .from('job_applications')
+      .select('guard_id')
+      .eq('job_id', jobId)
+      .not('guard_id', 'in', `(${currentGuardIds.join(',') || '00000000-0000-0000-0000-000000000000'})`)
+      .limit(3);
 
-      const applicantIds = (applicants || []).map((a: any) => a.guard_id).filter(Boolean);
-      if (applicantIds.length > 0) {
-        const { data: applicantProfiles } = await supabase
-          .from('guard_public_profiles')
-          .select('id, full_name, profile_photo_url:profile_image_url, sia_verified, average_rating:rating, total_reviews, total_jobs_completed, years_experience, location')
-          .in('id', applicantIds);
-        (applicantProfiles || []).forEach((g: any) => {
-          if (!results.find(r => r.id === g.id)) {
-            results.push({ ...g, reason: 'Previously shortlisted', availability: 'Applied before' });
-          }
-        });
-      }
-    } catch {}
-
-    // 2. Guards who worked this site before
-    try {
-      const { data: pastAssignments } = await supabase
-        .from('job_assignments')
-.select('guard_id')
-        .eq('job_id', jobId)
-        .limit(5);
-
-      const siteGuardIds = (pastAssignments || []).map((a: any) => a.guard_id).filter(Boolean);
-      if (siteGuardIds.length > 0) {
-        const { data: otherSiteJobs } = await supabase
-          .from('jobs')
-          .select('id')
-          .eq('client_id', job?.client_id)
-          .neq('id', jobId)
-          .limit(10);
-
-        if (otherSiteJobs && otherSiteJobs.length > 0) {
-          const { data: otherAssignments } = await supabase
-            .from('job_assignments')
-            .select('guard_id')
-            .in('job_id', otherSiteJobs.map(j => j.id))
-            .not('guard_id', 'in', `(${currentGuardIds.join(',') || '00000000-0000-0000-0000-000000000000'})`)
-            .limit(10);
-
-          const historicalGuardIds = [...new Set((otherAssignments || []).map((a: any) => a.guard_id).filter(Boolean))].slice(0, 3);
-          if (historicalGuardIds.length > 0) {
-            const { data: historicalProfiles } = await supabase
-              .from('guard_public_profiles')
-              .select('id, full_name, profile_photo_url:profile_image_url, sia_verified, average_rating:rating, total_reviews, total_jobs_completed, years_experience, location')
-              .in('id', historicalGuardIds);
-
-            (historicalProfiles || []).forEach((g: any) => {
-              if (!results.find(r => r.id === g.id)) {
-                results.push({
-                  ...g,
-                  reason: 'Worked your site before',
-                  availability: 'Familiar with site',
-                });
-              }
-            });
-          }
-        }
-      }
-    } catch {}
-
-    // 3. Similar available guards nearby
-    try {
-      let query = supabase
-.from('guard_public_profiles')
+    if (applicantsError) throw applicantsError;
+    const applicantIds = (applicants || []).map((a: any) => a.guard_id).filter(Boolean);
+    if (applicantIds.length > 0) {
+      const { data: applicantProfiles, error: profilesError } = await supabase
+        .from('guard_public_profiles')
         .select('id, full_name, profile_photo_url:profile_image_url, sia_verified, average_rating:rating, total_reviews, total_jobs_completed, years_experience, location')
-        .eq('sia_verified', true)
-        .not('id', 'in', `(${currentGuardIds.join(',') || '00000000-0000-0000-0000-000000000000'})`)
-        .order('rating', { ascending: false })
-        .limit(3);
-
-      if (requiredLicenceType) {
-        query = query.contains('licence_types', [requiredLicenceType]);
-      }
-
-      const { data: nearbyGuards } = await query;
-      (nearbyGuards || []).forEach((g: any) => {
+        .in('id', applicantIds);
+      if (profilesError) throw profilesError;
+      (applicantProfiles || []).forEach((g: any) => {
         if (!results.find(r => r.id === g.id)) {
-          results.push({
-            ...g,
-            reason: 'Available & rated',
-            availability: 'Available',
-          });
+          results.push({ ...g, reason: 'Applied to this job', availability: 'Availability to confirm' });
         }
       });
-    } catch {}
+    }
+
+    // 2. Guards who worked for this client before
+    const { data: pastAssignments, error: pastError } = await supabase
+      .from('job_assignments')
+      .select('guard_id')
+      .eq('job_id', jobId)
+      .limit(5);
+
+    if (pastError) throw pastError;
+    const siteGuardIds = (pastAssignments || []).map((a: any) => a.guard_id).filter(Boolean);
+    if (siteGuardIds.length > 0) {
+      const { data: otherSiteJobs, error: jobsError } = await supabase
+        .from('jobs')
+        .select('id')
+        .eq('client_id', job?.client_id)
+        .neq('id', jobId)
+        .limit(10);
+
+      if (jobsError) throw jobsError;
+      if (otherSiteJobs && otherSiteJobs.length > 0) {
+        const { data: otherAssignments, error: assignmentsError } = await supabase
+          .from('job_assignments')
+          .select('guard_id')
+          .in('job_id', otherSiteJobs.map(j => j.id))
+          .not('guard_id', 'in', `(${currentGuardIds.join(',') || '00000000-0000-0000-0000-000000000000'})`)
+          .limit(10);
+
+        if (assignmentsError) throw assignmentsError;
+        const historicalGuardIds = [...new Set((otherAssignments || []).map((a: any) => a.guard_id).filter(Boolean))].slice(0, 3);
+        if (historicalGuardIds.length > 0) {
+          const { data: historicalProfiles, error: profilesError } = await supabase
+            .from('guard_public_profiles')
+            .select('id, full_name, profile_photo_url:profile_image_url, sia_verified, average_rating:rating, total_reviews, total_jobs_completed, years_experience, location')
+            .in('id', historicalGuardIds);
+
+          if (profilesError) throw profilesError;
+          (historicalProfiles || []).forEach((g: any) => {
+            if (!results.find(r => r.id === g.id)) {
+              results.push({
+                ...g,
+                reason: 'Worked for your company',
+                availability: 'Availability to confirm',
+              });
+            }
+          });
+        }
+      }
+    }
+
+    // 3. Other verified guards to consider
+    let query = supabase
+      .from('guard_public_profiles')
+      .select('id, full_name, profile_photo_url:profile_image_url, sia_verified, average_rating:rating, total_reviews, total_jobs_completed, years_experience, location')
+      .eq('sia_verified', true)
+      .not('id', 'in', `(${currentGuardIds.join(',') || '00000000-0000-0000-0000-000000000000'})`)
+      .order('rating', { ascending: false })
+      .limit(3);
+
+    if (requiredLicenceType) {
+      query = query.contains('licence_types', [requiredLicenceType]);
+    }
+
+    const { data: nearbyGuards, error: nearbyError } = await query;
+    if (nearbyError) throw nearbyError;
+    (nearbyGuards || []).forEach((g: any) => {
+      if (!results.find(r => r.id === g.id)) {
+        results.push({
+          ...g,
+          reason: 'SIA verified',
+          availability: 'Availability to confirm',
+        });
+      }
+    });
 
     return results.slice(0, 5);
-  };
-
-  const handleApprove = async (guardId: string) => {
-    setApproving(guardId);
-    try {
-      // TODO: Create a new assignment for this guard as replacement
-      // This would require backend support for replacement assignments
-      onApproveReplacement?.(guardId);
-    } catch {
-    } finally {
-      setApproving(null);
-    }
   };
 
   if (!loaded) {
@@ -195,6 +184,7 @@ export default function ReplacementGuardSuggestions({
           <div className="w-12 h-12 bg-[#111d35] rounded-xl flex items-center justify-center mx-auto mb-3">
             <i className="ri-user-search-line text-2xl text-slate-600"></i>
           </div>
+          {error && <p role="alert" className="text-sm text-red-400 mb-3">{error}</p>}
           <p className="text-sm text-slate-500">Click "Find Replacements" to see available guards</p>
         </div>
       </div>
@@ -215,7 +205,7 @@ export default function ReplacementGuardSuggestions({
             <i className="ri-user-unfollow-line text-2xl text-slate-600"></i>
           </div>
           <p className="text-sm font-semibold text-slate-400 mb-1">No immediate matches found</p>
-          <p className="text-xs text-slate-500 mb-4">Our team is manually searching for a suitable replacement</p>
+          <p className="text-xs text-slate-500 mb-4">Submit a replacement request so our team can help arrange cover</p>
           <button
             onClick={onRequestMore}
             className="inline-flex items-center gap-2 bg-violet-500 text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-violet-600 transition-colors cursor-pointer whitespace-nowrap"
@@ -245,6 +235,7 @@ export default function ReplacementGuardSuggestions({
         </button>
       </div>
 
+      {error && <p role="alert" className="text-sm text-red-400 mb-3">{error}</p>}
       <div className="space-y-3">
         {suggestions.map((guard) => {
           const initials = guard.full_name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || '??';
@@ -298,16 +289,12 @@ export default function ReplacementGuardSuggestions({
               </div>
               <div className="flex flex-col gap-2 flex-shrink-0">
                 <button
-                  onClick={() => handleApprove(guard.id)}
-                  disabled={approving === guard.id}
+                  onClick={() => onRequestReplacement(guard.id, guard.full_name)}
+                  disabled={loading}
                   className="flex items-center gap-1.5 text-xs font-semibold text-white bg-teal-500 hover:bg-teal-600 px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap disabled:opacity-60"
                 >
-                  {approving === guard.id ? (
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <i className="ri-check-line"></i>
-                  )}
-                  Approve
+                  <i className="ri-user-add-line"></i>
+                  Request guard
                 </button>
                 <Link href={`/client/jobs/applicants?id=${encodeURIComponent(jobId)}`}>
                   <button className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-slate-300 bg-[#111d35] hover:bg-[#1a2642] px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap w-full">
@@ -324,7 +311,7 @@ export default function ReplacementGuardSuggestions({
       <div className="mt-4 pt-3 border-t border-[#1e2d4d] flex items-center justify-between">
         <p className="text-xs text-slate-500">
           <i className="ri-information-line mr-1"></i>
-          Approving will request this guard to confirm availability
+          Request your preferred guard; QuickGuard will confirm availability and arrange cover
         </p>
         <button
           onClick={onRequestMore}

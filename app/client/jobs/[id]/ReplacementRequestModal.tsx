@@ -10,6 +10,8 @@ interface ReplacementRequestModalProps {
   assignmentId?: string;
   guardName?: string;
   guardId?: string;
+  preferredGuard?: { id: string; fullName: string };
+  assignmentOptions?: { id: string; guardId?: string; guardName: string }[];
   clientId: string;
   onClose: () => void;
   onSuccess: () => void;
@@ -36,10 +38,13 @@ export default function ReplacementRequestModal({
   guardName,
   guardId,
   clientId,
+  preferredGuard,
+  assignmentOptions,
   onClose,
   onSuccess,
 }: ReplacementRequestModalProps) {
   const router = useRouter();
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState(assignmentId || '');
   const [urgency, setUrgency] = useState('urgent');
   const [reason, setReason] = useState('no_show');
   const [requiredArrivalTime, setRequiredArrivalTime] = useState('');
@@ -51,8 +56,17 @@ export default function ReplacementRequestModal({
   const [step, setStep] = useState(1);
   const [createTicket, setCreateTicket] = useState(true);
 
+  const selectedAssignment = assignmentOptions?.find(a => a.id === selectedAssignmentId);
+  const currentGuardName = selectedAssignment?.guardName || guardName;
+  const currentGuardId = selectedAssignment?.guardId || guardId;
+  const requestNotes = [
+    preferredGuard ? `Preferred replacement: ${preferredGuard.fullName} (guard ID: ${preferredGuard.id}). Availability and booking need confirmation.` : null,
+    notes.trim() || null,
+  ].filter(Boolean).join('\n\n');
+
   const handleSubmit = async () => {
     setError('');
+    if (preferredGuard && !selectedAssignment) { setError('Please select the guard who needs replacing.'); return; }
     if (!reason) { setError('Please select a reason.'); return; }
     if (!requiredArrivalTime) { setError('Please specify when the replacement guard is needed.'); return; }
     if (urgency === 'emergency' && !contactPhone) { setError('Please provide a contact phone for emergency cover.'); return; }
@@ -65,12 +79,12 @@ export default function ReplacementRequestModal({
         .insert({
           client_id: clientId,
           job_id: jobId,
-          assignment_id: assignmentId || null,
-          guard_id: guardId || null,
+          assignment_id: selectedAssignmentId || null,
+          guard_id: currentGuardId || null,
           reason,
           urgency,
           required_arrival_time: requiredArrivalTime,
-          notes: notes.trim() || null,
+          notes: requestNotes || null,
           contact_phone: contactPhone.trim() || null,
           status: 'requested',
         })
@@ -88,8 +102,8 @@ export default function ReplacementRequestModal({
             client_id: clientId,
             related_job_id: jobId,
             category: 'guard_no_show',
-            subject: `Replacement Request: ${guardName || 'Guard'} - ${urgency === 'emergency' ? 'Emergency Cover' : 'Urgent Cover'}`,
-            description: `Replacement request submitted for job "${jobTitle}".\n\nReason: ${REASON_OPTIONS.find(r => r.value === reason)?.label}\nUrgency: ${URGENCY_OPTIONS.find(u => u.value === urgency)?.label}\nRequired by: ${requiredArrivalTime}\nNotes: ${notes || 'None'}\nContact: ${contactPhone || 'Not provided'}`,
+            subject: `Replacement Request: ${currentGuardName || 'Guard'} - ${urgency === 'emergency' ? 'Emergency Cover' : 'Urgent Cover'}`,
+            description: `Replacement request submitted for job "${jobTitle}".\n\nReason: ${REASON_OPTIONS.find(r => r.value === reason)?.label}\nUrgency: ${URGENCY_OPTIONS.find(u => u.value === urgency)?.label}\nRequired by: ${requiredArrivalTime}\nNotes: ${requestNotes || 'None'}\nContact: ${contactPhone || 'Not provided'}`,
             priority: urgency === 'emergency' ? 'urgent' : 'high',
             status: 'open',
             contact_preference: 'phone',
@@ -119,7 +133,7 @@ export default function ReplacementRequestModal({
       });
 
       // If assignment exists, update it to mark replacement requested
-      if (assignmentId) {
+      if (selectedAssignmentId) {
         await supabase
           .from('job_assignments')
           .update({
@@ -128,7 +142,7 @@ export default function ReplacementRequestModal({
             issue_type: 'replacement_needed',
             updated_at: new Date().toISOString(),
           })
-          .eq('id', assignmentId);
+          .eq('id', selectedAssignmentId);
       }
 
       setSuccess(true);
@@ -189,14 +203,29 @@ export default function ReplacementRequestModal({
 
               {step === 1 && (
                 <>
+                  {preferredGuard && (
+                    <div className="bg-violet-500/10 border border-violet-500/25 rounded-xl p-3">
+                      <p className="text-sm font-semibold text-violet-300">Preferred replacement: {preferredGuard.fullName}</p>
+                      <p className="text-xs text-slate-400 mt-1">QuickGuard will check availability and arrange cover. This request does not confirm a booking.</p>
+                    </div>
+                  )}
+                  {assignmentOptions && assignmentOptions.length > 1 && (
+                    <div>
+                      <label htmlFor="replacement-assignment" className="block text-sm font-semibold text-slate-300 mb-2">Guard to replace</label>
+                      <select id="replacement-assignment" value={selectedAssignmentId} onChange={e => setSelectedAssignmentId(e.target.value)} className="w-full bg-[#162036] text-slate-200 border border-[#1e2d4d] rounded-xl p-3">
+                        <option value="">Select assigned guard</option>
+                        {assignmentOptions.map(a => <option key={a.id} value={a.id}>{a.guardName}</option>)}
+                      </select>
+                    </div>
+                  )}
                   {/* Guard info */}
-                  {guardName && (
+                  {currentGuardName && (
                     <div className="bg-[#162036] rounded-xl border border-[#1e2d4d] p-3 flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-[#111d35] flex items-center justify-center border border-[#1e2d4d]">
                         <i className="ri-shield-user-line text-teal-400 text-lg"></i>
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-slate-200">{guardName}</p>
+                        <p className="text-sm font-semibold text-slate-200">{currentGuardName}</p>
                         <p className="text-xs text-slate-500">Current assigned guard</p>
                       </div>
                     </div>
@@ -348,6 +377,12 @@ export default function ReplacementRequestModal({
                       <span className="text-slate-400">Job</span>
                       <span className="text-slate-200 font-medium truncate max-w-[200px]">{jobTitle}</span>
                     </div>
+                    {preferredGuard && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate-400">Preferred replacement</span>
+                        <span className="text-slate-200 font-medium">{preferredGuard.fullName}</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-400">Reason</span>
                       <span className="text-slate-200 font-medium">{REASON_OPTIONS.find(r => r.value === reason)?.label}</span>
@@ -356,10 +391,10 @@ export default function ReplacementRequestModal({
                       <span className="text-slate-400">Urgency</span>
                       <span className={`font-semibold ${urgencyCfg?.color}`}>{urgencyCfg?.label}</span>
                     </div>
-                    {guardName && (
+                    {currentGuardName && (
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-slate-400">Guard</span>
-                        <span className="text-slate-200 font-medium">{guardName}</span>
+                        <span className="text-slate-200 font-medium">{currentGuardName}</span>
                       </div>
                     )}
                   </div>
