@@ -320,6 +320,7 @@ serve(async (req) => {
     let queued = 0;
     let retried = 0;
     let alreadyDelivered = 0;
+    let suppressedCount = 0;
     let queueFailed = 0;
     let pushCount = 0;
 
@@ -367,6 +368,7 @@ serve(async (req) => {
         const result = String(outcome || 'queued');
         if (result === 'retried') retried++;
         else if (result === 'delivered') alreadyDelivered++;
+        else if (result === 'suppressed') suppressedCount++;
         else queued++;
       } catch {
         queueFailed++;
@@ -398,6 +400,7 @@ serve(async (req) => {
         queued,
         retried,
         skipped: alreadyDelivered,
+        suppressed: suppressedCount,
         failed: queueFailed,
         eligible: guardsWithDistance.length,
         pushSent: pushCount,

@@ -142,6 +142,10 @@ BEGIN
   IF v_id IS NOT NULL THEN
     IF v_status = 'sent' THEN
       RETURN 'delivered';
+    ELSIF v_status = 'suppressed' THEN
+      -- A guard who opted out is terminal. It is never reset for a retry, so
+      -- an admin retry can never requeue a suppressed notification.
+      RETURN 'suppressed';
     ELSIF v_status IN ('pending', 'processing', 'queued', 'sending') THEN
       RETURN 'queued';
     ELSE
@@ -186,6 +190,8 @@ EXCEPTION
     LIMIT 1;
     IF v_status = 'sent' THEN
       RETURN 'delivered';
+    ELSIF v_status = 'suppressed' THEN
+      RETURN 'suppressed';
     END IF;
     RETURN 'queued';
 END;
@@ -193,6 +199,31 @@ $function$;
 
 REVOKE ALL ON FUNCTION app.queue_job_match_notification(uuid, uuid, uuid, text, text, text, text, jsonb, integer) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION app.queue_job_match_notification(uuid, uuid, uuid, text, text, text, text, jsonb, integer) TO service_role;
+
+-- 6d-1. Mark a queued job-match email as a terminal suppression (e.g. the
+--       guard disabled job-match emails). Service-role only, and never resets
+--       an already-sent row.
+CREATE OR REPLACE FUNCTION app.suppress_email_queue(
+  p_queue_id uuid,
+  p_reason text default 'preference_disabled'
+) RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'app', 'public'
+AS $function$
+BEGIN
+  UPDATE app.email_queue
+    SET status = 'suppressed',
+        error_message = left(coalesce(p_reason, 'preference_disabled'), 500),
+        updated_at = now()
+  WHERE id = p_queue_id
+    AND status <> 'sent';
+  RETURN FOUND;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION app.suppress_email_queue(uuid, text) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION app.suppress_email_queue(uuid, text) TO service_role;
 
 -- 6e. Recompute the honest delivery state of a job from its queue rows.
 --     'delivered' only when every queued email was accepted by the provider.
@@ -206,6 +237,7 @@ DECLARE
   v_total int;
   v_sent int;
   v_failed int;
+  v_suppressed int;
   v_inflight int;
   v_status text;
 BEGIN
@@ -213,8 +245,9 @@ BEGIN
     count(*),
     count(*) FILTER (WHERE status = 'sent'),
     count(*) FILTER (WHERE status = 'failed'),
+    count(*) FILTER (WHERE status = 'suppressed'),
     count(*) FILTER (WHERE status IN ('pending', 'processing', 'queued', 'sending'))
-  INTO v_total, v_sent, v_failed, v_inflight
+  INTO v_total, v_sent, v_failed, v_suppressed, v_inflight
   FROM app.email_queue
   WHERE email_type = 'job_match'
     AND metadata->>'job_id' = p_job_id::text;
@@ -223,9 +256,13 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  IF v_sent = v_total THEN
+  IF v_suppressed = v_total THEN
+    -- Everyone who matched has opted out: nothing was actually delivered.
+    v_status := 'none';
+  ELSIF v_sent = v_total THEN
     v_status := 'delivered';
   ELSIF v_sent > 0 THEN
+    -- Some sent, some suppressed or failed: honestly partial.
     v_status := 'partially_delivered';
   ELSIF v_failed > 0 AND v_inflight = 0 THEN
     v_status := 'failed';

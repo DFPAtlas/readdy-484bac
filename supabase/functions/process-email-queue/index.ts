@@ -20,6 +20,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Records a reconciliation failure somewhere durable so an operator can see it.
+// Logging must never mask the original queue failure.
+async function logReconciliation(supabase: any, email: any, jobId: string | null, message: string) {
+  try {
+    await supabase.from('email_send_log').insert({
+      function_name: 'process-email-queue',
+      template: 'job_match_reconciliation',
+      recipient: email?.recipient_email || '',
+      related_user_id: email?.user_id || null,
+      related_job_id: jobId || null,
+      status: 'failed',
+      error_message: message.slice(0, 1000),
+      sent_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    });
+  } catch {
+    // ignore logging failure
+  }
+}
+
 async function sendEmailViaResend(apiKey: string, to: string, subject: string, html: string) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -72,6 +92,7 @@ serve(async (req) => {
     let sent = 0;
     let failed = 0;
     let delegated = 0;
+    let suppressed = 0;
     const errors: string[] = [];
 
     for (const email of emails) {
@@ -107,22 +128,51 @@ serve(async (req) => {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
             body: JSON.stringify(metadata),
           });
-          if (!res.ok) throw new Error(await res.text());
+
+          const rawBody = await res.text();
+          let providerResult: any = null;
+          try {
+            providerResult = rawBody ? JSON.parse(rawBody) : null;
+          } catch {
+            providerResult = null;
+          }
+
+          if (!res.ok) {
+            throw new Error(providerResult?.error || rawBody || `send-job-match-email responded ${res.status}`);
+          }
+
+          // A guard who opted out is a terminal suppression: never sent, never delivered.
+          if (providerResult?.suppressed === true) {
+            const { data: suppression, error: suppressionError } = await supabase.rpc('suppress_email_queue', {
+              p_queue_id: email.id,
+              p_reason: providerResult.reason || 'preference_disabled',
+            });
+            if (suppressionError || suppression !== true) {
+              const suppressionMessage = `Queue suppression not confirmed for job_match email ${email.id}: ${suppressionError?.message || `returned ${JSON.stringify(suppression)}`}`;
+              await logReconciliation(supabase, email, metadata.job_id, suppressionMessage);
+              errors.push(suppressionMessage);
+              failed++;
+              continue;
+            }
+            suppressed++;
+            const { error: suppressedRecomputeError } = await supabase.rpc('recompute_job_notification_status', { p_job_id: metadata.job_id });
+            if (suppressedRecomputeError) {
+              const suppressedRecomputeMessage = `recompute_job_notification_status failed for job ${metadata.job_id}: ${suppressedRecomputeError.message}`;
+              await logReconciliation(supabase, email, metadata.job_id, suppressedRecomputeMessage);
+              errors.push(suppressedRecomputeMessage);
+            }
+            continue;
+          }
+
+          // Only a genuine provider acceptance may complete the queue row.
+          if (!providerResult || providerResult.success !== true || !providerResult.email_id) {
+            throw new Error('send-job-match-email did not confirm provider acceptance');
+          }
 
           const { data: completion, error: completionError } = await supabase.rpc('complete_email_queue', { p_queue_id: email.id });
           if (completionError || completion !== true) {
             const reconciliationMessage = `Queue completion not confirmed for job_match email ${email.id}: ${completionError?.message || `returned ${JSON.stringify(completion)}`}`;
-            await supabase.from('email_send_log').insert({
-              function_name: 'process-email-queue',
-              template: 'job_match_reconciliation',
-              recipient: email.recipient_email || '',
-              related_user_id: email.user_id || null,
-              related_job_id: metadata.job_id || null,
-              status: 'failed',
-              error_message: reconciliationMessage.slice(0, 1000),
-              sent_at: new Date().toISOString(),
-              created_at: new Date().toISOString(),
-            });
+            await logReconciliation(supabase, email, metadata.job_id, reconciliationMessage);
             errors.push(reconciliationMessage);
             failed++;
             continue;
@@ -133,17 +183,7 @@ serve(async (req) => {
           const { error: recomputeError } = await supabase.rpc('recompute_job_notification_status', { p_job_id: metadata.job_id });
           if (recomputeError) {
             const recomputeMessage = `recompute_job_notification_status failed for job ${metadata.job_id}: ${recomputeError.message}`;
-            await supabase.from('email_send_log').insert({
-              function_name: 'process-email-queue',
-              template: 'job_match_reconciliation',
-              recipient: email.recipient_email || '',
-              related_user_id: email.user_id || null,
-              related_job_id: metadata.job_id || null,
-              status: 'failed',
-              error_message: recomputeMessage.slice(0, 1000),
-              sent_at: new Date().toISOString(),
-              created_at: new Date().toISOString(),
-            });
+            await logReconciliation(supabase, email, metadata.job_id, recomputeMessage);
             errors.push(recomputeMessage);
           }
           continue;
@@ -180,7 +220,16 @@ serve(async (req) => {
         sent++;
       } catch (err: any) {
         const message = err?.message || 'Unknown email queue failure';
-        await supabase.rpc('fail_email_queue', { p_queue_id: email.id, p_error: message });
+
+        // Supabase RPC errors are returned values, not thrown exceptions, so both
+        // data and error must be inspected to know whether the row was parked.
+        const { data: failResult, error: failError } = await supabase.rpc('fail_email_queue', { p_queue_id: email.id, p_error: message });
+        if (failError || failResult === false) {
+          const failReconciliation = `fail_email_queue not confirmed for email ${email.id}: ${failError?.message || `returned ${JSON.stringify(failResult)}`}`;
+          await logReconciliation(supabase, email, metadata.job_id || null, failReconciliation);
+          errors.push(failReconciliation);
+        }
+
         await supabase.from('email_send_log').insert({
           function_name: 'process-email-queue',
           template: email.template_key || email.template_name || email.email_type || 'queued_email',
@@ -192,8 +241,13 @@ serve(async (req) => {
           sent_at: new Date().toISOString(),
           created_at: new Date().toISOString(),
         });
-        if (metadata.job_id) {
-          try { await supabase.rpc('recompute_job_notification_status', { p_job_id: metadata.job_id }); } catch { /* keep the job intact */ }
+        if (metadata.job_id && email.email_type === 'job_match') {
+          const { error: recomputeError } = await supabase.rpc('recompute_job_notification_status', { p_job_id: metadata.job_id });
+          if (recomputeError) {
+            const recomputeMessage = `recompute_job_notification_status failed for job ${metadata.job_id}: ${recomputeError.message}`;
+            await logReconciliation(supabase, email, metadata.job_id, recomputeMessage);
+            errors.push(recomputeMessage);
+          }
         }
         failed++;
         errors.push(`Email ${email.id}: ${message}`);
@@ -201,7 +255,7 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify({
-      success: true, processed: emails.length, sent, failed, delegated, errors,
+      success: true, processed: emails.length, sent, failed, delegated, suppressed, errors,
     }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

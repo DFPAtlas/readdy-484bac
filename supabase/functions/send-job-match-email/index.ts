@@ -60,7 +60,10 @@ serve(async (req) => {
 
     const { data: preferences } = await supabase.from('notification_preferences').select('job_matches').eq('user_id', payload.guard_id).maybeSingle();
     if (preferences && preferences.job_matches === false) {
-      return new Response(JSON.stringify({ message: 'User disabled job match notifications' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({ success: false, suppressed: true, reason: 'preference_disabled' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const isDirect = payload.is_direct_booking === true;
@@ -116,6 +119,13 @@ serve(async (req) => {
       type: 'info', is_read: false,
       link: `/jobs/detail?id=${encodeURIComponent(payload.job_id)}`, created_at: new Date().toISOString(),
     });
+
+    if (!renderData?.email_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Template render did not return a provider email id' }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     return new Response(JSON.stringify({ success: true, email_id: renderData.email_id }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error: any) {
