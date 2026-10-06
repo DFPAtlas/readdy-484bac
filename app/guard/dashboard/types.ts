@@ -109,4 +109,5 @@ export interface ShiftItem {
   attendance_status?: string | null;
   issue_reported?: boolean;
   replacement_requested?: boolean;
+  guard_confirmed_at?: string | null;
 }

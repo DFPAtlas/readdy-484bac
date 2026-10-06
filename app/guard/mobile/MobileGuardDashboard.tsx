@@ -8,6 +8,7 @@ import MobileInstallPrompt from '@/components/MobileInstallPrompt';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import BottomNav from './BottomNav';
+import { submitGuardApplication } from '@/lib/guard-applications';
 import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
 import HomeSkeleton from './HomeSkeleton';
 import JobsSkeleton from './JobsSkeleton';
@@ -304,10 +305,15 @@ export default function MobileGuardDashboard() {
         return;
       }
 
-      const { error } = await supabase
-        .from('job_applications')
-        .insert([{ job_id: jobId, guard_id: guard.id, status: 'pending' }]);
-      if (error) throw error;
+      const result = await submitGuardApplication({ guardId: guard.id, jobId });
+      if (!result.ok) {
+        if (result.limitReached) {
+          alert('You have reached your monthly application limit for your current plan. Upgrade your plan to apply for more jobs this month.');
+          router.push('/upgrade?reason=guard_application_limit_reached');
+          return;
+        }
+        throw Object.assign(new Error(result.error), { code: result.alreadyApplied ? '23505' : result.code });
+      }
       await loadDashboardData();
     } catch (error: any) {
       if (error.code === '23505') {

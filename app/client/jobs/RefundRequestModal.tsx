@@ -1,5 +1,6 @@
 'use client';
 
+import { routeTicketToCommandCentre } from '@/lib/support-routing';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import CancellationStatusBadge from './CancellationStatusBadge';
@@ -86,7 +87,7 @@ export default function RefundRequestModal({ job, transaction, cancellation, onC
 
       // Create linked support ticket for admin review
       if (type === 'admin_review' || type === 'partial') {
-        await supabase.from('support_tickets').insert({
+        const { data: refundTicket, error: ticketError } = await supabase.from('support_tickets').insert({
           client_id: client.id,
           related_job_id: job.id,
           category: 'refund_request',
@@ -94,7 +95,16 @@ export default function RefundRequestModal({ job, transaction, cancellation, onC
           description: `Client requested a ${type} refund for job "${job.job_title}".\nReason: ${reason}\nNotes: ${notes || 'N/A'}`,
           priority: type === 'admin_review' ? 'high' : 'normal',
           status: 'open',
-        });
+          requested_refund_amount: requestedAmount || null,
+          refund_reason: reason || null,
+        }).select('id').single();
+        // The refund request itself is recorded; the linked review ticket must not fail silently.
+        if (ticketError || !refundTicket?.id) {
+          console.error('[RefundRequestModal] Review ticket was not created', ticketError);
+        } else {
+          const routed = await routeTicketToCommandCentre(refundTicket.id);
+          if (!routed.ok) console.warn('[RefundRequestModal] Command Centre sync pending for ticket', refundTicket.id);
+        }
       }
 
       // Send notification

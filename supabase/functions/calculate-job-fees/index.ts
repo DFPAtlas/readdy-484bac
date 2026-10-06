@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 import { getBookingPolicy, applyClientPromotion, bookingAmounts } from '../_shared/booking-policy.ts';
+import { scheduledDays, scheduledHoursPerGuard, grossGuardPence } from '../_shared/shift-hours.ts';
 
 serve(async (req) => {
   const origin = req.headers.get('origin') || 'https://quickguard.uk';
@@ -85,14 +86,11 @@ serve(async (req) => {
     if (!ownsJob) assignmentQuery = assignmentQuery.eq('guard_id', guardProfile.id);
     const { data: assignments, error: assignmentError } = await assignmentQuery;
     if (assignmentError) throw new Error('Unable to load agreed booking amounts');
-    const start = new Date(`1970-01-01T${job.start_time}`);
-    const end = new Date(`1970-01-01T${job.end_time}`);
-    let hours = (end.getTime() - start.getTime()) / 3600000;
-    if (hours <= 0) hours += 24;
-    const days = Math.max(1, Number(job.number_of_days ?? 1));
+    // Authoritative schedule: daily shift hours x number of days (_shared/shift-hours).
+    const days = scheduledDays(job.number_of_days, job.start_date, job.end_date);
     const rows = assignments?.length ? assignments : Array.from({ length: Number(job.number_of_guards) }, () => ({
-      id: null, guard_id: null, agreed_hourly_rate: job.hourly_rate, agreed_hours: hours * days,
-      gross_guard_amount: Number(job.hourly_rate) * hours * days,
+      id: null, guard_id: null, agreed_hourly_rate: job.hourly_rate, agreed_hours: scheduledHoursPerGuard(job),
+      gross_guard_amount: grossGuardPence(Number(job.hourly_rate), job) / 100,
     }));
     const breakdowns = rows.map((a: any) => {
       const gross = Math.round(Number(a.gross_guard_amount || Number(a.agreed_hourly_rate || job.hourly_rate) * Number(a.agreed_hours || 1)) * 100);
@@ -109,7 +107,8 @@ serve(async (req) => {
       clientTotalCharge: sum('clientTotalAmount'), guardPayoutAmount: sum('guardNetPayout'),
       quickguardNetFee: sum('platformFeeAmount'), feePolicyVersion: 'client-service-fee-v2',
       payoutDelayDays: policy.payoutDelay, autoReleaseHours: policy.autoRelease, disputeWindowHours: policy.disputeWindow,
-      taxDisclaimerAccepted: job.tax_disclaimer_accepted || false, hours: hours * days, days,
+      taxDisclaimerAccepted: job.tax_disclaimer_accepted || false, hours: scheduledHoursPerGuard(job), days,
+      scheduleMismatch: rows.some((a: any) => a.id && Math.abs(Math.round(Number(a.gross_guard_amount) * 100) - grossGuardPence(Number(a.agreed_hourly_rate || job.hourly_rate), job)) > 1),
       clientIsSubscribed: policy.isSubscribed, promoApplied: policy.promoApplied, promoLabel: policy.promoLabel,
       assignments: breakdowns,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });

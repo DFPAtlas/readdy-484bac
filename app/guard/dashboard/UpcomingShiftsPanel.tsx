@@ -16,8 +16,10 @@ interface Props {
 function getShiftAction(shift: ShiftItem) {
   const today = new Date().toISOString().split('T')[0];
   const isToday = shift.start_date === today;
-  if (shift.source === 'application') return { label: 'Confirm', action: 'confirm', variant: 'emerald' };
+  // Applications are not bookings: nothing to confirm until the client has paid.
+  if (shift.source === 'application') return { label: 'View Shift', action: 'view', variant: 'slate' };
   if (shift.status === 'confirmed' && isToday) return { label: 'Check In', action: 'checkin', variant: 'teal' };
+  if (shift.status === 'confirmed' && shift.payment_status === 'funded' && !shift.guard_confirmed_at) return { label: 'Confirm', action: 'confirm', variant: 'emerald' };
   if (shift.status === 'in_progress') {
     if (shift.check_in_time && shift.check_out_time) return { label: 'Mark Complete', action: 'complete', variant: 'emerald' };
     return { label: 'Check Out', action: 'checkout', variant: 'amber' };

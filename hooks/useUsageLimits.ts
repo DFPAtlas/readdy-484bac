@@ -39,16 +39,9 @@ export function useUsageLimits(userId: string | null): UseUsageLimitsResult {
       if (!token) return;
 
       const [guardRes, clientRes] = await Promise.all([
-        supabase.rpc('check_monthly_usage', {
-          p_user_id: userId,
-          p_feature_key: 'guard_application',
-          p_increment: false,
-        }),
-        supabase.rpc('check_monthly_usage', {
-          p_user_id: userId,
-          p_feature_key: 'client_job_post',
-          p_increment: false,
-        }),
+        // Signed-in account only (auth.uid()); userId just gates loading.
+        supabase.rpc('get_my_feature_usage', { p_feature_key: 'guard_application' }),
+        supabase.rpc('get_my_feature_usage', { p_feature_key: 'client_job_post' }),
       ]);
 
       if (guardRes.data) setGuardLimit(guardRes.data as UsageLimit);

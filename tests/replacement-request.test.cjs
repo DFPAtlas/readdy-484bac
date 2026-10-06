@@ -44,15 +44,16 @@ test('suggestion query errors are visible and Refresh performs a new search',asy
 });
 
 function modal(assignmentId='original',failed=false) {
-  const writes=[];
+  const writes=[];const routed=[];
   const db={auth:{getUser:async()=>({data:{user:{id:'client-user'}}})},from(table){return {insert(payload){writes.push({table,payload});return {select(){return {single:async()=>({data:failed?null:{id:'request'},error:failed?{message:'Could not save'}:null})}}};},update(){return {eq:async()=>({error:null})};}};}};
-  const h=harness(dir+'ReplacementRequestModal.tsx',[assignmentId,'urgent','no_show','18:00','Extra instructions','',false,'',false,2,true],{...common,'@/lib/supabase':{supabase:db}});
+  const h=harness(dir+'ReplacementRequestModal.tsx',[assignmentId,'urgent','no_show','18:00','Extra instructions','',false,'',false,2,true],{...common,'@/lib/supabase':{supabase:db},'@/lib/support-routing':{routeTicketToCommandCentre:async(id)=>{routed.push(id);return {ok:true};}}});
   const props={jobId:'job',jobTitle:'Test shift',clientId:'client',preferredGuard:{id:'candidate',fullName:'Preferred Guard'},assignmentOptions:[{id:'original',guardId:'absent',guardName:'Absent Guard'},{id:'other',guardId:'late',guardName:'Late Guard'}],onClose(){},onSuccess(){}};
-  return {h,props,writes};
+  return {h,props,writes,routed};
 }
 test('request persists the preferred guard while retaining the original assignment and guard',async()=>{
-  const {h,props,writes}=modal();
+  const {h,props,writes,routed}=modal();
   await button(h.render(props),'Request Replacement').props.onClick();
+  assert.deepEqual(routed,['request'],'replacement ticket is handed to the Command Centre');
   const request=writes.find(w=>w.table==='replacement_requests').payload;
   assert.equal(request.assignment_id,'original');assert.equal(request.guard_id,'absent');assert.equal(request.status,'requested');
   assert.match(request.notes,/Preferred Guard.*candidate/);assert.match(request.notes,/Extra instructions/);

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
+import { submitGuardApplication } from '@/lib/guard-applications';
 import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
 
 interface SavedJob {
@@ -124,22 +125,16 @@ export default function GuardSavedJobsPage() {
         return;
       }
 
-      const { error } = await supabase
-        .from('job_applications')
-        .insert({
-          job_id: jobId,
-          guard_id: guardId,
-          status: 'pending',
-          cover_message: '',
-          applied_at: new Date().toISOString(),
-        });
-
-      if (error) {
-        if (error.code === '23505') {
+      const result = await submitGuardApplication({ guardId, jobId });
+      if (!result.ok) {
+        if (result.alreadyApplied) {
           showToast('Already applied to this job', 'info');
           setApplications(prev => new Set([...prev, jobId]));
+        } else if (result.limitReached) {
+          showToast('You have reached your monthly application limit for your current plan. Upgrade your plan to apply for more jobs this month.', 'error');
+          router.push('/upgrade?reason=guard_application_limit_reached');
         } else {
-          showToast('Failed to apply. Please try again.', 'error');
+          showToast(result.error || 'Failed to apply. Please try again.', 'error');
         }
       } else {
         setApplications(prev => new Set([...prev, jobId]));

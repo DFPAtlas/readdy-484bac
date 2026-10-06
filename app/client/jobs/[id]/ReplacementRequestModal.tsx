@@ -1,5 +1,6 @@
 'use client';
 
+import { routeTicketToCommandCentre } from '@/lib/support-routing';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -111,8 +112,14 @@ export default function ReplacementRequestModal({
           .select('id')
           .single();
 
+        if (ticketError || !ticketData) {
+          console.error('[ReplacementRequestModal] Support ticket was not created', ticketError);
+        }
         if (!ticketError && ticketData) {
           supportTicketId = ticketData.id;
+          // Same Command Centre hand-over as ordinary support tickets.
+          const routed = await routeTicketToCommandCentre(ticketData.id);
+          if (!routed.ok) console.warn('[ReplacementRequestModal] Command Centre sync pending for ticket', ticketData.id);
           // Update the replacement request with the ticket link
           await supabase
             .from('replacement_requests')

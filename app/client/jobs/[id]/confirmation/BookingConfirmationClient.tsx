@@ -34,6 +34,8 @@ interface Assignment {
 
 interface Job {
   id: string;
+  disputed?: boolean | null;
+  disputed_at?: string | null;
   job_title: string;
   venue_name: string;
   venue_city: string;
@@ -219,45 +221,50 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
     loadData();
   }, [jobId]);
 
+  const [disputing, setDisputing] = useState(false);
+
   const handleDispute = async () => {
-    if (!job) return;
+    if (!job || disputing) return;
+    const assignment = assignments[0];
+    if (!assignment?.id) {
+      setToast('There is no booked guard to dispute yet. Please contact support.');
+      setTimeout(() => setToast(''), 5000);
+      return;
+    }
+    setDisputing(true);
     try {
-      await supabase
-        .from('jobs')
-        .update({
-          status: 'disputed',
-          disputed: true,
-          disputed_at: new Date().toISOString(),
-          disputed_reason: 'Client disputed before confirmation',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', jobId)
-        .eq('client_id', clientId);
-
-      await supabase.from('support_tickets').insert({
-        client_id: clientId,
-        related_job_id: jobId,
-        subject: `Booking Disputed: ${job.job_title}`,
-        description: 'Client has disputed this booking before final confirmation.',
-        status: 'open',
-        priority: 'high',
+      // Authoritative handler: ownership, eligibility, atomic dispute record,
+      // independent payout hold and audit (app.raise_client_payment_dispute).
+      const { data: sessionData } = await supabase.auth.getSession();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/dispute-job`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionData.session?.access_token ?? ''}`,
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+        },
+        body: JSON.stringify({
+          job_id: jobId,
+          assignment_id: assignment.id,
+          reason: 'Client disputed booking before confirmation',
+          details: `Raised from the booking confirmation screen for "${job.job_title}".`,
+        }),
       });
+      let result: any = {};
+      try { result = await res.json(); } catch { result = {}; }
+      if (!res.ok || !result.success || !result.disputeId) {
+        throw new Error(result.error || 'Failed to dispute booking. Please try again.');
+      }
 
-      await supabase.from('notifications').insert({
-        user_id: authUserId,
-        user_type: 'client',
-        type: 'booking_disputed',
-        title: 'Booking Disputed',
-        message: `Your booking "${job.job_title}" has been marked as disputed. Support will contact you shortly.`,
-        link: `/client/support`,
-        is_read: false,
-      });
-
-      setJob((prev: any) => prev ? { ...prev, status: 'disputed', disputed: true } : null);
-      setToast('Booking disputed. Support will contact you shortly.');
-      setTimeout(() => setToast(''), 4000);
-    } catch {
-      setToast('Failed to dispute booking. Please try again.');
+      // Only reflect the dispute once the server has recorded it.
+      setJob((prev: any) => prev ? { ...prev, disputed: true, disputed_at: new Date().toISOString() } : null);
+      setToast(result.replayed ? 'This booking is already under dispute.' : 'Booking disputed. Payout is on hold and support will contact you shortly.');
+      setTimeout(() => setToast(''), 5000);
+    } catch (err: any) {
+      setToast(err?.message || 'Failed to dispute booking. Please try again.');
+      setTimeout(() => setToast(''), 6000);
+    } finally {
+      setDisputing(false);
     }
   };
 
@@ -270,7 +277,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
   const allTermsAccepted = termsBooking && termsCancellation && termsSite && termsPayment;
   const paymentComplete = transaction?.status === 'completed' || transaction?.status === 'succeeded' || job?.status === 'awaiting_client_confirmation' || job?.status === 'confirmed' || job?.status === 'in_progress';
   const isConfirmed = job?.status === 'confirmed' || job?.status === 'in_progress' || job?.status === 'completed';
-  const isDisputed = job?.status === 'disputed';
+  const isDisputed = job?.status === 'disputed' || job?.disputed === true;
   const isCancelled = job?.status === 'cancelled';
   const guardsSelected = assignments.length;
   const guardsRequired = job?.number_of_guards || 0;
@@ -718,6 +725,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handleDispute}
+                      disabled={disputing}
                       className="flex items-center gap-2 px-4 py-2.5 border border-orange-500/25 text-orange-400 rounded-xl text-sm font-semibold hover:bg-orange-500/10 transition-colors cursor-pointer whitespace-nowrap"
                     >
                       <i className="ri-shield-flash-line"></i>

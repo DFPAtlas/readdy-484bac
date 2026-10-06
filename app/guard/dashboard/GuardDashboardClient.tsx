@@ -347,6 +347,7 @@ export default function GuardDashboardClient() {
           assigned_at,
           check_in_time,
           check_out_time,
+          guard_confirmed_at,
           attendance_status,
           issue_reported,
           replacement_requested,
@@ -723,33 +724,33 @@ export default function GuardDashboardClient() {
     }
   };
 
-  const handleConfirmShift = async (applicationId: string) => {
+  const handleConfirmShift = async (assignmentId: string) => {
     if (isAdmin || !guard) return;
     try {
-      const { data: appData } = await supabase
-        .from('job_applications')
-        .select('job_id, guard_id')
-        .eq('id', applicationId)
-        .maybeSingle();
-      if (!appData) throw new Error('Application not found');
+      const assignment = assignments.find(a => a.id === assignmentId);
+      const jobId = (assignment?.jobs as any)?.id;
+      if (!jobId) { showGuardToast('Could not find this shift. Please refresh.'); return; }
 
-      await supabase
-        .from('job_applications')
-        .update({ status: 'confirmed', updated_at: new Date().toISOString() })
-        .eq('id', applicationId);
-
-      await supabase
-        .from('job_assignments')
-        .upsert(
-          { job_id: appData.job_id, guard_id: appData.guard_id, status: 'confirmed', assigned_at: new Date().toISOString() },
-          { onConflict: 'job_id,guard_id', ignoreDuplicates: false }
-        );
-
-      await loadJobApplications();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/guard-shift-attendance`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionData.session?.access_token ?? ''}`,
+          },
+          body: JSON.stringify({ action: 'confirm_shift', assignmentId, jobId }),
+        }
+      );
+      let data: any = {};
+      try { data = await response.json(); } catch { data = {}; }
+      // Success only once the server has persisted guard_confirmed_at.
+      if (!response.ok || !data.success || !data.guard_confirmed_at) throw new Error(data.error || 'Failed to confirm. Please try again.');
       await loadJobAssignments(guardUserId!, isAdmin);
-      showGuardToast('Shift confirmed!');
-    } catch {
-      showGuardToast('Failed to confirm. Please try again.');
+      showGuardToast(data.alreadyConfirmed ? 'Shift already confirmed.' : 'Shift confirmed!');
+    } catch (err: any) {
+      showGuardToast(err.message || 'Failed to confirm. Please try again.');
     }
   };
 
@@ -852,6 +853,7 @@ export default function GuardDashboardClient() {
         attendance_status: a.attendance_status || null,
         issue_reported: a.issue_reported || false,
         replacement_requested: a.replacement_requested || false,
+        guard_confirmed_at: (a as any).guard_confirmed_at || null,
       } as any));
     return [...appShifts, ...assignShifts]
       .sort((a, b) => a.start_date.localeCompare(b.start_date))

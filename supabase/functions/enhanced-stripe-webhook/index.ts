@@ -3,6 +3,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { invoiceReferences, invoiceOutcome, stripeId, subscriptionStatus } from '../_shared/invoice-lifecycle.ts';
+import { subscriptionProfileUpdate, profileTable, normaliseAccountType, requireWrite, planForPrice } from '../_shared/subscription-profile.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://quickguard.uk',
@@ -353,10 +354,20 @@ serve(async (req) => {
           const planSlug = session.metadata?.planSlug || session.metadata?.plan_id || session.metadata?.plan_slug || null;
           const stripeSubId = session.subscription as string;
           const stripeCustomerId = session.customer as string;
-          const accountType = session.metadata?.account_type || session.metadata?.accountType || 'guard';
           const billingCycle = session.metadata?.billing_cycle || 'monthly';
           if (!userId) { console.error('[EnhancedWebhook] checkout.session.completed missing client_reference_id'); break; }
           if (!stripeSubId) { console.error('[EnhancedWebhook] checkout.session.completed missing subscription'); break; }
+          let accountType = normaliseAccountType(session.metadata?.account_type || session.metadata?.accountType);
+          if (!accountType && userId) {
+            // Never default an unknown account to 'guard': resolve it from the profile tables.
+            const [{ data: g, error: gErr }, { data: c, error: cErr }] = await Promise.all([
+              appSupabase.from('guards').select('id').eq('user_id', userId).maybeSingle(),
+              appSupabase.from('clients').select('id').eq('user_id', userId).maybeSingle(),
+            ]);
+            if (gErr || cErr) throw new Error('Unable to resolve subscription account type');
+            accountType = g ? 'guard' : c ? 'client' : null;
+          }
+          if (!accountType) throw new Error(`checkout.session.completed: no QuickGuard profile for user ${userId}`);
 
           const { data: oldSub } = await appSupabase.from('subscriptions').select('plan_slug, plan_name').eq('user_id', userId).maybeSingle();
           const stripeSub = await stripe.subscriptions.retrieve(stripeSubId);
@@ -375,7 +386,8 @@ serve(async (req) => {
           let planAmount: number | null = null;
           let planFeatures: any = '[]';
           if (planSlug) {
-            const { data: planData } = await appSupabase.from('plans').select('monthly_price_pence, features').eq('slug', planSlug).maybeSingle();
+            const { data: planData, error: planError } = await appSupabase.from('plans').select('monthly_price_pence, features').eq('slug', planSlug).maybeSingle();
+            if (planError) throw new Error(`Plan lookup failed: ${planError.message}`);
             if (planData) { planAmount = planData.monthly_price_pence; planFeatures = planData.features || '[]'; }
           }
 
@@ -383,27 +395,32 @@ serve(async (req) => {
           const { error: subUpsertError } = await appSupabase.from('subscriptions').upsert(subPayload, { onConflict: 'user_id' });
           if (subUpsertError) throw new Error(`Subscription upsert failed: ${subUpsertError.message}`);
 
-          const { data: subRecord } = await appSupabase.from('subscriptions').select('id').eq('user_id', userId).maybeSingle();
+          const { data: subRecord, error: subRecordError } = await appSupabase.from('subscriptions').select('id').eq('user_id', userId).maybeSingle();
+          if (subRecordError) throw new Error(`Subscription reload failed: ${subRecordError.message}`);
           const subscriptionDbId = subRecord?.id || null;
 
           const amountForPayment = isPaidUpfront ? ((planAmount || 0) / 100) : 0;
           if (isPaidUpfront && amountForPayment > 0 && subscriptionDbId) {
-            const { data: existingPayment } = await appSupabase.from('subscription_payments').select('id').eq('stripe_invoice_id', stripeSub.latest_invoice as string).maybeSingle();
+            const { data: existingPayment, error: existingPaymentError } = await appSupabase.from('subscription_payments').select('id').eq('stripe_invoice_id', stripeSub.latest_invoice as string).maybeSingle();
+            if (existingPaymentError) throw new Error(`Subscription payment lookup failed: ${existingPaymentError.message}`);
             if (!existingPayment) {
-              await appSupabase.from('subscription_payments').insert({ subscription_id: subscriptionDbId, user_id: userId, stripe_payment_intent_id: session.payment_intent as string || null, stripe_invoice_id: stripeSub.latest_invoice as string || null, amount: amountForPayment, currency: stripeSub.currency || 'gbp', status: 'succeeded', billing_reason: 'subscription_create', period_start: periodStart, period_end: periodEnd, paid_at: new Date().toISOString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+              const { error: paymentInsertError } = await appSupabase.from('subscription_payments').insert({ subscription_id: subscriptionDbId, user_id: userId, stripe_payment_intent_id: session.payment_intent as string || null, stripe_invoice_id: stripeSub.latest_invoice as string || null, amount: amountForPayment, currency: stripeSub.currency || 'gbp', status: 'succeeded', billing_reason: 'subscription_create', period_start: periodStart, period_end: periodEnd, paid_at: new Date().toISOString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+              // A concurrent duplicate delivery may already have recorded this invoice (unique index).
+              if (paymentInsertError && (paymentInsertError as any).code !== '23505') throw new Error(`Subscription payment insert failed: ${paymentInsertError.message}`);
               console.log(`[EnhancedWebhook] Created subscription_payments record for checkout, user=${userId}`);
             }
           }
 
-          const profileUpdate: any = { subscription_status: subStatus, subscription_plan: planSlug, subscription_tier: planSlug, plan_slug: planSlug, plan_name: planName, stripe_customer_id: stripeCustomerId, stripe_subscription_id: stripeSubId, updated_at: new Date().toISOString() };
-          if (accountType === 'guard') { profileUpdate.profile_completed = true; profileUpdate.onboarding_status = 'active'; await appSupabase.from('guards').update(profileUpdate).eq('user_id', userId); }
-          else { profileUpdate.profile_completed = true; profileUpdate.onboarding_status = 'active'; await appSupabase.from('clients').update(profileUpdate).eq('user_id', userId); }
+          const profileUpdate = subscriptionProfileUpdate(accountType, { status: subStatus, planSlug, planName, customerId: stripeCustomerId, subscriptionId: stripeSubId, currentPeriodEnd: periodEnd, activateProfile: true });
+          await requireWrite(appSupabase.from(profileTable(accountType)).update(profileUpdate).eq('user_id', userId).select('id'), `${accountType} profile subscription sync`, { minRows: 1 });
 
-          const { data: existingEnt } = await appSupabase.from('user_entitlements').select('user_id').eq('user_id', userId).maybeSingle();
+          const entitlementFields = { plan_slug: planSlug, plan_name: planName, subscription_status: subStatus, stripe_subscription_id: stripeSubId, monthly_price_pence: planAmount || 0, features: planFeatures, current_period_end: periodEnd, cancel_at_period_end: stripeSub.cancel_at_period_end || false, updated_at: new Date().toISOString() };
+          const { data: existingEnt, error: existingEntError } = await appSupabase.from('user_entitlements').select('user_id').eq('user_id', userId).maybeSingle();
+          if (existingEntError) throw new Error(`Entitlement lookup failed: ${existingEntError.message}`);
           if (existingEnt) {
-            await appSupabase.from('user_entitlements').update({ plan_slug: planSlug, plan_name: planName, subscription_status: subStatus, stripe_subscription_id: stripeSubId, monthly_price_pence: planAmount || 0, features: planFeatures, current_period_end: periodEnd, cancel_at_period_end: stripeSub.cancel_at_period_end || false, updated_at: new Date().toISOString() }).eq('user_id', userId);
+            await requireWrite(appSupabase.from('user_entitlements').update(entitlementFields).eq('user_id', userId).select('user_id'), 'Entitlement sync', { minRows: 1 });
           } else {
-            await appSupabase.from('user_entitlements').insert({ user_id: userId, plan_slug: planSlug, plan_name: planName, audience: accountType, features: planFeatures, monthly_price_pence: planAmount || 0, subscription_status: subStatus, stripe_subscription_id: stripeSubId, current_period_end: periodEnd, cancel_at_period_end: stripeSub.cancel_at_period_end || false, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+            await requireWrite(appSupabase.from('user_entitlements').insert({ user_id: userId, audience: accountType, created_at: new Date().toISOString(), ...entitlementFields }), 'Entitlement create');
           }
 
           if (oldSub && oldSub.plan_slug && oldSub.plan_slug !== planSlug) {
@@ -428,16 +445,22 @@ serve(async (req) => {
         const priceId = subscriptionItems?.[0]?.price?.id;
         let planFeatures: any = null; let newPlanSlug: string | null = null; let newPlanName: string | null = null;
         if (priceId) {
-          const { data: planMatch } = await appSupabase.from('plans').select('slug, name, monthly_price_pence, features').eq('stripe_price_id', priceId).maybeSingle();
-          if (planMatch) { updateData.plan_slug = planMatch.slug; updateData.plan_name = planMatch.name; updateData.plan_amount = planMatch.monthly_price_pence; planFeatures = planMatch.features; newPlanSlug = planMatch.slug; newPlanName = planMatch.name; }
+          // Monthly and annual prices both resolve to their plan.
+          const planMatch = await planForPrice(appSupabase, priceId);
+          if (planMatch) { updateData.plan_slug = planMatch.slug; updateData.plan_name = planMatch.name; updateData.plan_amount = planMatch.monthly_price_pence; updateData.billing_cycle = planMatch.billingCycle; planFeatures = planMatch.features; newPlanSlug = planMatch.slug; newPlanName = planMatch.name; }
+          else console.error(`[EnhancedWebhook] No plan matches Stripe price ${priceId}; plan fields left unchanged`);
         }
-        const { data: oldSub } = await appSupabase.from('subscriptions').select('plan_slug, plan_name, user_id, account_type').eq('stripe_subscription_id', subscription.id).maybeSingle();
+        const { data: oldSub, error: oldSubError } = await appSupabase.from('subscriptions').select('plan_slug, plan_name, user_id, account_type').eq('stripe_subscription_id', subscription.id).maybeSingle();
+        if (oldSubError) throw new Error(`Subscription lookup failed: ${oldSubError.message}`);
         await requireAudit(appSupabase.from('subscriptions').update(updateData).eq('stripe_subscription_id', subscription.id));
-        const { data: subRecord } = await appSupabase.from('subscriptions').select('user_id, account_type').eq('stripe_subscription_id', subscription.id).maybeSingle();
+        const { data: subRecord, error: subRecordError } = await appSupabase.from('subscriptions').select('user_id, account_type').eq('stripe_subscription_id', subscription.id).maybeSingle();
+        if (subRecordError) throw new Error(`Subscription reload failed: ${subRecordError.message}`);
         if (subRecord?.user_id) {
-          const table = subRecord.account_type === 'client' ? 'clients' : (subRecord.account_type === 'guard' ? 'guards' : 'clients');
-          const profileUpdate: any = { subscription_status: subscriptionStatus(subscription), updated_at: new Date().toISOString() };
-          if (updateData.plan_slug) { profileUpdate.subscription_plan = updateData.plan_slug; profileUpdate.subscription_tier = updateData.plan_slug; profileUpdate.plan_slug = updateData.plan_slug; profileUpdate.plan_name = updateData.plan_name; }
+          const accountType = normaliseAccountType(subRecord.account_type);
+          if (!accountType) throw new Error(`Subscription ${subscription.id} has unknown account type ${subRecord.account_type}`);
+          const table = profileTable(accountType);
+          // Only columns this account type actually has (guards have no subscription_tier).
+          const profileUpdate = subscriptionProfileUpdate(accountType, { status: subscriptionStatus(subscription), planSlug: updateData.plan_slug, planName: updateData.plan_name, currentPeriodEnd: period.end });
           await requireAudit(appSupabase.from(table).update(profileUpdate).eq('user_id', subRecord.user_id).eq('stripe_subscription_id', subscription.id));
           const entUpdate: any = { subscription_status: subscriptionStatus(subscription), current_period_end: period.end, cancel_at_period_end: subscription.cancel_at_period_end || false, updated_at: new Date().toISOString() };
           if (updateData.plan_slug) { entUpdate.plan_slug = updateData.plan_slug; entUpdate.plan_name = updateData.plan_name; entUpdate.monthly_price_pence = updateData.plan_amount || 0; }
@@ -480,8 +503,8 @@ serve(async (req) => {
           ...(outcome === 'succeeded' ? { last_payment_date: new Date(((invoice as any).status_transitions?.paid_at || invoice.created) * 1000).toISOString() } : {}),
         });
         await requireAudit(appSupabase.from('subscriptions').update(update).eq('id', sub.id));
-        const profileTable = sub.account_type === 'guard' ? 'guards' : 'clients';
-        await requireAudit(appSupabase.from(profileTable).update({subscription_status: status, updated_at: now})
+        const invoiceProfileTable = sub.account_type === 'guard' ? 'guards' : 'clients';
+        await requireAudit(appSupabase.from(invoiceProfileTable).update({subscription_status: status, updated_at: now})
           .eq('user_id', sub.user_id).eq('stripe_subscription_id', subId));
         await requireAudit(appSupabase.from('user_entitlements').update({ subscription_status: status,
           current_period_end: period.end, cancel_at_period_end: currentSubscription.cancel_at_period_end, updated_at: now })

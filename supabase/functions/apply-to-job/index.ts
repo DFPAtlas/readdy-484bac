@@ -7,35 +7,50 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-function base64UrlDecode(str: string): string {
-  const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  return atob(base64 + padding);
+function json(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
-function decodeJwtPayload(jwt: string): any {
-  try {
-    const parts = jwt.split(".");
-    if (parts.length !== 3) return null;
-    return JSON.parse(base64UrlDecode(parts[1]));
-  } catch {
-    return null;
+const APPLY_ERRORS: Record<string, [number, string, Record<string, unknown>?]> = {
+  invalid_request: [400, "guardId and jobId are required"],
+  guard_not_found: [404, "Guard not found"],
+  forbidden: [403, "Forbidden: You can only apply as yourself"],
+  invite_not_found: [404, "Invitation not found"],
+  invite_not_pending: [409, "This invitation is no longer open"],
+  already_applied: [409, "Already applied", { alreadyApplied: true }],
+  job_not_found: [404, "Job not found"],
+  job_removed: [400, "This job has been removed"],
+  job_closed: [400, "Job is no longer open for applications"],
+  guard_inactive: [403, "Your account is not active. Contact support."],
+  guard_not_verified: [403, "Your profile is not yet verified. You cannot apply for jobs until verification is complete."],
+  sia_expired: [403, "Your SIA licence has expired. Please update your licence details."],
+  sia_required: [403, "A verified SIA licence is required for this job"],
+  sia_expiry_missing: [403, "Your SIA licence expiry date is missing"],
+  licence_mismatch: [400, "You don't hold the required SIA licence types for this job"],
+  no_plan: [400, "No subscription plan found"],
+  plan_not_found: [400, "Plan not found"],
+  tier_locked: [400, "Upgrade required to access this job tier", { tierLocked: true }],
+  limit_reached: [400, "Monthly application limit reached", { limitReached: true }],
+};
+
+function applicationError(error: any) {
+  const message = String(error?.message || "");
+  const match = /qg_apply:([a-z_]+)(?::([a-z_]+))?/.exec(message);
+  if (error?.code === "23505") return json({ error: "Already applied", alreadyApplied: true }, 409);
+  if (!match) {
+    console.error("[apply-to-job] Application failed:", error?.code, message);
+    return json({ error: "Unable to submit application. Please try again." }, 500);
   }
+  const [status, text, extra] = APPLY_ERRORS[match[1]] || [400, "Unable to submit application"];
+  let usage: Record<string, unknown> = {};
+  if (match[1] === "limit_reached" && error?.details) {
+    try {
+      const u = JSON.parse(error.details);
+      usage = { limit: u.limit, used: u.used, planSlug: u.plan_slug, planName: u.plan_name, resetDate: u.period_end };
+    } catch { /* detail is optional */ }
+  }
+  return json({ error: text, code: match[1], ...(extra || {}), ...(match[2] ? { requiredLevel: match[2] } : {}), ...usage }, status);
 }
-
-const PLAN_ACCESS: Record<string, number> = {
-  guard_starter: 0,
-  "guard-basic": 1,
-  "guard-pro": 2,
-  "guard-elite": 3,
-};
-
-const JOB_LEVEL: Record<string, number> = {
-  basic: 0,
-  professional: 1,
-  premium: 2,
-  elite: 3,
-};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -50,252 +65,60 @@ serve(async (req) => {
     const jwt = authHeader.replace("Bearer ", "").trim();
 
     if (!jwt || jwt === Deno.env.get("SUPABASE_ANON_KEY")) {
-      return new Response(JSON.stringify({ error: "Unauthorized: Missing authentication token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Unauthorized: Missing authentication token" }, 401);
     }
 
-    const payload = decodeJwtPayload(jwt);
-    if (!payload || !payload.sub) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const authUserId = payload.sub;
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: "app" } });
+    // Verify the token with Supabase Auth (not just decode it).
+    const { data: authData, error: authError } = await supabaseClient.auth.getUser(jwt);
+    if (authError || !authData?.user) {
+      return json({ error: "Invalid token" }, 401);
+    }
+    const authUserId = authData.user.id;
 
-    const body = await req.json();
-    const { guardId, jobId, coverMessage } = body;
+    const body = await req.json().catch(() => ({}));
+    const { guardId, jobId, coverMessage, inviteId } = body;
 
     if (!guardId || !jobId) {
-      return new Response(JSON.stringify({ error: "guardId and jobId are required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "guardId and jobId are required" }, 400);
     }
 
-    const { data: guardData, error: guardError } = await supabaseClient
-      .from("guards")
-      .select("id, user_id, created_at, verification_status, licence_types, sia_licence_number, sia_expiry_date, sia_verified, is_active")
-      .eq("id", guardId)
-      .maybeSingle();
-
-    if (guardError || !guardData) {
-      return new Response(JSON.stringify({ error: "Guard not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { data: adminData } = await supabaseClient
+    const { data: adminData, error: adminError } = await supabaseClient
       .from("admin_users")
       .select("id, is_active")
       .eq("user_id", authUserId)
       .maybeSingle();
-
+    if (adminError) return json({ error: "Unable to verify account" }, 500);
     const isAdmin = !!adminData?.is_active;
 
-    if (!isAdmin && guardData.user_id !== authUserId) {
-      return new Response(JSON.stringify({ error: "Forbidden: You can only apply as yourself" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Single authoritative path: ownership, eligibility, tier, duplicate and
+    // usage checks, invitation acceptance and the insert commit atomically.
+    const { data: submitted, error: submitError } = await supabaseClient.rpc("submit_job_application", {
+      p_actor_user_id: authUserId,
+      p_guard_id: guardId,
+      p_job_id: jobId,
+      p_cover_message: typeof coverMessage === "string" ? coverMessage.slice(0, 5000) : "",
+      p_invite_id: inviteId || null,
+      p_is_admin: isAdmin,
+    });
+
+    if (submitError || !submitted?.applicationId) {
+      return applicationError(submitError);
     }
 
-    if (!isAdmin) {
-      if (!guardData.is_active) {
-        return new Response(JSON.stringify({ error: "Your account is not active. Contact support." }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    const application = { id: submitted.applicationId as string };
+    const now = new Date().toISOString();
 
-      if (guardData.verification_status !== "verified" && guardData.verification_status !== "approved") {
-        return new Response(JSON.stringify({
-          error: "Your profile is not yet verified. You cannot apply for jobs until verification is complete.",
-          verificationStatus: guardData.verification_status
-        }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      if (guardData.sia_expiry_date) {
-        const expiry = new Date(guardData.sia_expiry_date);
-        if (expiry < new Date()) {
-          return new Response(JSON.stringify({ error: "Your SIA licence has expired. Please update your licence details." }), {
-            status: 403,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-      }
+    if (submitted.replayed) {
+      return json({ success: true, applicationId: application.id, replayed: true, warnings: [] }, 200);
     }
 
-    const { data: jobData, error: jobError } = await supabaseClient
+    const { data: jobData } = await supabaseClient
       .from("jobs")
-      .select("id, status, sia_licence_required, required_licence_types, job_tier, job_access_level, job_title, start_date, venue_name, hourly_rate, clients(id, email, company_name, first_name, last_name), is_deleted")
+      .select("id, job_title, hourly_rate, clients(id, user_id, email, company_name, first_name, last_name)")
       .eq("id", jobId)
       .maybeSingle();
-
-    if (jobError || !jobData) {
-      return new Response(JSON.stringify({ error: "Job not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (jobData.is_deleted) {
-      return new Response(JSON.stringify({ error: "This job has been removed" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (jobData.status !== "open") {
-      return new Response(JSON.stringify({ error: "Job is no longer open for applications" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!isAdmin && jobData.sia_licence_required) {
-      if (!guardData.sia_verified || !guardData.sia_licence_number) {
-        return new Response(JSON.stringify({ error: "A verified SIA licence is required for this job" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      if (!guardData.sia_expiry_date) {
-        return new Response(JSON.stringify({ error: "Your SIA licence expiry date is missing" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    if (jobData.sia_licence_required && jobData.required_licence_types && jobData.required_licence_types.length > 0) {
-      const guardLicences = guardData.licence_types || [];
-      const hasRequired = jobData.required_licence_types.some((req: string) =>
-        guardLicences.some((lic: string) => lic.toLowerCase() === req.toLowerCase())
-      );
-      if (!hasRequired) {
-        return new Response(JSON.stringify({ error: "You don't hold the required SIA licence types for this job" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    const { data: existingApp } = await supabaseClient
-      .from("job_applications")
-      .select("id")
-      .eq("job_id", jobId)
-      .eq("guard_id", guardId)
-      .maybeSingle();
-
-    if (existingApp) {
-      return new Response(JSON.stringify({ error: "Already applied", alreadyApplied: true }), {
-        status: 409,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!isAdmin) {
-      const { data: entitlement } = await supabaseClient
-        .from("user_entitlements_data")
-        .select("plan_slug, plan_name, is_free_tier, current_period_end")
-        .eq("user_id", guardData.user_id)
-        .maybeSingle();
-
-      if (!entitlement?.plan_slug) {
-        return new Response(JSON.stringify({ error: "No subscription plan found" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const { data: plan } = await supabaseClient
-        .from("plans")
-        .select("job_limit_per_month, slug, name")
-        .eq("slug", entitlement.plan_slug)
-        .maybeSingle();
-
-      if (!plan) {
-        return new Response(JSON.stringify({ error: "Plan not found" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const jobAccessLevel = jobData.job_access_level || "basic";
-      const guardLvl = PLAN_ACCESS[entitlement.plan_slug] ?? 0;
-      const jobLvl = JOB_LEVEL[jobAccessLevel] ?? 0;
-
-      if (guardLvl < jobLvl) {
-        return new Response(JSON.stringify({ error: "Upgrade required to access this job tier", tierLocked: true, requiredLevel: jobAccessLevel }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      if (plan.job_limit_per_month !== null) {
-        const { data: usageCheck, error: usageError } = await supabaseClient
-          .rpc('check_monthly_usage', {
-            p_user_id: guardData.user_id,
-            p_feature_key: 'guard_application',
-            p_increment: true,
-          });
-
-        if (usageError || !usageCheck) {
-          return new Response(JSON.stringify({ error: "Failed to check usage limits" }), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-
-        if (!usageCheck.allowed) {
-          return new Response(JSON.stringify({
-            error: "Monthly application limit reached",
-            limitReached: true,
-            limit: usageCheck.limit,
-            used: usageCheck.used,
-            planSlug: usageCheck.plan_slug,
-            planName: usageCheck.plan_name,
-            resetDate: usageCheck.period_end,
-          }), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-      }
-    }
-
-    const now = new Date().toISOString();
-    const { data: application, error: insertError } = await supabaseClient
-      .from("job_applications")
-      .insert({
-        job_id: jobId,
-        guard_id: guardId,
-        cover_message: coverMessage || "",
-        status: "pending",
-        applied_at: now,
-      })
-      .select("id")
-      .single();
-
-    if (insertError) {
-      if (insertError.code === "23505") {
-        return new Response(JSON.stringify({ error: "Already applied", alreadyApplied: true }), {
-          status: 409,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw insertError;
-    }
+    const guardData = { user_id: submitted.guardUserId as string };
 
     const warnings: string[] = [];
 
@@ -306,7 +129,7 @@ serve(async (req) => {
         .eq("id", guardId)
         .maybeSingle();
 
-      if (guardInfo && jobData.clients) {
+      if (guardInfo && jobData?.clients) {
         const client = jobData.clients as any;
         const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-job-application-email`, {
           method: "POST",
@@ -318,9 +141,9 @@ serve(async (req) => {
             client_email: client.email || "",
             client_name: client.company_name || `${client.first_name || ""} ${client.last_name || ""}`.trim(),
             guard_name: guardInfo.full_name || "Guard",
-            job_title: jobData.job_title || "",
+            job_title: jobData?.job_title || "",
             job_id: jobId,
-            proposed_rate: jobData.hourly_rate || 0,
+            proposed_rate: jobData?.hourly_rate || 0,
             cover_message: coverMessage || "",
             guard_id: guardId,
           }),
@@ -342,7 +165,7 @@ serve(async (req) => {
         user_id: guardData.user_id || authUserId,
         user_type: "guard",
         title: "Application Submitted",
-        message: `You've applied to ${jobData.job_title || "a job"}. The client will review your application.`,
+        message: `You've applied to ${jobData?.job_title || "a job"}. The client will review your application.`,
         type: "info",
         is_read: false,
         link: `/guard/dashboard#notifications`,
@@ -350,6 +173,19 @@ serve(async (req) => {
         created_at: now,
       });
     } catch {
+    }
+
+    if (submitted.inviteAccepted && (jobData?.clients as any)?.user_id) {
+      const { error: inviteNoticeError } = await supabaseClient.from("notifications").insert({
+        user_id: (jobData!.clients as any).user_id,
+        user_type: "client",
+        type: "job_application",
+        title: "Invited Guard Applied",
+        message: `An invited guard accepted your invite and applied for "${jobData?.job_title || "your job"}".`,
+        link: `/client/jobs/applicants?id=${encodeURIComponent(jobId)}`,
+        is_read: false,
+      });
+      if (inviteNoticeError) warnings.push("client_invite_notification_failed");
     }
 
     return new Response(JSON.stringify({ success: true, applicationId: application.id, warnings }), {

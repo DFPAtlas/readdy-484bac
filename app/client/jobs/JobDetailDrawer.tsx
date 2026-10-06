@@ -1,5 +1,6 @@
 'use client';
 
+import { scheduledHoursPerGuard } from '@/lib/shift-hours';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -89,12 +90,9 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
   const isCancelled = job.status === 'cancelled';
   const unreviewedCount = assignments.filter((a) => a.guards?.id && !guardReviews[a.guards.id]).length;
 
-  const [sh, sm] = (job.start_time || '00:00').split(':').map(Number);
-  const [eh, em] = (job.end_time || '00:00').split(':').map(Number);
-  let hours = (eh * 60 + em - sh * 60 - sm) / 60;
-  if (hours <= 0) hours += 24;
-  const days = Math.max(1, job.number_of_days || 1);
-  const totalHours = hours * days;
+  // Daily shift hours x number of days (lib/shift-hours, shared with checkout).
+  let totalHours = 0;
+  try { totalHours = scheduledHoursPerGuard(job); } catch { totalHours = 0; }
   const guardPay = Number(latestTransaction?.metadata?.breakdown?.guardFees ?? (totalHours * (job.number_of_guards || 1) * (job.hourly_rate || 0)));
   const recorded = latestTransaction?.metadata?.breakdown;
   const serviceFee = Number(recorded?.platformFee ?? 0);

@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { geocodeAddress } from '@/lib/geocoding';
+import { submitClientJob, loadClientBookingFee } from '@/lib/post-job-request';
+import { calculatePaygFees } from '@/lib/payg-fees';
+import { shiftHours } from '@/lib/shift-hours';
 
 const venueCategories = [
   { key: 'door_supervisor', label: 'Door Supervisor', icon: 'ri-door-open-line', desc: 'Nightclubs, bars, pubs' },
@@ -98,6 +100,8 @@ export default function MobilePostJob() {
   const [success, setSuccess] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [toast, setToast] = useState('');
+  const [feePct, setFeePct] = useState<number | null>(null);
+  const [feeFixedPence, setFeeFixedPence] = useState(0);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -118,6 +122,10 @@ export default function MobilePostJob() {
       }
 
       setClientId(clientData.id);
+      // Same plan + promotion rules as desktop and checkout.
+      loadClientBookingFee(user.id, clientData.id)
+        .then(fee => { setFeePct(fee.feePercent); setFeeFixedPence(fee.feeFixedPence); })
+        .catch(() => setFeePct(null));
       setFormData(prev => ({
         ...prev,
         contactName: clientData.contact_name || '',
@@ -203,89 +211,46 @@ export default function MobilePostJob() {
   };
 
   const calculateHours = () => {
-    const [sh, sm] = formData.startTime.split(':').map(Number);
-    const [eh, em] = formData.endTime.split(':').map(Number);
-    let hrs = (eh * 60 + em - sh * 60 - sm) / 60;
-    if (hrs <= 0) hrs += 24;
-    return hrs;
+    try { return shiftHours(formData.startTime, formData.endTime); } catch { return 0; }
+  };
+
+  const feeBreakdown = () => {
+    const hourlyRate = parseFloat(formData.hourlyRate || '0');
+    const hours = calculateHours();
+    if (!hourlyRate || !hours || feePct === null) return null;
+    return calculatePaygFees({
+      hourlyRate,
+      hours,
+      numberOfGuards: parseInt(formData.numberOfGuards) || 1,
+      numberOfDays: parseInt(formData.numberOfDays) || 1,
+      serviceFeePct: feePct,
+      serviceFeeFixedPence: feeFixedPence,
+    });
   };
 
   const estimatedTotal = () => {
     const hrs = calculateHours();
-    return (hrs * parseFloat(formData.hourlyRate || '0') * parseInt(formData.numberOfGuards) * parseInt(formData.numberOfDays)).toFixed(2);
+    return (hrs * parseFloat(formData.hourlyRate || '0') * (parseInt(formData.numberOfGuards) || 1) * (parseInt(formData.numberOfDays) || 1)).toFixed(2);
   };
 
   const serviceFee = () => {
-    return (parseFloat(estimatedTotal()) * 0.15).toFixed(2);
+    const fees = feeBreakdown();
+    return fees ? fees.serviceFee.toFixed(2) : null;
   };
 
   const handlePost = async () => {
     if (!validateStep3()) return;
     setSubmitting(true);
     try {
+      if (!clientId) throw new Error('Authentication error. Please refresh the page.');
       const endDate = calculateEndDate();
-      const fullAddress = [formData.addressLine1, formData.city, formData.postcode, 'UK'].filter(Boolean).join(', ');
-      const geo = await geocodeAddress(fullAddress);
+      // Same authoritative path as desktop: create-job validates ownership,
+      // fields and the plan limit, geocodes, and notifies matching guards.
+      const result = await submitClientJob({ ...formData, endDate, repeatShift: 'none' }, clientId);
+      if (!result.ok || !result.jobId) throw new Error(result.error || 'Failed to post job');
 
-      const formatTime = (time: string) => {
-        if (!time) return null;
-        const trimmed = time.trim();
-        return trimmed.split(':').length === 2 ? `${trimmed}:00` : trimmed;
-      };
-
-      const { data: jobData, error } = await supabase
-        .from('jobs')
-        .insert({
-          client_id: clientId,
-          job_title: formData.jobTitle.trim(),
-          security_type: formData.securityType,
-          job_description: formData.jobDescription.trim(),
-          venue_name: formData.venue.trim(),
-          venue_address_line1: formData.addressLine1.trim(),
-          venue_address_line2: formData.addressLine2.trim() || null,
-          venue_city: formData.city.trim(),
-          venue_postcode: formData.postcode.trim(),
-          number_of_guards: parseInt(formData.numberOfGuards),
-          number_of_days: parseInt(formData.numberOfDays),
-          start_date: formData.startDate,
-          end_date: endDate,
-          start_time: formatTime(formData.startTime),
-          end_time: formatTime(formData.endTime),
-          hourly_rate: parseFloat(formData.hourlyRate),
-          sia_licence_required: formData.siaLicenceRequired === 'yes',
-          required_licence_types: formData.specificLicences.length > 0 ? formData.specificLicences : null,
-          uniform_required: formData.uniformRequired === 'yes',
-          uniform_details: formData.uniformDetails.trim() || null,
-          experience_level: formData.experienceLevel,
-          special_instructions: formData.specialInstructions.trim() || null,
-          urgency: formData.urgency,
-          contact_name: formData.contactName.trim(),
-          contact_phone: formData.contactPhone.trim(),
-          contact_email: formData.contactEmail.trim(),
-          status: 'open',
-          latitude: geo?.latitude ?? null,
-          longitude: geo?.longitude ?? null,
-        })
-        .select()
-        .maybeSingle();
-
-      if (error) throw new Error(error.message);
-      if (!jobData) throw new Error('Job creation failed');
-
-      setJobId(jobData.id);
+      setJobId(result.jobId);
       setSuccess(true);
-
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token;
-        if (token) {
-          fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/notify-matching-guards`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ jobId: jobData.id }),
-          }).catch(() => {});
-        }
-      } catch {}
     } catch (err: any) {
       setErrors({ submit: err.message || 'Failed to post job' });
     } finally {
@@ -316,7 +281,7 @@ export default function MobilePostJob() {
           <div className="bg-[#162036] rounded-xl p-4 mb-5 text-left border border-[#1e2d4d]">
             <p className="text-xs text-slate-500 mb-1">Estimated cost</p>
             <p className="text-xl font-bold text-teal-400">£{estimatedTotal()}</p>
-            <p className="text-xs text-slate-500 mt-1">Free-plan fee example: £{serviceFee()}. Your plan and eligible promotions determine the final fee before checkout.</p>
+            <p className="text-xs text-slate-500 mt-1">{serviceFee() !== null ? `Service fee for your plan: £${serviceFee()}. ` : ''}The confirmed total is shown before payment.</p>
           </div>
           <div className="flex flex-col gap-3">
             <Link href={`/client/jobs/detail?id=${encodeURIComponent(jobId)}`} className="bg-teal-500 text-white py-3 rounded-xl font-semibold text-center text-sm whitespace-nowrap">
@@ -694,8 +659,8 @@ export default function MobilePostJob() {
                     <span className="font-bold text-teal-400">£{estimatedTotal()}</span>
                   </div>
                   <div className="flex justify-between text-xs text-slate-500">
-                    <span>Free-plan example fee (15%)</span>
-                    <span>£{serviceFee()}</span>
+                    <span>{feePct !== null ? `Service fee (${feePct}%${feeFixedPence ? ' + fixed' : ''})` : 'Service fee'}</span>
+                    <span>{serviceFee() !== null ? `£${serviceFee()}` : 'Shown before payment'}</span>
                   </div>
                 </div>
               </div>

@@ -11,7 +11,7 @@ import PortalSidebar from '@/components/PortalSidebar';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useRouteGuard } from '@/hooks/useRouteGuard';
 import { logClientActivity, ACTIVITY_TYPES, ACTIVITY_CATEGORIES } from '@/lib/client-activity';
-import { checkClientJobLimit, recordClientJobPost } from '@/lib/guard-application-limits';
+import { checkClientJobLimit } from '@/lib/guard-application-limits';
 
 interface SavedSite {
   id: string;
@@ -414,17 +414,9 @@ export default function BulkPostingClient() {
       }
     });
 
-    // Phase 4: Record usage for successful jobs
-    let usageWarning = '';
-    if (successCount > 0) {
-      const usageResults = await Promise.all(
-        Array.from({ length: successCount }).map(() => recordClientJobPost(supabase, user.id))
-      );
-      const usageFailures = usageResults.filter(r => !r.allowed).length;
-      if (usageFailures > 0) {
-        usageWarning = `Usage tracking failed for ${usageFailures} job(s). Contact support if your limits appear incorrect.`;
-      }
-    }
+    // Phase 4: usage is consumed by the database (trg_enforce_client_job_post_limit)
+    // in the same transaction as each insert; a row over the plan limit is rejected.
+    const usageWarning = '';
 
     // Phase 5: Activity log
     try {

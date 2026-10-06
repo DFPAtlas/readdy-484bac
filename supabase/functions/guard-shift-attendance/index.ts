@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import { confirmGuardShift, ShiftConfirmationError } from '../_shared/shift-confirmation.ts';
 
 const CORS_ORIGINS = ['https://quickguard.uk', 'https://www.quickguard.uk'];
 
@@ -65,11 +66,22 @@ serve(async (req: Request) => {
   const assignmentId = body.assignmentId;
   const jobId = body.jobId;
 
-  if (!action || !['check_in', 'check_out'].includes(action)) return json(origin, 400, { error: 'Invalid action' });
+  if (!action || !['check_in', 'check_out', 'confirm_shift'].includes(action)) return json(origin, 400, { error: 'Invalid action' });
   if (!assignmentId || !jobId) return json(origin, 400, { error: 'Missing assignmentId or jobId' });
 
   const { data: guard } = await supabase.from('guards').select('id, full_name').eq('user_id', user.id).maybeSingle();
   if (!guard) return json(origin, 404, { error: 'Guard profile not found' });
+
+  if (action === 'confirm_shift') {
+    try {
+      const result = await confirmGuardShift(supabase, { guardId: guard.id, assignmentId, jobId });
+      return json(origin, 200, { action: 'confirm_shift', ...result });
+    } catch (err) {
+      if (err instanceof ShiftConfirmationError) return json(origin, err.status, { error: err.message, code: err.code });
+      console.error('[guard-shift-attendance] confirm_shift failed', err);
+      return json(origin, 500, { error: 'Failed to confirm shift' });
+    }
+  }
 
   const { data: assignment } = await supabase
     .from('job_assignments')
