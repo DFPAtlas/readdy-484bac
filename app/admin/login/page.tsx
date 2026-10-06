@@ -31,13 +31,31 @@ export default function AdminLogin() {
     setError('');
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const { data: loginData, error: loginError } = await supabase.functions.invoke('admin-login', {
+        body: { email, password },
       });
 
-      if (authError || !authData.session) {
-        setError('Invalid email or password');
+      if (loginError || !loginData?.session?.access_token || !loginData?.session?.refresh_token) {
+        let message = loginData?.error || 'Invalid email or password';
+        const context = (loginError as { context?: Response } | null)?.context;
+        if (context) {
+          try {
+            const errorBody = await context.clone().json();
+            if (typeof errorBody?.error === 'string') message = errorBody.error;
+          } catch {}
+        }
+        setError(message);
+        setLoading(false);
+        return;
+      }
+
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: loginData.session.access_token,
+        refresh_token: loginData.session.refresh_token,
+      });
+
+      if (sessionError) {
+        setError('Unable to establish an admin session');
         setLoading(false);
         return;
       }

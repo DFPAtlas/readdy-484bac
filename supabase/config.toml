@@ -4,6 +4,11 @@
 # with the project's current signing keys before the function can validate them.
 verify_jwt = false
 
+[functions.admin-login]
+# This pre-authentication endpoint validates credentials, rate-limits failures,
+# verifies the active admin record, and records the login attempt internally.
+verify_jwt = false
+
 [functions.create-job]
 # The function validates the bearer token with auth.getUser() and verifies that
 # the submitted client belongs to that authenticated user.

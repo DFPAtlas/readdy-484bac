@@ -30,7 +30,7 @@ const KNOWN_FUNCTIONS_FALLBACK: Record<string, { name: string; verify_jwt: boole
   "send-accessibility-feedback-confirmation": { name: "Send Accessibility Feedback Confirmation", verify_jwt: false },
   "send-job-payment-complete-email": { name: "Send Job Payment Complete Email", verify_jwt: true },
   "admin-register": { name: "Admin Register", verify_jwt: true },
-  "admin-login": { name: "Admin Login", verify_jwt: true },
+  "admin-login": { name: "Admin Login", verify_jwt: false },
   "send-admin-password-reset-alert": { name: "Send Admin Password Reset Alert", verify_jwt: true },
   "create-super-admin": { name: "Create Super Admin", verify_jwt: true },
   "send-contact-form-email": { name: "Send Contact Form Email", verify_jwt: false },
