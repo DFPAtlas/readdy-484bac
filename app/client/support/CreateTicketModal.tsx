@@ -1,5 +1,6 @@
 'use client';
 
+import { routeTicketToCommandCentre } from '@/lib/support-routing';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { logClientActivity, ACTIVITY_TYPES, ACTIVITY_CATEGORIES } from '@/lib/client-activity';
@@ -115,18 +116,7 @@ export default function CreateTicketModal({ clientId, jobs, prefillJobId, prefil
         metadata: { category, priority, contact_preference: contactPreference },
       };
 
-      let bridgeOk = false;
-      try {
-        const { data: bridgeData, error: bridgeError } = await supabase.functions.invoke(
-          'dfp-support-ticket-bridge',
-          {
-            body: { ticketId: createdTicket.id },
-          }
-        );
-        bridgeOk = !bridgeError && bridgeData?.success === true;
-      } catch {
-        bridgeOk = false;
-      }
+      const { ok: bridgeOk } = await routeTicketToCommandCentre(createdTicket.id);
 
       await logClientActivity(activityPayload);
 

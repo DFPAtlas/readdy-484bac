@@ -146,6 +146,7 @@ serve(async (req) => {
     if (!endDate || Number.isNaN(endDate.getTime())) validationErrors.push('Valid end date is required');
     if (startDate && endDate && endDate < startDate) validationErrors.push('End date cannot be before start date');
     if (!formData.startTime || !formData.endTime) validationErrors.push('Start and end times are required');
+    else if (!/^\d{1,2}:\d{2}(:\d{2})?$/.test(String(formData.startTime).trim()) || !/^\d{1,2}:\d{2}(:\d{2})?$/.test(String(formData.endTime).trim())) validationErrors.push('Start and end times must be valid times');
     if (!contactName) validationErrors.push('Contact name is required');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) validationErrors.push('Valid contact email is required');
     if (publishAt && Number.isNaN(publishAt.getTime())) validationErrors.push('Invalid publish date');
@@ -231,10 +232,10 @@ serve(async (req) => {
       latitude: geo?.latitude ?? null,
       longitude: geo?.longitude ?? null,
       geocoded_at: geo ? new Date().toISOString() : null,
-      repeat_pattern: formData.repeatShift === 'none' ? 'one-off' : (formData.repeatShift || 'one-off'),
+      repeat_pattern: !formData.repeatShift || formData.repeatShift === 'none' ? 'one-off' : formData.repeatShift,
       repeat_frequency: formData.repeatFrequency || null,
       repeat_end_date: formData.repeatEndDate || null,
-      is_recurring: formData.repeatShift !== 'none',
+      is_recurring: Boolean(formData.repeatShift) && formData.repeatShift !== 'none',
       saved_site_id: formData.savedSiteId || null,
       publish_at: formData.publishAt ? new Date(formData.publishAt).toISOString() : null,
       expires_at: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : null,
@@ -254,6 +255,13 @@ serve(async (req) => {
       .maybeSingle();
 
     if (insertError || !jobData) {
+      // The database trigger re-checks the plan limit atomically with the insert.
+      if (insertError?.message?.includes('job_post_limit_reached')) {
+        return new Response(JSON.stringify({
+          error: 'limit_reached',
+          message: 'You have reached your monthly job posting limit. Upgrade your plan to post more jobs.',
+        }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
       return new Response(JSON.stringify({
         error: 'insert_failed',
         message: insertError?.message || 'Failed to create job. Please try again.',
@@ -269,15 +277,7 @@ serve(async (req) => {
       warnings.push(geocodingWarning);
     }
 
-    try {
-      await supabaseAdmin.rpc('check_monthly_usage', {
-        p_user_id: user.id,
-        p_feature_key: 'client_job_post',
-        p_increment: true,
-      });
-    } catch {
-      warnings.push('usage_record_failed');
-    }
+    // Usage was consumed by trg_enforce_client_job_post_limit in the insert transaction.
 
     try {
       await supabaseAdmin.from('client_activity_log').insert({

@@ -1,212 +1,79 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { authorizePromoCaller } from '../_shared/promo-auth.ts';
+
+// Promotional tier allocation for a newly approved guard.
+// Callable ONLY by the backend (service-role bearer, e.g. admin-verify-guard) or an
+// active QuickGuard administrator. Anonymous callers, guards and clients are
+// rejected before any privileged client is created. Allocation itself is atomic,
+// idempotent and eligibility-checked in app.assign_guard_promo_tier.
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://quickguard.uk',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function json(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+
+const ERRORS: Record<string, [number, string]> = {
+  invalid_request: [400, 'guardId is required'],
+  guard_not_found: [404, 'Guard not found'],
+  guard_not_eligible: [409, 'Guard is not approved and active'],
+  config_missing: [503, 'Promotion configuration is missing; no tier was assigned'],
+  write_conflict: [409, 'Guard promotion changed concurrently; retry'],
+};
+
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !supabaseServiceKey) return json({ error: 'Server configuration error' }, 500);
 
-  if (!supabaseUrl || !supabaseServiceKey) {
-    return new Response(
-      JSON.stringify({ error: 'Server configuration error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+  const auth = await authorizePromoCaller(req.headers.get('Authorization'), supabaseServiceKey, async (token: string) => {
+    // Only reached for non-service tokens: verify the user and their admin role.
+    const verifier = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' }, auth: { persistSession: false } });
+    const { data: userData, error: userError } = await verifier.auth.getUser(token);
+    if (userError || !userData?.user) return false;
+    const { data: admin, error: adminError } = await verifier.from('admin_users')
+      .select('id, role, is_active').eq('user_id', userData.user.id).eq('is_active', true).maybeSingle();
+    return !adminError && !!admin && ['super_admin', 'admin'].includes(admin.role);
+  });
+  if (!auth.ok) return json({ error: auth.error || 'Unauthorized' }, auth.status || 401);
+
+  let guardId: unknown;
+  try { ({ guardId } = await req.json()); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+  if (typeof guardId !== 'string' || !/^[0-9a-f-]{36}$/i.test(guardId)) return json({ error: 'guardId is required' }, 400);
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
+  // Caller-supplied dates are ignored; the database uses its own records.
+  const { data: result, error } = await supabase.rpc('assign_guard_promo_tier', { p_guard_id: guardId });
+  if (error || !result?.success) {
+    const code = /qg_promo:([a-z_]+)/.exec(error?.message || '')?.[1];
+    const [status, message] = (code && ERRORS[code]) || [500, 'Unable to assign promotion tier'];
+    if (!code) console.error('[assign-guard-promo-tier] Allocation failed:', error?.code, error?.message);
+    return json({ error: message, code: code || 'allocation_failed' }, status);
   }
 
-  try {
-    const { guardId, guardCreatedAt } = await req.json();
-    if (!guardId) {
-      return new Response(
-        JSON.stringify({ error: 'guardId is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      db: { schema: 'app' }
-    });
-
-    const { data: config, error: configError } = await supabase
-      .from('promo_config')
-      .select('*')
-      .eq('id', 1)
-      .maybeSingle();
-
-    if (configError || !config) {
-      const { data: countData } = await supabase
-        .from('guards')
-        .select('id', { count: 'exact', head: true })
-        .eq('verification_status', 'approved');
-      
-      const signupNumber = (countData?.length || 0) + 1;
-      
-      const { error: updateErr } = await supabase
-        .from('guards')
-        .update({
-          signup_number: signupNumber,
-          promo_tier: 'standard',
-          lifetime_fee_percentage: null,
-          founding_badge: false,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', guardId);
-
-      if (updateErr) throw updateErr;
-
-      return new Response(
-        JSON.stringify({ success: true, tier: 'standard', signupNumber, message: 'Standard tier assigned (no promo config)' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (config.is_paused) {
-      const { count } = await supabase
-        .from('guards')
-        .select('*', { count: 'exact', head: true })
-        .eq('verification_status', 'approved');
-      
-      const signupNumber = (count || 0) + 1;
-      
-      await supabase.from('guards').update({
-        signup_number: signupNumber,
-        promo_tier: 'standard',
-        lifetime_fee_percentage: null,
-        founding_badge: false,
-        updated_at: new Date().toISOString(),
-      }).eq('id', guardId);
-
-      return new Response(
-        JSON.stringify({ success: true, tier: 'standard', signupNumber, message: 'Standard tier assigned (promo paused)' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const now = new Date();
-    const signupDate = guardCreatedAt ? new Date(guardCreatedAt) : now;
-    const daysSinceSignup = (now.getTime() - signupDate.getTime()) / (1000 * 60 * 60 * 24);
-    const effectiveDate = daysSinceSignup <= 14 ? signupDate : now;
-
-    const launchDate = new Date(config.launch_date);
-    const tier3EndDate = new Date(launchDate);
-    tier3EndDate.setDate(tier3EndDate.getDate() + config.tier3_window_days);
-
-    const withinLaunchWindow = now <= tier3EndDate;
-    const withinTier3Cap = true;
-
-    const { data: existing } = await supabase
-      .from('guards')
-      .select('signup_number')
-      .eq('id', guardId)
-      .maybeSingle();
-
-    if (existing?.signup_number) {
-      return new Response(
-        JSON.stringify({ success: true, alreadyAssigned: true, signupNumber: existing.signup_number }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const { count } = await supabase
-      .from('guards')
-      .select('*', { count: 'exact', head: true })
-      .eq('verification_status', 'approved')
-      .not('signup_number', 'is', null);
-
-    const signupNumber = (count || 0) + 1;
-
-    let tier = 'standard';
-    let promoStartsAt = now.toISOString();
-    let promoEndsAt: string | null = null;
-    let lifetimeFee: number | null = null;
-    let foundingBadge = false;
-
-    if (signupNumber <= config.tier1_cap) {
-      tier = 'founding';
-      const end = new Date(now);
-      end.setMonth(end.getMonth() + 12);
-      promoEndsAt = end.toISOString();
-      lifetimeFee = config.tier1_lifetime_fee;
-      foundingBadge = true;
-    } else if (signupNumber <= config.tier2_cap) {
-      tier = 'early';
-      const end = new Date(now);
-      end.setMonth(end.getMonth() + 6);
-      promoEndsAt = end.toISOString();
-    } else if (signupNumber <= config.tier3_cap && withinLaunchWindow) {
-      tier = 'launch';
-      const end = new Date(now);
-      end.setMonth(end.getMonth() + 3);
-      promoEndsAt = end.toISOString();
-    }
-
-    const { error: updateError } = await supabase
-      .from('guards')
-      .update({
-        signup_number: signupNumber,
-        promo_tier: tier,
-        promo_starts_at: promoStartsAt,
-        promo_ends_at: promoEndsAt,
-        lifetime_fee_percentage: lifetimeFee,
-        founding_badge: foundingBadge,
-        updated_at: now.toISOString(),
-      })
-      .eq('id', guardId);
-
-    if (updateError) throw updateError;
-
+  if (result.newlyAssigned) {
     try {
-      const { data: guardData } = await supabase
-        .from('guards')
-        .select('full_name, email')
-        .eq('id', guardId)
-        .maybeSingle();
-
+      const { data: guardData } = await supabase.from('guards').select('full_name, email').eq('id', guardId).maybeSingle();
       if (guardData?.email) {
         await fetch(`${supabaseUrl}/functions/v1/send-guard-promo-welcome`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
           body: JSON.stringify({
-            guardId,
-            guardName: guardData.full_name,
-            guardEmail: guardData.email,
-            tier,
-            signupNumber,
-            promoEndsAt,
-            lifetimeFee,
+            guardId, guardName: guardData.full_name, guardEmail: guardData.email,
+            tier: result.tier, signupNumber: result.signupNumber, promoEndsAt: result.promoEndsAt, lifetimeFee: result.lifetimeFee,
           }),
         });
       }
     } catch (emailErr) {
       console.error('Promo welcome email failed:', emailErr);
     }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        tier,
-        signupNumber,
-        promoEndsAt,
-        lifetimeFee,
-        foundingBadge,
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (err: any) {
-    console.error('Assign promo tier error:', err);
-    return new Response(
-      JSON.stringify({ error: 'Internal server error', details: err.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
   }
+
+  return json(result, 200);
 });

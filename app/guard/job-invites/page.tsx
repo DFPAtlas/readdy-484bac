@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
+import { submitGuardApplication } from '@/lib/guard-applications';
 import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
 import MessageClientModal from '@/app/guard/components/MessageClientModal';
 
@@ -118,79 +119,55 @@ export default function GuardJobInvitesPage() {
   const respond = async (inviteId: string, jobId: string, accept: boolean) => {
     if (!guardId) return;
     setProcessing(inviteId);
-
-    const newStatus = accept ? 'accepted' : 'declined';
-    const { error } = await supabase
-      .from('job_invites')
-      .update({ status: newStatus, responded_at: new Date().toISOString() })
-      .eq('id', inviteId)
-      .eq('guard_id', guardId);
-
-    if (error) {
-      showToast('Failed to respond. Please try again.', 'error');
-    } else {
-      if (accept) {
-        const limitCheck = await checkGuardApplicationLimit(supabase, guardId);
-        if (!limitCheck.allowed) {
-          if (limitCheck.reason === 'limit_reached') {
-            showToast('You have reached your monthly application limit for your current plan. Upgrade your plan to apply for more jobs this month.', 'error');
-            router.push('/upgrade?reason=guard_application_limit_reached');
-          } else {
-            showToast('We could not verify your guard subscription plan. Please refresh or contact support.', 'error');
-            router.push('/upgrade?reason=guard.plan_verification_failed');
-          }
-          setProcessing(null);
+    try {
+      if (!accept) {
+        const { data: declined, error } = await supabase
+          .from('job_invites')
+          .update({ status: 'declined', responded_at: new Date().toISOString() })
+          .eq('id', inviteId)
+          .eq('guard_id', guardId)
+          .eq('status', 'pending')
+          .select('id');
+        if (error || !declined?.length) {
+          showToast('Failed to respond. Please try again.', 'error');
           return;
         }
-
-        const { error: appErr } = await supabase
-          .from('job_applications')
-          .insert({
-            job_id: jobId,
-            guard_id: guardId,
-            status: 'pending',
-            cover_message: 'Applied via job invite.',
-            applied_at: new Date().toISOString(),
-          });
-
-        if (appErr && appErr.code !== '23505') {
-          showToast('Invite accepted but application failed — please apply manually.', 'error');
-        } else {
-          showToast('Invite accepted! Application submitted.', 'success');
-          try {
-            const { data: jobRow } = await supabase
-              .from('jobs')
-              .select('job_title, client_id')
-              .eq('id', jobId)
-              .maybeSingle();
-            if (jobRow?.client_id) {
-              const { data: clientRow } = await supabase
-                .from('clients')
-                .select('user_id')
-                .eq('id', jobRow.client_id)
-                .maybeSingle();
-              if (clientRow?.user_id) {
-                await supabase.from('notifications').insert({
-                  user_id: clientRow.user_id,
-                  user_type: 'client',
-                  type: 'job_application',
-                  title: 'Invited Guard Applied',
-                  message: `${guardName} accepted your invite and applied for "${jobRow.job_title}".`,
-                  link: `/client/jobs/applicants?id=${encodeURIComponent(jobId)}`,
-                  is_read: false,
-                });
-              }
-            }
-          } catch {
-            // non-blocking
-          }
-        }
-      } else {
         showToast('Invite declined.', 'info');
+        setInvites(prev => prev.map(inv => inv.id === inviteId ? { ...inv, status: 'declined' } : inv));
+        return;
       }
-      setInvites(prev => prev.map(inv => inv.id === inviteId ? { ...inv, status: newStatus } : inv));
+
+      const limitCheck = await checkGuardApplicationLimit(supabase, guardId);
+      if (!limitCheck.allowed) {
+        if (limitCheck.reason === 'limit_reached') {
+          showToast('You have reached your monthly application limit for your current plan. Upgrade your plan to apply for more jobs this month.', 'error');
+          router.push('/upgrade?reason=guard_application_limit_reached');
+        } else {
+          showToast('We could not verify your guard subscription plan. Please refresh or contact support.', 'error');
+          router.push('/upgrade?reason=guard.plan_verification_failed');
+        }
+        return;
+      }
+
+      // Acceptance and application commit together on the server. If the
+      // application fails, the invite stays pending so the guard can retry;
+      // repeating an accepted invite never creates a second application.
+      const result = await submitGuardApplication({ guardId, jobId, inviteId, coverMessage: 'Applied via job invite.' });
+      if (!result.ok) {
+        if (result.limitReached) {
+          showToast('You have reached your monthly application limit for your current plan. Upgrade your plan to apply for more jobs this month.', 'error');
+          router.push('/upgrade?reason=guard_application_limit_reached');
+        } else {
+          showToast(`${result.error || 'Could not accept the invite.'} Your invite is still open — please try again.`, 'error');
+        }
+        return;
+      }
+
+      showToast(result.replayed ? 'Invite already accepted.' : 'Invite accepted! Application submitted.', 'success');
+      setInvites(prev => prev.map(inv => inv.id === inviteId ? { ...inv, status: 'accepted' } : inv));
+    } finally {
+      setProcessing(null);
     }
-    setProcessing(null);
   };
 
   const pendingCount = invites.filter(i => i.status === 'pending').length;

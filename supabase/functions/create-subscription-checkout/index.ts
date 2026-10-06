@@ -1,4 +1,5 @@
 import { matchesSubscriptionPrice } from '../_shared/subscription-price.ts';
+import { subscriptionProfileUpdate, profileTable, requireWrite, type AccountType } from '../_shared/subscription-profile.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3?target=deno';
@@ -160,84 +161,72 @@ async function syncPlanToDb(
   publicSupabase: any,
   userId: string,
   planId: string,
-  accountType: string,
+  accountType: AccountType,
   stripeSubId: string,
   status: string,
   periodEnd: string,
   planAmount: number,
   planFeatures: any,
   cancelAtPeriodEnd: boolean,
+  billingCycle: 'monthly' | 'annual',
+  priceId: string,
 ) {
   const planName = PLAN_NAMES[planId] || planId;
+  const now = new Date().toISOString();
 
-  await publicSupabase
+  // Every write is error-checked: a plan switch already applied in Stripe must not
+  // be reported as complete when the database is only partly synchronised. The
+  // customer.subscription.updated webhook re-applies the same state if this fails.
+  await requireWrite(publicSupabase
     .from('subscriptions')
-    .upsert({
-      user_id: userId,
+    .update({
       plan_name: planName,
       plan_slug: planId,
       status,
-      stripe_subscription_id: stripeSubId,
       account_type: accountType,
       current_period_end: periodEnd,
       cancel_at_period_end: cancelAtPeriodEnd,
       plan_amount: planAmount,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' });
+      billing_cycle: billingCycle,
+      stripe_price_id: priceId,
+      updated_at: now,
+    })
+    .eq('user_id', userId)
+    .eq('stripe_subscription_id', stripeSubId)
+    .select('id'), 'Subscription sync', { minRows: 1 });
 
-  const profileUpdate: any = {
-    subscription_status: status,
-    subscription_plan: planId,
-    subscription_tier: planId,
+  // Only columns this account type has (guards have no subscription_tier).
+  const profileUpdate = subscriptionProfileUpdate(accountType, { status, planSlug: planId, planName, currentPeriodEnd: periodEnd, now });
+  await requireWrite(publicSupabase.from(profileTable(accountType)).update(profileUpdate).eq('user_id', userId).select('id'),
+    `${accountType} profile sync`, { minRows: 1 });
+
+  const entitlement = {
     plan_slug: planId,
     plan_name: planName,
-    updated_at: new Date().toISOString(),
+    subscription_status: status,
+    stripe_subscription_id: stripeSubId,
+    monthly_price_pence: planAmount || 0,
+    features: planFeatures,
+    current_period_end: periodEnd,
+    cancel_at_period_end: cancelAtPeriodEnd,
+    updated_at: now,
   };
-
-  if (accountType === 'guard') {
-    await publicSupabase.from('guards').update(profileUpdate).eq('user_id', userId);
-  } else {
-    await publicSupabase.from('clients').update(profileUpdate).eq('user_id', userId);
-  }
-
-  const { data: existingEnt } = await publicSupabase.from('user_entitlements_data').select('user_id').eq('user_id', userId).maybeSingle();
-
+  const { data: existingEnt, error: entLookupError } = await publicSupabase.from('user_entitlements_data').select('user_id').eq('user_id', userId).maybeSingle();
+  if (entLookupError) throw new Error(`Entitlement lookup failed: ${entLookupError.message}`);
   if (existingEnt) {
-    await publicSupabase.from('user_entitlements_data').update({
-      plan_slug: planId,
-      plan_name: planName,
-      subscription_status: status,
-      stripe_subscription_id: stripeSubId,
-      monthly_price_pence: planAmount || 0,
-      features: planFeatures,
-      current_period_end: periodEnd,
-      cancel_at_period_end: cancelAtPeriodEnd,
-      updated_at: new Date().toISOString(),
-    }).eq('user_id', userId);
+    await requireWrite(publicSupabase.from('user_entitlements_data').update(entitlement).eq('user_id', userId).select('user_id'), 'Entitlement sync', { minRows: 1 });
   } else {
-    await publicSupabase.from('user_entitlements_data').insert({
-      user_id: userId,
-      plan_slug: planId,
-      plan_name: planName,
-      audience: accountType,
-      features: planFeatures,
-      monthly_price_pence: planAmount || 0,
-      subscription_status: status,
-      stripe_subscription_id: stripeSubId,
-      current_period_end: periodEnd,
-      cancel_at_period_end: cancelAtPeriodEnd,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
+    await requireWrite(publicSupabase.from('user_entitlements_data').insert({ user_id: userId, audience: accountType, created_at: now, ...entitlement }), 'Entitlement create');
   }
 
-  await publicSupabase.from('notifications').insert([{
+  const { error: noticeError } = await publicSupabase.from('notifications').insert([{
     user_id: userId,
     title: 'Plan Changed',
     message: `Your plan has been changed to ${planName}. Changes take effect immediately with prorated billing.`,
     type: 'success',
     is_read: false,
   }]);
+  if (noticeError) console.error('[create-subscription-checkout] Plan change notification failed:', noticeError.message);
 }
 
 serve(async (req) => {
@@ -379,20 +368,37 @@ serve(async (req) => {
 
         console.log(`[create-subscription-checkout] Subscription updated. New status: ${updatedSub.status}`);
 
-        const periodEnd = new Date(updatedSub.current_period_end * 1000).toISOString();
+        const periodEndSeconds = (updatedSub as any).current_period_end ?? (updatedSub as any).items?.data?.[0]?.current_period_end;
+        const periodEnd = Number.isFinite(periodEndSeconds) ? new Date(periodEndSeconds * 1000).toISOString() : null;
 
-        await syncPlanToDb(
-          publicSupabase,
-          userId,
-          planId,
-          accountType,
-          existingSub.stripe_subscription_id,
-          updatedSub.status,
-          periodEnd,
-          planAmount,
-          planFeatures,
-          updatedSub.cancel_at_period_end || false,
-        );
+        try {
+          if (!periodEnd) throw new Error('Stripe subscription billing period missing');
+          await syncPlanToDb(
+            publicSupabase,
+            userId,
+            planId,
+            accountType,
+            existingSub.stripe_subscription_id,
+            updatedSub.status,
+            periodEnd,
+            planAmount,
+            planFeatures,
+            updatedSub.cancel_at_period_end || false,
+            billingCycle === 'annual' ? 'annual' : 'monthly',
+            priceId,
+          );
+        } catch (syncErr: any) {
+          // Stripe has applied the change; customer.subscription.updated will
+          // re-synchronise. Report the incomplete state honestly instead of success.
+          console.error('[create-subscription-checkout] Plan switched in Stripe but database sync failed:', syncErr.message);
+          return new Response(
+            JSON.stringify({
+              error: 'Your plan change was accepted by our payment provider, but your account has not finished updating. It will update automatically shortly — please refresh in a minute.',
+              syncPending: true,
+            }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
         const oldPlanName = PLAN_NAMES[oldPlanSlug] || oldPlanSlug;
         const newPlanName = PLAN_NAMES[planId] || planId;
@@ -476,11 +482,9 @@ serve(async (req) => {
       });
       customerId = customer.id;
 
-      if (accountType === 'client') {
-        await publicSupabase.from('clients').update({ stripe_customer_id: customerId }).eq('user_id', userId);
-      } else {
-        await publicSupabase.from('guards').update({ stripe_customer_id: customerId }).eq('user_id', userId);
-      }
+      // Persist the customer before checkout so retries reuse it instead of creating duplicates.
+      await requireWrite(publicSupabase.from(profileTable(accountType)).update({ stripe_customer_id: customerId }).eq('user_id', userId).select('id'),
+        'Stripe customer save', { minRows: 1 });
     }
 
     const referer = req.headers.get('referer') || '';

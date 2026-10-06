@@ -201,6 +201,8 @@ serve(async (req) => {
       };
 
       if (accountType === 'guard') {
+        // app.guards has no subscription_tier column; including it rejects the whole update.
+        delete profileUpdate.subscription_tier;
         profileUpdate.profile_completed = true;
         profileUpdate.onboarding_status = 'active';
         if (trialStart) profileUpdate.trial_start_date = trialStart;

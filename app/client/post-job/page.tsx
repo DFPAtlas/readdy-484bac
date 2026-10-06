@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { getBookingPolicy, applyClientPromotion } from '@/lib/booking-policy';
+import { submitClientJob, loadClientBookingFee } from '@/lib/post-job-request';
 import DraftManager from './DraftManager';
 import TemplateManager from './TemplateManager';
 import SaveTemplateModal from './SaveTemplateModal';
@@ -119,10 +119,7 @@ function PostJobContent() {
     if (!userId || !clientId) return;
     const loadPricing = async () => {
       try {
-        const policy = await getBookingPolicy(supabase, userId);
-        const { data: client, error } = await supabase.from('clients').select('*').eq('id', clientId).single();
-        if (error || !client) throw new Error('Unable to verify booking promotion');
-        const effective = applyClientPromotion(policy, client);
+        const effective = await loadClientBookingFee(userId, clientId);
         if (!cancelled) {
           setPaygServiceFeePct(effective.feePercent);
           setServiceFeeFixedPence(effective.feeFixedPence);
@@ -468,42 +465,11 @@ function PostJobContent() {
     setPostSubmitWarnings([]);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-
-      if (!accessToken) {
-        setErrors({ submit: 'Authentication expired. Please refresh the page.' });
+      const result = await submitClientJob(formData as unknown as Record<string, unknown>, clientId);
+      if (!result.ok) {
+        // Keep the form and draft intact (including on limit_reached) so the user can retry or upgrade.
+        setErrors({ submit: result.error || 'Failed to post job.' });
         setSubmitStatus('error');
-        return;
-      }
-
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-job`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-        },
-        body: JSON.stringify({ formData, clientId }),
-      });
-
-      const result = await res.json();
-
-      if (!res.ok || !result.success) {
-        const errorMap: Record<string, string> = {
-          entitlement_failed: 'We could not verify your subscription plan. Please refresh or contact support.',
-          limit_reached: result.message || 'You have reached your monthly job posting limit. Upgrade to post more jobs.',
-          unauthorized: 'Authentication failed. Please refresh the page.',
-          usage_check_failed: 'Could not verify job posting limits. Please try again.',
-          insert_failed: result.message || 'Failed to create job. Please try again.',
-        };
-        const details = Array.isArray(result.details) ? result.details.filter((d: unknown) => typeof d === 'string').join('. ') : '';
-        setErrors({ submit: details || errorMap[result.error] || result.message || 'Failed to post job.' });
-        setSubmitStatus('error');
-
-        if (result.error === 'limit_reached') {
-          // Keep the form and draft intact; the user can choose to upgrade.
-        }
         return;
       }
 

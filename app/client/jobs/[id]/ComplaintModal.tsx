@@ -1,5 +1,6 @@
 'use client';
 
+import { routeTicketToCommandCentre } from '@/lib/support-routing';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { logClientActivity, ACTIVITY_TYPES, ACTIVITY_CATEGORIES } from '@/lib/client-activity';
@@ -54,7 +55,7 @@ export default function ComplaintModal({
 
       if (!client) { setError('Client profile not found'); return; }
 
-      const { error: insertError } = await supabase.from('support_tickets').insert({
+      const { data: createdTicket, error: insertError } = await supabase.from('support_tickets').insert({
         client_id: client.id,
         guard_id: form.filed_against_type === 'guard' ? form.filed_against_id : null,
         related_job_id: jobId,
@@ -65,9 +66,14 @@ export default function ComplaintModal({
         status: 'open',
         contact_preference: 'email',
         evidence_url: form.evidence_url || null,
-      });
+      }).select('id').single();
 
       if (insertError) throw insertError;
+      if (!createdTicket?.id) throw new Error('Failed to submit complaint. Please try again.');
+
+      // Same Command Centre hand-over as ordinary support tickets.
+      const routed = await routeTicketToCommandCentre(createdTicket.id);
+      if (!routed.ok) console.warn('[ComplaintModal] Command Centre sync pending for ticket', createdTicket.id);
 
       // Log complaint activity
       await logClientActivity({

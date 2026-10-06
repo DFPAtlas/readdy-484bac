@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
+import { submitGuardApplication } from '@/lib/guard-applications';
 import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
 import PaymentFlowIndicator from '@/components/guard/PaymentFlowIndicator';
 import { getPaymentFlowStatus, FlowSourceData } from '@/lib/payments/paymentFlowStatus';
@@ -290,23 +291,19 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
 
     setApplying(true);
     try {
-      const { error } = await supabase.from('job_applications').insert({
-        job_id: jobId,
-        guard_id: guardId,
-        cover_letter: applyMessage || null,
-        cover_message: applyMessage || null,
-        status: 'pending',
-        applied_at: new Date().toISOString(),
-      });
-
-      if (error) {
-        if (error.code === '23505') {
+      const result = await submitGuardApplication({ guardId, jobId, coverMessage: applyMessage || '' });
+      if (!result.ok) {
+        if (result.alreadyApplied) {
           setHasApplied(true);
           showToast('Already applied to this job', 'info');
-          setApplying(false);
           return;
         }
-        throw error;
+        if (result.limitReached) {
+          showToast('Monthly application limit reached. Upgrade your plan to apply for more jobs.', 'error');
+          router.push('/upgrade?reason=guard_application_limit_reached');
+          return;
+        }
+        throw new Error(result.error);
       }
 
       try {

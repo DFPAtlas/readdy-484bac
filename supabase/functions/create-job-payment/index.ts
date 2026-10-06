@@ -3,6 +3,7 @@ import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 import { getBookingPolicy, applyClientPromotion, bookingAmounts } from '../_shared/booking-policy.ts';
+import { scheduledHoursPerGuard, grossGuardPence as scheduledGrossPence } from '../_shared/shift-hours.ts';
 
 const CORS_ALLOWLIST = [
   'https://quickguard.uk',
@@ -155,6 +156,59 @@ serve(async (req) => {
       );
     }
 
+    const { data: assignments, error: assignErr } = await supabaseService
+      .from('job_assignments')
+      .select('id, guard_id, agreed_hourly_rate, agreed_hours, gross_guard_amount, guards(user_id, full_name, hourly_rate)')
+      .eq('job_id', jobId)
+      .in('status', ['selected', 'awaiting_payment']);
+
+    if (assignErr) {
+      console.error('[create-job-payment] Assignment load error:', assignErr.message);
+      return new Response(
+        JSON.stringify({ error: 'Unable to load job assignments' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    if (!assignments || assignments.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'No selected guards to pay for this job' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Stored agreed amounts must match the authoritative schedule
+    // (daily shift hours x number of days). Bookings priced by the old
+    // span x days calculation are refused, never silently re-priced or charged.
+    let scheduledHours: number;
+    try { scheduledHours = scheduledHoursPerGuard(jobData); } catch (scheduleError: any) {
+      return new Response(JSON.stringify({ error: scheduleError.message || 'Job schedule is invalid' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const mismatched = assignments.filter((a: any) => {
+      const rate = Number(a.agreed_hourly_rate || jobData.hourly_rate);
+      const expectedPence = scheduledGrossPence(rate, jobData);
+      const storedPence = a.gross_guard_amount ? Math.round(Number(a.gross_guard_amount) * 100) : expectedPence;
+      return Math.abs(storedPence - expectedPence) > 1 || (a.agreed_hours != null && Math.abs(Number(a.agreed_hours) - scheduledHours) > 0.01);
+    });
+    if (mismatched.length) {
+      // An open checkout created from the stale amount must not remain payable.
+      const { data: staleTx } = await supabaseService.from('transactions').select('stripe_session_id')
+        .eq('job_id', jobId).eq('client_id', clientData.id).in('status', ['pending', 'processing'])
+        .not('stripe_session_id', 'is', null);
+      for (const tx of staleTx || []) {
+        try {
+          const stale = await stripe.checkout.sessions.retrieve(tx.stripe_session_id);
+          if (stale.status === 'open') await stripe.checkout.sessions.expire(stale.id);
+        } catch (expireError) { console.error('[create-job-payment] Unable to expire stale session', tx.stripe_session_id, expireError); }
+      }
+      console.error('[create-job-payment] Agreed amounts do not match schedule', { jobId, assignments: mismatched.map((a: any) => a.id), scheduledHours });
+      return new Response(JSON.stringify({
+        error: 'The selected guard amounts do not match this job\'s scheduled hours. Please reselect your guards so the booking can be repriced.',
+        code: 'booking_amount_mismatch', scheduledHours,
+      }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const { data: existingTx } = await supabaseService
       .from('transactions')
       .select('id, status, stripe_session_id, retry_count, metadata')
@@ -187,27 +241,6 @@ serve(async (req) => {
       } catch {
         console.error('[create-job-payment] Existing Stripe session', existingTx.stripe_session_id, 'no longer retrievable, will create new one');
       }
-    }
-
-    const { data: assignments, error: assignErr } = await supabaseService
-      .from('job_assignments')
-      .select('id, guard_id, agreed_hourly_rate, agreed_hours, gross_guard_amount, guards(user_id, full_name, hourly_rate)')
-      .eq('job_id', jobId)
-      .in('status', ['selected', 'awaiting_payment']);
-
-    if (assignErr) {
-      console.error('[create-job-payment] Assignment load error:', assignErr.message);
-      return new Response(
-        JSON.stringify({ error: 'Unable to load job assignments' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
-
-    if (!assignments || assignments.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'No selected guards to pay for this job' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
     }
 
     const feeResult = await getBookingPolicy(supabaseService, user.id);

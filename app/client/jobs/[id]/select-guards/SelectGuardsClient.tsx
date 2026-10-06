@@ -1,5 +1,6 @@
 "use client";
 
+import { scheduledHoursPerGuard, grossGuardPence } from "@/lib/shift-hours";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -71,6 +72,7 @@ interface Job {
   end_date: string | null;
   start_time: string;
   end_time: string;
+  number_of_days?: number | null;
   hourly_rate: number;
   number_of_guards: number;
   status: string;
@@ -315,7 +317,7 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
 
       const { data: jobData } = await supabase
         .from("jobs")
-        .select("id, job_title, venue_name, venue_city, venue_postcode, start_date, end_date, start_time, end_time, hourly_rate, number_of_guards, status, sia_licence_required, latitude, longitude, required_licence_types, required_license_type")
+        .select("id, job_title, venue_name, venue_city, venue_postcode, start_date, end_date, start_time, end_time, number_of_days, hourly_rate, number_of_guards, status, sia_licence_required, latitude, longitude, required_licence_types, required_license_type")
         .eq("id", jobId)
         .eq("client_id", client.id)
         .maybeSingle();
@@ -758,24 +760,19 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
     setConfirming(true);
     try {
       const selectedArray = Array.from(selectedGuardIds);
-      const start = new Date(`${job.start_date}T${job.start_time}`);
-      const end = new Date(`${job.end_date || job.start_date}T${job.end_time}`);
-      let hoursPerGuard = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-      if (hoursPerGuard <= 0) hoursPerGuard += 24;
-      const startD = new Date(job.start_date);
-      const endD = new Date(job.end_date || job.start_date);
-      const days = Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-      const agreedHours = hoursPerGuard * days;
+      // Payable hours = daily shift hours x number of days (lib/shift-hours).
+      // The server recomputes and stores the authoritative amounts; these values
+      // are only sent for compatibility and are ignored by select_job_guards.
+      const agreedHours = scheduledHoursPerGuard(job);
 
       const selections = selectedArray.map((guardId) => {
         const guard = allGuards.find((g) => g.id === guardId);
         const guardHourlyRate = guard?.hourly_rate || job.hourly_rate;
-        const grossGuardAmount = guardHourlyRate * agreedHours;
         return {
           guard_id: guardId,
           agreed_hourly_rate: guardHourlyRate,
           agreed_hours: agreedHours,
-          gross_guard_amount: grossGuardAmount,
+          gross_guard_amount: grossGuardPence(guardHourlyRate, job) / 100,
         };
       });
 
