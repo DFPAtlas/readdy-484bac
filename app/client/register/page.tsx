@@ -24,6 +24,7 @@ export default function ClientRegister() {
   const [portalDefaults, setPortalDefaults] = useState<any>(null);
   const [sentEmail, setSentEmail] = useState('');
   const [taxDisclaimerAccepted, setTaxDisclaimerAccepted] = useState(false);
+  const [loginHref, setLoginHref] = useState('/client/login');
   const router = useRouter();
   const appleAuthEnabled = process.env.NEXT_PUBLIC_APPLE_AUTH_ENABLED === 'true';
 
@@ -72,7 +73,8 @@ export default function ClientRegister() {
     const redirect = params.get('redirect');
     if (redirect) {
       const safe = sanitizeRedirectPath(redirect, 'client', '/client/dashboard');
-      sessionStorage.setItem('post_auth_redirect', safe);
+      try { sessionStorage.setItem('post_auth_redirect', safe); } catch {}
+      setLoginHref(`/client/login?redirect=${encodeURIComponent(safe)}`);
     }
   }, []);
 
@@ -434,7 +436,7 @@ export default function ClientRegister() {
           <div className="mt-6 text-center">
             <p className="text-sm text-[#AAB7C4]">
               Already have an account?{' '}
-              <Link href="/client/login" className="font-medium transition-colors hover:text-[#3B82F6]" style={{ color: "#1DA1F2" }}>
+              <Link href={loginHref} className="font-medium transition-colors hover:text-[#3B82F6]" style={{ color: "#1DA1F2" }}>
                 Sign In
               </Link>
             </p>

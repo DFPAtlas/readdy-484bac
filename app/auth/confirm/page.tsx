@@ -11,6 +11,7 @@ import {
 } from '@/lib/auth-helpers';
 import { useRouter } from 'next/navigation';
 import { sanitizeRedirectPath, clearBadStoredRedirects } from '@/lib/safe-redirect';
+import { getPendingBookingReturnPath } from '@/lib/pending-job-draft';
 
 function ConfirmContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -129,6 +130,17 @@ function ConfirmContent() {
             return;
           }
 
+          if (existingClient?.profile_completed) {
+            const bookingReturn = getPendingBookingReturnPath();
+            if (bookingReturn) {
+              setStatus('success');
+              setMessage('Account ready! Continuing your booking...');
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              router.push(sanitizeRedirectPath(bookingReturn, 'client', '/client/dashboard'));
+              return;
+            }
+          }
+
           setStatus('success');
           setMessage('Account created successfully! Redirecting...');
           await new Promise(resolve => setTimeout(resolve, 2500));
@@ -168,6 +180,16 @@ function ConfirmContent() {
           return;
         }
 
+        if (existingClient.profile_completed) {
+          const bookingReturn = getPendingBookingReturnPath();
+          if (bookingReturn) {
+            setStatus('success');
+            setMessage('Signed in successfully! Continuing your booking...');
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            router.push(sanitizeRedirectPath(bookingReturn, 'client', '/client/dashboard'));
+            return;
+          }
+        }
         setStatus('success');
         setMessage('Signed in successfully! Redirecting...');
         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -251,8 +273,9 @@ function ConfirmContent() {
         setStatus('success');
         setMessage('Verified successfully! Redirecting...');
 
+        const bookingReturn = clientData?.profile_completed ? getPendingBookingReturnPath() : null;
         const redirectPath = clientData?.profile_completed
-          ? '/client/dashboard'
+          ? (bookingReturn ? sanitizeRedirectPath(bookingReturn, 'client', '/client/dashboard') : '/client/dashboard')
           : '/client/complete-profile-wizard';
 
         await new Promise(resolve => setTimeout(resolve, 2500));

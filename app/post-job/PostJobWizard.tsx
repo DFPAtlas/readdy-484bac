@@ -4,11 +4,15 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { geocodeAddress } from '@/lib/geocoding';
-import PromoBanner from '@/components/PromoBanner';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
-import { hasFeature } from '@/lib/entitlements';
-import UpgradeRequiredModal from '@/components/billing/UpgradeRequiredModal';
+import { sanitizeRedirectPath } from '@/lib/safe-redirect';
+import {
+  buildPendingJobDraft,
+  savePendingJobDraft,
+  loadPendingJobDraft,
+  IMMEDIATE_BOOKING_RETURN_PATH,
+} from '@/lib/pending-job-draft';
+import BookingAuthModal from './BookingAuthModal';
 
 const venueCategories = [
   { key: 'nightclub_bar', label: 'Nightclub or Bar', icon: 'ri-door-open-line', desc: 'Door supervisors, crowd control', color: 'from-purple-500/10 to-pink-500/10' },
@@ -37,32 +41,6 @@ const bookingTypes = [
   { value: 'ongoing', label: 'Ongoing', desc: 'Open-ended contract' },
 ];
 
-const venueToSecurityType: Record<string, string> = {
-  nightclub_bar: 'door-supervisor',
-  retail_shop: 'retail-security',
-  construction_site: 'security-guard',
-  private_event: 'event-security',
-  festival_public_event: 'event-security',
-  warehouse_property: 'mobile-patrol',
-  office_building: 'security-guard',
-  other: 'security-guard',
-};
-
-const licenceToSecurityType: Record<string, string> = {
-  door_supervisor: 'door-supervisor',
-  security_guard: 'security-guard',
-  cctv: 'cctv-operator',
-  close_protection: 'close-protection',
-  dog_handler: 'dog-handler',
-};
-
-function deriveSecurityType(venueCategory: string, requiredLicenseType: string): string {
-  if (requiredLicenseType && requiredLicenseType !== 'any') {
-    return licenceToSecurityType[requiredLicenseType] || venueToSecurityType[venueCategory] || 'security-guard';
-  }
-  return venueToSecurityType[venueCategory] || 'security-guard';
-}
-
 interface FormData {
   venueCategory: string;
   venueName: string;
@@ -88,6 +66,7 @@ export default function PostJobWizard() {
   const searchParams = useSearchParams();
   const prefillVenue = searchParams.get('venue') || '';
   const prefillGuard = searchParams.get('guard') || '';
+  const sourceParam = searchParams.get('source') || 'post-job';
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<FormData>({
@@ -112,34 +91,40 @@ export default function PostJobWizard() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [clientId, setClientId] = useState<string | null>(null);
   const [isAuth, setIsAuth] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [jobId, setJobId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [prefilledGuard, setPrefilledGuard] = useState<{id: string, full_name: string, hourly_rate: number} | null>(null);
-  const [promoData, setPromoData] = useState<any>(null);
-  const [globalPromoCounts, setGlobalPromoCounts] = useState<any>(null);
-  const [canPostJobs, setCanPostJobs] = useState(true);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [entitlementsChecked, setEntitlementsChecked] = useState(false);
+  const [prefilledGuard, setPrefilledGuard] = useState<{ id: string; full_name: string; hourly_rate: number } | null>(null);
+  const [showAuthChoice, setShowAuthChoice] = useState(false);
 
   useEffect(() => {
+    restoreDraft();
     checkAuth();
     if (prefillGuard) fetchPrefilledGuard();
-    fetchPromoStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchPromoStats = async () => {
-    const { data } = await supabase.rpc('get_client_promo_stats');
-    if (data) {
-      setGlobalPromoCounts({
-        founding: data.counts?.founding ?? 0,
-        early: data.counts?.early ?? 0,
-        launch: data.counts?.launch ?? 0,
-        caps: data.caps ?? { tier1: 50, tier2: 250, tier3: 1000 },
-        tier3WindowEnd: data.tier3_window_end,
-      });
-    }
+  const restoreDraft = () => {
+    const draft = loadPendingJobDraft();
+    if (!draft) return;
+    setFormData(prev => ({
+      ...prev,
+      venueCategory: draft.venueCategory || prev.venueCategory,
+      venueName: draft.venueName || prev.venueName,
+      addressLine1: draft.addressLine1 || prev.addressLine1,
+      city: draft.city || prev.city,
+      postcode: draft.postcode || prev.postcode,
+      startDate: draft.startDate || prev.startDate,
+      startTime: draft.startTime || prev.startTime,
+      endTime: draft.endTime || prev.endTime,
+      numberOfGuards: draft.numberOfGuards || prev.numberOfGuards,
+      numberOfDays: draft.numberOfDays || prev.numberOfDays,
+      bookingType: draft.bookingType || prev.bookingType,
+      requiredLicenseType: draft.requiredLicenseType || prev.requiredLicenseType,
+      hourlyRate: draft.hourlyRate || prev.hourlyRate,
+      jobDescription: draft.jobDescription || prev.jobDescription,
+      contactName: draft.contactName || prev.contactName,
+      contactPhone: draft.contactPhone || prev.contactPhone,
+      contactEmail: draft.contactEmail || prev.contactEmail,
+    }));
   };
 
   const fetchPrefilledGuard = async () => {
@@ -150,7 +135,7 @@ export default function PostJobWizard() {
       .eq('accepts_direct_bookings', true)
       .maybeSingle();
     if (data) {
-      setPrefilledGuard(data);
+      setPrefilledGuard({ id: data.id, full_name: data.full_name, hourly_rate: data.hourly_rate });
       setFormData(prev => ({
         ...prev,
         hourlyRate: String(data.hourly_rate || ''),
@@ -160,43 +145,27 @@ export default function PostJobWizard() {
   };
 
   const checkAuth = async () => {
-    const query = searchParams.toString();
-    const returnPath = query ? `/post-job?${query}` : '/post-job';
-    const registrationPath = `/client/register?redirect=${encodeURIComponent(returnPath)}`;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      router.push(registrationPath);
+      setLoading(false);
       return;
     }
     const { data: clientData } = await supabase
       .from('clients')
-      .select('id, contact_name, email, phone, client_promo_tier, client_signup_number, client_promo_ends_at, client_lifetime_fee_discount, client_promo_jobs_remaining, founding_client_badge')
+      .select('id, contact_name, email, phone')
       .eq('user_id', user.id)
       .maybeSingle();
-    if (!clientData) {
-      router.push(registrationPath);
-      return;
+    if (clientData) {
+      setIsAuth(true);
+      setClientId(clientData.id);
+      setFormData(prev => ({
+        ...prev,
+        contactName: prev.contactName || clientData.contact_name || '',
+        contactEmail: prev.contactEmail || clientData.email || '',
+        contactPhone: prev.contactPhone || clientData.phone || '',
+      }));
     }
-    setIsAuth(true);
-    setClientId(clientData.id);
-    setPromoData({
-      clientTier: clientData.client_promo_tier,
-      signupNumber: clientData.client_signup_number,
-      promoEndsAt: clientData.client_promo_ends_at,
-      lifetimeDiscount: clientData.client_lifetime_fee_discount,
-      jobsRemaining: clientData.client_promo_jobs_remaining,
-      foundingBadge: clientData.founding_client_badge,
-    });
-    setFormData(prev => ({
-      ...prev,
-      contactName: clientData.contact_name || '',
-      contactEmail: clientData.email || '',
-      contactPhone: clientData.phone || '',
-    }));
     setLoading(false);
-    const canPost = await hasFeature(user.id, 'client.post_job');
-    setCanPostJobs(canPost);
-    setEntitlementsChecked(true);
   };
 
   const updateField = (field: keyof FormData, value: string) => {
@@ -253,13 +222,6 @@ export default function PostJobWizard() {
 
   const prevStep = () => setStep(s => s - 1);
 
-  const calculateEndDate = () => {
-    if (!formData.startDate || !formData.numberOfDays) return null;
-    const d = new Date(formData.startDate);
-    d.setDate(d.getDate() + parseInt(formData.numberOfDays) - 1);
-    return d.toISOString().split('T')[0];
-  };
-
   const calculateHours = () => {
     const [sh, sm] = formData.startTime.split(':').map(Number);
     const [eh, em] = formData.endTime.split(':').map(Number);
@@ -273,174 +235,43 @@ export default function PostJobWizard() {
     return (hrs * parseFloat(formData.hourlyRate || '0') * parseInt(formData.numberOfGuards) * parseInt(formData.numberOfDays)).toFixed(2);
   };
 
-  const serviceFee = () => {
-    const total = parseFloat(estimatedTotal());
-    return (total * 0.15).toFixed(2);
-  };
+  const getSafeReturnPath = () =>
+    sanitizeRedirectPath(IMMEDIATE_BOOKING_RETURN_PATH, 'client', '/client/dashboard');
 
-  const isPromoZeroFee = () => {
-    if (!promoData) return false;
-    const now = new Date();
-    const promoEnds = promoData.promoEndsAt ? new Date(promoData.promoEndsAt) : null;
-    const tier = promoData.clientTier;
-    if (tier === 'launch_client' && promoData.jobsRemaining > 0) return true;
-    if (promoEnds && now < promoEnds) return true;
-    return false;
-  };
-
-  const isLifetimeDiscount = () => {
-    if (!promoData) return false;
-    const now = new Date();
-    const promoEnds = promoData.promoEndsAt ? new Date(promoData.promoEndsAt) : null;
-    const tier = promoData.clientTier;
-    return tier === 'founding_client' && promoData.lifetimeDiscount && (promoEnds ? now >= promoEnds : true);
-  };
-
-  const promoFeePct = () => {
-    if (isPromoZeroFee()) return 0;
-    if (isLifetimeDiscount()) return 15 * (1 - (promoData.lifetimeDiscount || 0));
-    return 15;
-  };
-
-  const promoServiceFee = () => {
-    const total = parseFloat(estimatedTotal());
-    return (total * (promoFeePct() / 100)).toFixed(2);
-  };
-
-  const handlePost = async () => {
-    if (!isAuth || !clientId) return;
+  const handleContinue = () => {
     if (!validateStep3()) return;
-    setSubmitting(true);
 
-    try {
-      const endDate = calculateEndDate();
-      const fullAddress = [formData.addressLine1, formData.city, formData.postcode, 'UK'].filter(Boolean).join(', ');
-      const geo = await geocodeAddress(fullAddress);
+    const draft = buildPendingJobDraft({
+      mode: 'immediate',
+      source: sourceParam,
+      ...formData,
+    });
+    savePendingJobDraft(draft);
 
-      const { data: jobData, error } = await supabase
-        .from('jobs')
-        .insert({
-          client_id: clientId,
-          job_title: `${formData.venueName} — ${venueCategories.find(v => v.key === formData.venueCategory)?.label || 'Security Job'}`,
-          venue_category: formData.venueCategory,
-          venue_name: formData.venueName.trim(),
-          venue_address_line1: formData.addressLine1.trim(),
-          venue_city: formData.city.trim(),
-          venue_postcode: formData.postcode.trim(),
-          number_of_guards: parseInt(formData.numberOfGuards),
-          start_date: formData.startDate,
-          end_date: endDate,
-          start_time: formData.startTime ? `${formData.startTime}:00` : null,
-          end_time: formData.endTime ? `${formData.endTime}:00` : null,
-          hourly_rate: parseFloat(formData.hourlyRate),
-          required_license_type: formData.requiredLicenseType || null,
-          required_licence_types: formData.requiredLicenseType && formData.requiredLicenseType !== 'any'
-            ? [formData.requiredLicenseType]
-            : null,
-          booking_type: formData.bookingType,
-          number_of_days: parseInt(formData.numberOfDays),
-          job_description: formData.jobDescription.trim(),
-          contact_name: formData.contactName.trim(),
-          contact_phone: formData.contactPhone.trim(),
-          contact_email: formData.contactEmail.trim(),
-          status: 'open',
-          latitude: geo?.latitude ?? null,
-          longitude: geo?.longitude ?? null,
-          city: formData.city.trim(),
-          postcode: formData.postcode.trim(),
-          sia_licence_required: true,
-          security_type: deriveSecurityType(formData.venueCategory, formData.requiredLicenseType),
-          urgency: 'standard',
-          is_featured: false,
-          is_urgent: false,
-        })
-        .select()
-        .maybeSingle();
+    const safeReturn = getSafeReturnPath();
 
-      if (error) throw new Error(error.message);
-      if (!jobData) throw new Error('Job creation failed');
-
-      setJobId(jobData.id);
-      setSuccess(true);
-
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token;
-        if (token) {
-          fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/notify-matching-guards`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ jobId: jobData.id }),
-          }).catch(() => {});
-        }
-      } catch {}
-    } catch (err: any) {
-      setErrors({ submit: err.message || 'Failed to post job' });
-    } finally {
-      setSubmitting(false);
+    if (isAuth && clientId) {
+      router.push(safeReturn);
+      return;
     }
+    try { sessionStorage.setItem('post_auth_redirect', safeReturn); } catch {}
+    setShowAuthChoice(true);
   };
 
-  if (loading || !entitlementsChecked) {
+  const goToRegister = () => {
+    const safeReturn = getSafeReturnPath();
+    router.push(`/client/register?redirect=${encodeURIComponent(safeReturn)}`);
+  };
+
+  const goToLogin = () => {
+    const safeReturn = getSafeReturnPath();
+    router.push(`/client/login?redirect=${encodeURIComponent(safeReturn)}`);
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0B1933]">
         <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (!canPostJobs) {
-    return (
-      <div className="min-h-screen bg-[#0B1933] flex items-center justify-center px-6">
-        <div className="bg-[#111d35] rounded-2xl border border-slate-700/50 p-8 text-center max-w-md w-full">
-          <div className="w-16 h-16 bg-amber-500/10 rounded-2xl border border-amber-400/20 flex items-center justify-center mx-auto mb-4">
-            <i className="ri-vip-crown-line text-3xl text-amber-400" />
-          </div>
-          <h3 className="text-xl font-bold text-white mb-2">Upgrade Required</h3>
-          <p className="text-slate-400 mb-6">
-            Your current subscription does not include job posting. Upgrade your QuickGuard plan to unlock this feature.
-          </p>
-          <Link
-            href="/pricing"
-            prefetch={false}
-            className="inline-block bg-teal-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-teal-600 transition-colors whitespace-nowrap"
-          >
-            Upgrade Plan
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (success && jobId) {
-    return (
-      <div className="min-h-screen bg-[#0B1933] flex items-center justify-center px-6">
-        <div className="bg-[#111d35] rounded-2xl max-w-lg w-full p-8 text-center border border-[#1e2d4d]">
-          <div className="w-20 h-20 bg-emerald-500/15 rounded-full flex items-center justify-center mx-auto mb-5 border border-emerald-500/25">
-            <i className="ri-checkbox-circle-line text-4xl text-emerald-400"></i>
-          </div>
-          <h2 className="text-3xl font-bold text-white mb-2">Job Posted!</h2>
-          <p className="text-slate-400 mb-6">Your security job is live. Matching guards in your area have been notified.</p>
-          <div className="bg-[#162036] rounded-xl p-4 mb-6 text-left border border-[#1e2d4d]">
-            <p className="text-sm text-slate-500 mb-1">Estimated cost</p>
-            <p className="text-2xl font-bold text-teal-400">£{estimatedTotal()}</p>
-            {isPromoZeroFee() ? (
-              <p className="text-xs text-emerald-400 mt-1">QuickGuard fee: FREE (promo)</p>
-            ) : isLifetimeDiscount() ? (
-              <p className="text-xs text-amber-400 mt-1">QuickGuard fee: £{promoServiceFee()} ({promoFeePct().toFixed(1)}%)</p>
-            ) : (
-              <p className="text-xs text-slate-500 mt-1">Free-plan fee example: £{serviceFee()}. Your plan and eligible promotions determine the final fee before checkout.</p>
-            )}
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href={`/client/jobs/detail?id=${encodeURIComponent(jobId)}`} className="bg-teal-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-teal-600 transition-colors whitespace-nowrap text-center">
-              View Job
-            </Link>
-            <Link href="/find-a-guard" className="bg-[#162036] text-slate-300 px-6 py-3 rounded-xl font-semibold hover:bg-[#1a2642] transition-colors border border-[#1e2d4d] whitespace-nowrap text-center">
-              Browse Guards
-            </Link>
-          </div>
-        </div>
       </div>
     );
   }
@@ -452,29 +283,23 @@ export default function PostJobWizard() {
           <Link href="/" className="text-slate-500 hover:text-white text-sm flex items-center gap-1 mb-4">
             <i className="ri-arrow-left-line"></i> Back to home
           </Link>
-          <h1 className="text-3xl font-bold text-white mb-1">Post a Security Job</h1>
-          <p className="text-slate-400">Hire SIA-licensed guards directly — no agency needed</p>
+          <span className="inline-flex items-center gap-1.5 bg-red-500/15 border border-red-400/20 text-red-300 text-xs font-semibold px-3 py-1.5 rounded-full mb-3">
+            <i className="ri-flashlight-fill"></i>
+            Book a Guard Now
+          </span>
+          <h1 className="text-3xl font-bold text-white mb-1">Tell us what you need</h1>
+          <p className="text-slate-400">We&apos;ll notify suitable verified guards immediately. No card required until you select a guard.</p>
         </div>
-
-        <PromoBanner
-          clientTier={promoData?.clientTier}
-          signupNumber={promoData?.signupNumber}
-          promoEndsAt={promoData?.promoEndsAt}
-          jobsRemaining={promoData?.jobsRemaining}
-          lifetimeDiscount={promoData?.lifetimeDiscount}
-          foundingBadge={promoData?.foundingBadge}
-          globalCounts={globalPromoCounts}
-        />
 
         <div className="flex items-center gap-2 mb-8">
           {[1, 2, 3].map(s => (
             <div key={s} className="flex items-center gap-2 flex-1">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
-                step >= s ? 'bg-teal-500 text-white' : 'bg-[#162036] text-slate-500 border border-[#1e2d4d]'
+                step >= s ? 'bg-red-600 text-white' : 'bg-[#162036] text-slate-500 border border-[#1e2d4d]'
               }`}>
                 {step > s ? <i className="ri-check-line"></i> : s}
               </div>
-              <div className={`h-1 flex-1 rounded-full ${step > s ? 'bg-teal-500' : 'bg-[#162036]'}`}></div>
+              <div className={`h-1 flex-1 rounded-full ${step > s ? 'bg-red-600' : 'bg-[#162036]'}`}></div>
             </div>
           ))}
         </div>
@@ -491,16 +316,16 @@ export default function PostJobWizard() {
                     onClick={() => updateField('venueCategory', v.key)}
                     className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer ${
                       formData.venueCategory === v.key
-                        ? 'border-teal-500 bg-teal-500/10'
-                        : 'border-[#1e2d4d] bg-[#111d35] hover:border-teal-500/30'
+                        ? 'border-red-500 bg-red-500/10'
+                        : 'border-[#1e2d4d] bg-[#111d35] hover:border-red-500/30'
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center border border-teal-400/20 bg-gradient-to-br ${v.color}`}>
-                        <i className={`${v.icon} text-teal-400`}></i>
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center border border-red-400/20 bg-gradient-to-br ${v.color}`}>
+                        <i className={`${v.icon} text-red-400`}></i>
                       </div>
                       <div>
-                        <p className={`font-semibold text-sm ${formData.venueCategory === v.key ? 'text-teal-300' : 'text-white'}`}>{v.label}</p>
+                        <p className={`font-semibold text-sm ${formData.venueCategory === v.key ? 'text-red-300' : 'text-white'}`}>{v.label}</p>
                         <p className="text-xs text-slate-500">{v.desc}</p>
                       </div>
                     </div>
@@ -510,7 +335,7 @@ export default function PostJobWizard() {
               {errors?.venueCategory && <p className="text-red-400 text-sm mt-2">{errors.venueCategory}</p>}
             </div>
             <div className="flex justify-end">
-              <button onClick={nextStep} className="bg-teal-500 text-white px-8 py-3 rounded-xl font-semibold hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap">
+              <button onClick={nextStep} className="bg-red-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-red-500 transition-colors cursor-pointer whitespace-nowrap">
                 Next: When &amp; Where <i className="ri-arrow-right-line ml-1"></i>
               </button>
             </div>
@@ -521,16 +346,16 @@ export default function PostJobWizard() {
           <div className="space-y-5">
             <div>
               <label className="block text-sm font-semibold text-slate-300 mb-2">Venue / Event Name *</label>
-              <input type="text" value={formData.venueName} onChange={e => updateField('venueName', e.target.value)} placeholder="e.g. The Red Lion Pub" className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
+              <input type="text" value={formData.venueName} onChange={e => updateField('venueName', e.target.value)} placeholder="e.g. The Red Lion Pub" className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
               {errors?.venueName && <p className="text-red-400 text-sm mt-1">{errors.venueName}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-slate-300 mb-2">Address *</label>
-              <input type="text" value={formData.addressLine1} onChange={e => updateField('addressLine1', e.target.value)} placeholder="Street address" className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500 mb-2" />
+              <input type="text" value={formData.addressLine1} onChange={e => updateField('addressLine1', e.target.value)} placeholder="Street address" className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm placeholder:text-slate-500 mb-2" />
               <div className="grid grid-cols-2 gap-2">
-                <input type="text" value={formData.city} onChange={e => updateField('city', e.target.value)} placeholder="City" className="px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
-                <input type="text" value={formData.postcode} onChange={e => updateField('postcode', e.target.value)} placeholder="Postcode" className="px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
+                <input type="text" value={formData.city} onChange={e => updateField('city', e.target.value)} placeholder="City" className="px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
+                <input type="text" value={formData.postcode} onChange={e => updateField('postcode', e.target.value)} placeholder="Postcode" className="px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
               </div>
               {(errors?.addressLine1 || errors?.city || errors?.postcode) && (
                 <p className="text-red-400 text-sm mt-1">{errors.addressLine1 || errors.city || errors.postcode}</p>
@@ -540,13 +365,13 @@ export default function PostJobWizard() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Start Date *</label>
-                <input type="date" value={formData.startDate} onChange={e => updateField('startDate', e.target.value)} className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm" />
+                <input type="date" value={formData.startDate} onChange={e => updateField('startDate', e.target.value)} className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm" />
                 {errors?.startDate && <p className="text-red-400 text-sm mt-1">{errors.startDate}</p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Booking Type</label>
                 <div className="relative">
-                  <select value={formData.bookingType} onChange={e => updateField('bookingType', e.target.value)} className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm pr-8 appearance-none">
+                  <select value={formData.bookingType} onChange={e => updateField('bookingType', e.target.value)} className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm pr-8 appearance-none">
                     {bookingTypes.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
                   </select>
                   <i className="ri-arrow-down-s-line absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
@@ -557,12 +382,12 @@ export default function PostJobWizard() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Start Time *</label>
-                <input type="time" value={formData.startTime} onChange={e => updateField('startTime', e.target.value)} className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm" />
+                <input type="time" value={formData.startTime} onChange={e => updateField('startTime', e.target.value)} className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm" />
                 {errors?.startTime && <p className="text-red-400 text-sm mt-1">{errors.startTime}</p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">End Time *</label>
-                <input type="time" value={formData.endTime} onChange={e => updateField('endTime', e.target.value)} className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm" />
+                <input type="time" value={formData.endTime} onChange={e => updateField('endTime', e.target.value)} className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm" />
                 {errors?.endTime && <p className="text-red-400 text-sm mt-1">{errors.endTime}</p>}
               </div>
             </div>
@@ -570,11 +395,11 @@ export default function PostJobWizard() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Number of Guards</label>
-                <input type="number" value={formData.numberOfGuards} onChange={e => updateField('numberOfGuards', e.target.value)} min="1" max="50" className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm" />
+                <input type="number" value={formData.numberOfGuards} onChange={e => updateField('numberOfGuards', e.target.value)} min="1" max="50" className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Number of Days</label>
-                <input type="number" value={formData.numberOfDays} onChange={e => updateField('numberOfDays', e.target.value)} min="1" max="90" className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm" />
+                <input type="number" value={formData.numberOfDays} onChange={e => updateField('numberOfDays', e.target.value)} min="1" max="90" className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm" />
               </div>
             </div>
 
@@ -582,7 +407,7 @@ export default function PostJobWizard() {
               <button onClick={prevStep} className="text-slate-400 hover:text-white font-semibold cursor-pointer whitespace-nowrap">
                 <i className="ri-arrow-left-line mr-1"></i> Back
               </button>
-              <button onClick={nextStep} className="bg-teal-500 text-white px-8 py-3 rounded-xl font-semibold hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap">
+              <button onClick={nextStep} className="bg-red-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-red-500 transition-colors cursor-pointer whitespace-nowrap">
                 Next: Requirements <i className="ri-arrow-right-line ml-1"></i>
               </button>
             </div>
@@ -592,12 +417,12 @@ export default function PostJobWizard() {
         {step === 3 && (
           <div className="space-y-5">
             {prefilledGuard && (
-              <div className="bg-teal-500/10 border border-teal-400/20 rounded-xl p-4 flex items-center gap-3">
-                <div className="w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                  {prefilledGuard.full_name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
+              <div className="bg-red-500/10 border border-red-400/20 rounded-xl p-4 flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                  {prefilledGuard.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-teal-300">Direct booking request for {prefilledGuard.full_name}</p>
+                  <p className="text-sm font-semibold text-red-300">Direct booking request for {prefilledGuard.full_name}</p>
                   <p className="text-xs text-slate-500">This guard will be notified first when you post this job</p>
                 </div>
               </div>
@@ -613,16 +438,16 @@ export default function PostJobWizard() {
                     onClick={() => updateField('requiredLicenseType', l.value)}
                     className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
                       formData.requiredLicenseType === l.value
-                        ? 'border-teal-500 bg-teal-500/10'
-                        : 'border-[#1e2d4d] bg-[#111d35] hover:border-teal-500/30'
+                        ? 'border-red-500 bg-red-500/10'
+                        : 'border-[#1e2d4d] bg-[#111d35] hover:border-red-500/30'
                     }`}
                   >
                     <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                      formData.requiredLicenseType === l.value ? 'border-teal-500 bg-teal-500' : 'border-slate-600'
+                      formData.requiredLicenseType === l.value ? 'border-red-500 bg-red-500' : 'border-slate-600'
                     }`}>
                       {formData.requiredLicenseType === l.value && <i className="ri-check-line text-white text-xs"></i>}
                     </div>
-                    <span className={`text-sm font-medium ${formData.requiredLicenseType === l.value ? 'text-teal-300' : 'text-white'}`}>{l.label}</span>
+                    <span className={`text-sm font-medium ${formData.requiredLicenseType === l.value ? 'text-red-300' : 'text-white'}`}>{l.label}</span>
                   </button>
                 ))}
               </div>
@@ -633,7 +458,7 @@ export default function PostJobWizard() {
               <label className="block text-sm font-semibold text-slate-300 mb-2">Your Budget (per guard, per hour) *</label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm">£</span>
-                <input type="number" value={formData.hourlyRate} onChange={e => updateField('hourlyRate', e.target.value)} min="10" step="0.50" placeholder="12.50" className="w-full pl-8 pr-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
+                <input type="number" value={formData.hourlyRate} onChange={e => updateField('hourlyRate', e.target.value)} min="10" step="0.50" placeholder="12.50" className="w-full pl-8 pr-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
               </div>
               {errors?.hourlyRate && <p className="text-red-400 text-sm mt-1">{errors.hourlyRate}</p>}
               <p className="text-xs text-slate-500 mt-1">Most guards charge £12–£18/hr. You choose the rate.</p>
@@ -641,17 +466,17 @@ export default function PostJobWizard() {
 
             <div>
               <label className="block text-sm font-semibold text-slate-300 mb-2">Brief Description * <span className="font-normal text-slate-500">({formData.jobDescription.length}/500)</span></label>
-              <textarea value={formData.jobDescription} onChange={e => updateField('jobDescription', e.target.value)} maxLength={500} rows={4} placeholder="What does the guard need to do? e.g. Check IDs at the door, manage queue, handle disputes..." className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm resize-none placeholder:text-slate-500" />
+              <textarea value={formData.jobDescription} onChange={e => updateField('jobDescription', e.target.value)} maxLength={500} rows={4} placeholder="What does the guard need to do? e.g. Check IDs at the door, manage queue, handle disputes..." className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm resize-none placeholder:text-slate-500" />
               {errors?.jobDescription && <p className="text-red-400 text-sm mt-1">{errors.jobDescription}</p>}
             </div>
 
             <div className="border-t border-[#1e2d4d] pt-5">
               <h3 className="text-sm font-bold text-white mb-3">Your Contact Details</h3>
               <div className="space-y-3">
-                <input type="text" value={formData.contactName} onChange={e => updateField('contactName', e.target.value)} placeholder="Your name" className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
+                <input type="text" value={formData.contactName} onChange={e => updateField('contactName', e.target.value)} placeholder="Your name" className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
                 <div className="grid grid-cols-2 gap-3">
-                  <input type="tel" value={formData.contactPhone} onChange={e => updateField('contactPhone', e.target.value)} placeholder="Phone number" className="px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
-                  <input type="email" value={formData.contactEmail} onChange={e => updateField('contactEmail', e.target.value)} placeholder="Email address" className="px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
+                  <input type="tel" value={formData.contactPhone} onChange={e => updateField('contactPhone', e.target.value)} placeholder="Phone number" className="px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
+                  <input type="email" value={formData.contactEmail} onChange={e => updateField('contactEmail', e.target.value)} placeholder="Email address" className="px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm placeholder:text-slate-500" />
                 </div>
                 {(errors?.contactName || errors?.contactPhone || errors?.contactEmail) && (
                   <p className="text-red-400 text-sm">{errors.contactName || errors.contactPhone || errors.contactEmail}</p>
@@ -668,31 +493,10 @@ export default function PostJobWizard() {
                   <div className="flex justify-between text-slate-400"><span>Hours</span><span>× {calculateHours().toFixed(1)}</span></div>
                   <div className="flex justify-between text-slate-400"><span>Days</span><span>× {formData.numberOfDays}</span></div>
                   <div className="border-t border-[#1e2d4d] pt-1 flex justify-between">
-                    <span className="font-semibold text-white">Subtotal</span>
-                    <span className="font-bold text-teal-400">£{estimatedTotal()}</span>
+                    <span className="font-semibold text-white">Estimated guard total</span>
+                    <span className="font-bold text-red-400">£{estimatedTotal()}</span>
                   </div>
-                  {isPromoZeroFee() ? (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-400 line-through">Free-plan example fee (15%)</span>
-                      <span className="text-slate-500 line-through">£{serviceFee()}</span>
-                    </div>
-                  ) : isLifetimeDiscount() ? (
-                    <>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500 line-through">Free-plan example fee (15%)</span>
-                        <span className="text-slate-500 line-through">£{serviceFee()}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-amber-400">QuickGuard service fee ({promoFeePct().toFixed(1)}%)</span>
-                        <span className="font-semibold text-amber-400">£{promoServiceFee()}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex justify-between text-xs text-slate-500">
-                      <span>Free-plan example fee (15%)</span>
-                      <span>£{serviceFee()}</span>
-                    </div>
-                  )}
+                  <p className="text-xs text-slate-500 mt-1">Any platform fee and the confirmed total are shown before you pay. No card required until you select a guard.</p>
                 </div>
               </div>
             )}
@@ -708,31 +512,26 @@ export default function PostJobWizard() {
                 <i className="ri-arrow-left-line mr-1"></i> Back
               </button>
               <button
-                onClick={handlePost}
-                disabled={submitting}
-                className="bg-teal-500 text-white px-8 py-3 rounded-xl font-semibold hover:bg-teal-600 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap flex items-center gap-2"
+                onClick={handleContinue}
+                className="bg-red-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-red-500 transition-colors cursor-pointer whitespace-nowrap flex items-center gap-2"
               >
-                {submitting ? (
-                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>Posting...</>
-                ) : (
-                  <><i className="ri-shield-check-line"></i>Post Job &amp; Notify Guards</>
-                )}
+                <i className="ri-flashlight-fill"></i>
+                Continue — Book a Guard Now
               </button>
             </div>
-
-            {!isAuth && (
-              <p className="text-xs text-slate-500 text-center">
-                You will be asked to create a free account before payment. No card required to post.
-              </p>
-            )}
+            <p className="text-xs text-slate-500 text-center">
+              No card required until you select a guard.
+            </p>
           </div>
         )}
       </div>
-      <UpgradeRequiredModal
-        featureName="job posting"
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        audience="client"
+
+      <BookingAuthModal
+        isOpen={showAuthChoice}
+        email={formData.contactEmail}
+        onClose={() => setShowAuthChoice(false)}
+        onRegister={goToRegister}
+        onLogin={goToLogin}
       />
     </div>
   );

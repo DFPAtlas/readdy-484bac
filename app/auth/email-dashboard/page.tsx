@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { sanitizeRedirectPath } from '@/lib/safe-redirect';
+import { getPendingBookingReturnPath } from '@/lib/pending-job-draft';
 
 export default function EmailDashboardPage() {
   const started = useRef(false);
@@ -26,7 +28,18 @@ export default function EmailDashboardPage() {
         window.location.replace(role === 'client' ? '/client/complete-profile-wizard' : '/guard/complete-profile-wizard');
         return;
       }
-      window.location.replace(role === 'client' ? '/client/dashboard' : '/guard/dashboard');
+      let target = role === 'client' ? '/client/dashboard' : '/guard/dashboard';
+      try {
+        const stored = sessionStorage.getItem('post_auth_redirect');
+        if (stored) {
+          target = sanitizeRedirectPath(stored, role === 'client' ? 'client' : 'guard');
+          sessionStorage.removeItem('post_auth_redirect');
+        } else if (role === 'client') {
+          const bookingReturn = getPendingBookingReturnPath();
+          if (bookingReturn) target = sanitizeRedirectPath(bookingReturn, 'client', '/client/dashboard');
+        }
+      } catch {}
+      window.location.replace(target);
     }
     signIn().catch((err: Error) => setError(err.message));
   }, []);

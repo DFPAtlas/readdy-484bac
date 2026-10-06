@@ -56,24 +56,32 @@ export default function HomepageHero() {
             ))}
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
             <Link
-              href="/client/register"
+              href="/post-job?mode=immediate&source=homepage"
               prefetch={false}
-              className="bg-teal-500 hover:bg-teal-400 text-slate-900 px-8 py-4 rounded-lg text-lg font-semibold transition-all duration-300 hover:scale-105 whitespace-nowrap focus:ring-4 focus:ring-teal-500/30 focus:outline-none text-center"
+              className="bg-red-600 hover:bg-red-500 text-white px-6 sm:px-8 py-4 rounded-lg text-base sm:text-lg font-semibold shadow-lg shadow-red-600/30 transition-all duration-300 hover:scale-105 whitespace-nowrap focus:ring-4 focus:ring-red-500/30 focus:outline-none text-center"
             >
-              <i className="ri-user-add-line mr-2"></i>
-              I Need a Guard
+              <i className="ri-flashlight-fill mr-2"></i>
+              Book a Guard Now
             </Link>
             <Link
               href="/company/login"
               prefetch={false}
-              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-8 py-4 rounded-lg text-lg font-semibold transition-all duration-300 hover:scale-105 whitespace-nowrap focus:ring-4 focus:ring-white/20 focus:outline-none backdrop-blur-sm text-center"
+              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-6 sm:px-8 py-4 rounded-lg text-base sm:text-lg font-semibold transition-all duration-300 hover:scale-105 whitespace-nowrap focus:ring-4 focus:ring-white/20 focus:outline-none backdrop-blur-sm text-center"
             >
               <i className="ri-building-2-line mr-2"></i>
               I&apos;m a Security Company
             </Link>
           </div>
+
+          <p className="text-slate-200 mb-1.5 max-w-xl">
+            Tell us what you need. We&apos;ll notify suitable verified guards immediately.
+          </p>
+          <p className="flex items-center gap-1.5 text-sm text-emerald-300 mb-6">
+            <i className="ri-shield-check-line" aria-hidden="true"></i>
+            No card required until you select a guard.
+          </p>
 
           <HomepageIndustries />
 

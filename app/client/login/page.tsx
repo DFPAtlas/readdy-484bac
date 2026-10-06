@@ -8,6 +8,18 @@ import LoginMarketingPanel from '@/components/login/LoginMarketingPanel';
 import LoginFormCard from '@/components/login/LoginFormCard';
 import SocialConsentNotice from '@/components/login/SocialConsentNotice';
 import BrandLogo from '@/components/BrandLogo';
+import { sanitizeRedirectPath } from '@/lib/safe-redirect';
+
+function resolveClientReturnPath(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    const stored = sessionStorage.getItem('post_auth_redirect');
+    if (stored) return sanitizeRedirectPath(stored, 'client', '/client/dashboard');
+    const redirect = new URLSearchParams(window.location.search).get('redirect');
+    if (redirect) return sanitizeRedirectPath(redirect, 'client', '/client/dashboard');
+  } catch {}
+  return '';
+}
 
 const mobileBg = "https://readdy.ai/api/search-image?query=Dark%20subtle%20abstract%20gradient%20background%20with%20faint%20navy%20blue%20and%20cyan%20mesh%20lines%2C%20minimal%20technology%20pattern%2C%20very%20low%20contrast%20and%20opacity%2C%20suitable%20for%20dark%20mode%20mobile%20login%20screen%20background%2C%20soft%20glowing%20particles%2C%20premium%20SaaS%20aesthetic&width=800&height=1200&seq=2&orientation=portrait";
 
@@ -20,6 +32,7 @@ export default function ClientLogin() {
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [registerHref, setRegisterHref] = useState('/client/register');
   const router = useRouter();
   const appleAuthEnabled = process.env.NEXT_PUBLIC_APPLE_AUTH_ENABLED === 'true';
 
@@ -38,6 +51,15 @@ export default function ClientLogin() {
       setEmail(savedEmail);
       setRememberMe(true);
     }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const redirect = new URLSearchParams(window.location.search).get('redirect');
+    if (!redirect) return;
+    const safe = sanitizeRedirectPath(redirect, 'client', '/client/dashboard');
+    try { sessionStorage.setItem('post_auth_redirect', safe); } catch {}
+    setRegisterHref(`/client/register?redirect=${encodeURIComponent(safe)}`);
   }, []);
 
   const handleSocialLogin = async (provider: 'google' | 'apple' | 'linkedin_oidc') => {
@@ -129,6 +151,14 @@ export default function ClientLogin() {
       if (!clientData.profile_completed) {
         traceLog('profile incomplete, redirecting to wizard');
         router.push('/client/complete-profile-wizard');
+        return;
+      }
+
+      const returnPath = resolveClientReturnPath();
+      if (returnPath) {
+        traceLog('redirecting to requested destination', { returnPath });
+        try { sessionStorage.removeItem('post_auth_redirect'); } catch {}
+        router.push(returnPath);
         return;
       }
 
@@ -368,7 +398,7 @@ export default function ClientLogin() {
           <div className="mt-6 text-center">
             <p className="text-sm text-[#AAB7C4]">
               Don't have an account?{' '}
-              <Link href="/client/register" className="font-medium transition-colors hover:text-[#3B82F6]" style={{ color: "#1DA1F2" }}>
+              <Link href={registerHref} className="font-medium transition-colors hover:text-[#3B82F6]" style={{ color: "#1DA1F2" }}>
                 Create account
               </Link>
             </p>

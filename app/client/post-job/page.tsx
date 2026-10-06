@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -24,6 +24,7 @@ import FirstJobHelper from './FirstJobHelper';
 import ContextualHelpCard from '@/app/client/help/ContextualHelpCard';
 import { Suspense } from 'react';
 import { sanitiseTime, getStepErrors, validateAllSteps, stepFieldMap } from '@/lib/post-job-validation';
+import { loadPendingJobDraft, clearPendingJobDraft, mapPendingDraftToClientForm } from '@/lib/pending-job-draft';
 import ClientOnboardingAgent from '@/components/ClientOnboardingAgent';
 
 const defaultFormData = {
@@ -109,8 +110,11 @@ function PostJobContent() {
   const [serviceFeeFixedPence, setServiceFeeFixedPence] = useState(0);
   const [pricingError, setPricingError] = useState('');
   const [startFrom, setStartFrom] = useState<'blank' | 'template' | 'site' | 'previous'>('blank');
+  const [restoredFromBooking, setRestoredFromBooking] = useState(false);
+  const restoredDraftRef = useRef(false);
 
   const clientId = clientData?.id || null;
+  const isImmediateMode = searchParams.get('mode') === 'immediate';
 
   useEffect(() => {
     let cancelled = false;
@@ -158,6 +162,25 @@ function PostJobContent() {
     loadDraftsAndTemplates(clientData.id);
     loadSavedSites(clientData.id);
   }, [clientData, userId, allowed]);
+
+  useEffect(() => {
+    if (!allowed || !clientData || restoredDraftRef.current) return;
+    const draft = loadPendingJobDraft();
+    if (!draft) return;
+    if (!isImmediateMode && !searchParams.get('source')) return;
+    restoredDraftRef.current = true;
+    const mapped = mapPendingDraftToClientForm(draft);
+    setFormData(prev => ({
+      ...prev,
+      ...(mapped as any),
+      contactName: draft.contactName || prev.contactName,
+      contactEmail: draft.contactEmail || prev.contactEmail,
+      contactPhone: draft.contactPhone || prev.contactPhone,
+      urgency: 'immediate',
+    }));
+    setRestoredFromBooking(true);
+    setToastMessage('Your booking details were restored — review and confirm');
+  }, [allowed, clientData, isImmediateMode, searchParams]);
 
   const loadDraftsAndTemplates = async (cId: string) => {
     const [draftsRes, templatesRes] = await Promise.all([
@@ -481,6 +504,9 @@ function PostJobContent() {
         }).catch(() => {});
       }
 
+      clearPendingJobDraft();
+      try { sessionStorage.removeItem('post_auth_redirect'); } catch {}
+
       setSubmitStatus('success');
       setTimeout(() => {
         router.push('/client/jobs');
@@ -612,6 +638,26 @@ function PostJobContent() {
           <div className="fixed top-24 right-6 z-50 bg-[#111d35] text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in border border-[#1e2d4d]">
             <i className="ri-checkbox-circle-fill text-teal-400"></i>
             <span className="text-sm font-medium">{toastMessage}</span>
+          </div>
+        )}
+
+        {restoredFromBooking && (
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
+            <div className="bg-red-500/10 border border-red-500/25 rounded-xl p-4 flex items-start gap-3">
+              <i className="ri-flashlight-fill text-red-400 text-xl mt-0.5"></i>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-red-200">Continuing your &ldquo;Book a Guard Now&rdquo; request</p>
+                <p className="text-xs text-red-300/80 mt-0.5">Your details were carried over from the homepage. Review each step — your job is only created when you post it.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRestoredFromBooking(false)}
+                aria-label="Dismiss"
+                className="text-red-300 hover:text-white cursor-pointer"
+              >
+                <i className="ri-close-line text-lg"></i>
+              </button>
+            </div>
           </div>
         )}
 

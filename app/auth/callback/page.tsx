@@ -11,6 +11,7 @@ import {
 } from '@/lib/auth-helpers';
 import { useRouter } from 'next/navigation';
 import { sanitizeRedirectPath, clearBadStoredRedirects } from '@/lib/safe-redirect';
+import { getPendingBookingReturnPath } from '@/lib/pending-job-draft';
 
 function CallbackContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -140,6 +141,15 @@ function CallbackContent() {
           setTimeout(() => { router.push(safeRedirect); }, 1500);
           return;
         }
+        if (!storedRedirect && existing?.profile_completed) {
+          const bookingReturn = getPendingBookingReturnPath();
+          if (bookingReturn) {
+            setStatus('success');
+            setMessage('Account ready! Continuing your booking...');
+            setTimeout(() => { router.push(sanitizeRedirectPath(bookingReturn, 'client', '/client/dashboard')); }, 1500);
+            return;
+          }
+        }
         setStatus('success');
         setMessage('Account created successfully! Redirecting...');
         setTimeout(() => {
@@ -154,6 +164,13 @@ function CallbackContent() {
       await ensureUserRow(userId, userEmail, 'client', fullName);
       const { created, profile } = await ensureClientProfile(userId, userEmail, meta);
       await ensureSubscriptionRow(userId, 'client');
+      const bookingReturn = getPendingBookingReturnPath();
+      if (profile?.profile_completed && bookingReturn) {
+        setStatus('success');
+        setMessage('Signed in successfully! Continuing your booking...');
+        setTimeout(() => { router.push(sanitizeRedirectPath(bookingReturn, 'client', '/client/dashboard')); }, 1500);
+        return;
+      }
       setStatus('success');
       setMessage(created ? 'Client account created! Redirecting...' : 'Signed in successfully! Redirecting...');
       setTimeout(() => {
@@ -256,6 +273,13 @@ function CallbackContent() {
       .eq('user_id', userId)
       .maybeSingle();
     if (clientFallback) {
+      const bookingReturn = getPendingBookingReturnPath();
+      if (clientFallback.profile_completed && bookingReturn) {
+        setStatus('success');
+        setMessage('Signed in successfully! Continuing your booking...');
+        setTimeout(() => { router.push(sanitizeRedirectPath(bookingReturn, 'client', '/client/dashboard')); }, 1500);
+        return;
+      }
       setStatus('success');
       setMessage('Signed in successfully! Redirecting...');
       setTimeout(async () => {

@@ -9,6 +9,7 @@ import WizardNavigation from '@/components/WizardNavigation';
 import WizardCard from '@/components/WizardCard';
 import DynamicProfileForm, { useProfileWizardFields, useProfileFormData } from '@/components/DynamicProfileForm';
 import { sanitizeRedirectPath } from '@/lib/safe-redirect';
+import { getPendingBookingReturnPath } from '@/lib/pending-job-draft';
 
 const WIZARD_STEPS = [
   { id: 1, title: 'Welcome', description: 'Get started', icon: 'ri-hand-heart-line' },
@@ -267,6 +268,14 @@ export default function ClientCompleteProfileWizard() {
         sessionStorage.removeItem('post_auth_redirect');
         const safeRedirect = sanitizeRedirectPath(storedRedirect, 'client', '/client/onboarding');
         traceLog('redirecting to saved destination', { safeRedirect });
+        router.push(safeRedirect);
+        return;
+      }
+
+      const bookingReturn = getPendingBookingReturnPath();
+      if (bookingReturn) {
+        const safeRedirect = sanitizeRedirectPath(bookingReturn, 'client', '/client/onboarding');
+        traceLog('redirecting to pending booking', { safeRedirect });
         router.push(safeRedirect);
         return;
       }
