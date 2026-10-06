@@ -90,7 +90,76 @@ BEGIN
   END IF;
 END $$;
 
--- 6b-3. Race-safe unique index scoped to job-match emails only. The general
+-- 6b-3. The existing queue trigger historically derives dedupe_key from
+--       metadata.job_id. That is too broad for job-match notifications because
+--       one job can legitimately notify many guards. Preserve the explicit,
+--       server-generated per-job+guard key for job_match rows while leaving the
+--       existing derivation unchanged for every other email type.
+CREATE OR REPLACE FUNCTION app.set_email_queue_dedupe_key()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO ''
+AS $function$
+DECLARE
+  payload jsonb;
+  raw_metadata text;
+  entity_key text;
+BEGIN
+  IF new.metadata IS NOT NULL THEN
+    IF jsonb_typeof(new.metadata) = 'object' THEN
+      payload := new.metadata;
+    ELSIF jsonb_typeof(new.metadata) = 'string' THEN
+      raw_metadata := new.metadata #>> '{}';
+      BEGIN
+        IF raw_metadata ~ '^\s*\{' THEN
+          payload := raw_metadata::jsonb;
+        END IF;
+      EXCEPTION WHEN OTHERS THEN
+        payload := NULL;
+      END;
+    END IF;
+  END IF;
+
+  entity_key := coalesce(
+    payload ->> 'source_record_id',
+    payload ->> 'job_id',
+    payload ->> 'user_id',
+    payload #>> '{metadata,id}',
+    payload #>> '{metadata,user_id}'
+  );
+
+  IF new.email_type = 'job_match' THEN
+    new.dedupe_key := coalesce(
+      nullif(new.dedupe_key, ''),
+      nullif(payload ->> 'idempotency_key', ''),
+      nullif(entity_key, ''),
+      lower(coalesce(new.recipient_email, '')) || '|' || coalesce(new.subject, '')
+    );
+  ELSE
+    new.dedupe_key := coalesce(
+      nullif(entity_key, ''),
+      lower(coalesce(new.recipient_email, '')) || '|' || coalesce(new.subject, '')
+    );
+  END IF;
+
+  IF new.status IN ('pending', 'processing')
+     AND EXISTS (
+       SELECT 1
+       FROM app.email_queue q
+       WHERE q.status IN ('pending', 'processing')
+         AND q.email_type = new.email_type
+         AND q.dedupe_key = new.dedupe_key
+         AND q.id <> new.id
+     )
+  THEN
+    RETURN NULL;
+  END IF;
+
+  RETURN new;
+END;
+$function$;
+
+-- 6b-4. Race-safe unique index scoped to job-match emails only. The general
 --       queue indexes are left exactly as they are.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_email_queue_job_match_dedupe
   ON app.email_queue (dedupe_key)
