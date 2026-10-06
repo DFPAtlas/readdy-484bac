@@ -1,7 +1,8 @@
 # Cron Job Setup
 
-The three cron-gated functions read `CRON_SECRET` from Supabase Edge Function Secrets
-and require the same value to be sent in the `x-cron-secret` header on every request.
+The publishing and cleanup functions read `CRON_SECRET` from Supabase Edge Function
+Secrets and require the same value in `x-cron-secret`. Guard payout auto-release uses
+a separate generated Vault token and is installed by the database migration.
 
 ## Secrets to add
 
@@ -17,10 +18,10 @@ and require the same value to be sent in the `x-cron-secret` header on every req
 | Function | URL | Suggested cadence |
 | --- | --- | --- |
 | publish-scheduled-posts | `https://vnywjfpkepjgclkbcmsj.supabase.co/functions/v1/publish-scheduled-posts` | every 10 minutes |
-| auto-release-guard-payments | `https://vnywjfpkepjgclkbcmsj.supabase.co/functions/v1/auto-release-guard-payments` | every hour |
+| process-overdue-guard-payouts | `https://vnywjfpkepjgclkbcmsj.supabase.co/functions/v1/process-overdue-guard-payouts` | hourly at minute 7 (installed by migration) |
 | run-cleanup-now | `https://vnywjfpkepjgclkbcmsj.supabase.co/functions/v1/run-cleanup-now` | daily |
 
-All three are `POST` requests with header:
+The publishing and cleanup endpoints are `POST` requests with header:
 
 ```
 x-cron-secret: <YOUR-CRON-SECRET>
@@ -28,7 +29,7 @@ x-cron-secret: <YOUR-CRON-SECRET>
 
 ## Example: cron-job.org
 
-Create three monitors, one per endpoint, each with:
+Create monitors only for publishing and cleanup when an external scheduler is used:
 - Request type: POST
 - Header: `x-cron-secret` = `<YOUR-CRON-SECRET>`
 
@@ -42,7 +43,6 @@ name: cron-jobs
 on:
   schedule:
     - cron: "*/10 * * * *"
-    - cron: "0 * * * *"
     - cron: "0 2 * * *"
 jobs:
   cron:
@@ -50,8 +50,6 @@ jobs:
     steps:
       - name: publish-scheduled-posts
         run: curl -fsS -X POST https://vnywjfpkepjgclkbcmsj.supabase.co/functions/v1/publish-scheduled-posts -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
-      - name: auto-release-guard-payments
-        run: curl -fsS -X POST https://vnywjfpkepjgclkbcmsj.supabase.co/functions/v1/auto-release-guard-payments -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
       - name: run-cleanup-now
         run: curl -fsS -X POST https://vnywjfpkepjgclkbcmsj.supabase.co/functions/v1/run-cleanup-now -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
 ```
@@ -68,6 +66,12 @@ select cron.schedule('publish-scheduled-posts', '*/10 * * * *',
 
 ## Verify
 
-Hit any endpoint from the Supabase "Invoke" panel with the `x-cron-secret` header set.
+Hit either publishing or cleanup endpoint from the Supabase "Invoke" panel with the
+`x-cron-secret` header set.
 A `200` with a JSON body means you're wired up; `{"error":"Unauthorized"}` means the
 header value does not match `CRON_SECRET`.
+
+For guard payouts, verify that `cron.job` contains one active
+`process-overdue-guard-payouts` entry. Its token is stored as
+`qg_payout_worker_token` in Vault and must not be copied into frontend code. The retired
+`auto-release-guard-payments` endpoint intentionally remains HTTP 410.

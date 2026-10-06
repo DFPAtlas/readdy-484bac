@@ -151,7 +151,7 @@ const EDGE_FUNCTIONS: { name: string; slug: string; type: string; retired?: bool
   { name: 'Create Job Payment', slug: 'create-job-payment', type: 'payment' },
   { name: 'Create Guard Payout', slug: 'create-guard-payout', type: 'payment' },
   { name: 'Release Guard Payment (Retired)', slug: 'release-guard-payment', type: 'payment', retired: true },
-  { name: 'Auto-Release Guard Payments', slug: 'auto-release-guard-payments', type: 'payment' },
+  { name: 'Overdue Guard Payout Worker', slug: 'process-overdue-guard-payouts', type: 'payment' },
   { name: 'Enhanced Stripe Webhook', slug: 'enhanced-stripe-webhook', type: 'stripe' },
   { name: 'Get Storage Usage', slug: 'get-storage-usage', type: 'storage' },
   { name: 'Run Cleanup Now', slug: 'run-cleanup-now', type: 'maintenance' },
@@ -857,7 +857,7 @@ export default function SystemStatusClient() {
                     <div className="mt-4 p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
                       <p className="text-[11px] text-amber-300 leading-relaxed">
                         <i className="ri-information-line mr-1"></i>
-                        {adminData.payment_pipeline.stuck.awaiting_release_over_72h} assignment{adminData.payment_pipeline.stuck.awaiting_release_over_72h > 1 ? 's' : ''} past the 72-hour auto-release window. The auto-release cron runs every 6 hours.
+                        {adminData.payment_pipeline.stuck.awaiting_release_over_72h} completion request{adminData.payment_pipeline.stuck.awaiting_release_over_72h > 1 ? 's are' : ' is'} past the 72-hour fallback window. The overdue payout worker runs hourly; investigate if this count persists after its next run.
                       </p>
                     </div>
                   )}
@@ -940,7 +940,7 @@ export default function SystemStatusClient() {
                   </thead>
                   <tbody className="divide-y divide-[#1a2b4a]">
                     {adminData.cron_jobs.map((job) => {
-                      const isAutoRelease = job.jobname === 'auto-release-guard-payments';
+                      const isAutoRelease = job.jobname === 'process-overdue-guard-payouts';
                       return (
                         <tr key={job.jobid} className={`hover:bg-[#0a1628]/50 transition-colors ${isAutoRelease ? 'bg-teal-500/5' : ''}`}>
                           <td className="px-4 py-3">

@@ -349,7 +349,10 @@ async function authenticateAndValidate(
       ? internalBody.approvedByUserId.trim()
       : null;
 
-    if (!assignmentId || approvalSource !== 'client_completion_approved' || !approvedByUserId) {
+    const clientApproved = approvalSource === 'client_completion_approved' && !!approvedByUserId;
+    const automaticallyApproved = approvalSource === 'automatic_completion_timeout' && !approvedByUserId;
+
+    if (!assignmentId || (!clientApproved && !automaticallyApproved)) {
       throw { status: 403, message: 'Trusted internal payout approval required' };
     }
 
@@ -357,7 +360,7 @@ async function authenticateAndValidate(
       assignmentId,
       jobId,
       adminUserId: approvedByUserId,
-      adminRole: 'client_approved_internal',
+      adminRole: automaticallyApproved ? 'automatic_completion_timeout' : 'client_approved_internal',
       adminEmail: '',
     };
   }
@@ -936,7 +939,7 @@ async function recordTransferCreated(
 async function logAudit(
   supabase: ReturnType<typeof createClient>,
   params: {
-    adminUserId: string;
+    adminUserId: string | null;
     adminRole: string;
     adminEmail: string;
     assignmentId: string;

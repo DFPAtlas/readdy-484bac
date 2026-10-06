@@ -196,9 +196,20 @@ Deno.serve(async (req: Request) => {
   let failedPayoutsCount = 0;
 
   try {
-    const { data: allAssignments, error: allErr } = await app
+    const [{ data: allAssignments, error: allErr }, overdueCompletions] = await Promise.all([
+      app
       .from("job_assignments")
-      .select("payment_status, payment_date, completed_at, assigned_at, updated_at");
+      .select("payment_status, payment_date, completed_at, assigned_at, updated_at"),
+      app.from("job_completion_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .lte("requested_at", since72h),
+    ]);
+    if (overdueCompletions.error) {
+      schemaErrors.push(`Overdue completion query failed: ${overdueCompletions.error.message}`);
+    } else {
+      stuckAwaitingOver72h = overdueCompletions.count ?? 0;
+    }
     if (!allErr && allAssignments) {
       for (const a of allAssignments) {
         const ps = a.payment_status;
@@ -206,12 +217,6 @@ Deno.serve(async (req: Request) => {
           const assignedDate = a.assigned_at ? new Date(a.assigned_at) : null;
           if (assignedDate && assignedDate < new Date(Date.now() - 24 * 60 * 60 * 1000)) {
             stuckFundedOver24h++;
-          }
-          if (a.completed_at) {
-            const completedDate = new Date(a.completed_at);
-            if (completedDate < new Date(Date.now() - 72 * 60 * 60 * 1000)) {
-              stuckAwaitingOver72h++;
-            }
           }
           pendingPayoutsCount++;
         }
