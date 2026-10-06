@@ -5,7 +5,7 @@
     "focus-trap-react": "^10.2.3",
     "jspdf": "^4.2.1",
     "lucide-react": "0.539.0",
-    "next": "15.3.2",
+    "next": "15.5.27",
     "next-themes": "0.4.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -42,7 +42,7 @@
     "test:e2e:report": "playwright show-report",
     "test:e2e:smoke": "playwright test --grep @smoke",
     "test:e2e:uat": "playwright test --grep @uat",
-    "test:unit": "node --test tests/*.test.cjs",
+    "test:unit": "node --test tests/*.test.cjs lib/immediate-booking-phase2.test.cjs",
     "typecheck": "tsc --noEmit",
     "uat:cleanup": "node scripts/uat/cleanup.mjs",
     "uat:seed": "node scripts/uat/seed.mjs"
