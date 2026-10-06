@@ -57,12 +57,45 @@ NOTIFY pgrst, 'reload schema';
 ALTER TABLE app.jobs
   ADD COLUMN IF NOT EXISTS notified_at TIMESTAMPTZ;
 
--- 6b. At most one queue row per idempotency key (e.g.
---     immediate-job:{jobId}:guard:{guardId}). The partial predicate means
---     legacy queue rows without a key are untouched.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_email_queue_idempotency
-  ON app.email_queue ((metadata->>'idempotency_key'))
-  WHERE (metadata->>'idempotency_key') IS NOT NULL;
+-- 6b. The existing app.email_queue.dedupe_key column is the authoritative
+--     idempotency field. A previous revision of this migration used a ROW
+--     metadata expression index instead; drop it if the live database already
+--     created it so there is a single dedupe mechanism. This is a no-op on
+--     fresh databases.
+DROP INDEX IF EXISTS app.uq_email_queue_idempotency;
+
+-- 6b-1. Ensure the existing dedupe_key column is present (no duplicate
+--       idempotency column is introduced; this is the canonical field).
+ALTER TABLE app.email_queue
+  ADD COLUMN IF NOT EXISTS dedupe_key TEXT;
+
+-- 6b-2. Fail clearly if duplicate non-null job-match dedupe keys already
+--       exist. Building the unique index below on dirty data would fail
+--       opaquely, so abort with an actionable message instead.
+DO $$
+DECLARE
+  v_dupes int;
+BEGIN
+  SELECT count(*) INTO v_dupes
+  FROM (
+    SELECT dedupe_key
+    FROM app.email_queue
+    WHERE email_type = 'job_match' AND dedupe_key IS NOT NULL
+    GROUP BY dedupe_key
+    HAVING count(*) > 1
+  ) d;
+
+  IF v_dupes > 0 THEN
+    RAISE EXCEPTION 'Phase 2 migration aborted: % duplicate non-null job_match dedupe_key value(s) already exist in app.email_queue. Resolve the duplicates before applying this migration.', v_dupes;
+  END IF;
+END $$;
+
+-- 6b-3. Race-safe unique index scoped to job-match emails only. The general
+--       queue indexes are left exactly as they are.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_email_queue_job_match_dedupe
+  ON app.email_queue (dedupe_key)
+  WHERE email_type = 'job_match'
+    AND dedupe_key IS NOT NULL;
 
 -- 6c. Replace the delivery-status index so it covers the honest states.
 DROP INDEX IF EXISTS app.idx_jobs_notification_status;
@@ -93,10 +126,16 @@ AS $function$
 DECLARE
   v_id uuid;
   v_status text;
+  v_metadata jsonb;
 BEGIN
+  -- The authoritative dedupe key is the function argument; the caller's
+  -- metadata payload never supplies it.
+  v_metadata := coalesce(p_metadata, '{}'::jsonb);
+
   SELECT id, status INTO v_id, v_status
   FROM app.email_queue
-  WHERE metadata->>'idempotency_key' = p_idempotency_key
+  WHERE email_type = 'job_match'
+    AND dedupe_key = p_idempotency_key
   ORDER BY created_at ASC
   LIMIT 1;
 
@@ -116,17 +155,38 @@ BEGIN
     END IF;
   END IF;
 
+  -- Server-merged metadata: the authoritative identifiers cannot be spoofed
+  -- through p_metadata.
+  v_metadata := v_metadata
+    || jsonb_build_object(
+         'job_id', p_job_id::text,
+         'guard_record_id', p_guard_id::text,
+         'guard_id', p_user_id::text,
+         'notification_type', 'job_match',
+         'idempotency_key', p_idempotency_key
+       );
+
   INSERT INTO app.email_queue
     (user_id, email_type, recipient_email, recipient_name, subject, body_html,
-     status, priority, metadata, created_at, updated_at)
+     status, priority, metadata, dedupe_key, created_at, updated_at)
   VALUES
     (p_user_id, 'job_match', p_recipient_email, p_recipient_name, p_subject,
      '<p>You have a new QuickGuard job match. Open your dashboard to view and apply.</p>',
-     'pending', coalesce(p_priority, 5), p_metadata, now(), now());
+     'pending', coalesce(p_priority, 5), v_metadata, p_idempotency_key, now(), now());
 
   RETURN 'queued';
 EXCEPTION
   WHEN unique_violation THEN
+    -- A concurrent insert won the race on uq_email_queue_job_match_dedupe.
+    -- Re-read and report the existing row's state honestly instead of failing.
+    SELECT status INTO v_status
+    FROM app.email_queue
+    WHERE email_type = 'job_match' AND dedupe_key = p_idempotency_key
+    ORDER BY created_at ASC
+    LIMIT 1;
+    IF v_status = 'sent' THEN
+      RETURN 'delivered';
+    END IF;
     RETURN 'queued';
 END;
 $function$;
@@ -156,7 +216,8 @@ BEGIN
     count(*) FILTER (WHERE status IN ('pending', 'processing', 'queued', 'sending'))
   INTO v_total, v_sent, v_failed, v_inflight
   FROM app.email_queue
-  WHERE metadata->>'job_id' = p_job_id::text;
+  WHERE email_type = 'job_match'
+    AND metadata->>'job_id' = p_job_id::text;
 
   IF coalesce(v_total, 0) = 0 THEN
     RETURN NULL;

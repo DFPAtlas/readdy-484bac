@@ -81,6 +81,19 @@ serve(async (req) => {
         ? submissionId
         : null;
 
+    // Immediate bookings must carry a valid, stable idempotency key. A missing
+    // or malformed value is rejected outright rather than silently converted to
+    // null, so no entitlement check, usage consumption, job insert or guard
+    // notification runs for an invalid immediate request.
+    if (isImmediateBooking && !safeSubmissionId) {
+      return new Response(JSON.stringify({
+        error: 'invalid_submission_id',
+        message: 'Immediate bookings require a valid submission identifier.',
+      }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Idempotency: the same authenticated client replaying the same submission
     // must get the already-created job back instead of creating another one.
     if (safeSubmissionId) {

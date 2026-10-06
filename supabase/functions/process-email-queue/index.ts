@@ -108,9 +108,44 @@ serve(async (req) => {
             body: JSON.stringify(metadata),
           });
           if (!res.ok) throw new Error(await res.text());
-          await supabase.rpc('complete_email_queue', { p_queue_id: email.id });
+
+          const { data: completion, error: completionError } = await supabase.rpc('complete_email_queue', { p_queue_id: email.id });
+          if (completionError || completion !== true) {
+            const reconciliationMessage = `Queue completion not confirmed for job_match email ${email.id}: ${completionError?.message || `returned ${JSON.stringify(completion)}`}`;
+            await supabase.from('email_send_log').insert({
+              function_name: 'process-email-queue',
+              template: 'job_match_reconciliation',
+              recipient: email.recipient_email || '',
+              related_user_id: email.user_id || null,
+              related_job_id: metadata.job_id || null,
+              status: 'failed',
+              error_message: reconciliationMessage.slice(0, 1000),
+              sent_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+            });
+            errors.push(reconciliationMessage);
+            failed++;
+            continue;
+          }
+
           delegated++;
-          await supabase.rpc('recompute_job_notification_status', { p_job_id: metadata.job_id });
+
+          const { error: recomputeError } = await supabase.rpc('recompute_job_notification_status', { p_job_id: metadata.job_id });
+          if (recomputeError) {
+            const recomputeMessage = `recompute_job_notification_status failed for job ${metadata.job_id}: ${recomputeError.message}`;
+            await supabase.from('email_send_log').insert({
+              function_name: 'process-email-queue',
+              template: 'job_match_reconciliation',
+              recipient: email.recipient_email || '',
+              related_user_id: email.user_id || null,
+              related_job_id: metadata.job_id || null,
+              status: 'failed',
+              error_message: recomputeMessage.slice(0, 1000),
+              sent_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+            });
+            errors.push(recomputeMessage);
+          }
           continue;
         }
 
