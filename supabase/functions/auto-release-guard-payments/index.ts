@@ -14,7 +14,7 @@ serve(async (req: Request) => {
   return new Response(JSON.stringify({
     error: "This auto-release payout endpoint has been retired.",
     retired: true,
-    migrateTo: "approve-job-completion + create-guard-payout",
+    migrateTo: "process-overdue-guard-payouts",
   }), {
     status: 410,
     headers: { "Content-Type": "application/json" },

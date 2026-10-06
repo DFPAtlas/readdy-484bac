@@ -11,6 +11,7 @@ const KNOWN_FUNCTIONS_FALLBACK: Record<string, { name: string; verify_jwt: boole
   "create-subscription-checkout": { name: "Create Subscription Checkout", verify_jwt: true },
   "create-job-payment": { name: "Create Job Payment", verify_jwt: true },
   "create-guard-payout": { name: "Create Guard Payout", verify_jwt: true },
+  "process-overdue-guard-payouts": { name: "Overdue Guard Payout Worker", verify_jwt: false },
   "release-guard-payment": { name: "Release Guard Payment (Retired)", verify_jwt: true },
   "email-confirmation": { name: "Email Confirmation", verify_jwt: false },
   "send-job-posted-email": { name: "Send Job Posted Email", verify_jwt: true },
