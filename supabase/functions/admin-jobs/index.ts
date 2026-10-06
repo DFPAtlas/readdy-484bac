@@ -61,7 +61,7 @@ serve(async (req) => {
 
     let query = supabase
       .from('jobs')
-      .select('id, job_title, venue_city, venue_postcode, venue_name, start_date, end_date, start_time, end_time, hourly_rate, number_of_guards, status, urgency, sia_licence_required, risk_level, is_deleted, created_at, clients(company_name, contact_name, email)', { count: 'exact' })
+      .select('id, job_title, venue_city, venue_postcode, venue_name, start_date, end_date, start_time, end_time, hourly_rate, number_of_guards, status, urgency, is_urgent, booking_source, submission_id, notification_status, notification_attempts, notification_error, notified_guard_count, sia_licence_required, risk_level, is_deleted, created_at, clients(company_name, contact_name, email)', { count: 'exact' })
       .eq('is_deleted', false);
 
     if (filterStatus !== 'all') {
@@ -157,6 +157,7 @@ serve(async (req) => {
       { count: totalCancelled },
       { count: totalFlagged },
       { count: totalPendingApps },
+      { count: totalUrgent },
     ] = await Promise.all([
       supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false),
       supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false).eq('status', 'open'),
@@ -165,6 +166,7 @@ serve(async (req) => {
       supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false).eq('status', 'cancelled'),
       supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false).not('risk_level', 'is', null),
       supabase.from('job_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false).eq('urgency', 'immediate'),
     ]);
 
     const stats = {
@@ -175,6 +177,7 @@ serve(async (req) => {
       cancelled: totalCancelled || 0,
       pending_apps: totalPendingApps || 0,
       flagged: totalFlagged || 0,
+      urgent: totalUrgent || 0,
     };
 
     return new Response(JSON.stringify({ data: enriched, totalCount: count || 0, stats, page, pageSize }), {

@@ -5,7 +5,7 @@
     "focus-trap-react": "^10.2.3",
     "jspdf": "^4.2.1",
     "lucide-react": "0.539.0",
-    "next": "15.5.27",
+    "next": "15.3.2",
     "next-themes": "0.4.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -28,24 +28,24 @@
     "typescript": "^5"
   },
   "name": "next-app",
-  "private": true,
-  "scripts": {
-    "build": "next build",
-    "dev": "cross-env NODE_ENV=development next dev -H 0.0.0.0 -p 3000",
-    "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
-    "test:unit": "node --test tests/*.test.cjs",
-    "test:e2e": "playwright test",
-    "test:e2e:smoke": "playwright test --grep @smoke",
-    "test:e2e:uat": "playwright test --grep @uat",
-    "test:e2e:report": "playwright show-report",
-    "uat:seed": "node scripts/uat/seed.mjs",
-    "uat:cleanup": "node scripts/uat/cleanup.mjs",
-    "check:admin": "node scripts/checks/admin-typecheck.cjs"
-  },
-  "version": "0.1.0",
   "overrides": {
     "postcss": "8.5.23",
     "sharp": "0.35.4"
-  }
+  },
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "check:admin": "node scripts/checks/admin-typecheck.cjs",
+    "dev": "cross-env NODE_ENV=development next dev -H 0.0.0.0 -p 3000",
+    "lint": "eslint .",
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:smoke": "playwright test --grep @smoke",
+    "test:e2e:uat": "playwright test --grep @uat",
+    "test:unit": "node --test tests/*.test.cjs",
+    "typecheck": "tsc --noEmit",
+    "uat:cleanup": "node scripts/uat/cleanup.mjs",
+    "uat:seed": "node scripts/uat/seed.mjs"
+  },
+  "version": "0.1.0"
 }

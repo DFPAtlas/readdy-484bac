@@ -20,7 +20,7 @@ export default function AdminJobsPage() {
   const {
     jobs, loading, error, page, pageSize, totalCount, stats,
     filters, setFilter, clearFilters, goToPage, refresh,
-    deleteJob, changeStatus, flagJob, unflagJob, bulkAction,
+    deleteJob, changeStatus, flagJob, unflagJob, bulkAction, retryNotification,
   } = useAdminJobs();
 
   const {
@@ -41,6 +41,7 @@ export default function AdminJobsPage() {
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
 
   const [mutating, setMutating] = useState(false);
+  const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
 
   useEffect(() => {
@@ -52,6 +53,16 @@ export default function AdminJobsPage() {
   }, [jobs]);
 
   const showToast = (message: string, type: Toast['type']) => setToast({ message, type });
+
+  const handleRetryNotification = async (job: JobRow) => {
+    setRetryingJobId(job.id);
+    try {
+      await retryNotification(job.id);
+      showToast('Guard notifications retried', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to retry notifications', 'error');
+    } finally { setRetryingJobId(null); }
+  };
 
   const openDetail = useCallback((job: JobRow) => {
     setSelectedJob(job);
@@ -154,8 +165,7 @@ export default function AdminJobsPage() {
     setSelectedJobIds(next);
   };
 
-  const handleBulkApply = async (action: string) => {
-    if (!action || selectedJobIds.size === 0) return;
+  const handleBulkApply = async (action: string) => {    if (!action || selectedJobIds.size === 0) return;
     setMutating(true);
     try {
       const ids = Array.from(selectedJobIds);
@@ -196,9 +206,10 @@ export default function AdminJobsPage() {
         <p className="text-sm text-slate-400 font-medium">Manage, monitor, and moderate all job postings across the platform</p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
         {[
           { label: 'Total Jobs', value: stats.total, icon: 'ri-briefcase-line', color: 'text-slate-400', bg: 'bg-[#111d35]', ring: 'ring-[#1e2d4d]' },
+          { label: 'Immediate', value: stats.urgent, icon: 'ri-flashlight-fill', color: 'text-red-400', bg: 'bg-red-500/10', ring: 'ring-red-500/20' },
           { label: 'Open', value: stats.open, icon: 'ri-checkbox-circle-line', color: 'text-emerald-400', bg: 'bg-emerald-500/10', ring: 'ring-emerald-500/20' },
           { label: 'In Progress', value: stats.in_progress, icon: 'ri-loader-4-line', color: 'text-sky-400', bg: 'bg-sky-500/10', ring: 'ring-sky-500/20' },
           { label: 'Completed', value: stats.completed, icon: 'ri-check-double-line', color: 'text-slate-400', bg: 'bg-[#111d35]', ring: 'ring-[#1e2d4d]' },
@@ -263,6 +274,8 @@ export default function AdminJobsPage() {
         onOpenDelete={openDelete}
         onRetry={refresh}
         onPageChange={goToPage}
+        onRetryNotification={handleRetryNotification}
+        retryingId={retryingJobId}
       />
 
       {showDetail && selectedJob && (

@@ -42,7 +42,7 @@ serve(async (req) => {
     });
 
     const body = await req.json();
-    const { formData, clientId } = body;
+    const { formData, clientId, submissionId, bookingMode } = body;
 
     if (!clientId || !formData) {
       return new Response(JSON.stringify({ error: 'validation', message: 'Missing clientId or formData' }), {
@@ -67,6 +67,40 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'unauthorized', message: 'Client mismatch or not found' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Immediate classification is decided on the server, never taken from the
+    // browser, and can only ever be requested explicitly. It never bypasses the
+    // entitlement or usage checks below.
+    const isImmediateBooking = bookingMode === 'immediate';
+
+    // Stable, per-client idempotency key for the booking journey. Malformed
+    // values are ignored rather than trusted.
+    const safeSubmissionId =
+      typeof submissionId === 'string' && /^[A-Za-z0-9_-]{8,128}$/.test(submissionId)
+        ? submissionId
+        : null;
+
+    // Idempotency: the same authenticated client replaying the same submission
+    // must get the already-created job back instead of creating another one.
+    if (safeSubmissionId) {
+      const { data: existingJob, error: idempotencyError } = await supabaseAdmin
+        .from('jobs')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('submission_id', safeSubmissionId)
+        .maybeSingle();
+
+      if (!idempotencyError && existingJob?.id) {
+        return new Response(JSON.stringify({
+          success: true,
+          jobId: existingJob.id,
+          idempotent: true,
+          warnings: [],
+        }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     const { data: entitlement, error: entitlementError } = await supabaseAdmin
@@ -224,7 +258,7 @@ serve(async (req) => {
       dress_code: (formData.dressCode || '').trim() || null,
       special_instructions: (formData.specialInstructions || '').trim() || null,
       additional_requirements: (formData.additionalRequirements || '').trim() || null,
-      urgency: formData.urgency || 'standard',
+      urgency: isImmediateBooking ? 'immediate' : (formData.urgency || 'standard'),
       contact_name: contactName,
       contact_phone: formData.contactPhone || '',
       contact_email: contactEmail,
@@ -240,7 +274,14 @@ serve(async (req) => {
       publish_at: formData.publishAt ? new Date(formData.publishAt).toISOString() : null,
       expires_at: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : null,
       is_featured: formData.isFeatured || false,
-      is_urgent: formData.isUrgent || formData.urgency === 'urgent' || formData.urgency === 'immediate',
+      is_urgent: isImmediateBooking
+        ? true
+        : Boolean(formData.isUrgent || formData.urgency === 'urgent' || formData.urgency === 'immediate'),
+      booking_source: isImmediateBooking ? 'homepage_guard_now' : null,
+      submission_id: safeSubmissionId,
+      notification_status: formData.publishAt && new Date(formData.publishAt) > new Date() ? 'none' : 'pending',
+      notification_attempts: 0,
+      notified_guard_count: 0,
       is_draft: formData.publishAt ? new Date(formData.publishAt) > new Date() : false,
       auto_close_on_expiry: formData.autoCloseOnExpiry !== false,
       featured_until: formData.isFeatured && formData.featuredDuration
@@ -262,6 +303,31 @@ serve(async (req) => {
           message: 'You have reached your monthly job posting limit. Upgrade your plan to post more jobs.',
         }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+
+      // Concurrent replay: two requests with the same submission id raced and
+      // the partial unique index (client_id, submission_id) rejected the loser.
+      // Return the job that won instead of a false failure. The consumed usage
+      // of the rejected insert was rolled back with its transaction, so the
+      // allowance is not spent twice and no notifications were queued.
+      const isUniqueConflict = insertError?.code === '23505'
+        || /duplicate key value|unique constraint/i.test(insertError?.message || '');
+      if (isUniqueConflict && safeSubmissionId) {
+        const { data: racedJob } = await supabaseAdmin
+          .from('jobs')
+          .select('id')
+          .eq('client_id', clientId)
+          .eq('submission_id', safeSubmissionId)
+          .maybeSingle();
+        if (racedJob?.id) {
+          return new Response(JSON.stringify({
+            success: true,
+            jobId: racedJob.id,
+            idempotent: true,
+            warnings: [],
+          }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      }
+
       return new Response(JSON.stringify({
         error: 'insert_failed',
         message: insertError?.message || 'Failed to create job. Please try again.',
@@ -323,16 +389,52 @@ serve(async (req) => {
     }
 
     if (jobPayload.status === 'open') {
+      // Emails are durably queued by notify-matching-guards and delivered
+      // asynchronously by the existing email worker. The job only records an
+      // honest delivery state here: 'delivered' is never set from a queue row.
+      const notifyAttemptAt = new Date().toISOString();
       try {
-        await fetch(`${supabaseUrl}/functions/v1/notify-matching-guards`, {
+        const notifyRes = await fetch(`${supabaseUrl}/functions/v1/notify-matching-guards`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${supabaseServiceKey}`,
           },
           body: JSON.stringify({ jobId }),
         });
-      } catch {
+
+        if (!notifyRes.ok) {
+          throw new Error(`notify-matching-guards responded ${notifyRes.status}`);
+        }
+
+        const notifyJson = await notifyRes.json().catch(() => null);
+        const queued = Number(notifyJson?.queued ?? 0);
+        const retried = Number(notifyJson?.retried ?? 0);
+        const skipped = Number(notifyJson?.skipped ?? 0);
+        const queueFailed = Number(notifyJson?.failed ?? 0);
+        const targeted = queued + retried + skipped;
+
+        let deliveryStatus: string;
+        if (targeted === 0 && queueFailed === 0) deliveryStatus = 'none';
+        else if (targeted === 0) deliveryStatus = 'failed';
+        else if (queueFailed > 0) deliveryStatus = 'partially_delivered';
+        else deliveryStatus = 'queued';
+
+        await supabaseAdmin.from('jobs').update({
+          notification_status: deliveryStatus,
+          notification_attempts: 1,
+          notified_guard_count: targeted,
+          notification_error: queueFailed > 0 ? `${queueFailed} guard notification(s) could not be queued` : null,
+          notification_last_attempt_at: notifyAttemptAt,
+        }).eq('id', jobId);
+      } catch (notifyError) {
+        const notifyMessage = notifyError instanceof Error ? notifyError.message : 'notification_failed';
+        await supabaseAdmin.from('jobs').update({
+          notification_status: 'failed',
+          notification_attempts: 1,
+          notification_error: notifyMessage.slice(0, 500),
+          notification_last_attempt_at: notifyAttemptAt,
+        }).eq('id', jobId);
         warnings.push('notification_failed');
       }
     }

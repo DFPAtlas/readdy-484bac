@@ -101,6 +101,19 @@ serve(async (req) => {
           continue;
         }
 
+        if (email.email_type === 'job_match' && metadata.job_id && metadata.guard_id) {
+          const res = await fetch(`${functionsBaseUrl}/send-job-match-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
+            body: JSON.stringify(metadata),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          await supabase.rpc('complete_email_queue', { p_queue_id: email.id });
+          delegated++;
+          await supabase.rpc('recompute_job_notification_status', { p_job_id: metadata.job_id });
+          continue;
+        }
+
         if (!email.recipient_email || !(email.body_html || email.body_text || email.body) || !email.subject) {
           throw new Error('Missing recipient, subject, or body');
         }
@@ -144,6 +157,9 @@ serve(async (req) => {
           sent_at: new Date().toISOString(),
           created_at: new Date().toISOString(),
         });
+        if (metadata.job_id) {
+          try { await supabase.rpc('recompute_job_notification_status', { p_job_id: metadata.job_id }); } catch { /* keep the job intact */ }
+        }
         failed++;
         errors.push(`Email ${email.id}: ${message}`);
       }

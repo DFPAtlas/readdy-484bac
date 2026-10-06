@@ -79,18 +79,6 @@ serve(async (req) => {
       );
     }
 
-    const userSupabase = createClient(supabaseUrl, supabaseAnonKey || supabaseServiceKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user }, error: userError } = await userSupabase.auth.getUser();
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const { jobId } = await req.json();
     if (!jobId) {
       return new Response(
@@ -100,18 +88,45 @@ serve(async (req) => {
     }
 
     const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
+    const adminApp = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
 
-    const { data: clientData, error: clientError } = await adminSupabase
-      .from('clients')
-      .select('id, client_type')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // Trusted server-to-server callers (create-job, admin retry, email worker)
+    // authenticate by presenting the REAL service-role key. This is a direct
+    // secret comparison, so a browser-supplied role name or boolean flag can
+    // never satisfy it. Browser callers must still prove they own the job
+    // through their authenticated session below.
+    const bearer = authHeader.replace('Bearer ', '').trim();
+    const isServiceCaller = bearer.length > 0 && bearer === supabaseServiceKey;
+    let ownerClientId: string | null = null;
+    let clientType: string | null = null;
 
-    if (clientError || !clientData) {
-      return new Response(
-        JSON.stringify({ error: 'Client account not found' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!isServiceCaller) {
+      const userSupabase = createClient(supabaseUrl, supabaseAnonKey || supabaseServiceKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const { data: { user }, error: userError } = await userSupabase.auth.getUser();
+      if (userError || !user) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: clientData, error: clientError } = await adminSupabase
+        .from('clients')
+        .select('id, client_type')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (clientError || !clientData) {
+        return new Response(
+          JSON.stringify({ error: 'Client account not found' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      ownerClientId = clientData.id;
+      clientType = clientData.client_type ?? null;
     }
 
     const { data: job, error: jobError } = await adminSupabase
@@ -127,15 +142,24 @@ serve(async (req) => {
       );
     }
 
-    if (job.client_id !== clientData.id) {
+    if (!isServiceCaller && job.client_id !== ownerClientId) {
       return new Response(
         JSON.stringify({ error: 'Forbidden: you do not own this job' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    if (isServiceCaller && !clientType) {
+      const { data: jobClient } = await adminSupabase
+        .from('clients')
+        .select('client_type')
+        .eq('id', job.client_id)
+        .maybeSingle();
+      clientType = jobClient?.client_type ?? null;
+    }
+
     const directClientTypes = ['venue', 'event_organiser', 'business', 'individual'];
-    const isDirectBooking = directClientTypes.includes(clientData.client_type || '') && !!job.venue_category;
+    const isDirectBooking = directClientTypes.includes(clientType || '') && !!job.venue_category;
 
     const securityTypeMap: Record<string, string> = {
       'door-supervisor': 'Door Supervisor',
@@ -290,43 +314,62 @@ serve(async (req) => {
       : 'TBC';
 
     const location = `${job.venue_name}, ${job.venue_city}`;
-    let notifiedCount = 0;
+    const isImmediate = job.urgency === 'immediate' || job.booking_source === 'homepage_guard_now';
+    const queuePrefix = isImmediate ? 'immediate-job' : 'job';
+
+    let queued = 0;
+    let retried = 0;
+    let alreadyDelivered = 0;
+    let queueFailed = 0;
     let pushCount = 0;
 
     for (const entry of guardsWithDistance) {
       const guard = entry.guard;
+      const idempotencyKey = `${queuePrefix}:${jobId}:guard:${guard.id}`;
+
+      const queueMetadata = {
+        job_id: jobId,
+        guard_id: guard.user_id,
+        guard_record_id: guard.id,
+        notification_type: 'job_match',
+        idempotency_key: idempotencyKey,
+        guard_email: guard.email,
+        guard_name: guard.full_name || 'Guard',
+        job_title: job.job_title,
+        client_name: job.contact_name || 'Client',
+        location,
+        date: dateStr,
+        start_time: job.start_time || '',
+        end_time: job.end_time || '',
+        hourly_rate: job.hourly_rate ? job.hourly_rate.toFixed(2) : '0.00',
+        distance_miles: entry.distanceLabel,
+        job_type: licenceLabel,
+        is_direct_booking: isDirectBooking,
+        venue_category: job.venue_category || '',
+      };
 
       try {
-        const res = await fetch(`${supabaseUrl}/functions/v1/send-job-match-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-          },
-          body: JSON.stringify({
-            guard_id: guard.user_id,
-            job_id: jobId,
-            guard_email: guard.email,
-            guard_name: guard.full_name || 'Guard',
-            job_title: job.job_title,
-            client_name: job.contact_name || 'Client',
-            location,
-            date: dateStr,
-            start_time: job.start_time || '',
-            end_time: job.end_time || '',
-            hourly_rate: job.hourly_rate ? job.hourly_rate.toFixed(2) : '0.00',
-            distance_miles: entry.distanceLabel,
-            job_type: licenceLabel,
-            is_direct_booking: isDirectBooking,
-            venue_category: job.venue_category || '',
-          }),
-        });
+        const { data: outcome, error: queueError } = await adminApp
+          .rpc('queue_job_match_notification', {
+            p_job_id: jobId,
+            p_guard_id: guard.id,
+            p_user_id: guard.user_id,
+            p_recipient_email: guard.email,
+            p_recipient_name: guard.full_name || 'Guard',
+            p_subject: `New job match: ${job.job_title} — QuickGuard`,
+            p_idempotency_key: idempotencyKey,
+            p_metadata: queueMetadata,
+            p_priority: isImmediate ? 10 : 5,
+          });
 
-        if (res.ok) {
-          notifiedCount++;
-        }
+        if (queueError) throw new Error(queueError.message);
+
+        const result = String(outcome || 'queued');
+        if (result === 'retried') retried++;
+        else if (result === 'delivered') alreadyDelivered++;
+        else queued++;
       } catch {
-        // Continue on individual guard failure
+        queueFailed++;
       }
 
       try {
@@ -347,9 +390,16 @@ serve(async (req) => {
       }
     }
 
+    const targeted = queued + retried + alreadyDelivered;
+
     return new Response(
       JSON.stringify({
-        notified: notifiedCount,
+        notified: targeted,
+        queued,
+        retried,
+        skipped: alreadyDelivered,
+        failed: queueFailed,
+        eligible: guardsWithDistance.length,
         pushSent: pushCount,
         totalConsidered: guardsWithDistance.length,
         matchedByDistance: hasJobCoords ? guardsWithDistance.filter(e => e.distanceMiles !== null).length : 0,

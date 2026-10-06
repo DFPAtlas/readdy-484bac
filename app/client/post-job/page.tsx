@@ -24,7 +24,7 @@ import FirstJobHelper from './FirstJobHelper';
 import ContextualHelpCard from '@/app/client/help/ContextualHelpCard';
 import { Suspense } from 'react';
 import { sanitiseTime, getStepErrors, validateAllSteps, stepFieldMap } from '@/lib/post-job-validation';
-import { loadPendingJobDraft, clearPendingJobDraft, mapPendingDraftToClientForm } from '@/lib/pending-job-draft';
+import { loadPendingJobDraft, clearPendingJobDraft, mapPendingDraftToClientForm, createSubmissionId } from '@/lib/pending-job-draft';
 import ClientOnboardingAgent from '@/components/ClientOnboardingAgent';
 
 const defaultFormData = {
@@ -112,6 +112,7 @@ function PostJobContent() {
   const [startFrom, setStartFrom] = useState<'blank' | 'template' | 'site' | 'previous'>('blank');
   const [restoredFromBooking, setRestoredFromBooking] = useState(false);
   const restoredDraftRef = useRef(false);
+  const submissionIdRef = useRef<string | null>(null);
 
   const clientId = clientData?.id || null;
   const isImmediateMode = searchParams.get('mode') === 'immediate';
@@ -169,6 +170,7 @@ function PostJobContent() {
     if (!draft) return;
     if (!isImmediateMode && !searchParams.get('source')) return;
     restoredDraftRef.current = true;
+    submissionIdRef.current = draft.submissionId || submissionIdRef.current || createSubmissionId();
     const mapped = mapPendingDraftToClientForm(draft);
     setFormData(prev => ({
       ...prev,
@@ -181,6 +183,12 @@ function PostJobContent() {
     setRestoredFromBooking(true);
     setToastMessage('Your booking details were restored — review and confirm');
   }, [allowed, clientData, isImmediateMode, searchParams]);
+
+  useEffect(() => {
+    if (isImmediateMode && !submissionIdRef.current) {
+      submissionIdRef.current = createSubmissionId();
+    }
+  }, [isImmediateMode]);
 
   const loadDraftsAndTemplates = async (cId: string) => {
     const [draftsRes, templatesRes] = await Promise.all([
@@ -488,7 +496,10 @@ function PostJobContent() {
     setPostSubmitWarnings([]);
 
     try {
-      const result = await submitClientJob(formData as unknown as Record<string, unknown>, clientId);
+      const submitOptions = (isImmediateMode || restoredFromBooking)
+        ? { submissionId: submissionIdRef.current, bookingMode: 'immediate' as const }
+        : undefined;
+      const result = await submitClientJob(formData as unknown as Record<string, unknown>, clientId, submitOptions);
       if (!result.ok) {
         // Keep the form and draft intact (including on limit_reached) so the user can retry or upgrade.
         setErrors({ submit: result.error || 'Failed to post job.' });

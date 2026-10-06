@@ -12,6 +12,12 @@ export interface PostJobResult {
   warnings?: string[];
   error?: string;
   code?: string;
+  idempotent?: boolean;
+}
+
+export interface SubmitClientJobOptions {
+  submissionId?: string | null;
+  bookingMode?: 'immediate';
 }
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -20,7 +26,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   usage_check_failed: 'Could not verify job posting limits. Please try again.',
 };
 
-export async function submitClientJob(formData: Record<string, unknown>, clientId: string): Promise<PostJobResult> {
+export async function submitClientJob(
+  formData: Record<string, unknown>,
+  clientId: string,
+  options: SubmitClientJobOptions = {},
+): Promise<PostJobResult> {
   const { data: sessionData } = await supabase.auth.getSession();
   const accessToken = sessionData.session?.access_token;
   if (!accessToken) return { ok: false, code: 'unauthorized', error: 'Authentication expired. Please refresh the page.' };
@@ -34,7 +44,12 @@ export async function submitClientJob(formData: Record<string, unknown>, clientI
         Authorization: `Bearer ${accessToken}`,
         apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
       },
-      body: JSON.stringify({ formData, clientId }),
+      body: JSON.stringify({
+        formData,
+        clientId,
+        submissionId: options.submissionId || undefined,
+        bookingMode: options.bookingMode,
+      }),
     });
   } catch {
     return { ok: false, code: 'network', error: 'Network error. Please check your connection and try again.' };
@@ -49,7 +64,7 @@ export async function submitClientJob(formData: Record<string, unknown>, clientI
       : details || ERROR_MESSAGES[result.error] || result.message || 'Failed to post job.';
     return { ok: false, code: result.error || 'server_error', error: message };
   }
-  return { ok: true, jobId: result.jobId, warnings: result.warnings || [] };
+  return { ok: true, jobId: result.jobId, warnings: result.warnings || [], idempotent: Boolean(result.idempotent) };
 }
 
 /** Client booking fee for previews: same plan + promotion rules as checkout. */

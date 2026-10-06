@@ -17,6 +17,13 @@ export interface JobRow {
   number_of_guards: number;
   status: string;
   urgency: string | null;
+  is_urgent: boolean | null;
+  booking_source: string | null;
+  submission_id: string | null;
+  notification_status: string | null;
+  notification_attempts: number | null;
+  notification_error: string | null;
+  notified_guard_count: number | null;
   sia_licence_required: boolean;
   risk_level: string | null;
   is_deleted: boolean;
@@ -39,6 +46,7 @@ export interface JobsStats {
   cancelled: number;
   pending_apps: number;
   flagged: number;
+  urgent: number;
 }
 
 export interface JobsFilters {
@@ -90,7 +98,7 @@ export function useAdminJobs() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(25);
   const [totalCount, setTotalCount] = useState(0);
-  const [stats, setStats] = useState<JobsStats>({ total: 0, open: 0, in_progress: 0, completed: 0, cancelled: 0, pending_apps: 0, flagged: 0 });
+  const [stats, setStats] = useState<JobsStats>({ total: 0, open: 0, in_progress: 0, completed: 0, cancelled: 0, pending_apps: 0, flagged: 0, urgent: 0 });
   const [filters, setFilters] = useState<JobsFilters>(defaultFilters);
 
   const fetchJobs = useCallback(async (p: number = page) => {
@@ -118,7 +126,7 @@ export function useAdminJobs() {
 
       setJobs(json.data || []);
       setTotalCount(json.totalCount || 0);
-      setStats(json.stats || { total: 0, open: 0, in_progress: 0, completed: 0, cancelled: 0, pending_apps: 0, flagged: 0 });
+      setStats(json.stats || { total: 0, open: 0, in_progress: 0, completed: 0, cancelled: 0, pending_apps: 0, flagged: 0, urgent: 0 });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load jobs');
     } finally {
@@ -179,6 +187,11 @@ export function useAdminJobs() {
     await invokeEdgeFunction('update_payment_status', { jobId, newPaymentStatus, reason });
   };
 
+  const retryNotification = async (jobId: string) => {
+    await invokeEdgeFunction('retry_notification', { jobId });
+    await fetchJobs(page);
+  };
+
   return {
     jobs,
     loading,
@@ -198,5 +211,6 @@ export function useAdminJobs() {
     unflagJob,
     bulkAction,
     updatePaymentStatus,
+    retryNotification,
   };
 }

@@ -28,11 +28,22 @@ export interface PendingJobDraft {
   contactPhone: string;
   contactEmail: string;
   createdAt: string;
+  submissionId: string;
 }
 
-export type PendingJobDraftInput = Omit<PendingJobDraft, 'version' | 'createdAt' | 'mode'> & {
+export type PendingJobDraftInput = Omit<PendingJobDraft, 'version' | 'createdAt' | 'mode' | 'submissionId'> & {
   mode?: 'immediate';
+  submissionId?: string;
 };
+
+export function createSubmissionId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `qgb_${crypto.randomUUID().replace(/-/g, '')}`;
+    }
+  } catch {}
+  return `qgb_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+}
 
 const VENUE_LABELS: Record<string, string> = {
   nightclub_bar: 'Nightclub or Bar',
@@ -113,6 +124,7 @@ export function buildPendingJobDraft(input: PendingJobDraftInput): PendingJobDra
     contactPhone: input.contactPhone || '',
     contactEmail: input.contactEmail || '',
     createdAt: new Date().toISOString(),
+    submissionId: input.submissionId || createSubmissionId(),
   };
 }
 
@@ -160,6 +172,10 @@ export function loadPendingJobDraft(): PendingJobDraft | null {
     if (isPendingJobDraftExpired(candidate)) {
       clearPendingJobDraft();
       return null;
+    }
+    if (!candidate.submissionId) {
+      candidate.submissionId = createSubmissionId();
+      try { localStorage.setItem(PENDING_JOB_DRAFT_KEY, JSON.stringify(candidate)); } catch {}
     }
     return candidate;
   } catch {

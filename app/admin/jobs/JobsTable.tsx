@@ -7,11 +7,20 @@ import { JobRow } from './useAdminJobs';
 
 
 const urgencyConfig: Record<string, { label: string; bg: string; text: string; icon: string }> = {
-  immediate: { label: 'Immediate', bg: 'bg-red-500/10', text: 'text-red-400', icon: 'ri-flashlight-line' },
+  immediate: { label: 'IMMEDIATE', bg: 'bg-red-500/15', text: 'text-red-400', icon: 'ri-flashlight-fill' },
   urgent: { label: 'Urgent', bg: 'bg-orange-500/10', text: 'text-orange-400', icon: 'ri-alarm-warning-line' },
   high: { label: 'High', bg: 'bg-amber-500/10', text: 'text-amber-400', icon: 'ri-arrow-up-line' },
   normal: { label: 'Normal', bg: 'bg-sky-500/10', text: 'text-sky-400', icon: 'ri-time-line' },
   standard: { label: 'Standard', bg: 'bg-slate-500/10', text: 'text-slate-400', icon: 'ri-time-line' },
+};
+
+const notificationConfig: Record<string, { label: string; bg: string; text: string; icon: string }> = {
+  delivered: { label: 'Delivered', bg: 'bg-emerald-500/10', text: 'text-emerald-400', icon: 'ri-notification-3-line' },
+  queued: { label: 'Queued', bg: 'bg-sky-500/10', text: 'text-sky-400', icon: 'ri-time-line' },
+  pending: { label: 'Notifying', bg: 'bg-amber-500/10', text: 'text-amber-400', icon: 'ri-time-line' },
+  partially_delivered: { label: 'Partly delivered', bg: 'bg-amber-500/10', text: 'text-amber-400', icon: 'ri-error-warning-line' },
+  partial: { label: 'Partly notified', bg: 'bg-amber-500/10', text: 'text-amber-400', icon: 'ri-error-warning-line' },
+  failed: { label: 'Notify failed', bg: 'bg-red-500/10', text: 'text-red-400', icon: 'ri-error-warning-line' },
 };
 
 interface JobsTableProps {
@@ -31,12 +40,15 @@ interface JobsTableProps {
   onOpenDelete: (job: JobRow) => void;
   onRetry: () => void;
   onPageChange: (page: number) => void;
+  onRetryNotification?: (job: JobRow) => void;
+  retryingId?: string | null;
 }
 
 export default function JobsTable({
   jobs, loading, error, selectedJobIds, totalCount, page, pageSize,
   onToggleSelectAll, onToggleSelectJob, onOpenDetail, onOpenStatus,
   onOpenFlag, onUnflag, onOpenDelete, onRetry, onPageChange,
+  onRetryNotification, retryingId,
 }: JobsTableProps) {
   const getStatusBadge = (status: string) => adminJobStatusBadge(status);
   const getUrgencyBadge = (urgency: string | null) => urgency ? (urgencyConfig[urgency] || null) : null;
@@ -126,6 +138,7 @@ export default function JobsTable({
                 {jobs.map((job) => {
                   const sb = getStatusBadge(job.status);
                   const ub = getUrgencyBadge(job.urgency);
+                  const nb = job.notification_status ? (notificationConfig[job.notification_status] || null) : null;
                   const isSelected = selectedJobIds.has(job.id);
                   return (
                     <tr key={job.id} className={`border-b border-[#1a2642] hover:bg-[#1a2642]/50 transition-colors ${isSelected ? 'bg-teal-500/5' : ''} ${job.risk_level ? 'bg-red-500/5' : ''}`}>
@@ -136,6 +149,7 @@ export default function JobsTable({
                       <td className="px-4 py-3">
                         <div className="flex flex-col">
                           <span className="font-bold text-white">{job.job_title}</span>
+                          <span className="text-[11px] text-slate-500">Created {formatDate(job.created_at)}</span>
                           <div className="flex items-center gap-2 mt-1">
                             {ub && (
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${ub.bg} ${ub.text}`}>
@@ -143,6 +157,14 @@ export default function JobsTable({
                                   <i className={`${ub.icon} text-[8px]`}></i>
                                 </div>
                                 {ub.label}
+                              </span>
+                            )}
+                            {nb && (
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${nb.bg} ${nb.text}`} title={job.notification_error || undefined}>
+                                <div className="w-3 h-3 flex items-center justify-center">
+                                  <i className={`${nb.icon} text-[8px]`}></i>
+                                </div>
+                                {nb.label}
                               </span>
                             )}
                             {job.sia_licence_required && (
@@ -208,6 +230,12 @@ export default function JobsTable({
                             <button onClick={() => onOpenFlag(job)}
                               className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 transition-all cursor-pointer" title="Flag job">
                               <div className="w-4 h-4 flex items-center justify-center"><i className="ri-flag-line text-sm"></i></div>
+                            </button>
+                          )}
+                          {(job.notification_status === 'failed' || job.notification_status === 'partially_delivered') && onRetryNotification && (
+                            <button onClick={() => onRetryNotification(job)} disabled={retryingId === job.id}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-amber-500/10 text-amber-400 hover:text-amber-300 transition-all cursor-pointer disabled:opacity-50" title="Retry guard notifications">
+                              <div className="w-4 h-4 flex items-center justify-center"><i className={`ri-refresh-line text-sm ${retryingId === job.id ? 'animate-spin' : ''}`}></i></div>
                             </button>
                           )}
                           <button onClick={() => onOpenDelete(job)}

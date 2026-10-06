@@ -209,6 +209,68 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, message: `${ids.length} jobs ${bulkAction}ed` }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    if (action === 'retry_notification') {
+      const { jobId } = body;
+      if (!jobId) throw new Error('jobId required');
+      const { data: job } = await supabase.from('jobs').select('id, job_title, status, notification_attempts').eq('id', jobId).maybeSingle();
+      if (!job) throw new Error('Job not found');
+      if (job.status !== 'open') throw new Error('Notifications can only be retried for open jobs');
+      const attemptAt = new Date().toISOString();
+      const priorAttempts = Number(job.notification_attempts || 0);
+      try {
+        // Re-runs the existing eligibility checks. Already-delivered guard
+        // emails are skipped and failed ones are re-queued via the same
+        // idempotency key, so nothing is ever sent twice and no second job is
+        // created.
+        const notifyRes = await fetch(`${supabaseUrl}/functions/v1/notify-matching-guards`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
+          body: JSON.stringify({ jobId }),
+        });
+        if (!notifyRes.ok) throw new Error(`notify-matching-guards responded ${notifyRes.status}`);
+        const notifyJson = await notifyRes.json().catch(() => null);
+        const queued = Number(notifyJson?.queued ?? 0);
+        const retried = Number(notifyJson?.retried ?? 0);
+        const skipped = Number(notifyJson?.skipped ?? 0);
+        const queueFailed = Number(notifyJson?.failed ?? 0);
+        const targeted = queued + retried + skipped;
+
+        let deliveryStatus: string;
+        if (targeted === 0 && queueFailed === 0) deliveryStatus = 'none';
+        else if (targeted === 0) deliveryStatus = 'failed';
+        else if (queueFailed > 0) deliveryStatus = 'partially_delivered';
+        else deliveryStatus = 'queued';
+
+        await supabase.from('jobs').update({
+          notification_status: deliveryStatus,
+          notification_attempts: priorAttempts + 1,
+          notified_guard_count: targeted,
+          notification_error: queueFailed > 0 ? `${queueFailed} guard notification(s) could not be queued` : null,
+          notification_last_attempt_at: attemptAt,
+        }).eq('id', jobId);
+        await supabase.from('admin_activity_log').insert({
+          admin_username: adminUser.email || 'admin', admin_name: adminName,
+          action_type: 'job_notification_retried',
+          action_description: `Retried guard notification for "${job.job_title}"`,
+          target_type: 'job', target_name: job.job_title,
+          metadata: { jobId, queued, retried, skipped, failed: queueFailed, adminId },
+        });
+        return new Response(JSON.stringify({
+          success: true,
+          message: `Notifications dispatched: ${queued} new, ${retried} retried, ${skipped} already delivered${queueFailed ? `, ${queueFailed} could not be queued` : ''}`,
+        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      } catch (retryError: any) {
+        const retryMessage = retryError?.message || 'notification_failed';
+        await supabase.from('jobs').update({
+          notification_status: 'failed',
+          notification_attempts: priorAttempts + 1,
+          notification_error: retryMessage.slice(0, 500),
+          notification_last_attempt_at: attemptAt,
+        }).eq('id', jobId);
+        return new Response(JSON.stringify({ error: `Notification retry failed: ${retryMessage}` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
     if (action === 'update_payment_status') {
       return new Response(JSON.stringify({ error: 'Manual payment status changes are disabled. Use the verified completion, payout or dispute refund workflow.' }), {
         status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
