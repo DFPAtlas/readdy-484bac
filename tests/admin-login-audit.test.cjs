@@ -171,7 +171,7 @@ test('repeated failures are rate-limited and the block is audited', async () => 
 
 test('cleanup migration removes only the orphaned completion-task table and view', async () => {
   const migration = fs.readFileSync(
-    'supabase/migrations/20261006120153_restore_admin_login_audit_and_remove_orphaned_completion_tasks.sql',
+    'supabase/migrations/20261006125836_restore_admin_login_audit_and_remove_orphaned_completion_tasks.sql',
     'utf8',
   );
   const db = new PGlite();
