@@ -47,9 +47,7 @@ serve(async (req) => {
       dispute_reason,
       admin_approved_at,
       notes,
-      created_at,
-      jobs:job_id (job_title, venue_city, start_date, hourly_rate, agreed_amount, payment_status),
-      guards:guard_id (full_name, profile_image_url, rating)
+      created_at
     `)
     .order('created_at', { ascending: false });
 
@@ -66,7 +64,25 @@ serve(async (req) => {
     return respond({ error: error.message }, 500);
   }
 
-  return respond({ requests: data || [] }, 200);
+  const requests = data || [];
+  if (requests.length === 0) return respond({ requests: [] }, 200);
+  // This table has no foreign keys; hydrate only IDs from the authorized requests.
+  const jobIds = [...new Set(requests.map(r => r.job_id))];
+  const guardIds = [...new Set(requests.map(r => r.guard_id))];
+  const [jobsResult, guardsResult] = await Promise.all([
+    supabase.from('jobs').select('id, job_title, venue_city, start_date, hourly_rate, agreed_amount, payment_status').in('id', jobIds),
+    supabase.from('guards').select('id, full_name, profile_image_url, rating').in('id', guardIds),
+  ]);
+  if (jobsResult.error || guardsResult.error) {
+    return respond({ error: jobsResult.error?.message || guardsResult.error?.message }, 500);
+  }
+  const jobs = new Map((jobsResult.data || []).map(row => [row.id, row]));
+  const guards = new Map((guardsResult.data || []).map(row => [row.id, row]));
+  return respond({ requests: requests.map(request => ({
+    ...request,
+    jobs: jobs.get(request.job_id) || null,
+    guards: guards.get(request.guard_id) || null,
+  })) }, 200);
   } catch (error) {
     console.error('[GetCompletionRequests]', error instanceof Error ? error.message : 'Unknown error');
     return respond({ error: 'Unable to load completion requests' }, 500);
