@@ -5,8 +5,9 @@ const path = require('node:path');
 // Execute the actual loader, stripping its type-only syntax for Node 20 CI.
 const source = fs.readFileSync(path.join(__dirname, '../lib/guard-bookings.ts'), 'utf8')
   .replace(/^import type[^\n]+\n/m, '')
+  .replace(/^type GuardHistoryClient = [^\n]+\n/m, '')
   .replace(/export /g, '')
-  .replace(/: (?:SupabaseClient|string|any\[\]|any|Promise<any\[\]>)/g, '');
+  .replace(/: (?:GuardHistoryClient|string|any\[\]|any|Promise<any\[\]>)/g, '');
 const { hydrateGuardJobRows, loadGuardHistoryJobs } = new Function(
   source + '; return { hydrateGuardJobRows, loadGuardHistoryJobs };'
 )();
