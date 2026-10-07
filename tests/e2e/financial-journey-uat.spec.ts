@@ -107,9 +107,17 @@ test('@uat synthetic client-to-guard booking completes a Stripe test payment', a
   if (await cardholder.count() && await cardholder.isVisible()) {
     await cardholder.fill('QuickGuard UAT Client');
   }
+  const billingCountry = clientPage.getByLabel(/country or region/i);
+  if (await billingCountry.count() && await billingCountry.isVisible()) {
+    await billingCountry.selectOption('GB');
+  }
   const postalCode = clientPage.getByLabel(/postal code|postcode|zip/i);
   if (await postalCode.count() && await postalCode.isVisible()) {
     await postalCode.fill('EN11 8HD');
+  }
+  const savePaymentDetails = clientPage.getByRole('checkbox', { name: /save my information for faster checkout/i });
+  if (await savePaymentDetails.count() && await savePaymentDetails.isVisible() && await savePaymentDetails.isChecked()) {
+    await savePaymentDetails.uncheck();
   }
   await clientPage.getByRole('button', { name: /pay/i }).click();
   await clientPage.waitForURL(/quickguard\.uk\/client\/payment\/success/, { timeout: 60_000 });
