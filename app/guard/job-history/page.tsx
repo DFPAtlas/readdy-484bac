@@ -544,7 +544,7 @@ export default function GuardJobHistoryClient() {
                             </button>
                           )}
                           <Link
-                            href={`/jobs/detail?id=${job.job_id}`}
+                            href={`/guard/jobs/detail?id=${encodeURIComponent(job.job_id)}`}
                             onClick={(e) => e.stopPropagation()}
                             className="px-3 py-1.5 border border-slate-200 dark:border-[#1e2d4d] text-slate-600 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-slate-50 dark:hover:bg-[#162036] transition-colors whitespace-nowrap"
                           >
