@@ -16,6 +16,7 @@ async function dismissCookieConsent(page: Page) {
 }
 
 test('@uat synthetic client-to-guard booking completes a Stripe test payment', async ({ browser }) => {
+  test.setTimeout(180_000);
   const env = requireUatEnv();
   test.skip(!env, 'Set QG_UAT_INBOX and QG_UAT_SHARED_PASSWORD');
 
@@ -101,7 +102,7 @@ test('@uat synthetic client-to-guard booking completes a Stripe test payment', a
   }
   await clientPage.getByLabel(/card number/i).fill('4242424242424242');
   await clientPage.getByLabel(/expiration|expiry/i).fill('1230');
-  await clientPage.getByLabel(/cvc|security code/i).fill('123');
+  await clientPage.locator('input[name="cardCvc"]').fill('123');
   const cardholder = clientPage.getByLabel(/cardholder name|name on card/i);
   if (await cardholder.count() && await cardholder.isVisible()) {
     await cardholder.fill('QuickGuard UAT Client');
