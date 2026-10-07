@@ -18,16 +18,19 @@ interface CompletionRequest {
 
 interface Props {
   clientId: string;
+  jobId?: string;
+  onReviewed?: () => void;
 }
 
-export default function CompletionApprovalPanel({ clientId }: Props) {
+export default function CompletionApprovalPanel({ clientId, jobId, onReviewed }: Props) {
   const [requests, setRequests] = useState<CompletionRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<CompletionRequest | null>(null);
-  const [toast, setToast] = useState('');
+  const [error, setError] = useState('');
 
   const loadRequests = async () => {
     setLoading(true);
+    setError('');
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const response = await fetch(
@@ -42,12 +45,13 @@ export default function CompletionApprovalPanel({ clientId }: Props) {
         }
       );
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to load completion requests');
       if (data.requests) {
-        const pending = data.requests.filter((r: CompletionRequest) => r.status === 'pending');
+        const pending = data.requests.filter((r: CompletionRequest) => r.status === 'pending' && (!jobId || r.job_id === jobId));
         setRequests(pending);
       }
-    } catch {
-      // silent fail
+    } catch (err: any) {
+      setError(err.message || 'Unable to load completion requests');
     } finally {
       setLoading(false);
     }
@@ -55,13 +59,7 @@ export default function CompletionApprovalPanel({ clientId }: Props) {
 
   useEffect(() => {
     loadRequests();
-  }, [clientId]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(''), 3000);
-    return () => clearTimeout(timer);
-  }, [toast]);
+  }, [clientId, jobId]);
 
   if (loading) {
     return (
@@ -73,6 +71,13 @@ export default function CompletionApprovalPanel({ clientId }: Props) {
       </div>
     );
   }
+
+  if (error) return (
+    <div role="alert" className="bg-[#111d35] rounded-2xl border border-red-500/25 p-6 mb-6">
+      <p className="text-sm text-red-400">{error}</p>
+      <button onClick={loadRequests} className="mt-3 text-sm text-teal-400">Retry</button>
+    </div>
+  );
 
   if (requests.length === 0) return null;
 
@@ -86,7 +91,7 @@ export default function CompletionApprovalPanel({ clientId }: Props) {
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">Jobs Awaiting Approval</h2>
-              <p className="text-sm text-slate-400">{requests.length} job{requests.length !== 1 ? 's' : ''} completed by guards — review and release payment</p>
+              <p className="text-sm text-slate-400">{requests.length} job{requests.length !== 1 ? 's' : ''} completed by guards — review completion</p>
             </div>
           </div>
           <button
@@ -164,19 +169,13 @@ export default function CompletionApprovalPanel({ clientId }: Props) {
           guardName={selectedRequest.guards?.full_name || 'Guard'}
           jobTitle={selectedRequest.jobs?.job_title || 'Job'}
           onSuccess={() => {
-            setToast('Completion approved — payout pending');
             loadRequests();
+            onReviewed?.();
           }}
           onClose={() => setSelectedRequest(null)}
         />
       )}
 
-      {toast && (
-        <div className="fixed top-24 right-6 z-50 bg-[#111d35] text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 border border-[#1e2d4d]">
-          <i className="ri-checkbox-circle-fill text-emerald-400"></i>
-          <span className="text-sm font-medium">{toast}</span>
-        </div>
-      )}
     </div>
   );
 }
