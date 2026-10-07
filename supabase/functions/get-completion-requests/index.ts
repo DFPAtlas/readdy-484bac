@@ -1,7 +1,23 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 
+const allowedOrigins = ['https://quickguard.uk', 'https://www.quickguard.uk'];
+function corsHeaders(origin: string | null) {
+  return {
+    'Access-Control-Allow-Origin': origin && allowedOrigins.includes(origin) ? origin : 'https://quickguard.uk',
+    'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+  };
+}
+
 serve(async (req) => {
+  const headers = { ...corsHeaders(req.headers.get('Origin')), 'Content-Type': 'application/json' };
+  const respond = (body: unknown, status: number) => new Response(JSON.stringify(body), { status, headers });
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+  if (req.method !== 'POST') return respond({ error: 'Method not allowed' }, 405);
+  try {
   const authHeader = req.headers.get('Authorization');
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -10,7 +26,7 @@ serve(async (req) => {
   );
 
   const { data: { user } } = await supabase.auth.getUser(authHeader?.replace('Bearer ', '') || '');
-  if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+  if (!user) return respond({ error: 'Unauthorized' }, 401);
 
   const { data: client } = await supabase.from('clients').select('id').eq('user_id', user.id).maybeSingle();
   const { data: admin } = await supabase.from('admin_users').select('id').eq('user_id', user.id).maybeSingle();
@@ -42,13 +58,17 @@ serve(async (req) => {
   } else if (guard) {
     query = query.eq('guard_id', guard.id);
   } else if (!admin) {
-    return new Response(JSON.stringify({ error: 'Not authorized' }), { status: 403 });
+    return respond({ error: 'Not authorized' }, 403);
   }
 
   const { data, error } = await query;
   if (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    return respond({ error: error.message }, 500);
   }
 
-  return new Response(JSON.stringify({ requests: data || [] }), { status: 200 });
+  return respond({ requests: data || [] }, 200);
+  } catch (error) {
+    console.error('[GetCompletionRequests]', error instanceof Error ? error.message : 'Unknown error');
+    return respond({ error: 'Unable to load completion requests' }, 500);
+  }
 });
