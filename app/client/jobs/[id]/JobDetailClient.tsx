@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import PortalSidebar from '@/components/PortalSidebar';
 import JobInfoSection from './JobInfoSection';
+import CompletionApprovalPanel from '../../dashboard/CompletionApprovalPanel';
 import AssignedGuardsSection from './AssignedGuardsSection';
 import JobTimeline from './JobTimeline';
 import ComplaintModal from './ComplaintModal';
@@ -713,6 +714,9 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
         )}
 
         <main className="flex-1 px-4 sm:px-8 py-6 sm:py-8">
+          {isClientOwner && job.status === 'awaiting_client_approval' && (
+            <CompletionApprovalPanel clientId={clientId} jobId={jobId} onReviewed={loadJobDetail} />
+          )}
           <div className="flex gap-1 mb-4 sm:mb-6 bg-[#111d35] border border-[#1e2d4d] rounded-2xl p-1 w-full sm:w-fit shadow-sm overflow-x-auto">
             {tabs.map(tab => (
               <button
