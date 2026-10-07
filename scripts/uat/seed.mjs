@@ -78,6 +78,13 @@ function entitlement(persona, userId) {
 const summary = [];
 for (const persona of resolved) {
   const user = await ensureAuthUser(persona);
+  // UAT personas are intentionally reusable. Reset only their metered feature
+  // rows so repeated launch-gate runs cannot exhaust a monthly posting or
+  // application allowance and fail before exercising the journey under test.
+  await must(`reset feature usage ${persona.key}`, supabase
+    .from('user_feature_usage')
+    .delete()
+    .eq('user_id', user.id));
   await must(`upsert app.users ${persona.key}`, supabase.from('users').upsert({
     id: user.id,
     email: persona.email,
