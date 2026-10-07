@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { loadGuardHistoryJobs } from '@/lib/guard-bookings';
 import PortalSidebar from '@/components/PortalSidebar';
 import { submitGuardApplication } from '@/lib/guard-applications';
 import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
@@ -176,11 +177,9 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
 
       if (!assignment) { setFlowData(null); setLoadingFlow(false); return; }
 
-      const { data: jobData } = await supabase
-        .from('jobs')
-        .select('payment_status, completion_status, disputed, agreed_amount, currency, guard_payout_amount')
-        .eq('id', jobId)
-        .maybeSingle();
+      const historyJobs = await loadGuardHistoryJobs(supabase, gId);
+      const jobData = historyJobs.find(job => job.id === jobId);
+      if (!jobData) throw new Error('Unable to load booking payment data');
 
       const { data: completion } = await supabase
         .from('job_completion_requests')
