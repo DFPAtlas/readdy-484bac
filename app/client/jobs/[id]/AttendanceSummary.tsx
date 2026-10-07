@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { isGuardOnSite } from '@/lib/attendance-display.cjs';
 
 interface Guard {
   id: string;
@@ -55,7 +56,7 @@ export default function AttendanceSummary({
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   const totalAssigned = assignments.length;
-  const checkedIn = assignments.filter(a => a.attendance_status === 'checked_in' || a.attendance_status === 'checked_out' || a.attendance_status === 'completed').length;
+  const checkedIn = assignments.filter(isGuardOnSite).length;
   const late = assignments.filter(a => a.attendance_status === 'late').length;
   const noShow = assignments.filter(a => a.attendance_status === 'no_show').length;
   const completed = assignments.filter(a => a.attendance_status === 'completed').length;
