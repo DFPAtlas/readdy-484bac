@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { appUrl } from './app-url';
 import { login, plusAddress, requireUatEnv, UAT_RUN_ID } from './uat-helpers';
 
 function isoDate(daysFromNow: number) {
@@ -14,7 +15,7 @@ test('@uat free client can post a synthetic door-supervisor job through the UI',
   const email = plusAddress(env!.inbox, 'client-free');
   const title = `[UAT ${UAT_RUN_ID}] Pub Door Supervisor ${Date.now()}`;
   await login(page, 'client', email, env!.password);
-  await page.goto('/client/post-job');
+  await page.goto(appUrl('/client/post-job'));
 
   await page.locator('input[name="jobTitle"]').fill(title);
   await page.locator('select[name="securityType"]').selectOption('security-guard');
@@ -53,4 +54,3 @@ test('@uat free client can post a synthetic door-supervisor job through the UI',
   await expect(page).toHaveURL(/\/client\/jobs/);
   await expect(page.locator('body')).toContainText(title);
 });
-

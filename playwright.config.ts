@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+import { normalizeBaseURL } from './tests/e2e/app-url';
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000';
+const baseURL = normalizeBaseURL(process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000');
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -34,4 +35,3 @@ export default defineConfig({
         timeout: 180_000,
       },
 });
-
