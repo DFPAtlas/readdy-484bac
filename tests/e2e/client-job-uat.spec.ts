@@ -52,7 +52,7 @@ test('@uat free client can post a synthetic door-supervisor job through the UI',
   await page.locator('input[name="contactEmail"]').fill(email);
   await page.getByRole('button', { name: /next: review & post/i }).click();
   await expect(page.locator('body')).toContainText(title);
-  await page.getByRole('button', { name: /^post job$/i }).click();
+  await page.getByRole('button', { name: /post job/i }).click();
   await expect(page.locator('body')).toContainText(/job posted successfully/i, { timeout: 25_000 });
   await expect(page).toHaveURL(/\/client\/jobs/);
   await expect(page.locator('body')).toContainText(title);
