@@ -38,12 +38,15 @@ test('@uat free client can post a synthetic door-supervisor job through the UI',
   await page.getByRole('button', { name: /next: guard requirements/i }).click();
 
   await page.locator('input[name="siaLicenceRequired"][value="yes"]').check();
+  await page.getByRole('checkbox', { name: 'Door Supervisor' }).check();
   await page.locator('select[name="experienceLevel"]').selectOption('entry');
   await page.locator('input[name="uniformRequired"][value="yes"]').check();
   await page.locator('input[name="drivingRequired"][value="no"]').check();
   await page.getByRole('button', { name: /next: pay & budget/i }).click();
 
-  await page.locator('input[name="hourlyRate"]').fill('15');
+  const hourlyRate = page.locator('input[name="hourlyRate"]');
+  await expect(hourlyRate).toBeVisible();
+  await hourlyRate.fill('15');
   await page.locator('input[name="contactName"]').fill('QuickGuard UAT Client');
   await page.locator('input[name="contactPhone"]').fill('07000000000');
   await page.locator('input[name="contactEmail"]').fill(email);
