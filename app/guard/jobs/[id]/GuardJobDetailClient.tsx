@@ -42,6 +42,7 @@ interface JobDetail {
 export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [jobError, setJobError] = useState<string | null>(null);
   const [job, setJob] = useState<JobDetail | null>(null);
   const [guardId, setGuardId] = useState<string | null>(null);
   const [guardUserId, setGuardUserId] = useState<string | null>(null);
@@ -92,21 +93,23 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
 
     loadPaymentFlow(guard.id);
 
-    const { data: jobData } = await supabase
-      .from('jobs')
-      .select(`
-        id, client_id, job_title, job_description, security_type, number_of_guards,
-        start_date, end_date, start_time, end_time, urgency, sia_licence_required,
-        required_licence_types, experience_level, venue_name, venue_address_line1,
-        venue_city, venue_postcode, uniform_required, uniform_details,
-        additional_requirements, hourly_rate, status, created_at,
-        clients ( company_name )
-      `)
-      .eq('id', jobId)
-      .eq('is_deleted', false)
-      .maybeSingle();
-
-    setJob(jobData as any);
+    // Booked jobs are not public listings. The authenticated function checks
+    // this guard's application/assignment before returning a closed booking.
+    setJobError(null);
+    let jobData;
+    try {
+      const { data, error } = await supabase.functions.invoke('get-job-detail', {
+        body: { jobId },
+      });
+      if (error || data?.error) throw new Error('Unable to load this booking. Please retry or contact support.');
+      jobData = data?.job ?? null;
+      setJob(jobData);
+    } catch (error) {
+      setJob(null);
+      setJobError('Unable to load this booking. Please retry or contact support.');
+      setLoading(false);
+      return;
+    }
 
     if (jobData?.client_id) {
       const { data: clientRow } = await supabase
@@ -368,8 +371,9 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
             <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20">
               <i className="ri-file-search-line text-3xl text-red-400"></i>
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">Job Not Found</h2>
-            <p className="text-slate-400 mb-6">This job is no longer available.</p>
+            <h2 className="text-xl font-bold text-white mb-2">{jobError ? 'Unable to Load Booking' : 'Job Not Found'}</h2>
+            <p className="text-slate-400 mb-6">{jobError || 'This job is no longer available.'}</p>
+            {jobError && <button onClick={() => { setLoading(true); load(); }} className="bg-teal-500 text-white px-6 py-3 rounded-xl font-semibold mr-3">Retry</button>}
             <Link href="/guard/jobs" className="bg-teal-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-teal-400 transition-colors whitespace-nowrap">
               Browse Jobs
             </Link>
