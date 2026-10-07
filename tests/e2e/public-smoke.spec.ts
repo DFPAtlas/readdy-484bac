@@ -23,8 +23,8 @@ for (const path of publicRoutes) {
 
 test('@smoke homepage exposes client and guard journeys', async ({ page }) => {
   await page.goto(appUrl('/'));
-  await expect(page.locator('a[href*="/client/"]').first()).toBeVisible();
-  await expect(page.locator('a[href*="/guard/"]').first()).toBeVisible();
+  await expect(page.locator('a[href*="/client/"]:visible').first()).toBeVisible();
+  await expect(page.locator('a[href*="/guard/"]:visible').first()).toBeVisible();
 });
 
 test('@mobile homepage has no horizontal overflow', async ({ page }) => {
