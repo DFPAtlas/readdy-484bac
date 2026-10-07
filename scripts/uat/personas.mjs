@@ -38,8 +38,8 @@ export const personas = [
     licenceType: 'door_supervisor',
     verification: 'verified',
     siaStatus: 'valid',
-    planSlug: 'guard-free',
-    planName: 'Guard Free',
+    planSlug: 'guard_starter',
+    planName: 'Starter',
   },
   {
     key: 'guard-cctv',
@@ -48,8 +48,8 @@ export const personas = [
     licenceType: 'cctv',
     verification: 'verified',
     siaStatus: 'valid',
-    planSlug: 'guard-free',
-    planName: 'Guard Free',
+    planSlug: 'guard_starter',
+    planName: 'Starter',
   },
   {
     key: 'guard-pending',
@@ -58,8 +58,8 @@ export const personas = [
     licenceType: 'security_guard',
     verification: 'pending_sia_check',
     siaStatus: 'not_found',
-    planSlug: 'guard-free',
-    planName: 'Guard Free',
+    planSlug: 'guard_starter',
+    planName: 'Starter',
   },
   {
     key: 'guard-expired',
@@ -68,8 +68,8 @@ export const personas = [
     licenceType: 'door_supervisor',
     verification: 'suspended',
     siaStatus: 'expired',
-    planSlug: 'guard-free',
-    planName: 'Guard Free',
+    planSlug: 'guard_starter',
+    planName: 'Starter',
   },
 ];
 
@@ -78,4 +78,3 @@ export function plusAddress(inbox, runId, tag) {
   if (at < 1) throw new Error('QG_UAT_INBOX must be a valid email address');
   return `${inbox.slice(0, at)}+qg-${runId}-${tag}${inbox.slice(at)}`.toLowerCase();
 }
-
