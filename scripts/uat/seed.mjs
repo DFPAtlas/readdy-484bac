@@ -126,6 +126,11 @@ for (const persona of resolved) {
   } else {
     const isVerified = persona.verification === 'verified';
     const expiry = persona.siaStatus === 'expired' ? '2025-01-01' : '2028-12-31';
+    const licenceLabel = {
+      door_supervisor: 'Door Supervisor',
+      cctv: 'CCTV Operator',
+      security_guard: 'Security Guard',
+    }[persona.licenceType] || persona.licenceType;
     await must(`upsert guard ${persona.key}`, supabase.from('guards').upsert({
       id: user.id,
       user_id: user.id,
@@ -135,7 +140,7 @@ for (const persona of resolved) {
       bio: `Synthetic QuickGuard UAT persona ${persona.key}`,
       sia_licence_number: `UAT-${persona.key.toUpperCase()}`,
       sia_licence_type: persona.licenceType,
-      licence_types: [persona.licenceType],
+      licence_types: [persona.licenceType, licenceLabel],
       sia_expiry_date: expiry,
       sia_verified: isVerified,
       sia_check_status: persona.siaStatus,
@@ -161,4 +166,3 @@ for (const persona of resolved) {
 }
 
 console.log(JSON.stringify({ runId, createdOrUpdated: summary }, null, 2));
-
