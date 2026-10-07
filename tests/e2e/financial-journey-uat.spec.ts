@@ -136,16 +136,25 @@ test('@uat synthetic client-to-guard booking completes a Stripe test payment', a
     return data?.status;
   }, { timeout: 90_000 }).toMatch(/completed|succeeded/);
 
+  const { data: fundedTransaction, error: fundedTransactionError } = await admin
+    .from('transactions')
+    .select('status, stripe_session_id, stripe_payment_intent')
+    .eq('job_id', job.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  expect(fundedTransactionError, fundedTransactionError?.message).toBeNull();
+  expect(fundedTransaction?.stripe_session_id).toContain('cs_test_');
+  expect(fundedTransaction?.stripe_payment_intent).toBeTruthy();
+
   const { data: fundedJob, error: fundedJobError } = await admin
     .from('jobs')
-    .select('status, payment_status, stripe_session_id, stripe_payment_intent_id')
+    .select('status, payment_status')
     .eq('id', job.id)
     .single();
   expect(fundedJobError, fundedJobError?.message).toBeNull();
   expect(fundedJob?.status).toMatch(/confirmed|funded|awaiting_client_confirmation/);
   expect(fundedJob?.payment_status).toMatch(/funded|completed|succeeded/);
-  expect(fundedJob?.stripe_session_id).toContain('cs_test_');
-  expect(fundedJob?.stripe_payment_intent_id).toBeTruthy();
 
   await guardContext.close();
   await clientContext.close();
