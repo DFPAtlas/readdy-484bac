@@ -6,7 +6,7 @@ const React = require('react');
 
 function harness(file, initial, mocks = {}) {
   const states = [...initial]; let index = 0;
-  const hooks = {...React, useState(value) { const i = index++; if (!(i in states)) states[i] = value; return [states[i], next => states[i] = typeof next === 'function' ? next(states[i]) : next]; }};
+  const hooks = {...React, useEffect() {}, useState(value) { const i = index++; if (!(i in states)) states[i] = typeof value === 'function' ? value() : value; return [states[i], next => states[i] = typeof next === 'function' ? next(states[i]) : next]; }};
   const module = {exports:{}};
   const code = ts.transpileModule(fs.readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText;
   new Function('module','exports','require','setTimeout',code)(module,module.exports,name => name === 'react' ? hooks : name in mocks ? mocks[name] : require(name),()=>{});
@@ -20,7 +20,7 @@ function nodes(tree) {
 function text(tree) { if(Array.isArray(tree)) return tree.map(text).join(''); if(tree && typeof tree==='object') return text(tree.props?.children); return tree == null || typeof tree === 'boolean' ? '' : String(tree); }
 function button(tree,label) {const match=nodes(tree).find(n=>n.type==='button' && text(n).trim()===label); assert.ok(match,`missing ${label}`);return match;}
 const dir='app/client/jobs/[id]/';
-const common={'next/navigation':{useRouter:()=>({push(){}})},'next/link':{default:()=>null}};
+const common={'@/lib/attendance-display.cjs':require('../lib/attendance-display.cjs'),'next/navigation':{useRouter:()=>({push(){}})},'next/link':{default:()=>null}};
 
 test('replacement card passes the chosen guard to the required request action',()=>{
   const selected=[];
