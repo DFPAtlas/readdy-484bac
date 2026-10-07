@@ -535,7 +535,7 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
                   <div className="flex justify-between text-sm border-b border-[#1e2d4d] pb-3">
                     <span className="text-slate-400">Status</span>
                     <span className={`font-medium ${job.status === 'open' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                      {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                      {job.status === 'payout_approved' ? 'Payout Pending' : job.status.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">

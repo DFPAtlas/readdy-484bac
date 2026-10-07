@@ -29,6 +29,7 @@ export interface JobPayment {
   amountPaid: number;
   paymentStatus: string;
   releaseStatus: string;
+  jobStatus: string;
   refundStatus: string;
   receiptUrl: string | null;
   invoiceUrl: string | null;
@@ -111,7 +112,7 @@ export function useClientPaymentCentre() {
         (requests || []).forEach((request: any) => {if (!refundMap[request.job_id]) refundMap[request.job_id] = request.status;});
         const { data: jobsData } = await supabase
           .from('jobs')
-          .select('id, job_title, payment_status')
+          .select('id, job_title, payment_status, status')
           .in('id', jobIds);
         if (jobsData) jobsMap = Object.fromEntries(jobsData.map((j: any) => [j.id, j]));
 
@@ -144,6 +145,7 @@ export function useClientPaymentCentre() {
         amountPaid: Number(t.amount) || 0,
         paymentStatus: t.status,
         releaseStatus: jobsMap[t.job_id]?.payment_status || t.status,
+        jobStatus: jobsMap[t.job_id]?.status || '',
         refundStatus: t.status === 'partially_refunded' ? `Partially refunded (£${paymentAmounts(t).refunded.toFixed(2)})` : paymentAmounts(t).refunded > 0 ? 'Refunded' : refundMap[t.job_id] === 'pending' ? 'Refund requested' : refundMap[t.job_id] === 'approved' ? 'Refund processing' : refundMap[t.job_id] === 'rejected' ? 'Refund declined' : '—',
         receiptUrl: t.receipt_url || null,
         invoiceUrl: t.invoice_url || null,
