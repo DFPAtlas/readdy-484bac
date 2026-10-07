@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getAttendanceStatus, getShiftPhase } from '@/lib/attendance-display.cjs';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import GuardAttendanceCard from './GuardAttendanceCard';
@@ -22,6 +23,7 @@ interface Assignment {
   guard_id?: string | null;
   status?: string | null;
   attendance_status?: string | null;
+  guard_confirmed_at?: string | null;
   check_in_time?: string | null;
   check_out_time?: string | null;
   late_minutes?: number | null;
@@ -39,8 +41,16 @@ interface AttendancePanelProps {
   onMessageGuard?: (guardId: string, guardName: string, guardUserId: string) => void;
 }
 
-export default function AttendancePanel({ job, assignments, clientId, onMessageGuard }: AttendancePanelProps) {
+export default function AttendancePanel({ job, assignments: rawAssignments, clientId, onMessageGuard }: AttendancePanelProps) {
   const router = useRouter();
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+  const assignments = rawAssignments.map(assignment => ({
+    ...assignment, attendance_status: getAttendanceStatus(assignment),
+  }));
   const [reportingAssignment, setReportingAssignment] = useState<string | null>(null);
   const [reportType, setReportType] = useState('no_show');
   const [reportNotes, setReportNotes] = useState('');
@@ -120,8 +130,10 @@ export default function AttendancePanel({ job, assignments, clientId, onMessageG
     return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  const isActive = job.status === 'in_progress' || job.status === 'awaiting_payment';
-  const isUpcoming = job.status === 'open' || job.status === 'awaiting_guard_selection';
+  const phase = getShiftPhase(job, now);
+  const isActive = phase === 'active';
+  const isUpcoming = phase === 'upcoming';
+  const shiftLabel = { upcoming: 'Upcoming', active: 'Shift Active', ended: 'Shift Ended', completed: 'Completed', cancelled: 'Cancelled', unknown: 'Schedule Unavailable' }[phase];
 
   const noShowOrLate = assignments.filter(a => a.attendance_status === 'no_show' || a.attendance_status === 'late');
   const hasReplacementRequests = assignments.some(a => a.replacement_requested);
@@ -143,7 +155,7 @@ export default function AttendancePanel({ job, assignments, clientId, onMessageG
             <div className="w-7 h-7 flex items-center justify-center">
               <i className="ri-pulse-line text-teal-400 text-lg"></i>
             </div>
-            Active Shift
+            Shift Attendance
           </h2>
           <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${
             isActive
@@ -152,7 +164,7 @@ export default function AttendancePanel({ job, assignments, clientId, onMessageG
               ? 'bg-blue-500/10 text-blue-400 border-blue-500/25'
               : 'bg-slate-500/10 text-slate-400 border-slate-500/25'
           }`}>
-            {isActive ? 'Shift Active' : isUpcoming ? 'Upcoming' : 'Shift Ended'}
+            {shiftLabel}
           </span>
         </div>
 

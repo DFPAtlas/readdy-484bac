@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getAttendanceStatus } from '@/lib/attendance-display.cjs';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -93,7 +94,7 @@ export default function GuardAttendanceCard({
 }: GuardAttendanceCardProps) {
   const router = useRouter();
   const g = assignment.guards;
-  const status = assignment.attendance_status || 'awaiting_confirmation';
+  const status = getAttendanceStatus(assignment);
   const config = attendanceStatusConfig[status] || attendanceStatusConfig.awaiting_confirmation;
   const initials = g?.full_name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || '??';
   const [showActions, setShowActions] = useState(false);
@@ -142,7 +143,7 @@ export default function GuardAttendanceCard({
             <i className={config.icon}></i>
             {config.label}
           </span>
-          {assignment.late_minutes && assignment.late_minutes > 0 && (
+          {(assignment.late_minutes || 0) > 0 && (
             <span className="text-[10px] font-semibold text-amber-400">
               {assignment.late_minutes} min late
             </span>
