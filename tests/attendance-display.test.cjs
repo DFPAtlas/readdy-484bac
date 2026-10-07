@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { getAttendanceStatus, getShiftPhase } = require('../lib/attendance-display.cjs');
+const { getAttendanceStatus, getShiftPhase, isGuardOnSite } = require('../lib/attendance-display.cjs');
 const job = { status: 'confirmed', start_date: '2026-10-12', end_date: '2026-10-12',
   start_time: '09:00:00', end_time: '13:00:00' };
 
@@ -41,4 +41,19 @@ test('confirmation timestamps never overwrite later attendance or issue states',
   }
   assert.equal(getAttendanceStatus({}), 'awaiting_confirmation');
   assert.equal(getAttendanceStatus({ guard_confirmed_at: 'invalid' }), 'awaiting_confirmation');
+});
+
+test('on-site count drops after checkout and completion', () => {
+  const guard = { attendance_status: 'checked_in', check_in_time: '2026-10-07T19:16:16Z' };
+  assert.equal(isGuardOnSite(guard), true);
+  assert.equal(isGuardOnSite({ ...guard, attendance_status: 'checked_out', check_out_time: '2026-10-07T19:26:22Z' }), false);
+  assert.equal(isGuardOnSite({ ...guard, attendance_status: 'completed' }), false);
+  assert.equal(isGuardOnSite({ ...guard, check_out_time: '2026-10-07T19:26:22Z' }), false);
+});
+test('late guards count on site only after arrival', () => {
+  assert.equal(isGuardOnSite({ attendance_status: 'late' }), false);
+  assert.equal(isGuardOnSite({ attendance_status: 'late', check_in_time: '2026-10-07T19:30:00Z' }), true);
+  for (const attendance_status of ['confirmed', 'awaiting_confirmation', 'no_show', 'not_checked_in']) {
+    assert.equal(isGuardOnSite({ attendance_status }), false);
+  }
 });
