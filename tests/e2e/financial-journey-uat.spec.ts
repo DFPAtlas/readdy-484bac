@@ -1,7 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
-import { expect, test } from '@playwright/test';
+import { expect, Page, test } from '@playwright/test';
 import { appUrl } from './app-url';
 import { login, plusAddress, requireUatEnv, UAT_RUN_ID } from './uat-helpers';
+
+test.describe.configure({ retries: 0 });
+
+async function dismissCookieConsent(page: Page) {
+  const essentialOnly = page.getByRole('button', { name: /essential only/i });
+  try {
+    await essentialOnly.waitFor({ state: 'visible', timeout: 3_000 });
+    await essentialOnly.click();
+  } catch {
+    // Consent was already recorded for this synthetic browser context.
+  }
+}
 
 test('@uat synthetic client-to-guard booking completes a Stripe test payment', async ({ browser }) => {
   const env = requireUatEnv();
@@ -42,9 +54,8 @@ test('@uat synthetic client-to-guard booking completes a Stripe test payment', a
   const guardContext = await browser.newContext();
   const guardPage = await guardContext.newPage();
   await login(guardPage, 'guard', guardEmail, env!.password);
-  const guardCookieConsent = guardPage.getByRole('button', { name: /essential only/i });
-  if (await guardCookieConsent.isVisible()) await guardCookieConsent.click();
   await guardPage.goto(appUrl(`/guard/jobs/detail?id=${encodeURIComponent(job.id)}`));
+  await dismissCookieConsent(guardPage);
   const applyNow = guardPage.getByRole('button', { name: /apply now/i }).filter({ visible: true }).first();
   await expect(applyNow).toBeVisible();
   await applyNow.click();
@@ -55,9 +66,8 @@ test('@uat synthetic client-to-guard booking completes a Stripe test payment', a
   const clientContext = await browser.newContext();
   const clientPage = await clientContext.newPage();
   await login(clientPage, 'client', clientEmail, env!.password);
-  const clientCookieConsent = clientPage.getByRole('button', { name: /essential only/i });
-  if (await clientCookieConsent.isVisible()) await clientCookieConsent.click();
   await clientPage.goto(appUrl(`/client/jobs/applicants?id=${encodeURIComponent(job.id)}`));
+  await dismissCookieConsent(clientPage);
   await expect(clientPage.getByText('UAT Door Supervisor', { exact: true }).first()).toBeVisible();
   const applicantCard = clientPage
     .locator('div.rounded-xl.border-2')
