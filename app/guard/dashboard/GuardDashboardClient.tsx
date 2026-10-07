@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { oneRelation, requiredRelation } from '@/lib/relations';
+import { oneRelation } from '@/lib/relations';
 import { supabase } from '@/lib/supabase';
+import { hydrateGuardJobRows } from '@/lib/guard-bookings';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import Link from 'next/link';
 import PortalSidebar from '@/components/PortalSidebar';
@@ -351,26 +352,13 @@ export default function GuardDashboardClient() {
           attendance_status,
           issue_reported,
           replacement_requested,
-          jobs!inner (
-            id,
-            job_title,
-            venue_city,
-            venue_postcode,
-            start_date,
-            start_time,
-            end_time,
-            hourly_rate,
-            payment_status
-          )
+          job_id
         `)
         .eq('guard_id', guardData.id)
         .in('status', ['confirmed', 'in_progress', 'pending', 'awaiting_payment', 'selected'])
         .order('assigned_at', { ascending: false });
       if (error) throw error;
-      const all = (data || []).map(row => {
-        const job = requiredRelation(row.jobs);
-        return { ...row, jobs: { ...job, location: job.venue_city, postcode: job.venue_postcode } };
-      });
+      const all = await hydrateGuardJobRows(supabase, guardData.id, data || []);
       traceLog('loadJobAssignments', { count: all.length });
       setAssignments(all);
       const today = new Date().toISOString().split('T')[0];
@@ -402,31 +390,13 @@ export default function GuardDashboardClient() {
           id,
           status,
           applied_at,
-          jobs!inner (
-            id,
-            job_title,
-            venue_city,
-            venue_postcode,
-            start_date,
-            start_time,
-            end_time,
-            hourly_rate,
-            clients (
-              company_name
-            )
-          )
+          job_id
         `)
         .eq('guard_id', guardData.id)
         .order('applied_at', { ascending: false });
       if (error) throw error;
       traceLog('loadJobApplications', { count: (data || []).length });
-      setApplications((data || []).map(row => {
-        const job = requiredRelation(row.jobs);
-        return {
-          ...row,
-          jobs: { ...job, location: job.venue_city, postcode: job.venue_postcode, clients: oneRelation(job.clients) },
-        };
-      }));
+      setApplications(await hydrateGuardJobRows(supabase, guardData.id, data || []));
     } catch {
       traceLog('loadJobApplications', { error: true });
       setDataErrors(prev => [...prev, 'job_applications']);
@@ -819,7 +789,8 @@ export default function GuardDashboardClient() {
 
   const allShifts = useMemo(() => {
     const appShifts: ShiftItem[] = applications
-      .filter(a => a.status === 'accepted' || a.status === 'confirmed')
+      .filter(a => (a.status === 'accepted' || a.status === 'confirmed') &&
+        !assignments.some(assignment => (assignment.jobs as any)?.id === (a.jobs as any)?.id))
       .map(a => ({
         id: a.id,
         source: 'application',
@@ -861,7 +832,7 @@ export default function GuardDashboardClient() {
   }, [applications, assignments]);
 
   const stats = useMemo(() => {
-    const confirmed = applications.filter(a => a.status === 'confirmed').length;
+    const confirmed = assignments.filter(a => a.status === 'confirmed').length;
     const pendingApps = applications.filter(a => a.status === 'pending').length;
     const completed = guard?.total_jobs_completed || 0;
     const totalEarnings = Number(guard?.total_earnings || 0).toFixed(2);
@@ -879,7 +850,7 @@ export default function GuardDashboardClient() {
       { label: 'Completed', value: completed, icon: 'ri-check-double-line', color: 'purple', trend: 'all time' },
       { label: 'Earnings', value: `£${totalEarnings}`, icon: 'ri-money-pound-circle-line', color: 'emerald', trend: 'lifetime' },
     ];
-  }, [availableJobs, applications, upcomingJobs, guard]);
+  }, [availableJobs, applications, assignments, upcomingJobs, guard]);
 
   const jobsWithDistance: AvailableJobWithDistance[] = useMemo(() => {
     const gLat = guard?.home_latitude;

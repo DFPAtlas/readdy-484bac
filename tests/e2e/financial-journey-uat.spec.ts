@@ -149,7 +149,7 @@ test('@uat synthetic client-to-guard booking completes a Stripe test payment', a
 
   const { data: fundedJob, error: fundedJobError } = await admin
     .from('jobs')
-    .select('status, payment_status')
+    .select('status, payment_status, agreed_amount')
     .eq('id', job.id)
     .single();
   expect(fundedJobError, fundedJobError?.message).toBeNull();
@@ -161,6 +161,16 @@ test('@uat synthetic client-to-guard booking completes a Stripe test payment', a
   await guardPage.goto(appUrl(`/guard/jobs/detail?id=${encodeURIComponent(job.id)}`));
   await expect(guardPage.getByRole('heading', { name: job.job_title, exact: true })).toBeVisible();
   await expect(guardPage.getByRole('heading', { name: /job not found|unable to load booking/i })).toHaveCount(0);
+
+  const amountRow = guardPage.getByText('Job Amount', { exact: true }).locator('xpath=..');
+  await expect(amountRow).toContainText(`£${Number(fundedJob?.agreed_amount).toFixed(2)}`);
+
+  await guardPage.goto(appUrl('/guard/dashboard'));
+  const shiftsPanel = guardPage.getByRole('heading', { name: 'Upcoming Shifts', exact: true }).locator('xpath=../..');
+  await expect(shiftsPanel.getByText(job.job_title, { exact: true })).toBeVisible();
+  await expect(shiftsPanel.getByText(job.job_title, { exact: true })).toHaveCount(1);
+  const paymentsPanel = guardPage.getByRole('heading', { name: 'Payment Flow', exact: true }).locator('xpath=../..');
+  await expect(paymentsPanel.getByRole('heading', { name: job.job_title, exact: true })).toBeVisible();
 
   await guardContext.close();
   await clientContext.close();

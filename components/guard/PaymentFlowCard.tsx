@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { hydrateGuardJobRows } from '@/lib/guard-bookings';
 import PaymentFlowIndicator from './PaymentFlowIndicator';
 import { getPaymentFlowStatus, FlowSourceData } from '@/lib/payments/paymentFlowStatus';
 
@@ -45,21 +46,7 @@ export default function PaymentFlowCard({ guardId, guardUserId }: Props) {
             payout_id,
             assigned_at,
             job_id,
-            jobs!inner (
-              id,
-              job_title,
-              venue_city,
-              start_date,
-              payment_status,
-              completion_status,
-              disputed,
-              agreed_amount,
-              currency,
-              guard_payout_amount,
-              clients (
-                company_name
-              )
-            )
+            guard_id
           `)
           .eq('guard_id', guardId)
           .in('status', ['confirmed', 'in_progress', 'completed', 'pending'])
@@ -69,7 +56,8 @@ export default function PaymentFlowCard({ guardId, guardUserId }: Props) {
         if (assignError) throw assignError;
         if (!mounted) return;
 
-        const valid = (assignments || []).filter(a => a.jobs);
+        const valid = await hydrateGuardJobRows(supabase, guardId, assignments || []);
+        if (!mounted) return;
         if (valid.length === 0) {
           setJobs([]);
           setLoading(false);
@@ -143,7 +131,7 @@ export default function PaymentFlowCard({ guardId, guardUserId }: Props) {
             venueCity: job?.venue_city || '',
             clientName: job?.clients?.company_name || '',
             startDate: job?.start_date || '',
-            amount: a.payment_amount || job?.agreed_amount || job?.guard_payout_amount || null,
+            amount: a.payment_amount ?? job?.agreed_amount ?? job?.guard_payout_amount ?? null,
             currency: job?.currency || 'GBP',
             flowData,
           };
