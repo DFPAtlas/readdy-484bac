@@ -156,6 +156,12 @@ test('@uat synthetic client-to-guard booking completes a Stripe test payment', a
   expect(fundedJob?.status).toMatch(/confirmed|funded|awaiting_client_confirmation/);
   expect(fundedJob?.payment_status).toMatch(/funded|completed|succeeded/);
 
+  // Once funded, this booking is no longer exposed by the public jobs policy.
+  // The assigned guard must still be able to reopen it in the guard portal.
+  await guardPage.goto(appUrl(`/guard/jobs/detail?id=${encodeURIComponent(job.id)}`));
+  await expect(guardPage.getByRole('heading', { name: job.job_title, exact: true })).toBeVisible();
+  await expect(guardPage.getByRole('heading', { name: /job not found|unable to load booking/i })).toHaveCount(0);
+
   await guardContext.close();
   await clientContext.close();
 });
