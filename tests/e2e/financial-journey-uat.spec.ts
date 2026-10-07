@@ -42,6 +42,8 @@ test('@uat synthetic client-to-guard booking completes a Stripe test payment', a
   const guardContext = await browser.newContext();
   const guardPage = await guardContext.newPage();
   await login(guardPage, 'guard', guardEmail, env!.password);
+  const guardCookieConsent = guardPage.getByRole('button', { name: /essential only/i });
+  if (await guardCookieConsent.isVisible()) await guardCookieConsent.click();
   await guardPage.goto(appUrl(`/guard/jobs/detail?id=${encodeURIComponent(job.id)}`));
   const applyNow = guardPage.getByRole('button', { name: /apply now/i }).filter({ visible: true }).first();
   await expect(applyNow).toBeVisible();
@@ -53,6 +55,8 @@ test('@uat synthetic client-to-guard booking completes a Stripe test payment', a
   const clientContext = await browser.newContext();
   const clientPage = await clientContext.newPage();
   await login(clientPage, 'client', clientEmail, env!.password);
+  const clientCookieConsent = clientPage.getByRole('button', { name: /essential only/i });
+  if (await clientCookieConsent.isVisible()) await clientCookieConsent.click();
   await clientPage.goto(appUrl(`/client/jobs/applicants?id=${encodeURIComponent(job.id)}`));
   await expect(clientPage.getByText('UAT Door Supervisor', { exact: true }).first()).toBeVisible();
   const applicantCard = clientPage
