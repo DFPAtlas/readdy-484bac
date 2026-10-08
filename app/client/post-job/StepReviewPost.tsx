@@ -1,6 +1,7 @@
 'use client';
 
 import { calculatePaygFees, formatCurrency } from '@/lib/payg-fees';
+import { formatDateOnly } from '@/lib/date-only';
 import JobScheduler from './JobScheduler';
 
 interface StepReviewPostProps {
@@ -161,8 +162,8 @@ export default function StepReviewPost({
           </Section>
 
           <Section title="Shift Dates & Times" icon="ri-calendar-schedule-line">
-            <InfoRow label="Start Date" value={formData.startDate ? new Date(formData.startDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : ''} />
-            <InfoRow label="End Date" value={formData.endDate ? new Date(formData.endDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : ''} />
+            <InfoRow label="Start Date" value={formData.startDate ? formatDateOnly(formData.startDate, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : ''} />
+            <InfoRow label="End Date" value={formData.endDate ? formatDateOnly(formData.endDate, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : ''} />
             <InfoRow label="Duration" value={formData.numberOfDays ? `${formData.numberOfDays} day${parseInt(formData.numberOfDays) > 1 ? 's' : ''}` : ''} />
             <InfoRow label="Hours" value={formData.startTime && formData.endTime ? `${formData.startTime} – ${formData.endTime}` : ''} />
             <InfoRow label="Break Info" value={formData.breakInfo} />

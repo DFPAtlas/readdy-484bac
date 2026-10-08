@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface PreviousJob {
   id: string;
@@ -136,7 +137,7 @@ export default function DuplicateJobModal({ clientId, onSelectJob, onClose }: Du
                     </span>
                     <span className="flex items-center gap-1">
                       <i className="ri-calendar-line"></i>
-                      {new Date(job.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {formatDateOnly(job.start_date, { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
                   </div>
                 </button>
