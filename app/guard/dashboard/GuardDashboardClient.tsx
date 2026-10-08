@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { hydrateGuardJobRows } from '@/lib/guard-bookings';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import Link from 'next/link';
+import { useSidebar } from '@/lib/SidebarContext';
 import PortalSidebar from '@/components/PortalSidebar';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
 import NotificationHistory from './NotificationHistory';
@@ -84,7 +85,7 @@ export default function GuardDashboardClient() {
   const [entitlementsLoaded, setEntitlementsLoaded] = useState(false);
   const [dataErrors, setDataErrors] = useState<string[]>([]);
   const [dataLoadFailed, setDataLoadFailed] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { collapsed: sidebarCollapsed } = useSidebar();
   const { guardLimit, loading: usageLoading, refresh: refreshUsage } = useUsageLimits(guardUserId);
 
   const traceLog = useCallback((label: string, data: Record<string, unknown>) => {
@@ -1024,8 +1025,6 @@ export default function GuardDashboardClient() {
         accentColor="emerald"
         userId={guardUserId}
         collapsible={true}
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(c => !c)}
       />
       <div className={`flex-1 min-h-screen pt-16 lg:pt-8 pb-24 px-3 sm:px-4 lg:px-6 lg:pb-8 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'}`}>
         {isAdmin && (

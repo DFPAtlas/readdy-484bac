@@ -123,7 +123,7 @@ export function useGuardPaymentCentre() {
         const fee = payout ? Number(payout.fee_deducted) || 0 : 0;
         const net = payout ? Number(payout.net_amount ?? gross - fee) : Number(a.guard_net_payout ?? gross - fee);
 
-        const isPaid = payout && (payout.status === 'paid' || payout.status === 'completed');
+        const isPaid = payout && (['paid', 'completed', 'paid_out'].includes(payout.status));
         const isPending = !['cancelled', 'refunded'].includes(a.status) && ['funded', 'completed', 'released'].includes(jobsMap[a.job_id]?.payment_status) && (!payout || ['pending', 'initiated', 'processing', 'held'].includes(payout.status));
 
         if (isPaid) {

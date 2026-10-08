@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { useSidebar } from '@/lib/SidebarContext';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
 import { useGuardPaymentCentre } from '@/hooks/useGuardPaymentCentre';
@@ -11,6 +12,7 @@ import { useGuardGuard } from '@/hooks/useGuardGuard';
 type TabKey = 'overview' | 'history' | 'statements';
 
 export default function GuardPaymentCentrePage() {
+  const { collapsed: sidebarCollapsed } = useSidebar();
   const { loading: authLoading, allowed } = useGuardGuard();
   const {
     loading,
@@ -85,7 +87,9 @@ export default function GuardPaymentCentrePage() {
       );
     }
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(p => p.transferStatus === statusFilter);
+      filtered = filtered.filter(p => statusFilter === 'paid'
+        ? ['paid', 'completed', 'paid_out'].includes(p.transferStatus)
+        : p.transferStatus === statusFilter);
     }
     return filtered;
   }, [jobPayments, searchTerm, statusFilter]);
@@ -111,6 +115,7 @@ export default function GuardPaymentCentrePage() {
 
   const statusBadge = (status: string) => {
     const map: Record<string, string> = {
+      paid_out: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25',
       paid: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25',
       completed: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25',
       pending: 'bg-amber-500/10 text-amber-400 border-amber-500/25',
@@ -124,13 +129,14 @@ export default function GuardPaymentCentrePage() {
 
   const getTimeline = (payment: any) => {
     const status = payment.transferStatus;
+    const isPaid = ['paid', 'completed', 'paid_out'].includes(status);
     const steps = [
       { label: 'Client Paid', done: payment.paymentStatus !== 'unpaid', icon: 'ri-money-pound-circle-line' },
-      { label: 'Funds Held', done: payment.paymentStatus === 'funded' || payment.paymentStatus === 'completed' || status === 'paid' || status === 'completed', icon: 'ri-safe-line' },
-      { label: 'Job Completed', done: ['payout_approved', 'completed'].includes(payment.jobStatus) || status === 'paid' || status === 'completed', icon: 'ri-check-double-line' },
-      { label: 'Transfer Created', done: status === 'processing' || status === 'initiated' || status === 'paid' || status === 'completed', icon: 'ri-send-plane-line' },
-      { label: 'Transfer Paid', done: status === 'paid' || status === 'completed', icon: 'ri-bank-card-line' },
-      { label: 'Payout Complete', done: status === 'paid' || status === 'completed', icon: 'ri-checkbox-circle-line' },
+      { label: 'Funds Held', done: payment.paymentStatus === 'funded' || payment.paymentStatus === 'completed' || isPaid, icon: 'ri-safe-line' },
+      { label: 'Job Completed', done: ['payout_approved', 'completed', 'paid_out'].includes(payment.jobStatus) || isPaid, icon: 'ri-check-double-line' },
+      { label: 'Transfer Created', done: status === 'processing' || status === 'initiated' || isPaid, icon: 'ri-send-plane-line' },
+      { label: 'Transfer Paid', done: isPaid, icon: 'ri-bank-card-line' },
+      { label: 'QuickGuard Payment Released', done: isPaid, icon: 'ri-checkbox-circle-line' },
     ];
     return steps;
   };
@@ -146,7 +152,7 @@ export default function GuardPaymentCentrePage() {
     return (
       <div className="min-h-screen bg-[#0B1933] flex">
         <PortalSidebar role="guard" displayName="Guard" subtitle="Guard" initials="G" />
-        <main className="flex-1 ml-72 flex items-center justify-center p-6">
+        <main className={`flex-1 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'} flex items-center justify-center p-6`}>
           <div role="alert" className="text-center max-w-md">
             <h1 className="text-xl font-semibold text-white mb-3">
               {sessionUnavailable ? 'Guard session unavailable' : 'Payment Centre is taking too long to load'}
@@ -168,7 +174,7 @@ export default function GuardPaymentCentrePage() {
     return (
       <div className="min-h-screen bg-[#0B1933] flex">
         <PortalSidebar role="guard" displayName="Guard" subtitle="Guard" initials="G" />
-        <main className="flex-1 ml-72 flex items-center justify-center">
+        <main className={`flex-1 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'} flex items-center justify-center`}>
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-slate-400">Loading payment centre...</p>
@@ -181,7 +187,7 @@ export default function GuardPaymentCentrePage() {
   return (
     <div className="min-h-screen bg-[#0B1933] flex">
       <PortalSidebar role="guard" displayName={displayName} subtitle="Guard" initials={initials} accentColor="emerald" />
-      <main className="flex-1 ml-72 pt-8 pb-12">
+      <main className={`flex-1 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'} pt-16 lg:pt-8 pb-12 transition-[margin] duration-300`}>
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-start justify-between mb-6">
             <div>
@@ -251,9 +257,9 @@ export default function GuardPaymentCentrePage() {
                 <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-5 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/10 rounded-full -translate-y-8 translate-x-8" />
                   <div className="relative">
-                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Available Balance</p>
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Transferred to Stripe</p>
                     <p className="text-2xl font-bold text-white">£{earningsSummary.availableBalance.toFixed(2)}</p>
-                    <p className="text-xs text-slate-500 mt-1">Ready to withdraw</p>
+                    <p className="text-xs text-slate-500 mt-1">Released to your Stripe account</p>
                   </div>
                 </div>
                 <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-5 relative overflow-hidden">
@@ -482,7 +488,7 @@ export default function GuardPaymentCentrePage() {
                             <td className="px-5 py-3 text-sm text-emerald-400 text-right font-semibold">£{p.netPayout.toFixed(2)}</td>
                             <td className="px-5 py-3">
                               <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(p.transferStatus)}`}>
-                                {p.transferStatus.charAt(0).toUpperCase() + p.transferStatus.slice(1)}
+                                {p.transferStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                               </span>
                             </td>
                           </tr>
@@ -559,12 +565,12 @@ export default function GuardPaymentCentrePage() {
                             <td className="px-5 py-3 text-sm text-emerald-400 text-right font-semibold">£{p.netPayout.toFixed(2)}</td>
                             <td className="px-5 py-3">
                               <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(p.paymentStatus)}`}>
-                                {p.paymentStatus.charAt(0).toUpperCase() + p.paymentStatus.slice(1)}
+                                {p.paymentStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                               </span>
                             </td>
                             <td className="px-5 py-3">
                               <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(p.transferStatus)}`}>
-                                {p.transferStatus.charAt(0).toUpperCase() + p.transferStatus.slice(1)}
+                                {p.transferStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                               </span>
                             </td>
                             <td className="px-5 py-3 text-center">
@@ -644,6 +650,7 @@ export default function GuardPaymentCentrePage() {
               </button>
             </div>
             <p className="text-sm text-slate-400 mb-4">{selectedPayment.jobTitle} — {selectedPayment.clientName}</p>
+            <p className="text-xs text-slate-400 mb-4">Payment release records the transfer to your connected Stripe account. Bank arrival is tracked by Stripe.</p>
             <div className="space-y-0">
               {getTimeline(selectedPayment).map((step, i) => (
                 <div key={i} className="flex gap-3">
