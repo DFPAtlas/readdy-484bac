@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import { SidebarProvider } from '@/lib/SidebarContext';
 import GuardAuthGate from '@/components/GuardAuthGate';
 
 export const metadata: Metadata = {
@@ -8,7 +9,7 @@ export const metadata: Metadata = {
 export default function GuardPortalLayout({ children }: { children: React.ReactNode }) {
   return (
     <GuardAuthGate>
-      {children}
+      <SidebarProvider>{children}</SidebarProvider>
     </GuardAuthGate>
   );
 }

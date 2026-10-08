@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { useSidebar } from '@/lib/SidebarContext';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
 import { useGuardPaymentCentre } from '@/hooks/useGuardPaymentCentre';
@@ -11,6 +12,7 @@ import { useGuardGuard } from '@/hooks/useGuardGuard';
 type TabKey = 'overview' | 'history' | 'statements';
 
 export default function GuardPaymentCentrePage() {
+  const { collapsed: sidebarCollapsed } = useSidebar();
   const { loading: authLoading, allowed } = useGuardGuard();
   const {
     loading,
@@ -150,7 +152,7 @@ export default function GuardPaymentCentrePage() {
     return (
       <div className="min-h-screen bg-[#0B1933] flex">
         <PortalSidebar role="guard" displayName="Guard" subtitle="Guard" initials="G" />
-        <main className="flex-1 ml-72 flex items-center justify-center p-6">
+        <main className={`flex-1 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'} flex items-center justify-center p-6`}>
           <div role="alert" className="text-center max-w-md">
             <h1 className="text-xl font-semibold text-white mb-3">
               {sessionUnavailable ? 'Guard session unavailable' : 'Payment Centre is taking too long to load'}
@@ -172,7 +174,7 @@ export default function GuardPaymentCentrePage() {
     return (
       <div className="min-h-screen bg-[#0B1933] flex">
         <PortalSidebar role="guard" displayName="Guard" subtitle="Guard" initials="G" />
-        <main className="flex-1 ml-72 flex items-center justify-center">
+        <main className={`flex-1 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'} flex items-center justify-center`}>
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-slate-400">Loading payment centre...</p>
@@ -185,7 +187,7 @@ export default function GuardPaymentCentrePage() {
   return (
     <div className="min-h-screen bg-[#0B1933] flex">
       <PortalSidebar role="guard" displayName={displayName} subtitle="Guard" initials={initials} accentColor="emerald" />
-      <main className="flex-1 ml-72 pt-8 pb-12">
+      <main className={`flex-1 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'} pt-16 lg:pt-8 pb-12 transition-[margin] duration-300`}>
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-start justify-between mb-6">
             <div>
