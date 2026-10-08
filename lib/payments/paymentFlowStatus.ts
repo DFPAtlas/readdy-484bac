@@ -152,13 +152,25 @@ export function getPaymentFlowStatus(data: FlowSourceData): PaymentFlowStatus {
     },
     client_released: {
       status: stage2Stat,
-      label: 'Client Approved',
+      label: stage2Stat === 'complete'
+        ? 'Client Approved'
+        : stage2Stat === 'pending'
+          ? 'Awaiting Client Approval'
+          : stage2Stat === 'failed'
+            ? 'Approval Disputed'
+            : 'Completion Not Submitted',
       timestamp: data.completionRequestClientApprovedAt || data.assignmentPayoutReleasedAt || null,
       tooltip: stage2Tooltips[stage2Stat],
     },
     guard_paid: {
       status: stage3Stat,
-      label: 'Guard Paid',
+      label: stage3Stat === 'complete'
+        ? 'Guard Paid'
+        : stage3Stat === 'pending'
+          ? 'Payout Processing'
+          : stage3Stat === 'failed'
+            ? 'Payout Failed'
+            : 'Not Paid Yet',
       amount: stage3Amount,
       timestamp: data.payoutCompletedDate || null,
       tooltip: stage3Tooltips[stage3Stat],

@@ -49,6 +49,7 @@ import EarningsMiniPanel from './EarningsMiniPanel';
 import MobileQuickActions from './MobileQuickActions';
 import QuickActionsPanel from './QuickActionsPanel';
 import PaymentFlowCard from '@/components/guard/PaymentFlowCard';
+import { sumPaidGuardPayouts } from '@/lib/payments/guardPaymentDisplay';
 
 import { Guard, JobAssignment, JobApplication, AvailableJob, AvailableJobWithDistance, ClientResponse, ShiftItem } from './types';
 import { haversineDistanceMiles, formatDistance } from './distance';
@@ -301,7 +302,19 @@ export default function GuardDashboardClient() {
         }
         return;
       }
-      setGuard(data);
+      const { data: paidPayouts, error: payoutError } = await supabase
+        .from('guard_payouts')
+        .select('status, amount, net_amount')
+        .eq('guard_id', data.id);
+
+      setGuard({
+        ...data,
+        // Payout rows are the financial source of truth. Retain the legacy
+        // profile aggregate only if the protected payout query is unavailable.
+        total_earnings: payoutError
+          ? data.total_earnings
+          : sumPaidGuardPayouts(paidPayouts || []),
+      });
     } catch {
       setDataErrors(prev => [...prev, 'guard_profile']);
       setDataLoadFailed(true);

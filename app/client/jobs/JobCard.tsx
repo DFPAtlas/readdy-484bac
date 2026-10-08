@@ -8,6 +8,7 @@ import BookingStatusBadge from './BookingStatusBadge';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { ClientJob } from '@/lib/client-types';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface JobCardProps {
   job: ClientJob;
@@ -66,8 +67,7 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
   const noShow = job.no_show_count || 0;
   const hasAttendanceIssues = (checkedIn > 0 || late > 0 || noShow > 0 || job.issue_count > 0);
 
-  const formatDate = (d: string) =>
-    d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  const formatDate = (d: string) => formatDateOnly(d);
 
   const router = useRouter();
   const [showRepostModal, setShowRepostModal] = useState(false);

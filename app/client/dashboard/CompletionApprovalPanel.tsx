@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import CompletionReviewModal from './CompletionReviewModal';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface CompletionRequest {
   id: string;
@@ -121,7 +122,7 @@ export default function CompletionApprovalPanel({ clientId, jobId, onReviewed }:
                       {req.guards?.rating && <span className="text-amber-400 ml-1">★ {req.guards.rating}</span>}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
-                      {req.jobs?.venue_city} • {req.jobs?.start_date ? new Date(req.jobs.start_date).toLocaleDateString('en-GB') : ''}
+                      {req.jobs?.venue_city} • {req.jobs?.start_date ? formatDateOnly(req.jobs.start_date) : ''}
                     </p>
                     {req.notes && (
                       <p className="text-xs text-slate-500 mt-1 italic">"{req.notes}"</p>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { loadGuardHistoryJobs } from '@/lib/guard-bookings';
+import { deriveGuardPaymentDisplayStatus } from '@/lib/payments/guardPaymentDisplay';
 
 interface EarningsSummary {
   availableBalance: number;
@@ -123,7 +124,14 @@ export function useGuardPaymentCentre() {
         const fee = payout ? Number(payout.fee_deducted) || 0 : 0;
         const net = payout ? Number(payout.net_amount ?? gross - fee) : Number(a.guard_net_payout ?? gross - fee);
 
-        const isPaid = payout && (['paid', 'completed', 'paid_out'].includes(payout.status));
+        const transferStatus = deriveGuardPaymentDisplayStatus({
+          payoutStatus: payout?.status,
+          jobStatus: jobsMap[a.job_id]?.status,
+          jobPaymentStatus: jobsMap[a.job_id]?.payment_status,
+          assignmentStatus: a.status,
+          assignmentPaymentStatus: a.payment_status,
+        });
+        const isPaid = ['paid', 'completed', 'paid_out'].includes(transferStatus);
         const isPending = !['cancelled', 'refunded'].includes(a.status) && ['funded', 'completed', 'released'].includes(jobsMap[a.job_id]?.payment_status) && (!payout || ['pending', 'initiated', 'processing', 'held'].includes(payout.status));
 
         if (isPaid) {
@@ -146,7 +154,7 @@ export function useGuardPaymentCentre() {
           netPayout: net,
           paymentStatus: jobsMap[a.job_id]?.payment_status || a.payment_status || 'pending',
           jobStatus: jobsMap[a.job_id]?.status || a.status,
-          transferStatus: payout?.status || 'pending',
+          transferStatus,
           assignmentId: a.id,
           payoutId: payout?.id || null,
           receiptUrl: null,
