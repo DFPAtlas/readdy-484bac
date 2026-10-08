@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { AvailableJobWithDistance, Guard } from './types';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface Props {
   jobs: AvailableJobWithDistance[];
@@ -65,7 +66,7 @@ export default function RecommendedJobsPanel({ jobs, guard, onApply, hasApplied 
             <p className="text-xs text-slate-500 mb-3">{job.clients?.company_name || 'Company'}</p>
             <div className="flex items-center gap-3 text-xs text-slate-500 mb-3 flex-wrap">
               <span className="flex items-center gap-1"><i className="ri-map-pin-line text-slate-600"></i>{job.venue_city}</span>
-              <span className="flex items-center gap-1"><i className="ri-calendar-line text-slate-600"></i>{job.start_date ? new Date(job.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'N/A'}</span>
+              <span className="flex items-center gap-1"><i className="ri-calendar-line text-slate-600"></i>{job.start_date ? formatDateOnly(job.start_date, { day: 'numeric', month: 'short' }) : 'N/A'}</span>
             </div>
             <div className="flex items-center gap-2">
               <Link href={`/guard/jobs/detail?id=${job.id}`} className="flex-1 text-center px-3 py-2.5 border border-[#1e2d4d] text-slate-300 rounded-xl text-xs font-semibold hover:bg-[#162036] hover:border-[#2a3e5f] transition-all whitespace-nowrap">Details</Link>
