@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { paymentLabel } from '@/lib/client-journey';
 import BookingStatusBadge from './BookingStatusBadge';
 import ReviewStatusBadge from '@/components/reviews/ReviewStatusBadge';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface JobDetailDrawerProps {
   job: ClientJob;
@@ -201,7 +202,7 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
               <div className="flex justify-between"><span className="text-slate-500">Status</span><span className="text-slate-200 font-semibold capitalize">{job.status?.replace(/_/g, ' ')}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Location</span><span className="text-slate-200 text-right">{job.venue_name || job.venue_city}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Address</span><span className="text-slate-200 text-right">{[job.venue_address_line1, job.venue_city, job.venue_postcode].filter(Boolean).join(', ')}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Shift</span><span className="text-slate-200">{formatDate(job.start_date)}{job.end_date && job.end_date !== job.start_date ? ` – ${formatDate(job.end_date)}` : ''}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Shift</span><span className="text-slate-200">{formatDateOnly(job.start_date, { day: 'numeric', month: 'long', year: 'numeric' })}{job.end_date && job.end_date !== job.start_date ? ` – ${formatDateOnly(job.end_date, { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Time</span><span className="text-slate-200">{job.start_time?.slice(0, 5)} – {job.end_time?.slice(0, 5)}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Guards</span><span className="text-slate-200">{job.number_of_guards} needed</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Hourly Rate</span><span className="text-teal-400 font-bold">£{job.hourly_rate}/hr</span></div>

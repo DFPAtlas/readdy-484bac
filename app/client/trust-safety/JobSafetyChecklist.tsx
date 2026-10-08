@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface JobWithSafety {
   id: string;
@@ -158,7 +159,7 @@ export default function JobSafetyChecklist({ jobs, onToggle, onChangeRisk, onCha
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">{job.job_title}</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{job.venue_name} &middot; {job.start_date ? new Date(job.start_date).toLocaleDateString('en-GB') : ''}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{job.venue_name} &middot; {job.start_date ? formatDateOnly(job.start_date) : ''}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500 dark:text-slate-400">Risk:</span>

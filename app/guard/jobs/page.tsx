@@ -7,6 +7,7 @@ import PortalSidebar from '@/components/PortalSidebar';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
 import MessageClientModal from '@/app/guard/components/MessageClientModal';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface JobRow {
   id: string;
@@ -369,7 +370,7 @@ export default function GuardJobsPage() {
                         <p className="text-sm text-slate-400 mb-3">{job.clients?.company_name || 'Private Client'}</p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-400">
                           <span className="flex items-center gap-1"><i className="ri-map-pin-line text-slate-500"></i>{job.venue_city}</span>
-                          <span className="flex items-center gap-1"><i className="ri-calendar-line text-slate-500"></i>{new Date(job.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                          <span className="flex items-center gap-1"><i className="ri-calendar-line text-slate-500"></i>{formatDateOnly(job.start_date, { day: 'numeric', month: 'short' })}</span>
                           <span className="flex items-center gap-1"><i className="ri-time-line text-slate-500"></i>{job.start_time?.slice(0,5)} – {job.end_time?.slice(0,5)}</span>
                           <span className="flex items-center gap-1 font-semibold text-teal-400"><i className="ri-money-pound-circle-line"></i>£{Number(job.hourly_rate).toFixed(2)}/hr</span>
                         </div>

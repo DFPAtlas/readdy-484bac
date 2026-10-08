@@ -8,6 +8,7 @@ import { useClientGuard } from '@/hooks/useClientGuard';
 import Link from 'next/link';
 import ReviewStatusBadge, { ReviewStars } from '@/components/reviews/ReviewStatusBadge';
 import RateGuardModal from '@/components/reviews/RateGuardModal';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface ReviewItem {
   id: string;
@@ -362,7 +363,7 @@ export default function ClientReviewsPage() {
                       <p className="text-xs text-slate-500 mt-0.5">
                         <span className="text-slate-400">{pending.job_title}</span>
                         <span className="mx-1.5 text-slate-600">·</span>
-                        <span>{new Date(pending.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        <span>{formatDateOnly(pending.start_date, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">

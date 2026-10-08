@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface JobTrackerCardProps {
   job: any;
@@ -106,7 +107,7 @@ export default function JobTrackerCard({ job, onRefresh }: JobTrackerCardProps) 
                 {job.start_date && (
                   <span className="flex items-center gap-1">
                     <i className="ri-calendar-line text-slate-600 text-xs"></i>
-                    {new Date(job.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {formatDateOnly(job.start_date, { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                 )}
                 {job.start_time && job.end_time && (

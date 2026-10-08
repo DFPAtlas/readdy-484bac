@@ -1,5 +1,7 @@
 'use client';
 
+import { formatDateOnly } from '@/lib/date-only';
+
 interface Job {
   id: string;
   job_title: string;
@@ -21,7 +23,7 @@ interface JobSummaryCardProps {
 
 export default function JobSummaryCard({ job, hours }: JobSummaryCardProps) {
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-GB', {
+    return formatDateOnly(dateStr, {
       weekday: 'short',
       day: 'numeric',
       month: 'short',

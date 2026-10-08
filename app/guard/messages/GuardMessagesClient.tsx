@@ -7,6 +7,7 @@ import PortalSidebar from '@/components/PortalSidebar';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
 import Link from 'next/link';
 import { canSendJobMessage } from '@/lib/message-permissions';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface ClientInfo {
   id: string;
@@ -594,7 +595,7 @@ export default function GuardMessagesClient() {
                       <p className="text-sm font-semibold text-white truncate">{activeJob.job_title}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[11px] text-slate-500 flex items-center gap-1"><i className="ri-map-pin-line"></i>{activeJob.venue_city || '—'}</span>
-                        <span className="text-[11px] text-slate-500 flex items-center gap-1"><i className="ri-calendar-line"></i>{activeJob.start_date ? new Date(activeJob.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}</span>
+                        <span className="text-[11px] text-slate-500 flex items-center gap-1"><i className="ri-calendar-line"></i>{activeJob.start_date ? formatDateOnly(activeJob.start_date, { day: 'numeric', month: 'short' }) : '—'}</span>
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">{activeJob.status?.replace(/_/g, ' ')}</span>
                       </div>
                     </div>

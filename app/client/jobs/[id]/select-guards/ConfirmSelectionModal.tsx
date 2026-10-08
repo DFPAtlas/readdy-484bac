@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDateOnly, inclusiveDateOnlyDays } from "@/lib/date-only";
+
 interface Guard {
   id: string;
   full_name: string;
@@ -50,9 +52,7 @@ export default function ConfirmSelectionModal({
   if (totalMinutes < 0) totalMinutes += 24 * 60;
   const hoursPerShift = totalMinutes / 60;
 
-  const startDate = new Date(job.start_date);
-  const endDate = job.end_date ? new Date(job.end_date) : startDate;
-  const daysDiff = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  const daysDiff = inclusiveDateOnlyDays(job.start_date, job.end_date);
 
   const guardFees = selectedGuards.reduce((sum, g) => sum + (g.hourly_rate || job.hourly_rate) * hoursPerShift * daysDiff, 0);
 
@@ -73,7 +73,7 @@ export default function ConfirmSelectionModal({
             <h3 className="text-sm font-semibold text-slate-200 mb-2">{job.job_title}</h3>
             <div className="flex items-center gap-4 text-xs text-slate-500">
               <span><i className="ri-map-pin-line mr-1"></i>{job.venue_name}</span>
-              <span><i className="ri-calendar-line mr-1"></i>{new Date(job.start_date).toLocaleDateString("en-GB")}</span>
+              <span><i className="ri-calendar-line mr-1"></i>{formatDateOnly(job.start_date)}</span>
             </div>
           </div>
 

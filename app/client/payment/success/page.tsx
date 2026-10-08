@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { computeBookingConfirmation } from '@/lib/payments/bookingConfirmationState';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface Transaction {
   id: string;
@@ -176,7 +177,7 @@ function SuccessContent() {
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    return formatDateOnly(dateStr, { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
   const formatTime = (timeStr?: string) => {

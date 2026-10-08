@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { geocodePostcode } from '@/lib/geocoding';
 import JobMapEmbed from './JobMapEmbed';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface NearMeJob {
   id: string;
@@ -198,7 +199,7 @@ export default function JobsNearMeFilter() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
+    return formatDateOnly(dateString, {
       weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
     });
   };

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface JobInfoSectionProps {
   job: any;
@@ -13,8 +14,8 @@ export default function JobInfoSection({ job }: JobInfoSectionProps) {
   const fields = [
     { icon: 'ri-map-pin-2-line', label: 'Venue Name', value: job.venue_name || '—' },
     { icon: 'ri-road-map-line', label: 'Address', value: [job.venue_address_line1, job.venue_address_line2, job.venue_city, job.venue_postcode].filter(Boolean).join(', ') || '—' },
-    { icon: 'ri-calendar-event-line', label: 'Start Date', value: formatDate(job.start_date) },
-    { icon: 'ri-calendar-check-line', label: 'End Date', value: formatDate(job.end_date) },
+    { icon: 'ri-calendar-event-line', label: 'Start Date', value: formatDateOnly(job.start_date, { day: 'numeric', month: 'long', year: 'numeric' }) },
+    { icon: 'ri-calendar-check-line', label: 'End Date', value: formatDateOnly(job.end_date, { day: 'numeric', month: 'long', year: 'numeric' }) },
     { icon: 'ri-time-line', label: 'Hours', value: job.start_time && job.end_time ? `${job.start_time} – ${job.end_time}` : '—' },
     { icon: 'ri-group-line', label: 'Guards Needed', value: job.number_of_guards ? `${job.number_of_guards} guard${job.number_of_guards !== 1 ? 's' : ''}` : '—' },
     { icon: 'ri-money-pound-circle-line', label: 'Hourly Rate', value: job.hourly_rate ? `£${job.hourly_rate}/hr` : '—' },

@@ -2,6 +2,7 @@
 
 import { useRef, useCallback } from 'react';
 import BrandLogo from '@/components/BrandLogo';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface Job {
   id: string;
@@ -61,7 +62,7 @@ export default function InvoicePreview({ job, client, guards, costs, invoiceNumb
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   const formatDate = useCallback((dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-GB', {
+    return formatDateOnly(dateStr, {
       day: 'numeric',
       month: 'long',
       year: 'numeric'

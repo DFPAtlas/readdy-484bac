@@ -10,6 +10,7 @@ import BookingStatusBadge from '../../BookingStatusBadge';
 import ConfirmationBlockers from './ConfirmationBlockers';
 import BookingReceiptModal from './BookingReceiptModal';
 import { useClientGuard } from '@/hooks/useClientGuard';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface Guard {
   id: string;
@@ -269,7 +270,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
   };
 
   const formatDate = (d: string) =>
-    d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+    formatDateOnly(d, { day: 'numeric', month: 'long', year: 'numeric' });
 
   const formatDateTime = (d: string) =>
     d ? new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';

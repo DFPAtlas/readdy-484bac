@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
 import { submitGuardApplication } from '@/lib/guard-applications';
 import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface JobBasic {
   id: string;
@@ -229,7 +230,7 @@ export default function GuardApplyClient({ jobId }: { jobId: string }) {
             <div className="flex flex-wrap gap-4 text-sm text-slate-400">
               <span className="flex items-center gap-1"><i className="ri-building-line"></i>{job.clients?.company_name || 'Private Client'}</span>
               <span className="flex items-center gap-1"><i className="ri-map-pin-line"></i>{job.venue_city}</span>
-              <span className="flex items-center gap-1"><i className="ri-calendar-line"></i>{new Date(job.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+              <span className="flex items-center gap-1"><i className="ri-calendar-line"></i>{formatDateOnly(job.start_date, { day: 'numeric', month: 'short' })}</span>
               <span className="flex items-center gap-1 font-semibold text-teal-400"><i className="ri-money-pound-circle-line"></i>£{Number(job.hourly_rate).toFixed(2)}/hr</span>
             </div>
           </div>

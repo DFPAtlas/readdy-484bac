@@ -10,6 +10,7 @@ import AttendanceWarnings from './AttendanceWarnings';
 import ReplacementRequestModal from './ReplacementRequestModal';
 import ReplacementGuardSuggestions from './ReplacementGuardSuggestions';
 import ReplacementStatusTracker from './ReplacementStatusTracker';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface Guard {
   id: string;
@@ -126,8 +127,7 @@ export default function AttendancePanel({ job, assignments: rawAssignments, clie
   };
 
   const formatDate = (d: string) => {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return formatDateOnly(d, { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   const phase = getShiftPhase(job, now);

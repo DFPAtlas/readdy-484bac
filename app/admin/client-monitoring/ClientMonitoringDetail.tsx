@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface ClientMonitoringData {
   id: string;
@@ -534,7 +535,7 @@ export default function ClientMonitoringDetail({ client, onClose, onUpdate }: De
                         {getStatusBadge(job.status)}
                       </div>
                       <div className="flex items-center gap-4 text-xs text-slate-400">
-                        <span>{job.start_date ? new Date(job.start_date).toLocaleDateString('en-GB') : 'No start date'}</span>
+                        <span>{job.start_date ? formatDateOnly(job.start_date) : 'No start date'}</span>
                         <span>{job.guards_required} guards required</span>
                         <span>{job.total_cost ? `£${job.total_cost}` : '—'}</span>
                       </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface JobWithSafety {
   id: string;
@@ -211,7 +212,7 @@ export default function ComplianceWarnings({ jobs, assignments }: ComplianceWarn
           jobTitle: job.job_title,
           type: 'critical',
           title: 'Job Starting Soon with Unresolved Issues',
-          message: `This job starts on ${new Date(job.start_date).toLocaleDateString('en-GB')} and has outstanding safety or compliance warnings.`,
+          message: `This job starts on ${formatDateOnly(job.start_date)} and has outstanding safety or compliance warnings.`,
           icon: 'ri-alarm-warning-line',
         });
       }
