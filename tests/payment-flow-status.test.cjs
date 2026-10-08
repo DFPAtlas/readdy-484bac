@@ -101,3 +101,13 @@ test('checkout return waits for guards and reports failed payments', () => {
   assert.equal(deriveReturn(confirmedJob, confirmedAssignments, {status: 'failed'}), 'failed');
   assert.equal(deriveReturn(null, [], null), 'error');
 });
+
+test('an open unpaid Checkout Session is resumable instead of an endless processing state', () => {
+  const paymentClient = fs.readFileSync('app/client/jobs/[id]/payment/PaymentClient.tsx', 'utf8');
+  const actions = fs.readFileSync('app/client/jobs/[id]/payment/PaymentActions.tsx', 'utf8');
+  assert.match(paymentClient, /transaction\.stripe_session_id/);
+  assert.match(paymentClient, /!transaction\.stripe_payment_intent/);
+  assert.match(paymentClient, /return "checkout_open"/);
+  assert.match(paymentClient, /No payment has been taken yet/);
+  assert.match(actions, /Resume Secure Checkout/);
+});
