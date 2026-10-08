@@ -111,3 +111,13 @@ test('an open unpaid Checkout Session is resumable instead of an endless process
   assert.match(paymentClient, /No payment has been taken yet/);
   assert.match(actions, /Resume Secure Checkout/);
 });
+
+test('paid bookings keep the confirmed guard visible through the client-safe profile view', () => {
+  const paymentClient = fs.readFileSync('app/client/jobs/[id]/payment/PaymentClient.tsx', 'utf8');
+  const summary = fs.readFileSync('app/client/jobs/[id]/payment/SelectedGuardsPaymentSummary.tsx', 'utf8');
+  const loader = fs.readFileSync('lib/client-job-assignments.ts', 'utf8');
+  assert.match(paymentClient, /loadClientJobAssignments/);
+  assert.match(loader, /client_applicant_profiles/);
+  assert.match(summary, /confirmed/);
+  assert.match(summary, /Confirmed & Funded/);
+});
