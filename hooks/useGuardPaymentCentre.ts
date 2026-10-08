@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { loadGuardHistoryJobs } from '@/lib/guard-bookings';
 
 interface EarningsSummary {
   availableBalance: number;
@@ -30,6 +31,7 @@ interface JobPayment {
   platformFee: number;
   netPayout: number;
   paymentStatus: string;
+  jobStatus: string;
   transferStatus: string;
   assignmentId: string;
   payoutId: string | null;
@@ -73,21 +75,22 @@ export function useGuardPaymentCentre() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
 
-      const { data: guard } = await supabase
+      const { data: guard, error: guardError } = await supabase
         .from('guards')
         .select('id, stripe_account_id, stripe_account_status, stripe_details_submitted, stripe_charges_enabled, stripe_payouts_enabled, stripe_requirements_due, stripe_last_checked_at')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (!guard) { setLoading(false); return; }
+      if (guardError) throw guardError;
+      if (!guard) throw new Error('Guard profile unavailable');
       setGuardId(guard.id);
 
       const [assignmentsRes, payoutsRes] = await Promise.all([
         supabase
           .from('job_assignments')
-          .select('id, job_id, guard_id, payment_status, payment_amount, created_at, payout_id')
+          .select('id, job_id, guard_id, payment_status, payment_amount, gross_guard_amount, guard_net_payout, assigned_at, payout_id, status')
           .eq('guard_id', guard.id)
-          .order('created_at', { ascending: false }),
+          .order('assigned_at', { ascending: false }),
         supabase
           .from('guard_payouts')
           .select('*')
@@ -98,28 +101,11 @@ export function useGuardPaymentCentre() {
       const assignments = assignmentsRes.data || [];
       const payoutData = payoutsRes.data || [];
 
-      const jobIds = [...new Set(assignments.map((a: any) => a.job_id).filter(Boolean))];
-      let jobsMap: Record<string, any> = {};
-      let clientMap: Record<string, string> = {};
-      if (jobIds.length > 0) {
-        const { data: jobsData } = await supabase
-          .from('jobs')
-          .select('id, job_title, start_date, client_id')
-          .in('id', jobIds);
-        if (jobsData) {
-          jobsMap = Object.fromEntries(jobsData.map((j: any) => [j.id, j]));
-          const clientIds = [...new Set(jobsData.map((j: any) => j.client_id).filter(Boolean))];
-          if (clientIds.length > 0) {
-            const { data: clientsData } = await supabase
-              .from('clients')
-              .select('id, company_name')
-              .in('id', clientIds as string[]);
-            if (clientsData) {
-              clientMap = Object.fromEntries(clientsData.map((c: any) => [c.id, c.company_name || 'Unknown Client']));
-            }
-          }
-        }
-      }
+      if (assignmentsRes.error) throw assignmentsRes.error;
+      if (payoutsRes.error) throw payoutsRes.error;
+      const historyJobs = assignments.length ? await loadGuardHistoryJobs(supabase, guard.id) : [];
+      const jobsMap: Record<string, any> = Object.fromEntries(historyJobs.map(job => [job.id, job]));
+      if (assignments.some((a: any) => !jobsMap[a.job_id])) throw new Error('Booking data unavailable');
 
       const payoutMap: Record<string, any> = {};
       payoutData.forEach((p: any) => {
@@ -133,32 +119,33 @@ export function useGuardPaymentCentre() {
 
       const jobPaymentsList: JobPayment[] = assignments.map((a: any) => {
         const payout = payoutMap[a.id];
-        const gross = Number(a.payment_amount) || 0;
+        const gross = Number(a.gross_guard_amount ?? a.payment_amount ?? jobsMap[a.job_id]?.guard_payout_amount ?? jobsMap[a.job_id]?.agreed_amount ?? 0);
         const fee = payout ? Number(payout.fee_deducted) || 0 : 0;
-        const net = payout ? Number(payout.net_amount) || 0 : gross - fee;
+        const net = payout ? Number(payout.net_amount ?? gross - fee) : Number(a.guard_net_payout ?? gross - fee);
 
         const isPaid = payout && (payout.status === 'paid' || payout.status === 'completed');
-        const isPending = !payout || payout.status === 'pending' || payout.status === 'initiated' || payout.status === 'processing';
+        const isPending = !['cancelled', 'refunded'].includes(a.status) && ['funded', 'completed', 'released'].includes(jobsMap[a.job_id]?.payment_status) && (!payout || ['pending', 'initiated', 'processing', 'held'].includes(payout.status));
 
         if (isPaid) {
           lifetime += gross;
           available += net;
-          const d = new Date(jobsMap[a.job_id]?.start_date || a.created_at);
+          const d = new Date(jobsMap[a.job_id]?.start_date || a.assigned_at);
           if (d >= new Date(monthStart)) thisMonth += gross;
         }
         if (isPending) {
-          pending += gross;
+          pending += net;
         }
 
         return {
           id: a.id,
-          date: a.created_at,
+          date: a.assigned_at,
           jobTitle: jobsMap[a.job_id]?.job_title || 'Unknown Job',
-          clientName: clientMap[jobsMap[a.job_id]?.client_id] || 'Unknown Client',
+          clientName: jobsMap[a.job_id]?.clients?.company_name || 'Unknown Client',
           grossAmount: gross,
           platformFee: fee,
           netPayout: net,
-          paymentStatus: a.payment_status || 'pending',
+          paymentStatus: jobsMap[a.job_id]?.payment_status || a.payment_status || 'pending',
+          jobStatus: jobsMap[a.job_id]?.status || a.status,
           transferStatus: payout?.status || 'pending',
           assignmentId: a.id,
           payoutId: payout?.id || null,

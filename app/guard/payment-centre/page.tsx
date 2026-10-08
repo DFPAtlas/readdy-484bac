@@ -14,6 +14,8 @@ export default function GuardPaymentCentrePage() {
   const { loading: authLoading, allowed } = useGuardGuard();
   const {
     loading,
+    error,
+    refetch,
     earningsSummary,
     stripeStatus,
     stripeLoading,
@@ -114,7 +116,7 @@ export default function GuardPaymentCentrePage() {
     const steps = [
       { label: 'Client Paid', done: payment.paymentStatus !== 'unpaid', icon: 'ri-money-pound-circle-line' },
       { label: 'Funds Held', done: payment.paymentStatus === 'funded' || payment.paymentStatus === 'completed' || status === 'paid' || status === 'completed', icon: 'ri-safe-line' },
-      { label: 'Job Completed', done: payment.paymentStatus === 'completed' || status === 'paid' || status === 'completed', icon: 'ri-check-double-line' },
+      { label: 'Job Completed', done: ['payout_approved', 'completed'].includes(payment.jobStatus) || status === 'paid' || status === 'completed', icon: 'ri-check-double-line' },
       { label: 'Transfer Created', done: status === 'processing' || status === 'initiated' || status === 'paid' || status === 'completed', icon: 'ri-send-plane-line' },
       { label: 'Transfer Paid', done: status === 'paid' || status === 'completed', icon: 'ri-bank-card-line' },
       { label: 'Payout Complete', done: status === 'paid' || status === 'completed', icon: 'ri-checkbox-circle-line' },
@@ -174,6 +176,8 @@ export default function GuardPaymentCentrePage() {
               </Link>
             </div>
           </div>
+
+          {error && <div role="alert" className="mb-6 p-4 rounded-xl border border-red-500/30 text-red-300">{error} <button onClick={refetch} className="ml-3 underline">Retry</button></div>}
 
           {toast && (
             <div className={`mb-6 border rounded-xl p-4 flex items-center gap-3 animate-fade-in ${

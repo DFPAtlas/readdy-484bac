@@ -102,7 +102,7 @@ export default function ClientPaymentCentrePage() {
       { label: 'Guard Selected', done: payment.paymentStatus !== 'pending_payment', icon: 'ri-user-star-line' },
       { label: 'Client Paid', done: isCollected(payment.paymentStatus), icon: 'ri-money-pound-circle-line' },
       { label: 'Funds Held', done: payment.releaseStatus === 'funded' || payment.releaseStatus === 'completed' || payment.releaseStatus === 'released', icon: 'ri-safe-line' },
-      { label: 'Guard Completed', done: payment.releaseStatus === 'completed' || payment.releaseStatus === 'released', icon: 'ri-check-double-line' },
+      { label: 'Guard Completed', done: ['payout_approved', 'completed'].includes(payment.jobStatus) || payment.releaseStatus === 'completed' || payment.releaseStatus === 'released', icon: 'ri-check-double-line' },
       { label: 'Funds Released', done: payment.releaseStatus === 'released', icon: 'ri-send-plane-line' },
       { label: 'Transfer Paid', done: payment.releaseStatus === 'released', icon: 'ri-bank-card-line' },
     ];
