@@ -9,7 +9,7 @@ export async function loadClientJobAssignments(db: SupabaseClient<any, any, any,
   if (guardIds.length === 0) return assignments;
   const { data: profiles, error: profileError } = await db
     .from('client_applicant_profiles')
-    .select('id:guard_id, full_name, profile_photo_url:profile_image_url, sia_licence_number, average_rating:rating, total_reviews, total_jobs_completed')
+    .select('id:guard_id, full_name, profile_photo_url:profile_image_url, hourly_rate, sia_verified, sia_licence_number, licence_types, average_rating:rating, total_reviews, total_jobs_completed')
     .eq('job_id', jobId)
     .in('guard_id', guardIds);
   if (profileError) throw profileError;
