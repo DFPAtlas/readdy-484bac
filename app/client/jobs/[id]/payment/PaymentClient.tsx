@@ -21,6 +21,7 @@ import { computeBookingConfirmation } from '@/lib/payments/bookingConfirmationSt
 import UpgradePrompt from '@/components/UpgradePrompt';
 import ContextualHelpCard from '@/app/client/help/ContextualHelpCard';
 import TaxDisclaimerCheckbox from '@/components/TaxDisclaimerCheckbox';
+import { loadClientJobAssignments } from '@/lib/client-job-assignments';
 
 interface Job {
   id: string;
@@ -65,7 +66,7 @@ interface Job {
       sia_verified: boolean;
       sia_licence_number: string | null;
       licence_types: string[] | null;
-    };
+    } | null;
   }>;
 }
 
@@ -250,26 +251,6 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
             company_name,
             email,
             stripe_customer_id
-          ),
-          job_assignments (
-            id,
-            guard_id,
-            status,
-            payment_status,
-            agreed_hourly_rate,
-            agreed_hours,
-            gross_guard_amount,
-            currency,
-            guards (
-              id,
-              full_name,
-              profile_image_url,
-              hourly_rate,
-              rating,
-              sia_verified,
-              sia_licence_number,
-              licence_types
-            )
           )
         `)
         .eq("id", jobId)
@@ -282,12 +263,15 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
         return;
       }
 
-      setJob(jobData);
+      const hydratedAssignments = await loadClientJobAssignments(supabase, jobData.id);
+      const hydratedJob = { ...jobData, job_assignments: hydratedAssignments } as Job;
+
+      setJob(hydratedJob);
       setTaxDisclaimerAccepted(jobData.tax_disclaimer_accepted || false);
 
-      if (jobData.job_assignments && jobData.job_assignments.length > 0) {
-        const guardsWithHours = jobData.job_assignments.map((assignment: any) => ({
-          ...assignment.guards,
+      if (hydratedAssignments.length > 0) {
+        const guardsWithHours = hydratedAssignments.map((assignment: any) => ({
+          ...(assignment.guards || {}),
           hours_worked: calculateHours(jobData.start_time, jobData.end_time, jobData.start_date, jobData.end_date)
         }));
         setGuards(guardsWithHours);
