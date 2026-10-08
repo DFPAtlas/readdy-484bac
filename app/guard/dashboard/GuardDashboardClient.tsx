@@ -1393,7 +1393,7 @@ export default function GuardDashboardClient() {
                           </div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mt-3">
                             <div className="flex items-center gap-2"><i className="ri-map-pin-line text-slate-500"></i><span className="text-slate-300">{(assignment.jobs as any)?.venue_city}</span></div>
-                            <div className="flex items-center gap-2"><i className="ri-calendar-line text-slate-500"></i><span className="text-slate-300">{(assignment.jobs as any)?.start_date ? new Date((assignment.jobs as any).start_date).toLocaleDateString() : 'N/A'}</span></div>
+                            <div className="flex items-center gap-2"><i className="ri-calendar-line text-slate-500"></i><span className="text-slate-300">{(assignment.jobs as any)?.start_date ? formatDateOnly((assignment.jobs as any).start_date) : 'N/A'}</span></div>
                             <div className="flex items-center gap-2"><i className="ri-time-line text-slate-500"></i><span className="text-slate-300">{(assignment.jobs as any)?.start_time} - {(assignment.jobs as any)?.end_time}</span></div>
                             <div className="flex items-center gap-2"><i className="ri-money-pound-circle-line text-slate-500"></i><span className="text-slate-300">{assignment.payment_amount ? `£${Number(assignment.payment_amount).toFixed(2)}` : `£${(assignment.jobs as any)?.hourly_rate}/hr`}</span></div>
                           </div>
@@ -1433,7 +1433,7 @@ export default function GuardDashboardClient() {
                           <h3 className="text-base sm:text-xl font-semibold text-white mb-2 truncate">{(job.jobs as any)?.job_title}</h3>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                             <div className="flex items-center gap-2"><i className="ri-map-pin-line text-slate-500"></i><span className="text-slate-300">{(job.jobs as any)?.venue_city}</span></div>
-                            <div className="flex items-center gap-2"><i className="ri-calendar-line text-slate-500"></i><span className="text-slate-300">{(job.jobs as any)?.start_date ? new Date((job.jobs as any).start_date).toLocaleDateString() : 'N/A'}</span></div>
+                            <div className="flex items-center gap-2"><i className="ri-calendar-line text-slate-500"></i><span className="text-slate-300">{(job.jobs as any)?.start_date ? formatDateOnly((job.jobs as any).start_date) : 'N/A'}</span></div>
                             <div className="flex items-center gap-2"><i className="ri-time-line text-slate-500"></i><span className="text-slate-300">{(job.jobs as any)?.start_time} - {(job.jobs as any)?.end_time}</span></div>
                             <div className="flex items-center gap-2"><i className="ri-money-pound-circle-line text-slate-500"></i><span className="text-slate-300">{job.payment_amount ? `£${Number(job.payment_amount).toFixed(2)}` : `£${(job.jobs as any)?.hourly_rate}/hr`}</span></div>
                           </div>
@@ -1480,7 +1480,7 @@ export default function GuardDashboardClient() {
                             <p className="text-slate-400 mb-3">{(app.jobs as any)?.clients?.company_name || 'Company Name Not Available'}</p>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                               <div className="flex items-center gap-2"><i className="ri-map-pin-line text-slate-500"></i><span className="text-slate-300">{(app.jobs as any)?.venue_city}</span></div>
-                              <div className="flex items-center gap-2"><i className="ri-calendar-line text-slate-500"></i><span className="text-slate-300">{(app.jobs as any)?.start_date ? new Date((app.jobs as any).start_date).toLocaleDateString() : 'N/A'}</span></div>
+                              <div className="flex items-center gap-2"><i className="ri-calendar-line text-slate-500"></i><span className="text-slate-300">{(app.jobs as any)?.start_date ? formatDateOnly((app.jobs as any).start_date) : 'N/A'}</span></div>
                               <div className="flex items-center gap-2"><i className="ri-time-line text-slate-500"></i><span className="text-slate-300">{(app.jobs as any)?.start_time} - {(app.jobs as any)?.end_time}</span></div>
                               <div className="flex items-center gap-2"><i className="ri-money-pound-circle-line text-slate-500"></i><span className="text-slate-300">£{(app.jobs as any)?.hourly_rate}/hr</span></div>
                             </div>

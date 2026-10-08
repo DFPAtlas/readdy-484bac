@@ -9,6 +9,7 @@ import MobileInstallPrompt from '@/components/MobileInstallPrompt';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import Link from 'next/link';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface ClientDetails {
   id: string;
@@ -431,7 +432,7 @@ export default function MobileClientDashboard() {
                       </span>
                       <span className="flex items-center gap-1">
                         <i className="ri-calendar-line"></i>
-                        {new Date(job.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                        {formatDateOnly(job.start_date, { day: 'numeric', month: 'short' })}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -514,7 +515,7 @@ export default function MobileClientDashboard() {
                     </span>
                     <span className="flex items-center gap-1">
                       <i className="ri-calendar-line"></i>
-                      {new Date(job.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      {formatDateOnly(job.start_date, { day: 'numeric', month: 'short' })}
                     </span>
                   </div>
                 </Link>

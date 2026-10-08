@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
 import MessageClientModal from '@/app/guard/components/MessageClientModal';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface HistoryJob {
   job_id: string;
@@ -525,7 +526,7 @@ export default function GuardJobHistoryClient() {
                           <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
                             <span className="flex items-center gap-1"><i className="ri-building-line"></i>{job.client_name}</span>
                             <span className="flex items-center gap-1"><i className="ri-map-pin-line"></i>{job.venue_city}{job.venue_postcode ? `, ${job.venue_postcode}` : ''}</span>
-                            <span className="flex items-center gap-1"><i className="ri-calendar-line"></i>{job.start_date ? new Date(job.start_date).toLocaleDateString('en-GB') : 'N/A'}</span>
+                            <span className="flex items-center gap-1"><i className="ri-calendar-line"></i>{job.start_date ? formatDateOnly(job.start_date) : 'N/A'}</span>
                             <span className="flex items-center gap-1"><i className="ri-time-line"></i>{job.start_time || ''} - {job.end_time || ''}</span>
                             {job.agreed_amount && (
                               <span className="flex items-center gap-1 font-medium text-slate-700 dark:text-slate-300">

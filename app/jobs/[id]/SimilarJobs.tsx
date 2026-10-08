@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface SimilarJob {
   id: string;
@@ -201,7 +202,7 @@ export default function SimilarJobs({ currentJobId, securityType, venueCity }: S
               <div className="space-y-1.5 mb-4 flex-1">
                 <div className="flex items-center gap-1.5 text-xs text-slate-400">
                   <i className="ri-calendar-line text-slate-500"></i>
-                  {new Date(job.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {formatDateOnly(job.start_date, { day: 'numeric', month: 'short', year: 'numeric' })}
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-slate-400">
                   <i className="ri-time-line text-slate-500"></i>

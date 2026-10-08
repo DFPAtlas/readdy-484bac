@@ -14,6 +14,7 @@ import HomeSkeleton from './HomeSkeleton';
 import JobsSkeleton from './JobsSkeleton';
 import ShiftsSkeleton from './ShiftsSkeleton';
 import MessagesSkeleton from './MessagesSkeleton';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface Guard {
   id: string;
@@ -466,7 +467,7 @@ export default function MobileGuardDashboard() {
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', weekday: 'short' });
+    return formatDateOnly(dateStr, { day: 'numeric', month: 'short', weekday: 'short' });
   };
 
   const formatTime = (timeStr: string) => {

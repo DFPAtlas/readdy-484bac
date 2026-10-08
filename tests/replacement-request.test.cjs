@@ -20,7 +20,7 @@ function nodes(tree) {
 function text(tree) { if(Array.isArray(tree)) return tree.map(text).join(''); if(tree && typeof tree==='object') return text(tree.props?.children); return tree == null || typeof tree === 'boolean' ? '' : String(tree); }
 function button(tree,label) {const match=nodes(tree).find(n=>n.type==='button' && text(n).trim()===label); assert.ok(match,`missing ${label}`);return match;}
 const dir='app/client/jobs/[id]/';
-const common={'@/lib/attendance-display.cjs':require('../lib/attendance-display.cjs'),'next/navigation':{useRouter:()=>({push(){}})},'next/link':{default:()=>null}};
+const common={'@/lib/attendance-display.cjs':require('../lib/attendance-display.cjs'),'@/lib/date-only':{formatDateOnly:value=>value||'—'},'next/navigation':{useRouter:()=>({push(){}})},'next/link':{default:()=>null}};
 
 test('replacement card passes the chosen guard to the required request action',()=>{
   const selected=[];

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import MessageTemplates from './MessageTemplates';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface Message {
   id: string;
@@ -251,7 +252,7 @@ export default function ChatPanel({
                 </span>
                 <span className="text-[11px] text-slate-500 flex items-center gap-1">
                   <i className="ri-calendar-line"></i>
-                  {job.start_date ? new Date(job.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}
+                  {job.start_date ? formatDateOnly(job.start_date, { day: 'numeric', month: 'short' }) : '—'}
                 </span>
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${statusColor(job.status)}`}>
                   {job.status?.replace(/_/g, ' ')}

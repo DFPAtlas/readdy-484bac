@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { adminJobStatusBadge } from '@/lib/adminJobStatus';
 import { JobRow } from './useAdminJobs';
+import { formatDateOnly } from '@/lib/date-only';
 
 
 
@@ -188,7 +189,7 @@ export default function JobsTable({
                       </td>
                       <td className="px-4 py-3"><span className="font-medium text-slate-300">{job.clients?.company_name || 'Private'}</span></td>
                       <td className="px-4 py-3 text-slate-400">{job.venue_city}{job.venue_postcode ? `, ${job.venue_postcode}` : ''}</td>
-                      <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{formatDate(job.start_date)}</td>
+                      <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{formatDateOnly(job.start_date)}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${sb.bg} ${sb.text} ring-1 ${sb.ring}`}>
                           <div className="w-3 h-3 flex items-center justify-center"><i className={`${sb.icon} text-[10px]`}></i></div>

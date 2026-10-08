@@ -2,6 +2,7 @@
 'use client';
 
 import PayoutTimeline from './PayoutTimeline';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface PayoutDetailModalProps {
   earning: any;
@@ -167,7 +168,7 @@ export default function PayoutDetailModal({
                 <div>
                   <p className="text-xs text-slate-500">Date</p>
                   <p className="font-medium text-white">
-                    {formatDate(earning.jobs?.start_date)}
+                    {formatDateOnly(earning.jobs?.start_date, { day: 'numeric', month: 'long', year: 'numeric' })}
                   </p>
                 </div>
                 <div>

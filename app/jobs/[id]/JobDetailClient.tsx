@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { JobPostingSchema } from "@/components/JobPostingSchema";
 import SimilarJobs from "./SimilarJobs";
 import { sendPushToUser } from "@/lib/push-notifications";
+import { formatDateOnly } from "@/lib/date-only";
 
 interface Job {
   id: string;
@@ -441,7 +442,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-GB", {
+    return formatDateOnly(dateString, {
       weekday: "long",
       day: "numeric",
       month: "long",
@@ -804,14 +805,14 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                   <div className="flex items-center justify-between pb-3 border-b border-slate-800/60">
                     <span className="text-slate-400 text-sm">Start Date</span>
                     <span className="font-semibold text-white text-sm">
-                      {new Date(job.start_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      {formatDateOnly(job.start_date, { day: "numeric", month: "short", year: "numeric" })}
                     </span>
                   </div>
                   {job.end_date && (
                     <div className="flex items-center justify-between pb-3 border-b border-slate-800/60">
                       <span className="text-slate-400 text-sm">End Date</span>
                       <span className="font-semibold text-white text-sm">
-                        {new Date(job.end_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        {formatDateOnly(job.end_date, { day: "numeric", month: "short", year: "numeric" })}
                       </span>
                     </div>
                   )}

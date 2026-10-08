@@ -1,3 +1,5 @@
+import { formatDateOnly } from '@/lib/date-only';
+
 interface Guard {
   id: string;
   full_name: string;
@@ -80,7 +82,7 @@ export default function BookingReceiptModal({
   onClose,
 }: BookingReceiptModalProps) {
   const formatDate = (d: string) =>
-    d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+    formatDateOnly(d, { day: 'numeric', month: 'long', year: 'numeric' });
 
   const formatDateTime = (d: string) =>
     d ? new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';

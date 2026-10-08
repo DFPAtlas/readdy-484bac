@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatDateOnly } from "@/lib/date-only";
 
 interface Job {
   id: string;
@@ -31,13 +32,13 @@ export default function ApplicantDashboardHeader({
   selectedCount,
   shortlistedCount,
 }: Props) {
-  const dateStr = new Date(job.start_date).toLocaleDateString("en-GB", {
+  const dateStr = formatDateOnly(job.start_date, {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
   const endStr = job.end_date
-    ? new Date(job.end_date).toLocaleDateString("en-GB", {
+    ? formatDateOnly(job.end_date, {
         day: "numeric",
         month: "short",
         year: "numeric",
@@ -92,7 +93,7 @@ export default function ApplicantDashboardHeader({
             <p className="text-xs text-slate-500 mb-1">Shift Date</p>
             <p className="text-sm font-medium text-slate-200">
               {dateStr}
-              {endStr && ` — ${endStr}`}
+              {endStr && endStr !== dateStr && ` — ${endStr}`}
             </p>
           </div>
           <div className="bg-[#162036] rounded-lg p-3 border border-[#1e2d4d]">

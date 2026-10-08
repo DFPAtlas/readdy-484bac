@@ -11,6 +11,7 @@ import BackToTop from '@/components/BackToTop';
 import ShareJobButton from '@/components/ShareJobButton';
 import JobsNearMeFilter from '@/components/JobsNearMeFilter';
 import ClientBadge from '@/components/ClientBadge';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface Job {
   id: string;
@@ -321,7 +322,7 @@ export default function JobsClient() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
+    return formatDateOnly(dateString, {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
@@ -335,7 +336,7 @@ export default function JobsClient() {
   };
 
   const formatDateISO = (dateString: string) => {
-    return new Date(dateString).toISOString().split('T')[0];
+    return dateString.slice(0, 10);
   };
 
   const getUrgencyBadge = (urgency: string | null) => {

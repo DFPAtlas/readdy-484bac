@@ -2,6 +2,7 @@
 'use client';
 
 import * as React from 'react';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface PayoutTableProps {
   earnings: any[];
@@ -132,7 +133,7 @@ export default function PayoutTable({
                   <td className="px-6 py-4">
                     <div className="text-sm text-slate-300">
                       {earning.jobs?.start_date
-                        ? new Date(earning.jobs.start_date).toLocaleDateString('en-GB', {
+                        ? formatDateOnly(earning.jobs.start_date, {
                             day: 'numeric',
                             month: 'short',
                             year: 'numeric',
