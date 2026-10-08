@@ -98,6 +98,7 @@ interface Transaction {
   amount: number;
   created_at: string;
   completed_at: string | null;
+  stripe_session_id: string | null;
   stripe_payment_intent: string | null;
   stripe_charge_id: string | null;
   stripe_invoice_id: string | null;
@@ -144,6 +145,13 @@ function getPaymentStatus(job: Job & { payment_status?: string | null }, transac
   if (transaction?.status === "completed" || transaction?.payment_status === "completed" || transaction?.status === "succeeded" || transaction?.payment_status === "succeeded") return "paid";
   if (job.payment_status === 'funded' || job.status === 'funded') return "funded";
   if (transaction?.status === "failed" || transaction?.payment_status === "failed" || job.payment_status === 'failed' || job.payment_status === 'payment_failed') return "failed";
+  // A Checkout Session can be created in one browser and resumed in another.
+  // Until Stripe creates a PaymentIntent, no payment is being confirmed yet.
+  if (
+    transaction?.status === "pending" &&
+    transaction.stripe_session_id &&
+    !transaction.stripe_payment_intent
+  ) return "checkout_open";
   if (transaction?.status === "pending" || transaction?.payment_status === "pending" || transaction?.status === "processing" || transaction?.payment_status === "processing" || job.payment_status === 'processing') return "processing";
   if (transaction?.status === "invoice_sent" || transaction?.payment_status === "invoice_sent") return "invoice_sent";
   if (job.status === "awaiting_payment" || job.payment_status === 'pending' || job.payment_status === 'payment_pending') return "pending_payment";
@@ -601,7 +609,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
   const costs = calculateCosts();
   const paymentStatus = getPaymentStatus(job, transaction);
   const bookingConfirmation = computeBookingConfirmation(job, job.job_assignments || []);
-  const canPay = paymentStatus === "pending_payment" || paymentStatus === "not_required" || paymentStatus === "failed";
+  const canPay = paymentStatus === "pending_payment" || paymentStatus === "not_required" || paymentStatus === "failed" || paymentStatus === "checkout_open";
   const hasReceipt = !!transaction?.receipt_url;
   const hasInvoice = !!transaction?.invoice_url;
   const receiptUrl = transaction?.receipt_url || null;
@@ -738,6 +746,23 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
                   <p className="text-sm font-semibold text-blue-400">Payment is being confirmed</p>
                   <p className="text-sm text-blue-300 mt-1">
                     We are verifying your payment with Stripe. This usually takes a few moments — please don't close this page or start another payment.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Open Checkout Recovery Banner */}
+          {paymentStatus === "checkout_open" && (
+            <div className="bg-blue-500/10 rounded-xl border border-blue-500/25 p-5 mb-6">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-blue-500/15 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <i className="ri-bank-card-line text-blue-400 text-xl"></i>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-blue-400">Secure checkout is ready</p>
+                  <p className="text-sm text-blue-300 mt-1">
+                    No payment has been taken yet. Resume the existing Stripe checkout below to complete this booking safely.
                   </p>
                 </div>
               </div>
