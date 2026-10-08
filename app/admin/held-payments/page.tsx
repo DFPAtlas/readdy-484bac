@@ -73,7 +73,7 @@ export default function AdminHeldPayments() {
     try {
       const { data: assignments, error: assignmentsError } = await supabase
         .from('job_assignments')
-        .select('id, job_id, guard_id, status, payment_status, payment_amount, completed_at, assigned_at')
+        .select('id, job_id, guard_id, status, payment_status, guard_net_payout, completed_at, assigned_at')
         .eq('status', 'completed')
         .or('payment_status.eq.pending,payment_status.eq.held,payment_status.eq.payout_pending,payment_status.is.null')
         .order('completed_at', { ascending: false });
@@ -139,7 +139,7 @@ export default function AdminHeldPayments() {
           client_name: clientName,
           guard_name: guard?.full_name || '\u2014',
           guard_email: guard?.email || '\u2014',
-          payment_amount: a.payment_amount ?? 0,
+          payment_amount: Number(a.guard_net_payout ?? 0),
           payment_status: a.payment_status || 'null',
           completed_at: a.completed_at,
           days_held: daysHeld,
@@ -157,7 +157,7 @@ export default function AdminHeldPayments() {
   };
 
   const confirmRelease = async () => {
-    if (!confirmModal) return;
+    if (!confirmModal || !canRelease(confirmModal)) return;
 
     const payment = confirmModal;
     setReleasingId(payment.assignment_id);
@@ -290,7 +290,7 @@ export default function AdminHeldPayments() {
   const readyCount = allPayments.filter(p => p.payment_status === 'payout_pending').length;
   const awaitingCount = allPayments.filter(p => p.payment_status !== 'payout_pending').length;
 
-  const canRelease = (p: HeldPayment) => p.payment_status === 'payout_pending';
+  const canRelease = (p: HeldPayment) => p.payment_status === 'payout_pending' && Number.isFinite(p.payment_amount) && p.payment_amount > 0;
 
   return (
     <div className="min-h-screen bg-[#0B1933]">
@@ -434,7 +434,7 @@ export default function AdminHeldPayments() {
                       <span className="inline-flex items-center gap-1">Days Held {sortIcon('days_held')}</span>
                     </th>
                     <th className="text-left px-6 py-3 font-semibold text-slate-400 cursor-pointer select-none" onClick={() => handleSort('amount')}>
-                      <span className="inline-flex items-center gap-1">Amount {sortIcon('amount')}</span>
+                      <span className="inline-flex items-center gap-1" >Net Payout {sortIcon('amount')}</span>
                     </th>
                     <th className="text-left px-6 py-3 font-semibold text-slate-400">Action</th>
                   </tr>
@@ -561,7 +561,7 @@ export default function AdminHeldPayments() {
                   <span className="text-white text-sm font-medium text-right">{confirmModal.client_name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400 text-sm">Amount</span>
+                  <span className="text-slate-400 text-sm">Net Payout</span>
                   <span className="text-emerald-400 text-sm font-bold">&pound;{Number(confirmModal.payment_amount).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
