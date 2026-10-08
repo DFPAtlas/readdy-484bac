@@ -52,7 +52,9 @@ export default function ActionRequiredPanel({ guard, unreadCount, applications, 
     }
   }
 
-  if (!bankDetails) {
+  const stripePayoutReady = guard?.stripe_details_submitted === true && guard?.stripe_payouts_enabled === true;
+
+  if (!bankDetails && !stripePayoutReady) {
     actions.push({
       id: 'bank', title: 'Add Bank Details', description: 'Set up your payout method to receive earnings from completed jobs',
       icon: 'ri-bank-line', color: 'red', link: '/guard/bank-settings', linkLabel: 'Add Details',

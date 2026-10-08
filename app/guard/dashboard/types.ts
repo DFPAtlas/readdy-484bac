@@ -24,6 +24,8 @@ export interface Guard {
   home_latitude: number | null;
   home_longitude: number | null;
   dashboard_access: boolean | null;
+  stripe_details_submitted?: boolean | null;
+  stripe_payouts_enabled?: boolean | null;
 }
 
 export interface NestedJob {
