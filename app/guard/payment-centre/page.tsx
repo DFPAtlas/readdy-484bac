@@ -28,6 +28,17 @@ export default function GuardPaymentCentrePage() {
     exportCsv,
   } = useGuardPaymentCentre();
 
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!loading && !authLoading) {
+      setLoadTimedOut(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setLoadTimedOut(true), 20000);
+    return () => window.clearTimeout(timer);
+  }, [loading, authLoading]);
+
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -130,7 +141,30 @@ export default function GuardPaymentCentrePage() {
     { key: 'statements', label: 'Statements', icon: 'ri-file-list-3-line' },
   ];
 
-  if (loading || authLoading || !allowed) {
+  if (loadTimedOut || (!authLoading && !allowed)) {
+    const sessionUnavailable = !authLoading && !allowed;
+    return (
+      <div className="min-h-screen bg-[#0B1933] flex">
+        <PortalSidebar role="guard" displayName="Guard" subtitle="Guard" initials="G" />
+        <main className="flex-1 ml-72 flex items-center justify-center p-6">
+          <div role="alert" className="text-center max-w-md">
+            <h1 className="text-xl font-semibold text-white mb-3">
+              {sessionUnavailable ? 'Guard session unavailable' : 'Payment Centre is taking too long to load'}
+            </h1>
+            <p className="text-slate-400 mb-5">
+              {sessionUnavailable
+                ? 'Sign in with your guard account to view your payments.'
+                : 'Your session or payment request did not finish. Retry to reconnect.'}
+            </p>
+            <button onClick={() => window.location.reload()} className="px-5 py-3 rounded-lg bg-teal-500 text-white mr-3">Retry</button>
+            <Link href="/guard/login" className="text-teal-400 underline">Sign in</Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-[#0B1933] flex">
         <PortalSidebar role="guard" displayName="Guard" subtitle="Guard" initials="G" />

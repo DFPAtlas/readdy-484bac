@@ -161,21 +161,37 @@ export default function GuardDashboardClient() {
 
   useEffect(() => {
     let mounted = true;
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const pendingLoads = new Set<ReturnType<typeof setTimeout>>();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
         traceLog('authEvent', { event, userId: session?.user?.id, pathname: typeof window !== 'undefined' ? window.location.pathname : '' });
         if (!session?.user) return;
+        const userId = session.user.id;
+        // Run database work after the auth callback releases the session lock.
+        const timer = setTimeout(async () => {
+          pendingLoads.delete(timer);
+          if (!mounted) return;
+          try {
         const { data: adminData } = await supabase
           .from('admin_users')
           .select('id')
-          .eq('user_id', session.user.id)
+          .eq('user_id', userId)
           .maybeSingle();
         if (!mounted) return;
         if (adminData) {
           setIsAdmin(true);
-          setGuardUserId(session.user.id);
+          setGuardUserId(userId);
         }
-        await loadDashboardData(session.user.id, !!adminData);
+        await loadDashboardData(userId, !!adminData);
+          } catch (err) {
+            if (!mounted) return;
+            console.error('Guard dashboard session load failed:', err);
+            setDataErrors(['Unable to load your dashboard. Please retry.']);
+            setDataLoadFailed(true);
+            setLoading(false);
+          }
+        }, 0);
+        pendingLoads.add(timer);
       } else if (event === 'SIGNED_OUT') {
         if (mounted) router.push('/guard/login');
       }
@@ -183,6 +199,7 @@ export default function GuardDashboardClient() {
 
     return () => {
       mounted = false;
+      pendingLoads.forEach(timer => clearTimeout(timer));
       subscription.unsubscribe();
     };
   }, []);
