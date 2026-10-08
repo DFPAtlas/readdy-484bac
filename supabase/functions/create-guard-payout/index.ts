@@ -259,7 +259,7 @@ serve(async (req: Request) => {
             'Authorization': `Bearer ${resendApiKey}`,
           },
           body: JSON.stringify({
-            from: 'QuickGuard <payments@quickguard.uk>',
+            from: 'QuickGuard <payments.quickguard@digital-footprint.uk>',
             to: [guard.email],
             subject: `Payout Receipt: \u00A3${(netPence / 100).toFixed(2)} for ${job.job_title || 'Job'}`,
             html: receiptHtml,
