@@ -19,3 +19,18 @@ test('missing and invalid dates are not guessed', () => {
   assert.equal(formatDateOnly(null), '—');
   assert.equal(formatDateOnly('2026-02-31'), '—');
 });
+
+test('financial UAT booking surfaces use timezone-safe date-only formatting', () => {
+  const sources = [
+    'app/client/post-job/StepReviewPost.tsx',
+    'app/client/post-job/DuplicateJobModal.tsx',
+    'app/guard/dashboard/RecommendedJobsPanel.tsx',
+    'app/guard/dashboard/GuardDashboardClient.tsx',
+  ].map((file) => fs.readFileSync(file, 'utf8'));
+
+  for (const source of sources) assert.match(source, /formatDateOnly/);
+  assert.doesNotMatch(sources[0], /new Date\(formData\.(?:startDate|endDate)\)/);
+  assert.doesNotMatch(sources[1], /new Date\(job\.start_date\)/);
+  assert.doesNotMatch(sources[2], /new Date\(job\.start_date\)/);
+  assert.doesNotMatch(sources[3], /new Date\(\(nextShift\.jobs as any\)\?\.start_date\)/);
+});
