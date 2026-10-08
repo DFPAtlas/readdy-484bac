@@ -36,6 +36,7 @@ test('financial UAT booking surfaces use timezone-safe date-only formatting', ()
     'app/client/jobs/[id]/select-guards/ApplicantDashboardHeader.tsx',
     'app/client/jobs/[id]/select-guards/ConfirmSelectionModal.tsx',
     'app/client/jobs/[id]/select-guards/ConfirmModal.tsx',
+    'app/client/jobs/[id]/payment/CostBreakdown.tsx',
   ].map((file) => fs.readFileSync(file, 'utf8'));
 
   for (const source of sources) assert.match(source, /formatDateOnly/);
@@ -46,6 +47,7 @@ test('financial UAT booking surfaces use timezone-safe date-only formatting', ()
   for (const source of sources.slice(4)) {
     assert.doesNotMatch(source, /new Date\(job\.(?:start_date|end_date)\)/);
   }
+  assert.doesNotMatch(sources[7], /new Date\(dateStr\)/);
 });
 
 test('job date displays cannot bypass the shared date-only formatter', () => {

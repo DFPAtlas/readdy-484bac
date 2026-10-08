@@ -1,3 +1,5 @@
+import { formatDateOnly } from '@/lib/date-only';
+
 interface CostBreakdownProps {
   guards: number;
   hours: number;
@@ -45,7 +47,7 @@ export default function CostBreakdown({
 }: CostBreakdownProps) {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "";
-    return new Date(dateStr).toLocaleDateString("en-GB", {
+    return formatDateOnly(dateStr, {
       day: "numeric",
       month: "short",
       year: "numeric",
