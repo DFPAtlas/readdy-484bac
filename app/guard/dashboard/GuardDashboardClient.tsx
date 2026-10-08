@@ -50,6 +50,7 @@ import MobileQuickActions from './MobileQuickActions';
 import QuickActionsPanel from './QuickActionsPanel';
 import PaymentFlowCard from '@/components/guard/PaymentFlowCard';
 import { sumPaidGuardPayouts } from '@/lib/payments/guardPaymentDisplay';
+import { formatDateOnly } from '@/lib/date-only';
 
 import { Guard, JobAssignment, JobApplication, AvailableJob, AvailableJobWithDistance, ClientResponse, ShiftItem } from './types';
 import { haversineDistanceMiles, formatDistance } from './distance';
@@ -871,7 +872,7 @@ export default function GuardDashboardClient() {
     const todayShifts = upcomingJobs.filter(j => (j.jobs as any)?.start_date === today).length;
     const nextShift = upcomingJobs.length > 0 ? upcomingJobs[0] : null;
     const nextShiftLabel = nextShift
-      ? new Date((nextShift.jobs as any)?.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+      ? formatDateOnly((nextShift.jobs as any)?.start_date, { day: 'numeric', month: 'short' })
       : null;
     return [
       { label: 'Available Jobs', value: availableJobs.length, icon: 'ri-briefcase-line', color: 'teal', trend: 'open now' },
@@ -1582,7 +1583,7 @@ export default function GuardDashboardClient() {
                               <p className="text-slate-400 mb-3">{job.clients?.company_name || 'Company Name Not Available'}</p>
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
                                 <div className="flex items-center gap-2"><i className="ri-map-pin-line text-slate-500"></i><span className="text-slate-300">{job.venue_city}</span></div>
-                                <div className="flex items-center gap-2"><i className="ri-calendar-line text-slate-500"></i><span className="text-slate-300">{job.start_date ? new Date(job.start_date).toLocaleDateString() : 'N/A'}</span></div>
+                                <div className="flex items-center gap-2"><i className="ri-calendar-line text-slate-500"></i><span className="text-slate-300">{job.start_date ? formatDateOnly(job.start_date) : 'N/A'}</span></div>
                                 <div className="flex items-center gap-2"><i className="ri-time-line text-slate-500"></i><span className="text-slate-300">{job.start_time} - {job.end_time}</span></div>
                                 <div className="flex items-center gap-2"><i className="ri-money-pound-circle-line text-slate-500"></i><span className="text-slate-300">£{job.hourly_rate}/hr</span></div>
                               </div>
