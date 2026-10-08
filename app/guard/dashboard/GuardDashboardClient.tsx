@@ -290,7 +290,7 @@ export default function GuardDashboardClient() {
       setGuardUserId(userId);
       const { data, error } = await supabase
         .from('guards')
-        .select('id, full_name, email, profile_image_url, location, postcode, years_experience, rating, total_reviews, total_jobs_completed, total_earnings, verification_status, profile_completed, subscription_status, accepts_direct_bookings, sia_licence_front_url, sia_expiry_date, licence_types, sia_licence_number, phone, sia_verified, is_active, dashboard_access, home_latitude, home_longitude')
+        .select('id, full_name, email, profile_image_url, location, postcode, years_experience, rating, total_reviews, total_jobs_completed, total_earnings, verification_status, profile_completed, subscription_status, accepts_direct_bookings, sia_licence_front_url, sia_expiry_date, licence_types, sia_licence_number, phone, sia_verified, is_active, dashboard_access, home_latitude, home_longitude, stripe_details_submitted, stripe_payouts_enabled')
         .eq('user_id', userId)
         .maybeSingle();
       if (error) throw error;
