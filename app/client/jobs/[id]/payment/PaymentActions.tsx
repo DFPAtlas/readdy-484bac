@@ -41,7 +41,7 @@ export default function PaymentActions({
 }: Props) {
   return (
     <div className="space-y-3">
-      {(paymentStatus === "pending_payment" || paymentStatus === "not_required") && (
+      {(paymentStatus === "pending_payment" || paymentStatus === "not_required" || paymentStatus === "checkout_open") && (
         <button
           onClick={onPayNow}
           disabled={processing || feeLoading || !feesReady || !agreedToTerms}
@@ -59,7 +59,11 @@ export default function PaymentActions({
           ) : feeLoading ? "Loading booking total…" : !feesReady ? "Booking total unavailable" : (
             <>
               <i className="ri-secure-payment-line"></i>
-              {paymentMethod === "card" ? `Pay & Confirm Booking (${totalAmount})` : "Request Invoice"}
+              {paymentMethod === "card"
+                ? paymentStatus === "checkout_open"
+                  ? `Resume Secure Checkout (${totalAmount})`
+                  : `Pay & Confirm Booking (${totalAmount})`
+                : "Request Invoice"}
             </>
           )}
         </button>

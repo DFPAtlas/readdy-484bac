@@ -13,12 +13,14 @@ interface Props {
 export default function PaymentBlockers({ paymentStatus, jobStartDate, jobStartTime, transaction }: Props) {
   const warnings: Array<{ type: "error" | "warning" | "info"; icon: string; title: string; message: string }> = [];
 
-  if (paymentStatus === "pending_payment" || paymentStatus === "failed") {
+  if (paymentStatus === "pending_payment" || paymentStatus === "checkout_open" || paymentStatus === "failed") {
     warnings.push({
       type: "error",
       icon: "ri-error-warning-line",
       title: "Guards cannot be confirmed until payment is complete",
-      message: "Your selected guards are waiting for payment confirmation. Please complete payment to proceed.",
+      message: paymentStatus === "checkout_open"
+        ? "Your Stripe checkout is open but unpaid. Resume the existing checkout to confirm your guards."
+        : "Your selected guards are waiting for payment confirmation. Please complete payment to proceed.",
     });
   }
 
@@ -36,7 +38,7 @@ export default function PaymentBlockers({ paymentStatus, jobStartDate, jobStartT
     const start = new Date(`${jobStartDate}T${jobStartTime}`);
     const now = new Date();
     const hoursUntil = Math.ceil((start.getTime() - now.getTime()) / (1000 * 60 * 60));
-    if (hoursUntil <= 24 && hoursUntil > 0 && (paymentStatus === "pending_payment" || paymentStatus === "failed")) {
+    if (hoursUntil <= 24 && hoursUntil > 0 && (paymentStatus === "pending_payment" || paymentStatus === "checkout_open" || paymentStatus === "failed")) {
       warnings.push({
         type: "warning",
         icon: "ri-time-line",

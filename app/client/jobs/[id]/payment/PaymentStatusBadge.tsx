@@ -9,6 +9,7 @@ const statusConfig: Record<string, { bg: string; text: string; border: string; i
   funded: { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/25", icon: "ri-shield-check-line", label: "Funded — Job Confirmed" },
   not_required: { bg: "bg-slate-500/10", text: "text-slate-400", border: "border-slate-500/25", icon: "ri-forbid-line", label: "Not Required" },
   pending_payment: { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/25", icon: "ri-time-line", label: "Pending Payment" },
+  checkout_open: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/25", icon: "ri-bank-card-line", label: "Checkout Ready" },
   processing: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/25", icon: "ri-loader-4-line", label: "Processing" },
   paid: { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/25", icon: "ri-check-double-line", label: "Paid" },
   failed: { bg: "bg-red-500/10", text: "text-red-400", border: "border-red-500/25", icon: "ri-close-circle-line", label: "Failed" },
