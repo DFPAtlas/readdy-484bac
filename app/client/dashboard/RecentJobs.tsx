@@ -6,6 +6,7 @@ import { nextJobAction, paymentLabel } from '@/lib/client-journey';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface RecentJob {
   id: string;
@@ -132,7 +133,7 @@ export default function RecentJobs({ jobs, loading = false }: RecentJobsProps) {
                     </span>
                     <span className="flex items-center gap-1">
                       <i className="ri-calendar-line" />
-                      {job.start_date ? new Date(job.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}
+                      {formatDateOnly(job.start_date, { day: 'numeric', month: 'short' })}
                     </span>
                     <span className="flex items-center gap-1">
                       <i className="ri-user-line" />

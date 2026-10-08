@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { hydrateGuardJobRows } from '@/lib/guard-bookings';
 import PaymentFlowIndicator from './PaymentFlowIndicator';
 import { getPaymentFlowStatus, FlowSourceData } from '@/lib/payments/paymentFlowStatus';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface Props {
   guardId: string;
@@ -228,7 +229,7 @@ export default function PaymentFlowCard({ guardId, guardUserId }: Props) {
         <div className="space-y-4">
           {jobs.map(job => {
             const flow = getPaymentFlowStatus(job.flowData);
-            const jobDate = job.startDate ? new Date(job.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }) : '';
+            const jobDate = job.startDate ? formatDateOnly(job.startDate, { day: 'numeric', month: 'short', year: '2-digit' }) : '';
             return (
               <div key={job.id} className="bg-[#0B1933] rounded-xl border border-[#1a2b4a] p-4 hover:border-teal-500/20 transition-all">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">

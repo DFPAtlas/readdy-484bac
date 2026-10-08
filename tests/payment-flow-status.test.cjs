@@ -53,6 +53,20 @@ test('zero amounts are preserved rather than replaced by another amount', () => 
   assert.equal(result.guard_paid.amount, 0);
 });
 
+test('stage labels do not claim approval or payment before those stages complete', () => {
+  const funded = flow({ jobPaymentStatus: 'funded' });
+  assert.equal(funded.client_released.label, 'Completion Not Submitted');
+  assert.equal(funded.guard_paid.label, 'Not Paid Yet');
+
+  const awaitingApproval = flow({ jobPaymentStatus: 'funded', completionRequestStatus: 'pending' });
+  assert.equal(awaitingApproval.client_released.label, 'Awaiting Client Approval');
+  assert.equal(awaitingApproval.guard_paid.label, 'Not Paid Yet');
+
+  const payoutPending = flow({ completionRequestStatus: 'approved', payoutStatus: 'pending' });
+  assert.equal(payoutPending.client_released.label, 'Client Approved');
+  assert.equal(payoutPending.guard_paid.label, 'Payout Processing');
+});
+
 function loadReturnStatus() {
   const source = fs.readFileSync('app/client/payment/success/page.tsx', 'utf8');
   const start = source.indexOf('(jobData: JobSummary | null, assignmentData: AssignmentSummary[], txnData: Transaction | null): PageStatus =>');

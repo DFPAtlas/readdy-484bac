@@ -9,18 +9,18 @@ interface Props {
 }
 
 export default function EarningsMiniPanel({ guard, assignments }: Props) {
-  const completed = assignments.filter(a => a.status === 'completed');
   const inProgress = assignments.filter(a => a.status === 'in_progress');
-  const pendingPayout = assignments.filter(a => a.payment_status === 'pending');
-  const paid = assignments.filter(a => a.payment_status === 'paid');
+  const pendingPayout = assignments.filter(a =>
+    ['pending', 'funded', 'payout_pending', 'processing'].includes(a.payment_status || '')
+  );
 
-  const completedEarnings = completed.reduce((sum, a) => sum + (a.payment_amount || 0), 0);
   const pendingEarnings = pendingPayout.reduce((sum, a) => sum + (a.payment_amount || 0), 0);
-  const paidEarnings = paid.reduce((sum, a) => sum + (a.payment_amount || 0), 0);
   const totalEarnings = Number(guard?.total_earnings || 0);
+  const paidEarnings = totalEarnings;
+  const completedCount = Number(guard?.total_jobs_completed || 0);
 
   // Build real chart data from completed assignments sorted by job date
-  const recentCompleted = [...completed]
+  const recentCompleted = assignments.filter(a => a.status === 'completed')
     .sort((a, b) => {
       const da = (a.jobs as any)?.start_date || a.assigned_at || '';
       const db = (b.jobs as any)?.start_date || b.assigned_at || '';
@@ -82,11 +82,11 @@ export default function EarningsMiniPanel({ guard, assignments }: Props) {
             <div className="w-2 h-2 rounded-full bg-teal-400"></div>
             <span className="text-[10px] text-slate-500">Completed</span>
           </div>
-          <p className="text-lg font-bold text-white">{completed.length}</p>
+          <p className="text-lg font-bold text-white">{completedCount}</p>
         </div>
       </div>
 
-      {hasEarnings ? (
+      {chartBars.length > 0 ? (
         <div className="h-16 bg-[#0B1933] rounded-xl border border-[#1a2b4a] flex items-center justify-center">
           <div className="flex items-end gap-1 px-4">
             {chartBars.map((bar, i) => (
@@ -102,11 +102,11 @@ export default function EarningsMiniPanel({ guard, assignments }: Props) {
       ) : (
         <div className="h-16 bg-[#0B1933] rounded-xl border border-[#1a2b4a] flex flex-col items-center justify-center gap-1">
           <i className="ri-bar-chart-line text-slate-600 text-lg"></i>
-          <p className="text-[10px] text-slate-500">No earnings data yet</p>
+          <p className="text-[10px] text-slate-500">{hasEarnings ? 'Payout history is available in Payment Centre' : 'No earnings data yet'}</p>
         </div>
       )}
       <p className="text-[10px] text-slate-600 text-center mt-2">
-        {hasEarnings ? 'Recent job earnings' : 'Complete shifts to start earning'}
+        {chartBars.length > 0 ? 'Recent job earnings' : hasEarnings ? 'Verified paid-out total' : 'Complete shifts to start earning'}
       </p>
     </div>
   );

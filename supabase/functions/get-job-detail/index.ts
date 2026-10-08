@@ -93,6 +93,7 @@ serve(async (req) => {
         hourly_rate,
         payment_terms,
         status,
+        is_deleted,
         views,
         created_at,
         clients (

@@ -11,13 +11,14 @@ import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
 import PaymentFlowIndicator from '@/components/guard/PaymentFlowIndicator';
 import { getPaymentFlowStatus, FlowSourceData } from '@/lib/payments/paymentFlowStatus';
 import MessageClientModal from '@/app/guard/components/MessageClientModal';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface JobDetail {
   id: string;
   client_id: string;
   job_title: string;
-  job_description: string;
-  security_type: string;
+  job_description: string | null;
+  security_type: string | null;
   number_of_guards: number;
   start_date: string;
   end_date: string | null;
@@ -421,7 +422,7 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
                 <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <i className="ri-file-text-line text-teal-400"></i>Job Description
                 </h2>
-                <p className="text-slate-300 leading-relaxed whitespace-pre-line">{job.job_description}</p>
+                <p className="text-slate-300 leading-relaxed whitespace-pre-line">{job.job_description || 'No job description was supplied.'}</p>
               </div>
 
               {flowData && (
@@ -514,7 +515,7 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm border-b border-[#1e2d4d] pb-3">
                     <span className="text-slate-400">Security Type</span>
-                    <span className="text-white font-medium">{job.security_type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
+                    <span className="text-white font-medium">{(job.security_type || 'Security').split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
                   </div>
                   <div className="flex justify-between text-sm border-b border-[#1e2d4d] pb-3">
                     <span className="text-slate-400">Guards Needed</span>
@@ -522,7 +523,7 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
                   </div>
                   <div className="flex justify-between text-sm border-b border-[#1e2d4d] pb-3">
                     <span className="text-slate-400">Date</span>
-                    <span className="text-white font-medium">{new Date(job.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                    <span className="text-white font-medium">{formatDateOnly(job.start_date)}</span>
                   </div>
                   <div className="flex justify-between text-sm border-b border-[#1e2d4d] pb-3">
                     <span className="text-slate-400">Shift</span>

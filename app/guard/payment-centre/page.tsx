@@ -123,6 +123,11 @@ export default function GuardPaymentCentrePage() {
       initiated: 'bg-blue-500/10 text-blue-400 border-blue-500/25',
       held: 'bg-red-500/10 text-red-400 border-red-500/25',
       failed: 'bg-red-500/10 text-red-400 border-red-500/25',
+      funded: 'bg-blue-500/10 text-blue-400 border-blue-500/25',
+      payout_pending: 'bg-amber-500/10 text-amber-400 border-amber-500/25',
+      awaiting_approval: 'bg-amber-500/10 text-amber-400 border-amber-500/25',
+      refunded: 'bg-slate-500/10 text-slate-400 border-slate-500/25',
+      cancelled: 'bg-slate-500/10 text-slate-400 border-slate-500/25',
     };
     return map[status] || 'bg-slate-500/10 text-slate-400 border-slate-500/25';
   };

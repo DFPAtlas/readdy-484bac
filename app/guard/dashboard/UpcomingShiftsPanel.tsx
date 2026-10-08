@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ShiftItem } from './types';
 import FundedBadge from './FundedBadge';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface Props {
   shifts: ShiftItem[];
@@ -79,7 +80,7 @@ export default function UpcomingShiftsPanel({ shifts, onConfirm, onCheckIn, onCh
                   </div>
                   <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
                     <span className="flex items-center gap-1"><i className="ri-map-pin-line text-slate-600"></i>{shift.location}</span>
-                    <span className="flex items-center gap-1"><i className="ri-calendar-line text-slate-600"></i>{shift.start_date ? new Date(shift.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'N/A'}</span>
+                    <span className="flex items-center gap-1"><i className="ri-calendar-line text-slate-600"></i>{shift.start_date ? formatDateOnly(shift.start_date, { day: 'numeric', month: 'short' }) : 'N/A'}</span>
                     <span className="flex items-center gap-1"><i className="ri-time-line text-slate-600"></i>{shift.start_time}</span>
                   </div>
                   {shift.client_name && (
