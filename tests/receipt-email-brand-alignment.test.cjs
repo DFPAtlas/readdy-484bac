@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const payout = fs.readFileSync('supabase/functions/create-guard-payout/index.ts', 'utf8');
-const migration = fs.readFileSync('supabase/migrations/20261009143011_refresh_receipt_email_branding.sql', 'utf8');
+const migration = fs.readFileSync('supabase/migrations/20261009144928_refresh_receipt_email_branding.sql', 'utf8');
 
 test('guard and client receipts use the QuickGuard navy and teal brand', () => {
   for (const source of [payout, migration]) {
