@@ -264,7 +264,7 @@ serve(async (req: Request) => {
             'Authorization': `Bearer ${resendApiKey}`,
           },
           body: JSON.stringify({
-            from: 'QuickGuard <payments.quickguard@digital-footprint.uk>',
+            from: 'QuickGuard Payments <payments@quickguard.uk>',
             to: [guard.email],
             subject: `Payout Receipt: \u00A3${(netPence / 100).toFixed(2)} for ${job.job_title || 'Job'}`,
             html: receiptHtml,
@@ -296,7 +296,7 @@ serve(async (req: Request) => {
       guard_id: guard.id,
       details: {
         error: emailFailureReason,
-        sender: 'QuickGuard <payments.quickguard@digital-footprint.uk>',
+        sender: 'QuickGuard Payments <payments@quickguard.uk>',
         recipient: guard.email,
         provider: 'resend',
         provider_message_id: providerMessageId,
