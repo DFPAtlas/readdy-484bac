@@ -257,6 +257,16 @@ serve(async (req: Request) => {
           payoutDate: now,
         });
 
+        const receiptText = buildPayoutReceiptText({
+          guardName: guard.full_name || 'Guard',
+          jobTitle: job.job_title || 'Job',
+          grossAmount: grossPence / 100,
+          feeAmount: feePence / 100,
+          netAmount: netPence / 100,
+          transferId: transfer.id,
+          payoutDate: now,
+        });
+
         const resendRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
@@ -268,6 +278,7 @@ serve(async (req: Request) => {
             to: [guard.email],
             subject: `Payout Receipt: \u00A3${(netPence / 100).toFixed(2)} for ${job.job_title || 'Job'}`,
             html: receiptHtml,
+            text: receiptText,
           }),
         });
 
@@ -993,6 +1004,52 @@ async function logAudit(
   if (error) throw new Error('Transfer submitted; audit reconciliation required');
 }
 
+function escapeReceiptHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character] || character);
+}
+
+function buildPayoutReceiptText(params: {
+  guardName: string;
+  jobTitle: string;
+  grossAmount: number;
+  feeAmount: number;
+  netAmount: number;
+  transferId: string;
+  payoutDate: string;
+}): string {
+  const dateTime = new Date(params.payoutDate).toLocaleString('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+  const feePercent = params.grossAmount > 0
+    ? Math.round((params.feeAmount / params.grossAmount) * 100)
+    : 0;
+
+  return [
+    'QuickGuard payout receipt',
+    '',
+    `Hi ${params.guardName},`,
+    `Your payout for ${params.jobTitle} has been submitted to your connected Stripe account.`,
+    '',
+    `Gross amount: £${params.grossAmount.toFixed(2)}`,
+    `QuickGuard service fee (${feePercent}%): £${params.feeAmount.toFixed(2)}`,
+    `Net payout: £${params.netAmount.toFixed(2)}`,
+    `Transfer ID: ${params.transferId}`,
+    `Submitted: ${dateTime}`,
+    '',
+    'Funds typically arrive in your bank account within 1–3 business days, depending on your bank.',
+    'View your earnings: https://quickguard.uk/guard/dashboard#earnings',
+    'Support: support@quickguard.uk',
+    '',
+    'QuickGuard is operated by Digital Footprint.',
+  ].join('\n');
+}
+
 function buildPayoutReceiptHtml(params: {
   guardName: string;
   jobTitle: string;
@@ -1011,8 +1068,11 @@ function buildPayoutReceiptHtml(params: {
   const feePercent = params.grossAmount > 0
     ? Math.round((params.feeAmount / params.grossAmount) * 100)
     : 0;
+  const guardName = escapeReceiptHtml(params.guardName);
+  const jobTitle = escapeReceiptHtml(params.jobTitle);
+  const transferId = escapeReceiptHtml(params.transferId);
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Payout Receipt</title></head><body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background-color:#f3f4f6;"><table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:40px 20px;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.1);"><tr><td style="background:linear-gradient(135deg,#10B981 0%,#059669 100%);padding:40px 30px;text-align:center;"><h1 style="margin:0;color:#fff;font-size:28px;font-weight:bold;">QuickGuard</h1><p style="margin:10px 0 0;color:#D1FAE5;font-size:16px;">Payout Receipt</p></td></tr><tr><td style="padding:40px 30px;"><div style="background:linear-gradient(135deg,#ECFDF5 0%,#D1FAE5 100%);border:2px solid #10B981;border-radius:10px;padding:30px;text-align:center;margin-bottom:30px;"><p style="margin:0;color:#047857;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Net Payout</p><p style="margin:10px 0 0;color:#065F46;font-size:42px;font-weight:bold;">\u00A3${params.netAmount.toFixed(2)}</p></div><p style="margin:0 0 20px;color:#374151;font-size:16px;line-height:1.6;">Hi <strong>${params.guardName}</strong>,</p><p style="margin:0 0 30px;color:#374151;font-size:16px;line-height:1.6;">Your payment for <strong>${params.jobTitle}</strong> has been transferred to your connected account.</p><table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:30px;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden;"><tr><td style="padding:14px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;"><strong style="color:#374151;">Job Title</strong></td><td style="padding:14px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;text-align:right;color:#6B7280;">${params.jobTitle}</td></tr><tr><td style="padding:14px;border-bottom:1px solid #E5E7EB;"><strong style="color:#374151;">Gross Amount</strong></td><td style="padding:14px;border-bottom:1px solid #E5E7EB;text-align:right;color:#6B7280;">\u00A3${params.grossAmount.toFixed(2)}</td></tr><tr><td style="padding:14px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;"><strong style="color:#374151;">Platform Fee (${feePercent}%)</strong></td><td style="padding:14px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;text-align:right;color:#6B7280;">\u00A3${params.feeAmount.toFixed(2)}</td></tr><tr><td style="padding:16px;background:#F0FDF4;"><strong style="color:#065F46;font-size:18px;">Net Payout</strong></td><td style="padding:16px;background:#F0FDF4;text-align:right;"><strong style="color:#10B981;font-size:22px;">\u00A3${params.netAmount.toFixed(2)}</strong></td></tr><tr><td style="padding:14px;border-bottom:1px solid #E5E7EB;"><strong style="color:#374151;">Transfer ID</strong></td><td style="padding:14px;border-bottom:1px solid #E5E7EB;text-align:right;color:#6B7280;font-family:monospace;font-size:12px;">${params.transferId}</td></tr><tr><td style="padding:14px;background:#F9FAFB;"><strong style="color:#374151;">Date &amp; Time</strong></td><td style="padding:14px;background:#F9FAFB;text-align:right;color:#6B7280;">${dateStr} at ${timeStr}</td></tr></table><div style="background:#DBEAFE;border-left:4px solid #2563EB;padding:16px;margin-bottom:30px;border-radius:4px;"><p style="margin:0;color:#1E40AF;font-size:14px;line-height:1.6;"><strong>Payment Timing:</strong> Funds typically arrive in your bank account within 1-3 business days depending on your bank.</p></div><p style="margin:30px 0 0;color:#6B7280;font-size:14px;text-align:center;">Questions? Contact us at <a href="mailto:support@quickguard.uk" style="color:#1a237e;">support@quickguard.uk</a></p></td></tr><tr><td style="background:#111827;padding:20px 30px;text-align:center;"><p style="margin:0;color:#9CA3AF;font-size:12px;">&copy; ${new Date().getFullYear()} QuickGuard. All rights reserved. This is an automated receipt.</p></td></tr></table></td></tr></table></body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QuickGuard payout receipt</title></head><body style="margin:0;padding:0;background:#081426;font-family:Arial,Helvetica,sans-serif;color:#D7E1EF"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">Your QuickGuard payout of £${params.netAmount.toFixed(2)} has been submitted.</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#081426" style="width:100%;background:#081426"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#111D35;border:1px solid #1E2D4D;border-radius:12px"><tr><td align="center" bgcolor="#0B1933" style="padding:24px 28px;border-bottom:4px solid #14B8A6"><img src="https://public.readdy.ai/ai/img_res/c10b9a7b-68d7-4ace-860f-4fe6cdb37c9d.png" alt="QuickGuard.uk" width="190" border="0" style="display:block;width:190px;max-width:100%;height:auto;border:0"></td></tr><tr><td style="padding:32px 28px 12px"><p style="margin:0 0 8px;color:#5EEAD4;font-size:13px;font-weight:bold;letter-spacing:1px;text-transform:uppercase">Payout receipt</p><h1 style="margin:0;color:#FFFFFF;font-size:28px;line-height:1.25">Your payout has been submitted</h1></td></tr><tr><td style="padding:16px 28px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0B1933" style="width:100%;background:#0B1933;border:1px solid #14B8A6;border-radius:10px"><tr><td align="center" style="padding:26px 20px"><p style="margin:0 0 8px;color:#94A3B8;font-size:13px;font-weight:bold;letter-spacing:1px;text-transform:uppercase">Net payout</p><p style="margin:0;color:#5EEAD4;font-size:40px;line-height:1.1;font-weight:bold">&pound;${params.netAmount.toFixed(2)}</p><p style="margin:12px 0 0;color:#CCFBF1;font-size:14px">Submitted to your connected Stripe account</p></td></tr></table><p style="margin:28px 0 12px;color:#D7E1EF;font-size:16px;line-height:1.65">Hi <strong style="color:#FFFFFF">${guardName}</strong>,</p><p style="margin:0 0 24px;color:#D7E1EF;font-size:16px;line-height:1.65">Your payout for <strong style="color:#FFFFFF">${jobTitle}</strong> has been submitted. Here is the complete breakdown for your records.</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border:1px solid #30425B;border-radius:8px"><tr><td style="padding:14px 16px;background:#162036;border-bottom:1px solid #30425B;color:#94A3B8;font-size:14px">Job</td><td align="right" style="padding:14px 16px;background:#162036;border-bottom:1px solid #30425B;color:#FFFFFF;font-size:14px">${jobTitle}</td></tr><tr><td style="padding:14px 16px;background:#111D35;border-bottom:1px solid #30425B;color:#94A3B8;font-size:14px">Gross amount</td><td align="right" style="padding:14px 16px;background:#111D35;border-bottom:1px solid #30425B;color:#D7E1EF;font-size:14px">&pound;${params.grossAmount.toFixed(2)}</td></tr><tr><td style="padding:14px 16px;background:#162036;border-bottom:1px solid #30425B;color:#94A3B8;font-size:14px">QuickGuard service fee (${feePercent}%)</td><td align="right" style="padding:14px 16px;background:#162036;border-bottom:1px solid #30425B;color:#D7E1EF;font-size:14px">&minus;&nbsp;&pound;${params.feeAmount.toFixed(2)}</td></tr><tr><td style="padding:16px;background:#0F3D3A;border-bottom:1px solid #30425B;color:#CCFBF1;font-size:16px;font-weight:bold">Net payout</td><td align="right" style="padding:16px;background:#0F3D3A;border-bottom:1px solid #30425B;color:#5EEAD4;font-size:20px;font-weight:bold">&pound;${params.netAmount.toFixed(2)}</td></tr><tr><td style="padding:14px 16px;background:#111D35;border-bottom:1px solid #30425B;color:#94A3B8;font-size:14px">Transfer ID</td><td align="right" style="padding:14px 16px;background:#111D35;border-bottom:1px solid #30425B;color:#D7E1EF;font-family:Consolas,Monaco,monospace;font-size:12px;word-break:break-all">${transferId}</td></tr><tr><td style="padding:14px 16px;background:#162036;color:#94A3B8;font-size:14px">Submitted</td><td align="right" style="padding:14px 16px;background:#162036;color:#D7E1EF;font-size:14px">${dateStr} at ${timeStr}</td></tr></table><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#132B46" style="width:100%;margin:24px 0;background:#132B46;border-left:4px solid #14B8A6"><tr><td style="padding:16px;color:#BFDBFE;font-size:14px;line-height:1.6"><strong style="color:#FFFFFF">When will it arrive?</strong><br>Funds typically reach your bank within 1&ndash;3 business days, depending on your bank.</td></tr></table><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td align="center" bgcolor="#14B8A6" style="border-radius:7px"><a href="https://quickguard.uk/guard/dashboard#earnings" style="display:inline-block;padding:14px 24px;color:#071525;font-size:16px;font-weight:bold;text-decoration:none">View your earnings</a></td></tr></table><p style="margin:26px 0 0;color:#94A3B8;font-size:13px;line-height:1.6;text-align:center">Questions? Email <a href="mailto:support@quickguard.uk" style="color:#5EEAD4;text-decoration:underline">support@quickguard.uk</a></p></td></tr><tr><td bgcolor="#0B1933" style="padding:22px 28px;border-top:1px solid #30425B;text-align:center"><p style="margin:0;color:#B9C8DB;font-size:13px;line-height:1.6">The UK&rsquo;s security staffing marketplace<br><a href="https://quickguard.uk" style="color:#5EEAD4;text-decoration:underline">quickguard.uk</a></p><p style="margin:10px 0 0;color:#64748B;font-size:12px;line-height:1.5">&copy; ${new Date().getFullYear()} QuickGuard. Operated by <a href="https://digital-footprint.uk" style="color:#94A3B8;text-decoration:underline">Digital Footprint</a>.</p></td></tr></table></td></tr></table></body></html>`;
 }
 
 async function validateAvailableFunds(stripe: Stripe, db: ReturnType<typeof createClient>, jobId: string, clientId: string, payoutPence: number, assignmentId: string): Promise<string> {
