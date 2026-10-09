@@ -38,3 +38,14 @@ test('client receipt migration refuses to overwrite an unexpected template', () 
   assert.match(migration, /md5\(body_html\) = '6f01c71767e1db5f2696031debc052df'/);
   assert.match(migration, /changed <> 1/);
 });
+
+test('committed receipt previews contain resolved sample data', () => {
+  for (const path of [
+    'docs/email-preview/payment_receipt.html',
+    'docs/email-preview/payout_receipt.html',
+  ]) {
+    const preview = fs.readFileSync(path, 'utf8');
+    assert.doesNotMatch(preview, /\$\{/);
+    assert.doesNotMatch(preview, /{{[^}]+}}/);
+  }
+});
