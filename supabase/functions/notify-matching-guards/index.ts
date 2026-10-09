@@ -87,8 +87,14 @@ serve(async (req) => {
       );
     }
 
-    const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
-    const adminApp = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
+    // All QuickGuard operational tables and queue RPCs live in the canonical
+    // app schema. Reading through public compatibility views can hide newly
+    // added columns and caused freshly-created jobs to return a false 404.
+    const adminSupabase = createClient(supabaseUrl, supabaseServiceKey, {
+      db: { schema: 'app' },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const adminApp = adminSupabase;
 
     // Trusted server-to-server callers (create-job, admin retry, email worker)
     // authenticate by presenting the REAL service-role key. This is a direct
