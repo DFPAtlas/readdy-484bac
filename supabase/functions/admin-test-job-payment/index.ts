@@ -156,7 +156,6 @@ serve(async (req) => {
 
         const sessionPayload: any = {
           mode: 'payment',
-          payment_method_types: ['card'],
           line_items: [{
             price_data: {
               currency: 'gbp',

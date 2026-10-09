@@ -333,10 +333,10 @@ Deno.serve(async (req: Request) => {
     if (!stripeKey) {
       checks.push(auto("stripe_mode", "critical", "Stripe payment in production mode", "fail",
         "STRIPE_SECRET_KEY secret is missing."));
-    } else if (stripeKey.startsWith("sk_live_")) {
+    } else if (/^(?:sk|rk)_live_/.test(stripeKey)) {
       checks.push(auto("stripe_mode", "critical", "Stripe payment in production mode", "pass",
         "Stripe is configured in live (production) mode."));
-    } else if (stripeKey.startsWith("sk_test_")) {
+    } else if (/^(?:sk|rk)_test_/.test(stripeKey)) {
       checks.push(auto("stripe_mode", "critical", "Stripe payment in production mode", "warning",
         "Stripe is in test mode. Switch to a live key before public launch."));
     } else {

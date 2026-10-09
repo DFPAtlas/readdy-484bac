@@ -1,93 +1,160 @@
-# QuickGuard — Stripe Live-Mode Cutover Checklist
+# QuickGuard — Stripe live cutover runbook
 
-**Status:** Stripe is currently in **Test mode** (`sk_test_...`).
+**Current state:** QuickGuard is connected to a Stripe sandbox/test account. Test-mode objects and IDs cannot be used in live mode.
 
-This checklist is the precise, ordered procedure for switching to **Live mode** (`sk_live_...`) before accepting real payments. Follow every step in order. Do not skip the backup steps.
+**Change risk:** High. Use a planned maintenance window, one named operator, one verifier, and a written timestamped change log. Do not accept a real payment until every pre-cutover item passes.
 
-**Risk level:** High. Wrong keys = broken payments. A test key left in production = real charges landing in a sandbox. A live key in test = real charges during "testing".
+## 1. Secrets and mode map
 
----
-
-## 0. Glossary — the two secret types (do not confuse them)
-
-| Secret | Prefix | What it is | Where it goes |
+| QuickGuard location | Value in sandbox | Value at live cutover | Purpose |
 |---|---|---|---|
-| Secret key | `sk_live_...` (or `sk_test_...`) | Your Stripe API key — used to create charges, checkout sessions, etc. | `STRIPE_SECRET_KEY` in Supabase Edge Function secrets |
-| Webhook signing secret | `whsec_...` | Verifies incoming webhook events are genuinely from Stripe | `STRIPE_WEBHOOK_SECRET` in Supabase Edge Function secrets |
+| Supabase Edge Function secret `STRIPE_SECRET_KEY` | `rk_test_...` or `sk_test_...` | Prefer least-privilege `rk_live_...`; use `sk_live_...` only if the restricted key has not passed testing | Server-side Stripe API access |
+| Supabase Edge Function secret `STRIPE_WEBHOOK_SECRET` | Test endpoint `whsec_...` | Live **platform** endpoint `whsec_...` | Verifies events delivered to `enhanced-stripe-webhook` |
+| `app.bank_payout_webhook_keys` | Active test signing-secret row with `livemode=false` | Active live **connected-account** signing-secret row with `livemode=true` | Verifies bank-payout events delivered to `stripe-bank-payout-webhook` |
 
-**Critical:** `sk_live_...` and `whsec_...` are completely different secrets and serve completely different purposes. Never swap them. Test-mode and live-mode each have their own pair — the live `whsec_...` is generated separately from the live `sk_live_...`, and must match the live webhook endpoint.
+QuickGuard does not currently use a Stripe publishable key in the browser. Do not add one for this cutover.
 
----
+Never put an `sk_`, `rk_`, or `whsec_` value in source control, tickets, chat, screenshots, logs, or SQL checked into the repository. Keep recoverable copies in the approved password manager/secrets vault. Supabase may show only secret names after values are stored.
 
-## 1. Pre-Cutover Checklist
+## 2. Pre-cutover — complete in test mode
 
-Complete all of these in **Test mode** before touching any live keys.
+- [ ] Confirm the Stripe live account is activated and business details, public business information, branding, support contact, statement descriptor, settlement bank account, tax settings, fraud controls, team access, and strong 2FA are reviewed.
+- [ ] Confirm Stripe Connect is enabled for the platform and the live Express-account configuration is ready.
+- [ ] Complete the full sandbox flow: client signup → job → Checkout → webhook → funded job → completion approval → transfer → connected-account bank payout.
+- [ ] Complete subscription create, renewal, failed-payment, cancellation, refund, and dispute tests.
+- [ ] Verify the webhook event log has no unexplained failures or retry backlog.
+- [ ] Test a least-privilege `rk_test_...` key first. Review Stripe Workbench request logs, grant only required permissions, and resolve every 403 before creating the equivalent live restricted key.
+- [ ] Record the current sandbox Stripe account ID, endpoint IDs, test product/price IDs, and the affected QuickGuard record IDs.
+- [ ] Export a database backup and a separate mapping export for all Stripe-linked columns, including customer, subscription, product, price, connected-account, Checkout Session, PaymentIntent, transfer, and payout IDs.
+- [ ] Confirm the current test secret values are recoverable from the approved secrets vault. If they are not, rotate them and test the replacements before cutover.
+- [ ] Confirm a rollback operator can restore the **mapping export** without overwriting new business data.
+- [ ] Put QuickGuard into maintenance/payment freeze. Block new Checkout Sessions, subscription changes, Connect onboarding, transfers, and payout actions during the switch.
 
-- [ ] **1.1** Guard signup → earnings flow works end-to-end (guard registers, gets approved, is paid out — test payout lands in test Stripe).
-- [ ] **1.2** Client signup → post job → payment flow works (client registers, posts a job, pays via Stripe Checkout test card).
-- [ ] **1.3** Subscription creation works (client subscribes to a plan, test card charged).
-- [ ] **1.4** Subscription renewal / recurring charge works (invoice.payment_succeeded fires, subscription stays active).
-- [ ] **1.5** Webhook events are received and processed (check `processed_stripe_events` / `payment_events` tables show no backlog of failures).
-- [ ] **1.6** `sync-stripe-prices` run in test mode successfully populated `app.plans` and `public.plans` with test price IDs.
-- [ ] **1.7** **Backup the Supabase database.** Supabase Dashboard → Database → Backups → Create backup (or `pg_dump`). Note the timestamp.
-- [ ] **1.8** **Export current test edge function secrets.** Go to Supabase Dashboard → Edge Functions → Manage Secrets, and copy out (to a password manager, not the repo) the current `sk_test_...`, `whsec_...`, and every other secret value so you can roll back.
+## 3. Live objects must be created or re-onboarded
 
----
+Stripe objects are mode-specific. Never copy a sandbox object ID into live configuration.
 
-## 2. Cutover Steps (in order)
+- [ ] Clear or replace sandbox `stripe_customer_id` values so live Customers are created in the live account.
+- [ ] Archive/reconcile sandbox subscription records and clear sandbox `stripe_subscription_id` references. Customers must start a new live subscription; test subscriptions do not become live subscriptions.
+- [ ] Run QuickGuard's Stripe plan sync in live mode. Verify all six paid plans have a live Product plus monthly and annual live Price IDs in every plan table used by the app.
+- [ ] Clear sandbox guard `stripe_account_id` references and require each payout-enabled guard to complete Stripe-hosted onboarding for a new live connected account. A test connected account cannot receive live transfers.
+- [ ] Keep the exported sandbox mappings; do not delete the evidence needed for reconciliation or rollback.
 
-1. Log into **Stripe Dashboard**.
-2. In the top-right corner, toggle from **Test mode** to **Live mode**.
-3. Copy your **live secret key** — it starts with `sk_live_...` (Developers → API keys).
-4. Go to **Stripe Dashboard → Developers → Webhooks** (still in Live mode).
-5. Click **Add endpoint** and create a new webhook for:
-   ```
-   https://vnywjfpkepjgclkbcmsj.supabase.co/functions/v1/enhanced-stripe-webhook
-   ```
-   (Replace the host with your actual Supabase project URL if it differs.)
-6. Select these events:
-   - `checkout.session.completed`
-   - `customer.subscription.created`
-   - `customer.subscription.updated`
-   - `customer.subscription.deleted`
-   - `invoice.payment_succeeded`
-   - `invoice.payment_failed`
-7. Click **Add endpoint**, then copy the **Signing Secret** — it starts with `whsec_...` (NOT `sk_`).
-8. In **Supabase Dashboard → Edge Functions → Manage Secrets**, update:
-   - `STRIPE_SECRET_KEY` → the `sk_live_...` key from step 3
-   - `STRIPE_WEBHOOK_SECRET` → the `whsec_...` signing secret from step 7
-9. Run the **Stripe price sync** to pull live price IDs into the plans table: go to `/admin/stripe-sync` and click **Run Sync** (this writes `stripe_price_id`, `stripe_product_id`, `stripe_annual_price_id` into `app.plans` and `public.plans`).
-10. **Verify** the live price IDs were written (spot-check `app.plans` / `public.plans` in the SQL editor — IDs should now start with `price_` from your live account, not your test account).
-11. Test one full payment flow using Stripe's **test card** `4242 4242 4242 4242`, any future expiry, any CVC/ZIP. This validates the live pipeline end-to-end without moving real money.
-12. Test one **subscription** flow (client subscribes → card charged on the schedule).
-13. Do one real, low-value transaction (e.g. £1) to confirm real money settles correctly.
+## 4. Create the two live webhook destinations
 
----
+### 4.1 Platform endpoint
 
-## 3. Verification
+Create a live webhook destination for:
 
-- [ ] **Stripe Dashboard → Payments**: the test transactions appear under the **Live** view (NOT under "Test Data" / test-mode toggle).
-- [ ] **Supabase `transactions` / `payment_events` tables**: real transaction rows are logged.
-- [ ] **Guard earnings** reflect the real payment (guard dashboard shows correct earnings from the live transaction).
-- [ ] **Subscription** shows as active with a real (live) price ID.
+```text
+https://vnywjfpkepjgclkbcmsj.supabase.co/functions/v1/enhanced-stripe-webhook
+```
 
----
+Subscribe to exactly the events the deployed handler processes:
 
-## 4. Rollback (if needed)
+- `account.updated`
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+- `checkout.session.async_payment_failed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.payment_succeeded`
+- `invoice.payment_failed`
+- `payment_intent.payment_failed`
+- `transfer.created`
+- `transfer.updated`
+- `transfer.reversed`
+- `charge.refunded`
+- `charge.dispute.created`
+- `charge.dispute.updated`
+- `charge.dispute.closed`
 
-If anything breaks after cutover:
+Reveal that endpoint's live signing secret once and store it as Supabase secret `STRIPE_WEBHOOK_SECRET`.
 
-1. **Revert secrets.** In Supabase Dashboard → Edge Functions → Manage Secrets, set:
-   - `STRIPE_SECRET_KEY` → back to the `sk_test_...` value saved in step 1.8
-   - `STRIPE_WEBHOOK_SECRET` → back to the test `whsec_...` value
-2. **Remove the live webhook.** Stripe Dashboard → Developers → Webhooks → delete the live endpoint created in step 5.
-3. **Restore the database backup** from step 1.7 if critical data was corrupted.
-4. Re-run `/admin/stripe-sync` to restore test price IDs, then re-verify test-mode flows.
+### 4.2 Connected-account bank-payout endpoint
 
----
+Create a separate **Connect / events on connected accounts** live destination for:
 
-## 5. Post-Cutover Reminders
+```text
+https://vnywjfpkepjgclkbcmsj.supabase.co/functions/v1/stripe-bank-payout-webhook
+```
 
-- Keep the test `sk_test_...` and `whsec_...` values in a password manager for future staging/testing — do not delete them.
-- Never mix modes: a single webhook endpoint is either test or live. Keep them separate.
-- Rotate `sk_live_...` only via Stripe Dashboard (roll keys), then immediately update `STRIPE_SECRET_KEY`.
+Subscribe to:
+
+- `payout.created`
+- `payout.updated`
+- `payout.paid`
+- `payout.failed`
+- `payout.canceled`
+
+Add its signing secret to `app.bank_payout_webhook_keys` using the approved secure admin procedure with the live endpoint ID, `livemode=true`, and `active=true`. Do not reuse the platform endpoint secret. Keep the test row available for rollback until live verification is complete.
+
+## 5. Ordered cutover
+
+1. Record the start time and confirm the maintenance/payment freeze.
+2. Take the final database backup and Stripe-ID mapping export.
+3. In Stripe live mode, create the products/prices, platform webhook destination, connected-account webhook destination, and least-privilege live restricted key.
+4. Store the live `STRIPE_WEBHOOK_SECRET`.
+5. Store the live `STRIPE_SECRET_KEY`.
+6. Add and activate the live `app.bank_payout_webhook_keys` row; do not deactivate the test row yet.
+7. Reset sandbox customer, subscription, connected-account, product, and price mappings according to section 3.
+8. Run the live plan sync and verify all live IDs in both QuickGuard plan tables.
+9. Deploy/restart Edge Functions if required for refreshed secrets, then run launch readiness. `stripe_mode` must pass.
+10. Use Stripe Dashboard's webhook test delivery for every subscribed event family and verify successful signature checks and idempotent processing.
+11. Complete live Stripe-hosted onboarding for one real guard and verify `account.updated` reaches QuickGuard.
+12. Make one genuine low-value live job payment with a real payment method. **Do not use Stripe test card numbers in live mode.**
+13. Verify the job remains unfulfilled while an asynchronous payment is unpaid, then confirms only after `checkout.session.async_payment_succeeded`. Verify the failure path with a test-mode simulation before cutover; never deliberately fail a real card.
+14. Verify the live Payment, Checkout Session, Customer, QuickGuard transaction, funded job, assignments, client notification, guard notification, and confirmation emails all agree.
+15. Complete and approve the job, create the live transfer to the onboarded guard, and verify transfer events.
+16. Verify the connected account's real bank payout and each `payout.*` event through the separate connected-account endpoint.
+17. Create one genuine low-value live subscription and verify its live Customer, Subscription, Price, invoice, webhook processing, and access level.
+18. Have the second operator reconcile amounts, fees, currency, IDs, and timestamps.
+19. Remove the maintenance/payment freeze only after all critical checks pass.
+20. After the observation window, deactivate obsolete test webhook-key rows in production configuration. Keep sandbox credentials only in the secrets vault for isolated future testing.
+
+## 6. Go/no-go checks
+
+Do not open payments unless all are true:
+
+- [ ] `STRIPE_SECRET_KEY` is a live server-side key and launch readiness reports live mode.
+- [ ] The platform endpoint and connected-account endpoint are both live, enabled, and returning 2xx.
+- [ ] Their two signing secrets are stored in the correct locations and are not swapped.
+- [ ] Every live Product/Price ID belongs to the live account.
+- [ ] No Customer, Subscription, connected-account, Checkout, PaymentIntent, transfer, or payout record depends on a sandbox ID.
+- [ ] At least one real guard has completed live Connect onboarding.
+- [ ] A genuine low-value payment, subscription, transfer, and payout reconcile end to end.
+- [ ] Receipt/confirmation email delivery is verified in the email provider and the recipient inbox.
+
+## 7. Safe rollback
+
+Stop new Checkout, subscription, onboarding, transfer, and payout actions first.
+
+1. Record all live Stripe objects and QuickGuard rows created since cutover.
+2. Reconcile or refund/cancel live Payments, Subscriptions, Transfers, and Payouts as appropriate in Stripe. Do not orphan real-money activity.
+3. Restore the test `STRIPE_SECRET_KEY` and test platform `STRIPE_WEBHOOK_SECRET`.
+4. Activate the test bank-payout webhook-key row and deactivate the live row.
+5. Disable the live webhook destinations; do not delete them until the incident record is complete.
+6. Restore only the exported sandbox Stripe-ID mappings and plan mappings needed to resume test mode.
+7. Re-run the test plan sync and the full sandbox smoke test.
+8. Keep live transaction/audit records intact for accounting and incident review.
+
+**Never restore a whole pre-cutover database over records created after real payments began.** A full restore can disconnect money movements from QuickGuard's ledger. Use a point-in-time restore only under an incident plan that preserves and reconciles all post-cutover live activity.
+
+## 8. Change-control notes
+
+- Keep Stripe SDK/API-version upgrades out of the cutover change. Test and deploy those separately.
+- Rotate/expire any temporary full-access live key after the restricted key has passed production verification.
+- Apply Stripe key IP restrictions where the hosting model supports stable egress.
+- Require passkeys or authenticator-app 2FA for Stripe Dashboard users.
+
+## Official Stripe references
+
+- [Go-live checklist](https://docs.stripe.com/get-started/checklist/go-live)
+- [API keys and restricted keys](https://docs.stripe.com/keys)
+- [API key security](https://docs.stripe.com/keys-best-practices)
+- [Webhook signatures and delivery](https://docs.stripe.com/webhooks)
+- [Connect webhooks](https://docs.stripe.com/connect/webhooks)
+- [Testing](https://docs.stripe.com/testing)
+- [Express connected accounts](https://docs.stripe.com/connect/express-accounts)
+- [Separate charges and transfers](https://docs.stripe.com/connect/separate-charges-and-transfers)

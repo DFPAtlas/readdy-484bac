@@ -201,6 +201,75 @@ async function finalizeJobPayment(appSupabase: any, supabaseUrl: string, supabas
   }
 }
 
+async function failJobPayment(appSupabase: any, supabaseUrl: string, supabaseServiceKey: string, session: Stripe.Checkout.Session) {
+  const sessionId = session.id;
+  const paymentIntent = typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : session.payment_intent?.id || null;
+  const failureReason = 'Delayed payment method failed';
+
+  const { data: transaction, error: txLookupError } = await appSupabase
+    .from('transactions')
+    .select('id, job_id, client_id, amount, retry_count')
+    .eq('stripe_session_id', sessionId)
+    .maybeSingle();
+
+  if (txLookupError || !transaction?.job_id) {
+    throw new Error(`Job payment transaction missing for failed session ${sessionId}`);
+  }
+
+  const now = new Date().toISOString();
+  const retryCount = (transaction.retry_count || 0) + 1;
+
+  await requireAudit(appSupabase.from('transactions').update({
+    status: 'failed',
+    payment_status: 'failed',
+    stripe_payment_intent: paymentIntent,
+    failure_reason: failureReason,
+    retry_count: retryCount,
+    updated_at: now,
+  }).eq('id', transaction.id));
+
+  await requireAudit(appSupabase.from('jobs').update({
+    payment_status: 'failed',
+    updated_at: now,
+  }).eq('id', transaction.job_id));
+
+  await requireAudit(appSupabase.from('job_assignments').update({
+    payment_status: 'failed',
+    updated_at: now,
+  }).eq('job_id', transaction.job_id).in('status', ['selected', 'awaiting_payment']));
+
+  if (transaction.client_id) {
+    await requireAudit(appSupabase.from('notifications').insert([{
+      user_id: transaction.client_id,
+      title: 'Payment Failed',
+      message: `Your payment of £${Number(transaction.amount || 0).toFixed(2)} failed. Please try again or contact support.`,
+      type: 'error',
+      related_id: transaction.job_id,
+      is_read: false,
+    }]));
+  }
+
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/send-failed-payment-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
+      body: JSON.stringify({
+        transaction_id: transaction.id,
+        client_id: transaction.client_id,
+        job_id: transaction.job_id,
+        failure_reason: failureReason,
+        retry_count: retryCount,
+        amount: transaction.amount,
+        stripe_payment_intent: paymentIntent,
+      }),
+    });
+  } catch (emailError: any) {
+    console.error('[EnhancedWebhook] Failed to send delayed-payment failure email:', emailError.message);
+  }
+}
+
 async function finalizeJobAfterPayout(appSupabase: any, jobId: string) {
   const now = new Date().toISOString();
   const { data: allAssignments } = await appSupabase.from('job_assignments').select('id, status, payment_status').eq('job_id', jobId);
@@ -343,8 +412,13 @@ serve(async (req) => {
         break;
       }
 
-      case 'checkout.session.completed': {
+      case 'checkout.session.completed':
+      case 'checkout.session.async_payment_succeeded': {
         const session = event.data.object as Stripe.Checkout.Session;
+        if (event.type === 'checkout.session.completed' && session.payment_status === 'unpaid') {
+          console.log(`[EnhancedWebhook] Checkout session ${session.id} completed with payment pending; waiting for async success or failure`);
+          break;
+        }
         const isJobPayment = session.metadata?.paymentType === 'job_payment';
         const isSubscription = session.metadata?.paymentType === 'subscription' || session.mode === 'subscription';
         if (isJobPayment) await finalizeJobPayment(appSupabase, supabaseUrl, supabaseKey, session);
@@ -428,6 +502,16 @@ serve(async (req) => {
             await sendAdminAlert(supabaseUrl, supabaseKey, userId, oldSub.plan_slug, planSlug, oldSub.plan_name, planName, accountType, 'webhook', false);
           }
           await appSupabase.from('notifications').insert([{ user_id: userId, title: 'Subscription Activated', message: `Your ${planName} subscription is now active. Welcome aboard!`, type: 'success', is_read: false }]);
+        }
+        break;
+      }
+
+      case 'checkout.session.async_payment_failed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.metadata?.paymentType === 'job_payment') {
+          await failJobPayment(appSupabase, supabaseUrl, supabaseKey, session);
+        } else {
+          console.log(`[EnhancedWebhook] Async Checkout payment failed for non-job session ${session.id}; subscription invoice events remain authoritative`);
         }
         break;
       }
