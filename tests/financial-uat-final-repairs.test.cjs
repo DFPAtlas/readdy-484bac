@@ -47,5 +47,5 @@ test('payout receipts record both provider acceptance and configuration failures
   assert.match(source, /payout_receipt_email_failed/);
   assert.match(source, /provider_message_id: providerMessageId/);
   assert.match(source, /RESEND_API_KEY is not configured/);
-  assert.match(source, /QuickGuard <payments\.quickguard@digital-footprint\.uk>/);
+  assert.match(source, /QuickGuard Payments <payments@quickguard\.uk>/);
 });
