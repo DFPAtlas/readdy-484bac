@@ -16,12 +16,10 @@ export default function CompletionReviewModal({ requestId, guardName, jobTitle, 
   const [disputeReason, setDisputeReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
-    setSuccessMessage(null);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
 
@@ -43,32 +41,14 @@ export default function CompletionReviewModal({ requestId, guardName, jobTitle, 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to process');
 
-      const message = data.message || (action === 'approve' ? 'Completion approved — payout pending' : 'Dispute submitted.');
-
-      setSuccessMessage(message);
-      setTimeout(() => { onSuccess(); onClose(); }, 2000);
+      onSuccess();
+      onClose();
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
     } finally {
       setLoading(false);
     }
   };
-
-  if (successMessage) {
-    return (
-      <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-        <div className="bg-[#111d35] rounded-2xl max-w-lg w-full border border-[#1e2d4d] shadow-2xl">
-          <div className="p-8 text-center">
-            <div className="w-14 h-14 bg-emerald-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
-              <i className="ri-check-line text-emerald-400 text-2xl"></i>
-            </div>
-            <h3 className="text-lg font-bold text-white mb-2">Done</h3>
-            <p className="text-sm text-slate-300">{successMessage}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">

@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { fetchWithTransientRetry } from '../_shared/fetchWithTransientRetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -407,11 +408,12 @@ serve(async (req) => {
       // honest delivery state here: 'delivered' is never set from a queue row.
       const notifyAttemptAt = new Date().toISOString();
       try {
-        const notifyRes = await fetch(`${supabaseUrl}/functions/v1/notify-matching-guards`, {
+        const notifyRes = await fetchWithTransientRetry(`${supabaseUrl}/functions/v1/notify-matching-guards`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${supabaseServiceKey}`,
+            'apikey': supabaseServiceKey,
           },
           body: JSON.stringify({ jobId }),
         });
