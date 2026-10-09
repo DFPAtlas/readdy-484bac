@@ -13,10 +13,11 @@ Deno.serve(async(req:Request)=>{
     const {data:keys,error}=await db.from('bank_payout_webhook_keys').select('signing_secret,livemode').eq('active',true);
     if(error||!keys?.length) throw new Error('Bank payout webhook configuration missing');
     const body=await req.text(); let event:any=null;
+    const keyIsLive=/^(?:sk|rk)_live_/.test(stripeKey);
     for(const key of keys){
       try {
         const verified=await stripe.webhooks.constructEventAsync(body,signature,key.signing_secret);
-        if(verified.livemode===key.livemode && verified.livemode===stripeKey.startsWith('sk_live_')) {event=verified;break;}
+        if(verified.livemode===key.livemode && verified.livemode===keyIsLive) {event=verified;break;}
       } catch { /* Try another active signing key during rotation. */ }
     }
     if(!event) return new Response('Invalid Stripe signature or environment',{status:400});
