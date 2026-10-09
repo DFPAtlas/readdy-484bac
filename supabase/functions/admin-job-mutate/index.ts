@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { fetchWithTransientRetry } from '../_shared/fetchWithTransientRetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -222,9 +223,13 @@ serve(async (req) => {
         // emails are skipped and failed ones are re-queued via the same
         // idempotency key, so nothing is ever sent twice and no second job is
         // created.
-        const notifyRes = await fetch(`${supabaseUrl}/functions/v1/notify-matching-guards`, {
+        const notifyRes = await fetchWithTransientRetry(`${supabaseUrl}/functions/v1/notify-matching-guards`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'apikey': supabaseServiceKey,
+          },
           body: JSON.stringify({ jobId }),
         });
         if (!notifyRes.ok) throw new Error(`notify-matching-guards responded ${notifyRes.status}`);

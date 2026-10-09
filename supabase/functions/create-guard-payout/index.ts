@@ -239,8 +239,13 @@ serve(async (req: Request) => {
 
     let emailSent = false;
     let emailFailureReason: string | null = null;
+    let providerMessageId: string | null = null;
 
-    if (resendApiKey && guard.email) {
+    if (!resendApiKey) {
+      emailFailureReason = 'RESEND_API_KEY is not configured';
+    } else if (!guard.email) {
+      emailFailureReason = 'Guard email is not configured';
+    } else {
       try {
         const receiptHtml = buildPayoutReceiptHtml({
           guardName: guard.full_name || 'Guard',
@@ -266,35 +271,43 @@ serve(async (req: Request) => {
           }),
         });
 
+        const resendJson = await resendRes.json().catch(() => null);
+
         if (resendRes.ok) {
           emailSent = true;
+          providerMessageId = typeof resendJson?.id === 'string' ? resendJson.id : null;
         } else {
-          const errText = await resendRes.text().catch(() => 'unknown');
           emailFailureReason = `Resend API responded with ${resendRes.status}`;
-          safeLog('receipt email http error', resendRes.status, errText.slice(0, 200));
+          safeLog('receipt email http error', resendRes.status);
         }
       } catch (e: unknown) {
         emailFailureReason = e instanceof Error ? e.message : 'Unknown email error';
         safeLog('receipt email exception', emailFailureReason);
       }
-
-      if (!emailSent) {
-        await supabase.from('payment_audit_logs').insert({
-          to_status: 'payout_processing',
-          event_type: 'payout_receipt_email_failed',
-          reference_type: 'guard_payout',
-          reference_id: payoutRecord.id,
-          details: {
-            error: emailFailureReason,
-            guard_id: guard.id,
-            assignment_id: validated.assignmentId,
-            job_id: job.id,
-            transfer_id: transfer.id,
-          },
-          created_at: now,
-        }).then(() => undefined, () => undefined);
-      }
     }
+
+    const receiptAudit = {
+      to_status: emailSent ? 'paid_out' : 'payout_processing',
+      event_type: emailSent ? 'payout_receipt_email_accepted' : 'payout_receipt_email_failed',
+      reference_type: 'guard_payout',
+      reference_id: payoutRecord.id,
+      job_id: job.id,
+      assignment_id: validated.assignmentId,
+      guard_id: guard.id,
+      details: {
+        error: emailFailureReason,
+        sender: 'QuickGuard <payments.quickguard@digital-footprint.uk>',
+        recipient: guard.email,
+        provider: 'resend',
+        provider_message_id: providerMessageId,
+        amount_pence: netPence,
+        currency: 'gbp',
+        transfer_id: transfer.id,
+      },
+      created_at: now,
+    };
+    const { error: receiptAuditError } = await supabase.from('payment_audit_logs').insert(receiptAudit);
+    if (receiptAuditError) safeLog('receipt audit write failed', receiptAuditError.message);
 
     const netDisplay = (netPence / 100).toFixed(2);
     const guardNameDisplay = guard.full_name || 'guard';
@@ -309,6 +322,7 @@ serve(async (req: Request) => {
       recovered,
       emailSent,
       emailFailureReason,
+      receiptProviderMessageId: providerMessageId,
       message,
     });
   } catch (e: unknown) {
