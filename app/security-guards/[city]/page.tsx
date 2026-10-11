@@ -514,14 +514,14 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   }
 
   return {
-    title: `Hire SIA Licensed Security Guards in ${data.city} | QuickGuard`,
+    title: `SIA Security Guards in ${data.city} | QuickGuard`,
     description: `Book verified SIA-licensed security guards in ${data.city} and ${data.region}. Event, retail, corporate, and construction security. Instant matching, same-day deployment, no upfront fees.`,
     keywords: `security guards ${data.city.toLowerCase()}, SIA licensed ${data.city.toLowerCase()}, hire security ${data.city.toLowerCase()}, event security ${data.city.toLowerCase()}, door supervisor ${data.city.toLowerCase()}, security jobs ${data.city.toLowerCase()}`,
     alternates: {
       canonical: `https://quickguard.uk/security-guards/${data.slug}`,
     },
     openGraph: {
-      title: `Hire SIA Licensed Security Guards in ${data.city} | QuickGuard`,
+      title: `SIA Security Guards in ${data.city} | QuickGuard`,
       description: `Book verified SIA-licensed security guards in ${data.city}. Event, retail, corporate, and construction security. Instant matching, same-day deployment.`,
       url: `https://quickguard.uk/security-guards/${data.slug}`,
       siteName: 'QuickGuard',
@@ -538,7 +538,7 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
     },
     twitter: {
       card: 'summary_large_image',
-      title: `Hire SIA Licensed Security Guards in ${data.city} | QuickGuard`,
+      title: `SIA Security Guards in ${data.city} | QuickGuard`,
       description: `Book verified SIA-licensed security guards in ${data.city}. Instant matching, same-day deployment.`,
       images: ['https://public.readdy.ai/ai/img_res/99cbad8f-297d-414a-946f-a43c56ace314.png'],
     },
