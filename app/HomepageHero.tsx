@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import BrandLogo from '@/components/BrandLogo';
+import HomepageLogo from '@/components/HomepageLogo';
 import HomepageIndustries from './HomepageIndustries';
 
 const HERO_IMAGE =
@@ -30,7 +30,7 @@ export default function HomepageHero() {
       />
       <div className="w-full max-w-7xl mx-auto px-6 md:px-8 relative z-10">
         <div className="flex items-center mb-6 pt-4">
-          <BrandLogo variant="full" theme="dark" imgClassName="h-16 w-auto" />
+          <HomepageLogo />
         </div>
 
         <div className="max-w-2xl">
