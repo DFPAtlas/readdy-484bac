@@ -90,7 +90,7 @@ export default function HomepageHero() {
               <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">
                 <i className="ri-shield-star-line text-teal-400 text-base" aria-hidden="true"></i>
               </div>
-              <span className="font-medium text-slate-200">SIA Approved</span>
+              <span className="font-medium text-slate-200">SIA licences checked</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">
@@ -102,13 +102,13 @@ export default function HomepageHero() {
               <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">
                 <i className="ri-building-2-line text-teal-400 text-base" aria-hidden="true"></i>
               </div>
-              <span className="font-medium text-slate-200">500+ Venues</span>
+              <span className="font-medium text-slate-200">No agency fees</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">
                 <i className="ri-star-fill text-teal-400 text-base" aria-hidden="true"></i>
               </div>
-              <span className="font-medium text-slate-200">4.9/5 Rating</span>
+              <span className="font-medium text-slate-200">No contracts</span>
             </div>
           </div>
         </div>

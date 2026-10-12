@@ -6,39 +6,27 @@ import { useEffect, useState } from 'react';
 const badges = [
   {
     icon: 'ri-shield-star-line',
-    title: 'SIA Approved Contractor',
-    description: 'All guards hold valid SIA licences, verified before joining',
+    title: 'SIA Licence Checked',
+    description: "Every guard's SIA licence is checked before they can take work through QuickGuard.",
     color: 'blue',
   },
   {
     icon: 'ri-lock-line',
-    title: 'PCI DSS Compliant',
-    description: 'Payments processed through Stripe with full PCI compliance',
+    title: 'Held Job Payments',
+    description: 'Your payment is held until the shift is confirmed complete, then released to the guard.',
     color: 'green',
+  },
+  {
+    icon: 'ri-secure-payment-line',
+    title: 'Payments by Stripe',
+    description: 'Card payments are processed by Stripe, a PCI DSS Level 1 certified provider. QuickGuard never stores your card details.',
+    color: 'purple',
   },
   {
     icon: 'ri-file-shield-2-line',
     title: 'ICO Registered',
-    description: "Fully registered with the Information Commissioner's Office",
-    color: 'purple',
-  },
-  {
-    icon: 'ri-verified-badge-line',
-    title: 'ISO 27001 Standards',
-    description: 'Information security management aligned with ISO 27001',
+    description: "Registered with the Information Commissioner's Office. Personal data handled under UK GDPR.",
     color: 'indigo',
-  },
-  {
-    icon: 'ri-user-settings-line',
-    title: 'DBS Checked Staff',
-    description: 'Enhanced DBS checks completed for all security personnel',
-    color: 'teal',
-  },
-  {
-    icon: 'ri-secure-payment-line',
-    title: 'Stripe Verified',
-    description: 'Secure payment processing with end-to-end encryption',
-    color: 'orange',
   },
 ];
 
@@ -77,11 +65,10 @@ export default function TrustBadges() {
             Trusted &amp; Certified
           </div>
           <h2 id="trust-heading" className="text-4xl font-bold text-white mb-4">
-            Industry-Leading Certifications
+            How We Keep Bookings Safe
           </h2>
           <p className="text-xl text-slate-400 max-w-3xl mx-auto">
-            QuickGuard meets the highest standards in security, data protection, and payment
-            compliance
+            The checks and protections built into every booking
           </p>
         </div>
 
@@ -120,10 +107,10 @@ export default function TrustBadges() {
             </div>
             <div>
               <p className="font-semibold text-white text-lg">
-                100% Verified Security Professionals
+                Every Guard Licence-Checked
               </p>
               <p className="text-slate-400 text-sm">
-                Every guard is SIA-licensed, DBS-checked, and identity-verified before joining
+                Guards must pass an SIA licence check before they can accept any work.
               </p>
             </div>
           </div>
@@ -138,9 +125,6 @@ export default function TrustBadges() {
                 </div>
               ))}
             </div>
-            <p className="text-sm text-slate-300 font-medium whitespace-nowrap">
-              Trusted by 500+ businesses
-            </p>
           </div>
         </div>
       </div>

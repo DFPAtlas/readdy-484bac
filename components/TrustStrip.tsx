@@ -6,7 +6,7 @@ const trustSignals = [
   { icon: 'ri-shield-check-line', label: 'All Guards SIA-Verified', sub: 'Planned: weekly AI licence checks' },
   { icon: 'ri-lock-line', label: 'Held Job Payment with Stripe', sub: 'Released only after shift completion' },
   { icon: 'ri-money-pound-circle-line', label: 'Pay Per Shift', sub: 'No contracts, pay per shift' },
-  { icon: 'ri-map-pin-2-line', label: 'UK-Wide Coverage', sub: 'Guards in every major city' },
+  { icon: 'ri-map-pin-2-line', label: 'UK-Wide Coverage', sub: 'Post a job anywhere in the UK' },
 ];
 
 export default function TrustStrip() {

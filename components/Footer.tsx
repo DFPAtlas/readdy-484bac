@@ -14,7 +14,7 @@ export default function Footer() {
               <BrandLogo variant="full" theme="dark" imgClassName="h-10 w-auto" />
             </div>
             <p className="text-slate-400 mb-6 leading-relaxed text-sm">
-              The UK's leading platform connecting SIA-licensed security professionals with businesses nationwide. Trusted, verified, with 24/7 AI support.
+              QuickGuard connects SIA-licensed security professionals with UK businesses that need cover, shift by shift.
             </p>
             <p className="text-slate-500 text-sm mb-2">© {currentYear} QuickGuard. All rights reserved.</p>
             <p className="text-slate-400 text-sm">
@@ -325,62 +325,13 @@ export default function Footer() {
               </li>
             </ul>
 
-            <div>
-              <p className="text-sm font-medium text-slate-300 mb-3">Follow Us</p>
-              <ul className="flex space-x-3 list-none m-0 p-0" aria-label="Social media links">
-                <li>
-                  <a
-                    href="https://facebook.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-[#111d35] border border-slate-700/50 rounded-lg flex items-center justify-center hover:bg-teal-500 hover:text-slate-900 hover:border-teal-500 transition-all focus:outline-none focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 focus:ring-offset-[#0B1933]"
-                    aria-label="Visit our Facebook page"
-                  >
-                    <i className="ri-facebook-fill text-xl" aria-hidden="true"></i>
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://twitter.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-[#111d35] border border-slate-700/50 rounded-lg flex items-center justify-center hover:bg-teal-500 hover:text-slate-900 hover:border-teal-500 transition-all focus:outline-none focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 focus:ring-offset-[#0B1933]"
-                    aria-label="Visit our Twitter page"
-                  >
-                    <i className="ri-twitter-fill text-xl" aria-hidden="true"></i>
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://linkedin.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-[#111d35] border border-slate-700/50 rounded-lg flex items-center justify-center hover:bg-teal-500 hover:text-slate-900 hover:border-teal-500 transition-all focus:outline-none focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 focus:ring-offset-[#0B1933]"
-                    aria-label="Visit our LinkedIn page"
-                  >
-                    <i className="ri-linkedin-fill text-xl" aria-hidden="true"></i>
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://instagram.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-[#111d35] border border-slate-700/50 rounded-lg flex items-center justify-center hover:bg-teal-500 hover:text-slate-900 hover:border-teal-500 transition-all focus:outline-none focus:ring-2 focus:ring-teal-400 focus:ring-offset-2 focus:ring-offset-[#0B1933]"
-                    aria-label="Visit our Instagram page"
-                  >
-                    <i className="ri-instagram-fill text-xl" aria-hidden="true"></i>
-                  </a>
-                </li>
-              </ul>
-            </div>
           </div>
         </div>
 
         <div className="border-t border-slate-800 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <p className="text-gray-400 text-xs">
-              QuickGuard is a registered trademark. All security guards are independently verified and SIA licensed.
+              All guards must hold a valid SIA licence to work through QuickGuard.
             </p>
             <nav aria-label="Additional links">
               <ul className="flex items-center flex-wrap justify-center gap-4 list-none m-0 p-0">

@@ -13,28 +13,28 @@ const comparisons = [
   {
     label: 'Cost per hour',
     quickguard: 'You set the rate',
-    agency: 'Markup + hidden fees',
+    agency: 'Agency markup on top of guard pay',
     highlight: true,
   },
   {
     label: 'Contract lock-in',
     quickguard: 'None — book by the shift',
-    agency: 'Minimum 3-12 month term',
+    agency: 'Often a minimum contract term',
   },
   {
     label: 'Choose your guard',
     quickguard: 'Browse profiles & reviews',
-    agency: 'Assigned randomly',
+    agency: 'Usually assigned by the agency',
   },
   {
     label: 'Payment protection',
     quickguard: 'Held with Stripe until done',
-    agency: 'Pay upfront, chase refunds',
+    agency: 'Usually invoiced upfront or on account',
   },
   {
     label: 'Licence verification',
-    quickguard: 'SIA badge checked automatically',
-    agency: 'Manual checks, often skipped',
+    quickguard: 'Checked before a guard can work',
+    agency: 'Varies by agency',
   },
 ];
 
@@ -68,7 +68,7 @@ export default function WhyChooseQuickGuard() {
             Compare
           </div>
           <h2 id="why-heading" className="text-3xl md:text-4xl font-bold text-white mb-3">
-            Why QuickGuard vs a Security Company?
+            QuickGuard vs a Traditional Agency
           </h2>
           <p className="text-slate-400 text-lg max-w-2xl mx-auto">
             No middlemen. No long contracts. Just verified guards when you need them.

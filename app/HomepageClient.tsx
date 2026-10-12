@@ -8,11 +8,16 @@ import TrustBadges from './TrustBadges';
 export default function HomepageClient() {
   const [isVisible, setIsVisible] = useState<Record<string, boolean>>({});
   const [jsEnabled, setJsEnabled] = useState(false);
-  const [stats, setStats] = useState({
-    totalGuards: 0,
-    completedJobs: 0,
-    activeClients: 0,
-    successRate: 0,
+  const [stats, setStats] = useState<{
+    totalGuards: number | null;
+    completedJobs: number | null;
+    activeClients: number | null;
+    successRate: number | null;
+  }>({
+    totalGuards: null,
+    completedJobs: null,
+    activeClients: null,
+    successRate: null,
   });
   const [loadingStats, setLoadingStats] = useState(true);
 
@@ -67,7 +72,7 @@ export default function HomepageClient() {
           totalGuards,
           completedJobs,
           activeClients,
-          successRate,
+          successRate: totalAssignments > 0 ? successRate : null,
         });
       } catch {
         // silent fail
@@ -78,6 +83,14 @@ export default function HomepageClient() {
     fetchStats();
     return () => { cancelled = true; };
   }, []);
+
+  const MIN_STAT = 50;
+  const statsReady = !loadingStats;
+  const showGuards = statsReady && stats.totalGuards !== null && stats.totalGuards >= MIN_STAT;
+  const showJobs = statsReady && stats.completedJobs !== null && stats.completedJobs >= MIN_STAT;
+  const showClients = statsReady && stats.activeClients !== null && stats.activeClients >= MIN_STAT;
+  const showSuccessRate = statsReady && stats.successRate !== null && stats.successRate >= MIN_STAT;
+  const showStatsSection = statsReady && (showGuards || showJobs || showClients);
 
   return (
     <>
@@ -180,7 +193,7 @@ export default function HomepageClient() {
               Why Choose QuickGuard?
             </h2>
             <p className="text-xl text-slate-400 max-w-3xl mx-auto">
-              A secure, efficient platform trusted by security professionals and businesses across the UK — with verified guards, protected payments, and 24/7 AI support whenever you need it.
+              A secure, simple platform built for security professionals and the businesses that hire them — with verified guards, protected payments, and 24/7 AI support whenever you need it.
             </p>
           </div>
 
@@ -232,8 +245,8 @@ export default function HomepageClient() {
               >
                 <i className="ri-time-line text-2xl text-teal-400"></i>
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-white">Quick Matching</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">AI-powered system finds the right guard for your needs in minutes</p>
+              <h3 className="text-lg font-semibold mb-2 text-white">Fast Matching</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">When you post a job, verified guards whose travel radius covers your location are notified straight away.</p>
             </li>
 
             <li
@@ -258,6 +271,7 @@ export default function HomepageClient() {
 
       <TrustBadges />
 
+      {showStatsSection && (
       <section className="py-20 bg-[#0B1933] border-y border-slate-800/60" aria-labelledby="stats-heading">
         <div className="max-w-7xl mx-auto px-6 md:px-8">
           <h2 id="stats-heading" className="sr-only">
@@ -272,68 +286,44 @@ export default function HomepageClient() {
             role="group"
             aria-label="Platform statistics"
           >
+            {showGuards && (
             <figure className="group">
               <div className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 transition-all duration-300 hover:border-teal-500/30 hover:-translate-y-1">
                 <div className="text-4xl font-bold text-teal-400 mb-2">
-                  {loadingStats ? (
-                    <div role="status" aria-live="polite">
-                      <div
-                        className="w-12 h-12 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto"
-                        aria-hidden="true"
-                      ></div>
-                      <span className="sr-only">Loading verified guards count</span>
-                    </div>
-                  ) : (
-                    <span>{stats.totalGuards.toLocaleString()}+</span>
-                  )}
+                  <span>{stats.totalGuards !== null ? `${stats.totalGuards.toLocaleString()}+` : ''}</span>
                 </div>
                 <figcaption className="text-slate-400 font-medium">Verified Guards</figcaption>
               </div>
             </figure>
+            )}
 
+            {showJobs && (
             <figure className="group">
               <div className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 transition-all duration-300 hover:border-teal-500/30 hover:-translate-y-1">
                 <div className="text-4xl font-bold text-teal-400 mb-2">
-                  {loadingStats ? (
-                    <div role="status" aria-live="polite">
-                      <div
-                        className="w-12 h-12 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto"
-                        aria-hidden="true"
-                      ></div>
-                      <span className="sr-only">Loading completed jobs count</span>
-                    </div>
-                  ) : (
-                    <span>{stats.completedJobs.toLocaleString()}+</span>
-                  )}
+                  <span>{stats.completedJobs !== null ? `${stats.completedJobs.toLocaleString()}+` : ''}</span>
                 </div>
                 <figcaption className="text-slate-400 font-medium">Jobs Completed</figcaption>
               </div>
             </figure>
+            )}
 
+            {showClients && (
             <figure className="group">
               <div className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 transition-all duration-300 hover:border-teal-500/30 hover:-translate-y-1">
                 <div className="text-4xl font-bold text-teal-400 mb-2">
-                  {loadingStats ? (
-                    <div role="status" aria-live="polite">
-                      <div
-                        className="w-12 h-12 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto"
-                        aria-hidden="true"
-                      ></div>
-                      <span className="sr-only">Loading active clients count</span>
-                    </div>
-                  ) : (
-                    <span>{stats.activeClients.toLocaleString()}+</span>
-                  )}
+                  <span>{stats.activeClients !== null ? `${stats.activeClients.toLocaleString()}+` : ''}</span>
                 </div>
                 <figcaption className="text-slate-400 font-medium">Active Clients</figcaption>
               </div>
             </figure>
+            )}
 
-            {(!loadingStats && stats.successRate > 0) && (
+            {showSuccessRate && (
               <figure className="group">
                 <div className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 transition-all duration-300 hover:border-teal-500/30 hover:-translate-y-1">
                   <div className="text-4xl font-bold text-teal-400 mb-2">
-                    <span>{stats.successRate}%</span>
+                    <span>{stats.successRate !== null ? `${stats.successRate}%` : ''}</span>
                   </div>
                   <figcaption className="text-slate-400 font-medium">Success Rate</figcaption>
                 </div>
@@ -342,6 +332,7 @@ export default function HomepageClient() {
           </div>
         </div>
       </section>
+      )}
 
       <section className="py-20 bg-[#0B1933] border-y border-slate-800/60" aria-labelledby="cities-heading">
         <div className="max-w-7xl mx-auto px-6 md:px-8">
@@ -354,7 +345,7 @@ export default function HomepageClient() {
               Security Guards in Major UK Cities
             </h2>
             <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-              QuickGuard operates nationwide with strong local presence in the UK&apos;s biggest cities
+              Post a job in any of these cities and verified local guards are notified.
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
@@ -366,7 +357,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">London</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">850+ verified guards across all 32 Greater London boroughs. Same-day deployment available.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Security cover across all 32 Greater London boroughs.</p>
             </Link>
             <Link href="/security-guards/manchester" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -376,7 +367,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Manchester</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">420+ verified guards across Greater Manchester. From city centre to Salford and Trafford.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">From the city centre to Salford and Trafford.</p>
             </Link>
             <Link href="/security-guards/birmingham" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -386,7 +377,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Birmingham</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">380+ verified guards across Birmingham and the West Midlands. Instant matching, fast deployment.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Birmingham and the wider West Midlands.</p>
             </Link>
             <Link href="/security-guards/leeds" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -396,7 +387,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Leeds</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">290+ verified guards across West Yorkshire. Trinity Leeds, Elland Road, and beyond.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Leeds and across West Yorkshire.</p>
             </Link>
             <Link href="/security-guards/liverpool" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -406,7 +397,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Liverpool</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">260+ verified guards across Merseyside. From Albert Dock events to Anfield match days.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">From the waterfront to match days across Merseyside.</p>
             </Link>
             <Link href="/security-guards/glasgow" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -416,7 +407,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Glasgow</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">240+ verified guards across Greater Glasgow. SEC events, retail, and corporate coverage.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Events, retail and corporate cover across Greater Glasgow.</p>
             </Link>
             <Link href="/security-guards/edinburgh" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -426,7 +417,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Edinburgh</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">210+ verified guards across the Lothians. Festival security, retail, and corporate guarding.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Festival, retail and corporate cover across the Lothians.</p>
             </Link>
             <Link href="/security-guards/bristol" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -436,7 +427,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Bristol</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">230+ verified guards across the South West. Cabot Circus, Ashton Gate, and beyond.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Bristol and across the South West.</p>
             </Link>
             <Link href="/security-guards/cardiff" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -446,7 +437,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Cardiff</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">180+ verified guards across Wales. Principality Stadium events, St David&apos;s retail, and more.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Stadium events, retail and more across South Wales.</p>
             </Link>
           </div>
         </div>
@@ -470,7 +461,7 @@ export default function HomepageClient() {
               Ready to Get Started?
             </h2>
             <p className="text-xl mb-10 text-slate-400 max-w-2xl mx-auto">
-              Join thousands of security professionals and businesses across the UK who trust QuickGuard
+              Post your first job free, or sign up as a guard and start picking up shifts.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
