@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 interface DeleteSummary {
   tables: { name: string; rowCount: number }[];
   storageFiles: string[];
-  financialRowsAnonymised: { table: string; rowCount: number }[];
+  retainedRecords: { table: string; rowCount: number }[];
   totalRows: number;
   totalFiles: number;
 }
@@ -26,6 +26,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
   const [summary, setSummary] = useState<DeleteSummary | null>(null);
   const [confirmationText, setConfirmationText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [retentionReviewRequired, setRetentionReviewRequired] = useState(false);
   const [result, setResult] = useState<any>(null);
 
   const requiredPhrase = userType === 'guard' ? 'DELETE GUARD' : 'DELETE CLIENT';
@@ -67,7 +68,8 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
         return;
       }
 
-      setSummary(data.summary);
+      setSummary({ ...data.summary, retainedRecords: data.summary.retainedRecords ?? data.summary.financialRowsAnonymised ?? [] });
+      setRetentionReviewRequired(data.retentionReviewRequired === true);
       setStep('confirm');
     } catch (e: any) {
       setError(e.message || 'Something went wrong');
@@ -76,7 +78,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
   };
 
   const handleDelete = async () => {
-    if (confirmationText !== requiredPhrase) return;
+    if (retentionReviewRequired || confirmationText !== requiredPhrase) return;
     setError(null);
     setStep('deleting');
 
@@ -106,8 +108,8 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
       );
 
       const data = await res.json();
-      if (!res.ok || data.error) {
-        setError(data.error || 'Deletion failed');
+      if (!res.ok || data.error || data.success !== true || data.status !== 'completed') {
+        setError(data.error || data.failed_items?.join('; ') || 'Deletion is incomplete. Review the audit before retrying.');
         setStep('error');
         return;
       }
@@ -196,7 +198,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
                   <div>
                     <p className="text-sm font-medium text-red-300 mb-1">This action is permanent</p>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      It will remove the user account, profile, documents, images, applications, assignments, notifications, and related records. Financial records will be retained and anonymised. This cannot be undone.
+                      It will remove the user account, profile, documents, images, applications, assignments, notifications, and related records. Accounts with booking, financial or legal review records require a retention review before deletion. This cannot be undone.
                     </p>
                   </div>
                 </div>
@@ -220,7 +222,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
             <div className="space-y-4">
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
                 <p className="text-sm font-medium text-emerald-300 mb-2">Impact Summary</p>
-                <p className="text-xs text-slate-400">The following will be permanently deleted:</p>
+                <p className="text-xs text-slate-400">Records found during the impact check (deletion may require retention review):</p>
               </div>
 
               <div className="bg-[#111d35] border border-[#1a2b4a] rounded-xl divide-y divide-[#1a2b4a] max-h-[260px] overflow-y-auto">
@@ -233,10 +235,10 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
                     <span className="text-xs font-medium text-slate-400 bg-[#0a1628] px-2 py-0.5 rounded-full">{t.rowCount} record{t.rowCount !== 1 ? 's' : ''}</span>
                   </div>
                 ))}
-                {summary.financialRowsAnonymised.length > 0 && (
+                {summary.retainedRecords.length > 0 && (
                   <div className="px-4 py-3 bg-amber-500/5">
-                    <p className="text-xs font-medium text-amber-400 mb-2">Financial records will be retained &amp; anonymised:</p>
-                    {summary.financialRowsAnonymised.map((f) => (
+                    <p className="text-xs font-medium text-amber-400 mb-2">Records requiring retention review:</p>
+                    {summary.retainedRecords.map((f) => (
                       <div key={f.table} className="flex items-center justify-between px-1 py-1">
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-4 flex items-center justify-center"><i className="ri-shield-check-line text-amber-400 text-xs"></i></div>
@@ -258,6 +260,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
                 </div>
               )}
 
+              {retentionReviewRequired && <p className="text-sm text-amber-300">Deletion is blocked pending retention review. No account data or files have been deleted.</p>}
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
                 <p className="text-sm font-semibold text-red-300 mb-2">
                   Type <span className="font-mono bg-red-500/20 px-2 py-0.5 rounded">{requiredPhrase}</span> to confirm
@@ -360,7 +363,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
             {step === 'confirm' && (
               <button
                 onClick={handleDelete}
-                disabled={confirmationText !== requiredPhrase}
+                disabled={retentionReviewRequired || confirmationText !== requiredPhrase}
                 className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors cursor-pointer text-sm font-medium whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center gap-2">
