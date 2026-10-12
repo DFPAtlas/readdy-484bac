@@ -13,6 +13,7 @@ import {
   IMMEDIATE_BOOKING_RETURN_PATH,
 } from '@/lib/pending-job-draft';
 import BookingAuthModal from './BookingAuthModal';
+import styles from './postJobInputs.module.css';
 
 const venueCategories = [
   { key: 'nightclub_bar', label: 'Nightclub or Bar', icon: 'ri-door-open-line', desc: 'Door supervisors, crowd control', color: 'from-purple-500/10 to-pink-500/10' },
@@ -95,9 +96,12 @@ export default function PostJobWizard() {
   const [prefilledGuard, setPrefilledGuard] = useState<{ id: string; full_name: string; hourly_rate: number } | null>(null);
   const [showAuthChoice, setShowAuthChoice] = useState(false);
 
+  const [minDate, setMinDate] = useState('');
+
   useEffect(() => {
     restoreDraft();
     checkAuth();
+    setMinDate(new Date().toLocaleDateString('en-CA'));
     if (prefillGuard) fetchPrefilledGuard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -192,6 +196,7 @@ export default function PostJobWizard() {
     if (!formData.city.trim()) e.city = 'City is required';
     if (!formData.postcode.trim()) e.postcode = 'Postcode is required';
     if (!formData.startDate) e.startDate = 'Start date is required';
+    else if (minDate && formData.startDate < minDate) e.startDate = 'Start date cannot be in the past';
     if (!formData.startTime) e.startTime = 'Start time is required';
     if (!formData.endTime) e.endTime = 'End time is required';
     setErrors(e);
@@ -365,7 +370,7 @@ export default function PostJobWizard() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Start Date *</label>
-                <input type="date" value={formData.startDate} onChange={e => updateField('startDate', e.target.value)} className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm" />
+                <input type="date" value={formData.startDate} min={minDate || undefined} onChange={e => updateField('startDate', e.target.value)} className={`${styles.dateTimeInput} w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm`} />
                 {errors?.startDate && <p className="text-red-400 text-sm mt-1">{errors.startDate}</p>}
               </div>
               <div>
@@ -382,12 +387,12 @@ export default function PostJobWizard() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Start Time *</label>
-                <input type="time" value={formData.startTime} onChange={e => updateField('startTime', e.target.value)} className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm" />
+                <input type="time" value={formData.startTime} onChange={e => updateField('startTime', e.target.value)} className={`${styles.dateTimeInput} w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm`} />
                 {errors?.startTime && <p className="text-red-400 text-sm mt-1">{errors.startTime}</p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">End Time *</label>
-                <input type="time" value={formData.endTime} onChange={e => updateField('endTime', e.target.value)} className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm" />
+                <input type="time" value={formData.endTime} onChange={e => updateField('endTime', e.target.value)} className={`${styles.dateTimeInput} w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent text-white text-sm`} />
                 {errors?.endTime && <p className="text-red-400 text-sm mt-1">{errors.endTime}</p>}
               </div>
             </div>

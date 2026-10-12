@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import styles from './shiftDateTimeInputs.module.css';
 
 interface RepeatOption {
   value: string;
@@ -42,12 +43,18 @@ interface StepShiftDatesProps {
 }
 
 export default function StepShiftDates({ formData, errors, onChange, onNext, onBack }: StepShiftDatesProps) {
+  const [minDate, setMinDate] = useState('');
+  useEffect(() => {
+    setMinDate(new Date().toLocaleDateString('en-CA'));
+  }, []);
   const [sh, sm] = formData.startTime?.split(':').map(Number) || [0, 0];
   const [eh, em] = formData.endTime?.split(':').map(Number) || [0, 0];
   let hours = (eh * 60 + em - sh * 60 - sm) / 60;
   if (hours <= 0) hours += 24;
 
   const selectedRepeat = repeatOptions.find(r => r.value === formData.repeatShift) || repeatOptions[0];
+
+  const datesReversed = !!formData.startDate && !!formData.endDate && formData.endDate < formData.startDate;
 
   return (
     <div className="bg-[#111d35] border border-[#1e2d4d] rounded-2xl p-5 sm:p-6 md:p-8 shadow-sm">
@@ -70,7 +77,7 @@ export default function StepShiftDates({ formData, errors, onChange, onNext, onB
               aria-describedby={errors.startDate ? "error-startDate" : undefined}
               value={formData.startDate}
               onChange={onChange}
-              className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm"
+              className={`${styles.dateTimeInput} w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm`}
             />
             {errors.startDate && <p id="error-startDate" className="text-red-400 text-sm mt-1">{errors.startDate}</p>}
           </div>
@@ -79,15 +86,25 @@ export default function StepShiftDates({ formData, errors, onChange, onNext, onB
             <input
               type="date"
               name="endDate"
+              min={minDate || undefined}
               aria-invalid={!!errors.endDate}
               aria-describedby={errors.endDate ? "error-endDate" : undefined}
               value={formData.endDate}
               onChange={onChange}
-              className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm"
+              className={`${styles.dateTimeInput} w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm`}
             />
             {errors.endDate && <p id="error-endDate" className="text-red-400 text-sm mt-1">{errors.endDate}</p>}
           </div>
         </div>
+
+        {datesReversed && (
+          <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-3 flex items-start gap-3">
+            <i className="ri-alert-line text-amber-400 mt-0.5 flex-shrink-0"></i>
+            <p className="text-sm text-amber-300">
+              <span className="font-semibold">Heads up:</span> your End Date is before your Start Date. Please double-check the dates so the shift isn&apos;t booked the wrong way round.
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
@@ -99,7 +116,7 @@ export default function StepShiftDates({ formData, errors, onChange, onNext, onB
               aria-describedby={errors.startTime ? "error-startTime" : undefined}
               value={formData.startTime}
               onChange={onChange}
-              className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm"
+              className={`${styles.dateTimeInput} w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm`}
             />
             {errors.startTime && <p id="error-startTime" className="text-red-400 text-sm mt-1">{errors.startTime}</p>}
           </div>
@@ -112,7 +129,7 @@ export default function StepShiftDates({ formData, errors, onChange, onNext, onB
               aria-describedby={errors.endTime ? "error-endTime" : undefined}
               value={formData.endTime}
               onChange={onChange}
-              className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm"
+              className={`${styles.dateTimeInput} w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm`}
             />
             {errors.endTime && <p id="error-endTime" className="text-red-400 text-sm mt-1">{errors.endTime}</p>}
           </div>
@@ -230,11 +247,12 @@ export default function StepShiftDates({ formData, errors, onChange, onNext, onB
                 <input
                   type="date"
                   name="repeatEndDate"
+                  min={minDate || undefined}
               aria-invalid={!!errors.repeatEndDate}
               aria-describedby={errors.repeatEndDate ? "error-repeatEndDate" : undefined}
                   value={formData.repeatEndDate || ''}
                   onChange={onChange}
-                  className="w-full px-4 py-3 bg-[#111d35] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm"
+                  className={`${styles.dateTimeInput} w-full px-4 py-3 bg-[#111d35] border border-[#1e2d4d] rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white text-sm`}
                 />
               </div>
               <p className="text-xs text-slate-500">

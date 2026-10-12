@@ -1,0 +1,24 @@
+.dateTimeInput {
+  color-scheme: dark;
+}
+
+.dateTimeInput::-webkit-calendar-picker-indicator {
+  opacity: 0.9;
+  cursor: pointer;
+}
+
+.dateTimeInput::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+.dateTimeInput::-webkit-datetime-edit {
+  color: #ffffff;
+}
+
+.dateTimeInput::-webkit-datetime-edit-fields-wrapper {
+  color: #ffffff;
+}
+
+.dateTimeInput::-webkit-datetime-edit-text {
+  color: #94a3b8;
+}
