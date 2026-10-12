@@ -145,6 +145,7 @@ export default function ClockInScreen() {
 
       <div className="flex-1 px-4 pb-24 pt-4 space-y-4">
 
+        <p className="text-xs text-slate-400">This screen uses precise GPS with your device permission to compare your position with the displayed shift. Coordinates stay in this screen and are not submitted as an attendance record. <a href="/privacy" className="text-teal-400 underline">Privacy policy</a></p>
         {/* Live Clock */}
         <div className="bg-[#111d35] border border-[#1e2d4d] rounded-2xl p-4 flex items-center justify-between">
           <div>
@@ -364,7 +365,7 @@ export default function ClockInScreen() {
             </div>
             <div>
               <p className="font-bold text-sm">{successType === 'in' ? 'Clocked In Successfully!' : 'Clocked Out Successfully!'}</p>
-              <p className="text-white/80 text-xs mt-0.5">GPS location recorded & verified</p>
+              <p className="text-white/80 text-xs mt-0.5">Location checked on this device</p>
             </div>
           </div>
         </div>

@@ -20,7 +20,7 @@ export default function PrivacyPolicy() {
             How we collect, use, and protect your personal information
           </p>
           <p className="text-sm text-slate-500 mt-4">
-            Last updated: 1 October 2026
+            Last updated: 12 October 2026
           </p>
         </div>
       </section>
@@ -114,6 +114,8 @@ export default function PrivacyPolicy() {
                 <ul className="list-disc list-inside space-y-2 text-slate-400">
                   <li>Device information (browser type, operating system, device ID)</li>
                   <li>IP address and approximate location</li>
+                  <li>Location used for nearby-job searches and matching, including saved coordinates when you choose to use your device location or provide a postcode.</li>
+                  <li>The mobile clock-in/out screen requests precise GPS coordinates with your device permission to compare your position with the displayed shift location. Coordinates remain on your device for this screen session and are cleared when you leave or reload the screen. They are not saved to your account or shared with a client by this feature.</li>
                   <li>Usage data (pages visited, features used, time spent)</li>
                   <li>Cookies and similar tracking technologies</li>
                   <li>Log data and error reports</li>
@@ -318,7 +320,7 @@ export default function PrivacyPolicy() {
                 <div className="space-y-4">
                   {[
                     { icon: 'ri-check-line', color: 'text-teal-400', title: 'Service Delivery', text: 'To provide, maintain, and improve our platform services, process bookings, and facilitate connections between guards and clients.' },
-                    { icon: 'ri-check-line', color: 'text-teal-400', title: 'Identity Verification', text: 'To verify SIA licenses, conduct background checks, and ensure all guards meet our professional standards.' },
+                    { icon: 'ri-check-line', color: 'text-teal-400', title: 'Identity Verification', text: 'To verify SIA licence details and identity for platform access. SIA verification is not a separate DBS or criminal-record check.' },
                     { icon: 'ri-check-line', color: 'text-teal-400', title: 'Payment Processing', text: 'To process payments, manage held job payment services, handle refunds, and maintain financial records.' },
                     { icon: 'ri-check-line', color: 'text-teal-400', title: 'Communication', text: 'To send service updates, booking confirmations, security alerts, and respond to your enquiries.' },
                     { icon: 'ri-check-line', color: 'text-teal-400', title: 'Legal Compliance', text: 'To comply with legal obligations, prevent fraud, and protect the rights and safety of our users.' },
@@ -377,7 +379,7 @@ export default function PrivacyPolicy() {
 
                 <div className="space-y-4">
                   {[
-                    { title: 'Service Providers', items: ['Stripe: Payment processing and financial services', 'Supabase: Database and authentication services', 'Google: OAuth authentication (only email and profile data)', 'SIA: License verification and compliance checks', 'Email providers: Transactional email delivery'] },
+                    { title: 'Service Providers', items: ['Stripe: Payment processing and financial services', 'Supabase: Database and authentication services', 'Google: Optional sign-in, maps and Google Analytics when analytics consent is given', 'LinkedIn: Optional account sign-in', 'SIA: License verification and compliance checks', 'Resend: Transactional email delivery'] },
                     { title: 'Other Users', items: ['When you book a service, relevant information is shared between guards and clients to facilitate the booking (e.g., contact details, job location, service requirements).'] },
                     { title: 'Legal Requirements', items: ['We may disclose data to law enforcement, regulatory authorities, or courts when required by law or to protect our legal rights and the safety of our users.'] },
                   ].map((section) => (
@@ -490,7 +492,7 @@ export default function PrivacyPolicy() {
                 </div>
 
                 <p className="text-slate-400 mt-4">
-                  You can manage your cookie preferences through your browser settings or our cookie consent banner.
+                  Google Analytics loads only after you accept analytics cookies. Use Cookie settings in the footer to change or withdraw your choice at any time. We ask again after 180 days. Rejecting analytics does not prevent account access.
                 </p>
               </section>
 

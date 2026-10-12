@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import CookieSettingsButton from '@/components/CookieSettingsButton';
 import FooterExitPopupTestIcon from '@/components/qg-rewards/FooterExitPopupTestIcon';
 import BrandLogo from '@/components/BrandLogo';
 
@@ -275,6 +276,7 @@ export default function Footer() {
                   Privacy Policy
                 </Link>
               </li>
+              <li><CookieSettingsButton /></li>
               <li>
                 <a
                   href="mailto:info@quickguard.uk"
