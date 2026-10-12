@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { readCookiePreferences, applyAnalyticsConsent } from '@/lib/cookie-consent';
 
 type CookiePreferences = {
   necessary: boolean;
@@ -22,18 +23,33 @@ export default function CookieConsent() {
   });
 
   useEffect(() => {
-    const consent = localStorage.getItem('cookieConsent');
-    if (!consent) {
-      const timer = setTimeout(() => setIsVisible(true), 1000);
-      return () => clearTimeout(timer);
-    }
+    const apply = () => {
+      const saved = readCookiePreferences();
+      setPreferences(saved ?? { necessary: true, analytics: false, marketing: false, functional: false });
+      applyAnalyticsConsent(saved?.analytics === true);
+      if (!saved) setIsVisible(true);
+    };
+    const reopen = () => { apply(); setShowPreferences(true); setIsVisible(true); };
+    apply();
+    window.addEventListener('storage', apply);
+    window.addEventListener('quickguard:cookie-settings', reopen);
+    return () => {
+      window.removeEventListener('storage', apply);
+      window.removeEventListener('quickguard:cookie-settings', reopen);
+    };
   }, []);
 
   const saveConsent = (prefs: CookiePreferences) => {
-    localStorage.setItem('cookieConsent', JSON.stringify({
-      ...prefs,
-      timestamp: new Date().toISOString(),
-    }));
+    // Fail closed if the browser cannot remember the preference.
+    try {
+      localStorage.setItem('cookieConsent', JSON.stringify({
+        ...prefs, version: 2, timestamp: new Date().toISOString(),
+      }));
+    } catch {
+      applyAnalyticsConsent(false);
+      return;
+    }
+    applyAnalyticsConsent(prefs.analytics);
     setIsVisible(false);
   };
 
@@ -77,7 +93,7 @@ export default function CookieConsent() {
               <div>
                 <h2 className="text-lg font-bold text-gray-900 mb-1">We Value Your Privacy</h2>
                 <p className="text-sm text-gray-600 leading-relaxed">
-                  We use cookies to enhance your browsing experience, serve personalised content, and analyse our traffic. 
+                  We use cookies to enhance your browsing experience, and, with your permission, use Google Analytics to understand website usage.
                   Under UK GDPR, we need your consent to use non-essential cookies.
                 </p>
               </div>
@@ -92,7 +108,7 @@ export default function CookieConsent() {
               </button>
               <button
                 onClick={rejectNonEssential}
-                className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap"
+                className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap"
               >
                 Essential Only
               </button>
@@ -131,7 +147,7 @@ export default function CookieConsent() {
               />
               <CookieCategory
                 title="Analytics Cookies"
-                description="Help us understand how visitors interact with our website by collecting anonymous information."
+                description="Help us understand how visitors interact with our website using usage and device information."
                 checked={preferences.analytics}
                 disabled={false}
                 onChange={(checked) => setPreferences({ ...preferences, analytics: checked })}
@@ -161,7 +177,7 @@ export default function CookieConsent() {
               </button>
               <button
                 onClick={acceptAll}
-                className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap"
+                className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap"
               >
                 Accept All
               </button>
