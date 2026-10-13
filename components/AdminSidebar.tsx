@@ -190,6 +190,7 @@ export default function AdminSidebar() {
       icon: 'ri-settings-4-line',
       items: [
         { href: '/admin/system-status', icon: 'ri-heart-pulse-line', label: 'System Health' },
+        { href: '/admin/account-retention', icon: 'ri-shield-keyhole-line', label: 'Account Retention' },
         { href: '/admin/security', icon: 'ri-shield-keyhole-line', label: 'Security' },
         { href: '/admin/stripe-sync', icon: 'ri-bank-card-2-line', label: 'Stripe' },
         { href: '/admin/agents', icon: 'ri-robot-2-line', label: 'Agents' },

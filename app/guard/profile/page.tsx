@@ -1,5 +1,7 @@
 'use client';
 
+import CloseAccountSection from '@/components/CloseAccountSection';
+
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -657,6 +659,7 @@ function ProfileContent() {
             {activeTab === 'settings' && (
               <div className="space-y-6">
                 <h2 className="text-lg font-semibold text-white mb-4">Account Settings</h2>
+                <CloseAccountSection />
                 <div className="bg-[#162036] rounded-xl p-4 border border-[#1e2d4d]">
                   <h3 className="text-white font-semibold">Your data and privacy</h3>
                   <p className="text-sm text-slate-400 mt-2">Request a copy of your data, a portable export, correction, deletion, restriction, or object to processing. Contact us from your registered email address; we may need to verify your identity.</p>
