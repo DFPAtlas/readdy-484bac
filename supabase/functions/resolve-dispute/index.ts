@@ -1,3 +1,4 @@
+import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { claimFinancialOperation, finishFinancialOperation, holdFinancialOperation, verifyRefundSafety, type FinancialOperation } from '../_shared/financialOperations.ts';
@@ -217,6 +218,8 @@ serve(async (req) => {
     }
 
     if (resolution === 'resolved_guard') {
+      const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);
+      if (paymentFreeze) return paymentFreeze;
       if (!guard?.stripe_account_id || guard.stripe_connect_status !== 'verified') {
         throw {status: 403, message: 'Guard Stripe Connect account is not verified for payout'};
       }
