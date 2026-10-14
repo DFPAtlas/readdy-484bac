@@ -315,7 +315,6 @@ serve(async (req) => {
 
     const sessionPayload: Record<string, unknown> = {
       mode: 'payment',
-      payment_method_types: ['card'],
       line_items: [{
         price_data: {
           currency: 'gbp',
