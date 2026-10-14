@@ -1,3 +1,4 @@
+import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
@@ -28,6 +29,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+
+  const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);\n  if (paymentFreeze) return paymentFreeze;
 
   if (req.method !== 'POST') {
     return new Response(
