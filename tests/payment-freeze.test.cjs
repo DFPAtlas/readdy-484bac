@@ -5,14 +5,15 @@ const { test } = require('node:test');
 
 const root = path.resolve(__dirname, '..');
 
-test('freeze policy allows normal requests and blocks explicit freeze or lookup failure', async () => {
+test('freeze policy allows only an explicit false setting and fails closed otherwise', async () => {
   const { shouldBlockStripeOperation } = await import(
     '../supabase/functions/_shared/payment-freeze-policy.mjs'
   );
 
   assert.equal(shouldBlockStripeOperation('false', false), false);
-  assert.equal(shouldBlockStripeOperation(undefined, false), false);
+  assert.equal(shouldBlockStripeOperation(undefined, false), true);
   assert.equal(shouldBlockStripeOperation('true', false), true);
+  assert.equal(shouldBlockStripeOperation('unexpected', false), true);
   assert.equal(shouldBlockStripeOperation('false', true), true);
   assert.equal(shouldBlockStripeOperation(undefined, true), true);
 });
@@ -48,6 +49,6 @@ test('every Stripe initiation route uses the shared freeze guard; webhooks remai
       path.join(root, 'supabase/functions', slug, 'index.ts'),
       'utf8',
     );
-    assert.doesNotMatch(source, /paymentFreezeResponse/, `${slug} must remain active during freeze`);
+    assert.doesNotMatch(source, /paymentFreezeResponse/, `${slug} must remain available during the freeze`);
   }
 });
