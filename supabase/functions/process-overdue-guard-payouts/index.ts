@@ -31,10 +31,10 @@ function safeError(error: unknown): string {
 serve(async (req: Request) => {
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-
   const paymentFreeze = await paymentFreezeResponse(req.method);
   if (paymentFreeze) return paymentFreeze;
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   const workerToken = req.headers.get('x-qg-payout-worker-token') || '';
 
