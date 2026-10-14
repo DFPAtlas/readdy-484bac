@@ -30,7 +30,8 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);\n  if (paymentFreeze) return paymentFreeze;
+  const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);
+  if (paymentFreeze) return paymentFreeze;
 
   if (req.method !== 'POST') {
     return new Response(
