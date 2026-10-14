@@ -15,7 +15,8 @@ function isTestKey(key: string): boolean {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);\n  if (paymentFreeze) return paymentFreeze;
+  const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);
+  if (paymentFreeze) return paymentFreeze;
 
   const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
