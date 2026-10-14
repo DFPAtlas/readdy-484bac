@@ -1,3 +1,4 @@
+import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
 import { matchesSubscriptionPrice } from '../_shared/subscription-price.ts';
 import { subscriptionProfileUpdate, profileTable, requireWrite, type AccountType } from '../_shared/subscription-profile.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -240,6 +241,9 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders, status: 204 });
   }
+
+  const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);
+  if (paymentFreeze) return paymentFreeze;
 
   try {
     const body = await req.json();

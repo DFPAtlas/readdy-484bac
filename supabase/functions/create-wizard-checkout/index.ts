@@ -1,3 +1,4 @@
+import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3?target=deno';
@@ -145,11 +146,12 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders, status: 204 });
   }
 
+  const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);
+  if (paymentFreeze) return paymentFreeze;
+
   try {
     const body = await req.json();
-    console.log('[create-wizard-checkout] Request body:', JSON.stringify(body));
-
-    const { userId, accountType, planId, userEmail, billingCycle, siteUrl: bodySiteUrl } = body;
+    const { userId, accountType, planId, billingCycle, siteUrl: bodySiteUrl } = body;
 
     if (!userId || !accountType || !planId) {
       return new Response(
@@ -158,12 +160,72 @@ serve(async (req) => {
       );
     }
 
+    if (accountType !== 'client' && accountType !== 'guard') {
+      return new Response(
+        JSON.stringify({ error: 'Invalid accountType. Expected client or guard.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!PLAN_NAMES[planId] || !planId.startsWith(`${accountType}-`)) {
+      return new Response(
+        JSON.stringify({ error: 'The selected plan is not valid for this account type.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.match(/^Bearer\s+\S+$/i)) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required.' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      db: { schema: 'app' }
+      db: { schema: 'app' },
+      auth: { persistSession: false, autoRefreshToken: false },
     });
+
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const { data: { user: authenticatedUser }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !authenticatedUser) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired session.' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (authenticatedUser.id !== userId) {
+      console.warn('[create-wizard-checkout] Blocked userId ownership mismatch');
+      return new Response(
+        JSON.stringify({ error: 'You cannot create checkout for another user.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const profileTable = accountType === 'client' ? 'clients' : 'guards';
+    const { data: profile, error: profileError } = await supabase
+      .from(profileTable)
+      .select('stripe_customer_id, email')
+      .eq('user_id', authenticatedUser.id)
+      .maybeSingle();
+
+    if (profileError || !profile) {
+      return new Response(
+        JSON.stringify({ error: `${accountType === 'client' ? 'Client' : 'Guard'} account not found for the authenticated user.` }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { priceId, error: priceError } = await getPriceId(supabase, planId, billingCycle || 'monthly');
     if (!priceId || priceError) {
@@ -174,24 +236,15 @@ serve(async (req) => {
       );
     }
 
-    const email = userEmail;
-
-    let customerId: string | undefined;
-    if (accountType === 'client') {
-      const { data: client } = await supabase
-        .from('clients')
-        .select('stripe_customer_id')
-        .eq('user_id', userId)
-        .maybeSingle();
-      customerId = client?.stripe_customer_id || undefined;
-    } else {
-      const { data: guard } = await supabase
-        .from('guards')
-        .select('stripe_customer_id')
-        .eq('user_id', userId)
-        .maybeSingle();
-      customerId = guard?.stripe_customer_id || undefined;
+    const email = profile.email || authenticatedUser.email;
+    if (!email) {
+      return new Response(
+        JSON.stringify({ error: 'No verified account email is available for checkout.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    let customerId: string | undefined = profile.stripe_customer_id || undefined;
 
     if (!customerId) {
       console.log('[create-wizard-checkout] Creating new Stripe customer for', userId);
@@ -202,9 +255,9 @@ serve(async (req) => {
       customerId = customer.id;
 
       if (accountType === 'client') {
-        await supabase.from('clients').update({ stripe_customer_id: customerId }).eq('user_id', userId);
+        await supabase.from('clients').update({ stripe_customer_id: customerId }).eq('user_id', authenticatedUser.id);
       } else {
-        await supabase.from('guards').update({ stripe_customer_id: customerId }).eq('user_id', userId);
+        await supabase.from('guards').update({ stripe_customer_id: customerId }).eq('user_id', authenticatedUser.id);
       }
     }
 

@@ -1,3 +1,4 @@
+import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { claimFinancialOperation, finishFinancialOperation, holdFinancialOperation, verifyRefundSafety, type FinancialOperation } from '../_shared/financialOperations.ts';
@@ -112,6 +113,11 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    if (resolution === 'resolved_guard') {
+      const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);
+      if (paymentFreeze) return paymentFreeze;
     }
 
     const { data: dispute } = await supabase
