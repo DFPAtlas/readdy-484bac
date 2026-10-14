@@ -100,7 +100,12 @@ serve(async (req: Request) => {
     });
   }
 
-  const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);\n  if (paymentFreeze) return paymentFreeze;
+  const paymentFreeze = await paymentFreezeResponse(req.method, {
+    'Access-Control-Allow-Origin': getAllowedOrigin(origin),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  });
+  if (paymentFreeze) return paymentFreeze;
 
   if (req.method !== 'POST') {
     return corsResponse(origin, 405, { error: 'Method not allowed' });
