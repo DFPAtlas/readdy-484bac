@@ -18,7 +18,7 @@ test('freeze policy allows only an explicit false setting and fails closed other
   assert.equal(shouldBlockStripeOperation(undefined, true), true);
 });
 
-test('every Stripe initiation route uses the shared freeze guard; webhooks remain available', () => {
+test('payment, subscription, refund and payout routes enforce the shared freeze guard; webhooks remain available', () => {
   const guarded = [
     'create-subscription-checkout',
     'create-job-payment',
@@ -27,8 +27,6 @@ test('every Stripe initiation route uses the shared freeze guard; webhooks remai
     'resume-subscription',
     'create-guard-payout',
     'create-connect-account',
-    'create-guard-connect-account',
-    'create-guard-onboarding-link',
     'admin-test-job-payment',
     'create-client-billing-portal',
     'retry-failed-payment',
@@ -50,5 +48,23 @@ test('every Stripe initiation route uses the shared freeze guard; webhooks remai
       'utf8',
     );
     assert.doesNotMatch(source, /paymentFreezeResponse/, `${slug} must remain available during the freeze`);
+  }
+});
+
+test('guard account creation and hosted onboarding remain available during payment freeze without moving funds', () => {
+  for (const slug of ['create-guard-connect-account', 'create-guard-onboarding-link']) {
+    const source = fs.readFileSync(
+      path.join(root, 'supabase/functions', slug, 'index.ts'),
+      'utf8',
+    );
+
+    assert.doesNotMatch(source, /paymentFreezeResponse/, `${slug} must allow onboarding during the freeze`);
+    assert.match(source, /stripe\.accounts\.(create|retrieve)/, `${slug} must manage the connected account`);
+    assert.match(source, /stripe\.accountLinks\.create/, `${slug} must create a hosted onboarding link`);
+    assert.doesNotMatch(
+      source,
+      /stripe\.(?:paymentIntents|transfers|refunds)\.create/,
+      `${slug} must not initiate charges, transfers, or refunds`,
+    );
   }
 });
