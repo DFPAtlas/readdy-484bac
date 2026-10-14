@@ -2,5 +2,5 @@ export function shouldBlockStripeOperation(
   settingValue,
   queryFailed = false,
 ) {
-  return queryFailed || settingValue === 'true';
+  return queryFailed || settingValue !== 'false';
 }
