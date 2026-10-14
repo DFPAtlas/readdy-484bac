@@ -115,6 +115,11 @@ serve(async (req) => {
       });
     }
 
+    if (resolution === 'resolved_guard') {
+      const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);
+      if (paymentFreeze) return paymentFreeze;
+    }
+
     const { data: dispute } = await supabase
       .from('disputes')
       .select('*, jobs:job_id(id, stripe_payment_intent_id, agreed_amount, guard_payout_amount, platform_fee, currency, payment_status, status, job_title, client_id), guards:guard_id(id, stripe_account_id, stripe_connect_status, user_id, full_name), clients:client_id(user_id)')
@@ -218,8 +223,6 @@ serve(async (req) => {
     }
 
     if (resolution === 'resolved_guard') {
-      const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);
-      if (paymentFreeze) return paymentFreeze;
       if (!guard?.stripe_account_id || guard.stripe_connect_status !== 'verified') {
         throw {status: 403, message: 'Guard Stripe Connect account is not verified for payout'};
       }
