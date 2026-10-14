@@ -1,3 +1,4 @@
+import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { claimFinancialOperation, finishFinancialOperation, holdFinancialOperation, type FinancialOperation } from '../_shared/financialOperations.ts';
@@ -98,6 +99,8 @@ serve(async (req: Request) => {
       },
     });
   }
+
+  const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);\n  if (paymentFreeze) return paymentFreeze;
 
   if (req.method !== 'POST') {
     return corsResponse(origin, 405, { error: 'Method not allowed' });
