@@ -91,7 +91,6 @@ serve(async (req) => {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card'],
       line_items: [{ price_data: { currency: 'gbp', product_data: { name: `[TEST] Security Job: ${job.job_title}` }, unit_amount: Math.round(amount * 100) }, quantity: 1 }],
       success_url: 'https://quickguard.uk/admin/payment-management?test_checkout=success&session_id={CHECKOUT_SESSION_ID}',
       cancel_url: 'https://quickguard.uk/admin/payment-management?test_checkout=cancelled',
