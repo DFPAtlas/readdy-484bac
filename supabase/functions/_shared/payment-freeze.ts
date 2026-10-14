@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { shouldBlockStripeOperation } from './payment-freeze-policy.mjs';
 
 type CorsHeaders = Record<string, string>;
 
@@ -12,6 +13,8 @@ export async function paymentFreezeResponse(
 ): Promise<Response | null> {
   if (method.toUpperCase() === 'OPTIONS') return null;
 
+  let settingValue: string | undefined;
+  let queryFailed = false;
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -30,10 +33,13 @@ export async function paymentFreezeResponse(
       .maybeSingle();
 
     if (error) throw error;
-    if (data?.value !== 'true') return null;
+    settingValue = data?.value;
   } catch {
     console.error('[payment-freeze] Settings lookup failed; blocking Stripe operation');
+    queryFailed = true;
   }
+
+  if (!shouldBlockStripeOperation(settingValue, queryFailed)) return null;
 
   return new Response(JSON.stringify({
     error: 'Payments are temporarily paused',
