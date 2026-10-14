@@ -33,7 +33,8 @@ serve(async (req: Request) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 
-  const paymentFreeze = await paymentFreezeResponse(req.method);\n  if (paymentFreeze) return paymentFreeze;
+  const paymentFreeze = await paymentFreezeResponse(req.method);
+  if (paymentFreeze) return paymentFreeze;
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   const workerToken = req.headers.get('x-qg-payout-worker-token') || '';
 
