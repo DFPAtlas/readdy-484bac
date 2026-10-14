@@ -146,7 +146,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders, status: 204 });
   }
 
-  const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);\n  if (paymentFreeze) return paymentFreeze;
+  const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);
+  if (paymentFreeze) return paymentFreeze;
 
   try {
     const body = await req.json();
