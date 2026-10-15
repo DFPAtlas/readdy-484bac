@@ -416,7 +416,7 @@ export default function PrivacyPolicy() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {[
                     { icon: 'ri-time-line', title: 'Active Accounts', text: 'Data retained while account is active plus 2 years after closure' },
-                    { icon: 'ri-file-text-line', title: 'Financial Records', text: '7 years as required by UK tax law' },
+                    { icon: 'ri-file-text-line', title: 'Financial Records', text: 'Our standard financial-record retention period is 7 years. Specific tax, accounting and legal requirements are assessed separately.' },
                     { icon: 'ri-shield-check-line', title: 'Verification Documents', text: 'Duration of account plus 3 years' },
                     { icon: 'ri-chat-3-line', title: 'Support Communications', text: '2 years from last interaction' },
                   ].map((item) => (
@@ -430,6 +430,8 @@ export default function PrivacyPolicy() {
                   ))}
                 </div>
               </section>
+
+              <p className="text-slate-400 mb-8">You can close your account through your profile privacy or account settings once outstanding bookings, paid subscriptions, payments and disputes are resolved. Access is disabled on closure. A nightly process minimises account profile data after two years and deletes verification documents after three years. Necessary accounting and booking evidence is kept separately and reviewed for erasure. A documented legal hold pauses cleanup while evidence is needed. Stable record identifiers may remain, so profile minimisation is not complete anonymisation. You can request earlier erasure by contacting us.</p>
 
               <section id="your-rights">
                 <h2 className="text-2xl font-bold text-white mb-4 border-b border-teal-500/30 pb-2">

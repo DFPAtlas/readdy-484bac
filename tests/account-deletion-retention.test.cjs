@@ -160,3 +160,9 @@ test('row deletion and Auth API returned errors cannot report completion',async(
     assert.equal(r.status,409);assert.equal(body.success,false);assert.ok(body.failed_items.length);
   }
 });
+
+test('legacy verification references require review rather than a false purge result',()=>{
+  assert.throws(()=>helper.assertAccountStorageReferences({sia_licence_front_url:'other-owner/front.jpg'},[ROOT,USER],'documents'),/ownership review/);
+  assert.throws(()=>helper.assertAccountStorageReferences({sia_licence_front_url:'https://external.test/front.jpg'},[ROOT,USER],'documents'),/ownership review/);
+  assert.doesNotThrow(()=>helper.assertAccountStorageReferences({sia_licence_front_url:`https://project.test/storage/v1/object/sign/sia-licences/${USER}/sia/front.jpg?token=old`},[ROOT,USER],'documents'));
+});
