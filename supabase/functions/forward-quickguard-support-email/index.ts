@@ -31,7 +31,7 @@ serve(async req=>{
     .eq("id",item.id).in("status",["pending","failed"]).select("id").maybeSingle();
   if(claimError||!claimed)continue;
   const {data:email}=await db.from("support_inbound_emails").select("resend_email_id,sender_email,recipient_email,subject,body_text,received_at").eq("id",item.inbound_email_id).maybeSingle();
-  if(!email)continue;
+  if(!email){await db.from("support_email_dfp_outbox").update({status:"failed",lease_until:null,last_error:"Staged email missing",next_attempt_at:new Date(Date.now()+3600000).toISOString()}).eq("id",item.id);failed++;continue;}
   const raw=JSON.stringify({siteSlug:"quickguard",providerEmailId:email.resend_email_id,from:email.sender_email,to:email.recipient_email,
     subject:email.subject,text:email.body_text,receivedAt:email.received_at});
   const timestamp=new Date().toISOString();
