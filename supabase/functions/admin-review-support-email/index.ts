@@ -25,6 +25,11 @@ serve(async (req) => {
   const db = createClient(base, serviceKey, { db: { schema: 'app' }, auth: { persistSession: false, autoRefreshToken: false } });
   const { data: { user }, error: authError } = await db.auth.getUser(token);
   if (authError || !user) return json(401, { error: 'Login required' });
+  // The privileged service-role client bypasses ticket RLS. Match the
+  // existing ticket administration policy by requiring an MFA AAL2 session.
+  const { data: assurance, error: assuranceError } = await db.auth.mfa.getAuthenticatorAssuranceLevel(token);
+  if (assuranceError || assurance?.currentLevel !== 'aal2')
+    return json(403, { error: 'Administrator MFA verification required' });
   const { data: admin, error: adminError } = await db.from('admin_users')
     .select('id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle();
   if (adminError || !admin || !['super_admin', 'admin'].includes(admin.role)) return json(403, { error: 'Admin access required' });
