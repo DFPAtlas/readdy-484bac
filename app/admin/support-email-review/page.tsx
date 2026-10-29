@@ -77,7 +77,7 @@ export default function SupportEmailReviewPage() {
         <label className="text-sm block mb-2" htmlFor={email.id}>Existing ticket reference</label>
         <div className="flex gap-2 mb-2">
           <input id={email.id} className="bg-slate-800 border border-slate-600 rounded px-2 py-2 flex-1"
-            value={ticketRefs[email.id] || ''} onChange={e => setTicketRefs(old => ({ ...old, [email.id]: e.target.value }))} />
+            value={ticketRefs[email.id] || ''} onChange={e => { setTicketRefs(old => ({ ...old, [email.id]: e.target.value })); setTicketIds(old => ({ ...old, [email.id]: '' })); setTicketDetails(old => ({ ...old, [email.id]: '' })); }} />
           <button disabled={busy !== null} className="border px-3 rounded disabled:opacity-50" onClick={() => void lookup(email)}>Find ticket</button>
         </div>
         {ticketDetails[email.id] && <p className="text-sm text-teal-300 mb-2">Selected: {ticketDetails[email.id]}</p>}
