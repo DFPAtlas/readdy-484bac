@@ -17,3 +17,10 @@
 - DFP bridge outage and retry, customer-visible RLS, admin response and email deliverability
 
 No automatic ticket creation, AI agent actions or outbound replies should be turned on by this draft PR.
+
+## Stage 2 committed — reviewed, internal-only ticket attachment
+- Migration `20261029133000_resend_support_triage_stage2.sql` adds `app.triage_quickguard_support_email(inbound_id, ticket_id)`.
+- Service-role-only; callers MUST authenticate a real admin separately and check sender identity, claimed ticket ownership and content before invoking it.
+- Locks the staged email, checks it is pending and the ticket exists, atomically inserts a uniquely linked **internal** ticket note, then marks the inbound row linked. Replays return the existing note ID.
+- Does not create public customer/guard messages or new tickets, does not send emails and does not trigger DFP synchronisation. No live changes.
+- Before production, add the authenticated admin triage API/UI, association verification, integration tests on an isolated Supabase database, and explicit published-message + DFP bridge workflows.
