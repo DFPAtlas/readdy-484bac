@@ -46,6 +46,24 @@ serve(async (req) => {
     const ticketId = payload.ticketId;
     if (typeof inboundId !== 'string' || !uuid.test(inboundId) || typeof ticketId !== 'string' || !uuid.test(ticketId))
       return json(400, { error: 'Valid email and ticket IDs required' });
+    // Sender equality is a necessary association check, NOT authentication of mail.
+    // Fail closed on mismatches and ambiguous owner records; email is kept internal
+    // even when it matches because From headers can be spoofed.
+    const { data: mail, error: mailError } = await db.from('support_inbound_emails')
+      .select('id, sender_email, status').eq('id', inboundId).eq('status', 'pending_review').maybeSingle();
+    if (mailError || !mail) return json(404, { error: 'Pending email not found' });
+    const { data: ticket, error: ticketError } = await db.from('support_tickets')
+      .select('id, client_id, guard_id').eq('id', ticketId).eq('is_deleted', false).maybeSingle();
+    if (ticketError || !ticket) return json(404, { error: 'Active ticket not found' });
+    if (Number(Boolean(ticket.client_id)) + Number(Boolean(ticket.guard_id)) !== 1)
+      return json(409, { error: 'Ticket ownership ambiguous; manual escalation required' });
+    const ownerTable = ticket.client_id ? 'clients' : 'guards';
+    const ownerId = ticket.client_id || ticket.guard_id;
+    const { data: owner, error: ownerError } = await db.from(ownerTable)
+      .select('id, email').eq('id', ownerId).maybeSingle();
+    if (ownerError || !owner || typeof owner.email !== 'string' ||
+        owner.email.trim().toLowerCase() !== mail.sender_email.trim().toLowerCase())
+      return json(409, { error: 'Sender does not match ticket owner; manual escalation required' });
     // This performs an INTERNAL note insertion only; staff must inspect mail and select the ticket.
     const { data, error } = await db.rpc('triage_quickguard_support_email',
       { p_inbound_id: inboundId, p_ticket_id: ticketId });
