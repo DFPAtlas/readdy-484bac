@@ -154,6 +154,7 @@ export default function AdminSidebar() {
       icon: 'ri-customer-service-2-line',
       items: [
         { href: '/admin/support-tickets', icon: 'ri-customer-service-2-line', label: 'Support' },
+        { href: '/admin/support-email-review', icon: 'ri-mail-open-line', label: 'Support Email Review' },
         {
           href: '/admin/complaints',
           icon: 'ri-feedback-line',
