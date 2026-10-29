@@ -13,6 +13,10 @@ export default function SupportEmailReviewPage() {
   const [ticketIds, setTicketIds] = useState<Record<string, string>>({});
   const [ticketRefs, setTicketRefs] = useState<Record<string, string>>({});
   const [ticketDetails, setTicketDetails] = useState<Record<string, string>>({});
+  const [clientCandidates, setClientCandidates] = useState<Record<string, {id:string;email:string}[]>>({});
+  const [selectedClient, setSelectedClient] = useState<Record<string,string>>({});
+  const [verified, setVerified] = useState<Record<string,boolean>>({});
+  const [createdTicket, setCreatedTicket] = useState<Record<string,string>>({});
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,6 +42,28 @@ export default function SupportEmailReviewPage() {
   };
   useEffect(() => { void refresh(); }, []);
 
+  const findClient = async (email: InboundEmail) => {
+    setBusy(email.id); setError('');
+    try {
+      const data = await invoke({ action: 'find_client', inboundId: email.id });
+      setClientCandidates(old => ({ ...old, [email.id]: data.clients || [] }));
+    } catch (e) { setError(e instanceof Error ? e.message : 'Client lookup failed'); }
+    finally { setBusy(null); }
+  };
+  const createTicket = async (email: InboundEmail) => {
+    if (!selectedClient[email.id] || !verified[email.id]) {
+      setError('Select a matching client and independently verify sender identity'); return;
+    }
+    if (!window.confirm('Create a private support ticket and INTERNAL note? No emails or DFP sync will be sent.')) return;
+    setBusy(email.id); setError('');
+    try {
+      const data = await invoke({ action: 'create_ticket', inboundId: email.id,
+        clientId: selectedClient[email.id], identityVerified: true, approvedInternalOnly: true });
+      setCreatedTicket(old => ({ ...old, [email.id]: data.ticket.ticket_reference }));
+      await refresh();
+    } catch(e) { setError(e instanceof Error ? e.message : 'Ticket creation failed'); }
+    finally { setBusy(null); }
+  };
   const lookup = async (email: InboundEmail) => {
     setBusy(email.id); setError('');
     setTicketIds(old => ({ ...old, [email.id]: '' }));
@@ -74,6 +100,28 @@ export default function SupportEmailReviewPage() {
         <div className="font-semibold">{email.subject || '(No subject)'}</div>
         <div className="text-sm text-slate-300">{email.sender_email} · {new Date(email.created_at).toLocaleString()}</div>
         <pre className="whitespace-pre-wrap break-words text-sm bg-slate-900 rounded p-3 my-3 max-h-64 overflow-y-auto">{email.body_text}</pre>
+        <section className="border border-slate-700 rounded p-3 mb-4">
+          <h2 className="font-semibold mb-2">Verify &amp; Create Ticket (registered clients only)</h2>
+          <button disabled={busy !== null} className="border rounded px-3 py-2 mb-2"
+            onClick={() => void findClient(email)}>Find matching client</button>
+          <select className="block bg-slate-800 border border-slate-600 rounded p-2 my-2 w-full"
+            value={selectedClient[email.id] || ''}
+            onChange={e => { setSelectedClient(old => ({ ...old, [email.id]: e.target.value }));
+              setVerified(old => ({ ...old, [email.id]: false })); }}>
+            <option value="">Select a matching client account</option>
+            {(clientCandidates[email.id] || []).map(c => <option key={c.id} value={c.id}>{c.email}</option>)}
+          </select>
+          <label className="flex items-start gap-2 text-sm my-3">
+            <input type="checkbox" checked={Boolean(verified[email.id])}
+              onChange={e => setVerified(old => ({ ...old, [email.id]: e.target.checked }))} />
+            I independently verified this sender's identity and ownership of the selected client account.
+            Email address matching alone is insufficient.
+          </label>
+          <button disabled={busy !== null || !selectedClient[email.id] || !verified[email.id]}
+            className="bg-teal-700 disabled:opacity-50 px-3 py-2 rounded"
+            onClick={() => void createTicket(email)}>Verify &amp; Create Ticket</button>
+          <p className="text-xs text-amber-300 mt-2">Creates a private internal note only. No outbound replies or DFP Command sync.</p>
+        </section>
         <label className="text-sm block mb-2" htmlFor={email.id}>Existing ticket reference</label>
         <div className="flex gap-2 mb-2">
           <input id={email.id} className="bg-slate-800 border border-slate-600 rounded px-2 py-2 flex-1"
