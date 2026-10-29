@@ -26,3 +26,24 @@ begin
 end $$;
 revoke all on function app.enqueue_pending_support_email_dfp() from public,anon,authenticated;
 grant execute on function app.enqueue_pending_support_email_dfp() to service_role;
+
+-- Atomic claim with SKIP LOCKED and stale-lease recovery.
+create or replace function app.claim_due_support_email_dfp(p_limit integer default 5)
+returns table(id uuid, inbound_email_id uuid, attempt_count integer)
+language plpgsql security definer set search_path='' as $$
+begin
+ return query
+ with claim as (
+   select q.id from app.support_email_dfp_outbox q
+   where ((q.status in ('pending','failed') and q.next_attempt_at <= now())
+      or (q.status = 'processing' and q.lease_until < now()))
+   order by q.next_attempt_at, q.created_at
+   limit least(greatest(p_limit,1),10) for update skip locked
+ )
+ update app.support_email_dfp_outbox q
+ set status='processing', attempt_count=q.attempt_count+1, lease_until=now()+interval '2 minutes'
+ from claim where q.id=claim.id
+ returning q.id,q.inbound_email_id,q.attempt_count;
+end $$;
+revoke all on function app.claim_due_support_email_dfp(integer) from public,anon,authenticated;
+grant execute on function app.claim_due_support_email_dfp(integer) to service_role;
