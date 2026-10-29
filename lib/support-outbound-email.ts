@@ -9,7 +9,7 @@ export function prepareSupportReply(input: {
   if (typeof input.ticketId !== 'string' || !UUID.test(input.ticketId) ||
       typeof input.messageId !== 'string' || !UUID.test(input.messageId) ||
       typeof input.recipient !== 'string' || input.recipient.length > 254 ||
-      !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(input.recipient) ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.recipient) ||
       typeof input.subject !== 'string' || !input.subject.trim() || input.subject.length > 500 ||
       typeof input.body !== 'string' || !input.body.trim() || input.body.length > 20000) return null;
   return {
