@@ -19,17 +19,10 @@ serve(async req=>{
  const db=createClient(Deno.env.get("SUPABASE_URL")!,service,{db:{schema:"app"},auth:{persistSession:false}});
  const {error:enqueueError}=await db.rpc("enqueue_pending_support_email_dfp");
  if(enqueueError)return json(503,{error:"Enqueue failed"});
- const {data:due,error:listError}=await db.from("support_email_dfp_outbox")
-  .select("id,inbound_email_id,attempt_count").in("status",["pending","failed"])
-  .lte("next_attempt_at",new Date().toISOString()).order("next_attempt_at").limit(5);
+ const {data:due,error:listError}=await db.rpc("claim_due_support_email_dfp",{p_limit:5});
  if(listError)return json(503,{error:"Outbox unavailable"});
  let delivered=0,failed=0;
  for(const item of due||[]){
-  const until=new Date(Date.now()+120000).toISOString();
-  const {data:claimed,error:claimError}=await db.from("support_email_dfp_outbox")
-    .update({status:"processing",lease_until:until,attempt_count:item.attempt_count+1})
-    .eq("id",item.id).in("status",["pending","failed"]).select("id").maybeSingle();
-  if(claimError||!claimed)continue;
   const {data:email}=await db.from("support_inbound_emails").select("resend_email_id,sender_email,recipient_email,subject,body_text,received_at").eq("id",item.inbound_email_id).maybeSingle();
   if(!email){await db.from("support_email_dfp_outbox").update({status:"failed",lease_until:null,last_error:"Staged email missing",next_attempt_at:new Date(Date.now()+3600000).toISOString()}).eq("id",item.id);failed++;continue;}
   const raw=JSON.stringify({siteSlug:"quickguard",providerEmailId:email.resend_email_id,from:email.sender_email,to:email.recipient_email,
@@ -44,7 +37,7 @@ serve(async req=>{
    }
    throw new Error("HTTP "+response.status);
   }catch(error){
-   const attempt=item.attempt_count+1;
+   const attempt=item.attempt_count;
    await db.from("support_email_dfp_outbox").update({status:"failed",lease_until:null,
      last_error:error instanceof Error?error.message.slice(0,120):"Delivery failed",
      next_attempt_at:new Date(Date.now()+Math.min(3600,Math.pow(2,Math.min(attempt,10))*30)*1000).toISOString()}).eq("id",item.id);
