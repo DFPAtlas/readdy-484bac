@@ -41,6 +41,35 @@ serve(async (req) => {
     // This is advisory only; a matching reference does not prove email ownership.
     return json(200, { ticket: data[0], warning: 'Review sender ownership before attaching. Email addresses and references can be spoofed.' });
   }
+  if (action === 'find_client') {
+    const inboundId = payload.inboundId;
+    if (typeof inboundId !== 'string' || !uuid.test(inboundId))
+      return json(400, { error: 'Valid email ID required' });
+    const { data: mail } = await db.from('support_inbound_emails')
+      .select('sender_email').eq('id', inboundId).eq('status', 'pending_review').maybeSingle();
+    if (!mail) return json(404, { error: 'Pending email not found' });
+    const { data: clients, error } = await db.from('clients')
+      .select('id, email').ilike('email', mail.sender_email).limit(3);
+    if (error) return json(500, { error: 'Client lookup unavailable' });
+    return json(200, { clients, warning: 'Email equality is not proof of sender identity. Verify independently.' });
+  }
+  if (action === 'create_ticket') {
+    const inboundId = payload.inboundId;
+    const clientId = payload.clientId;
+    if (typeof inboundId !== 'string' || !uuid.test(inboundId) ||
+        typeof clientId !== 'string' || !uuid.test(clientId))
+      return json(400, { error: 'Valid email and client IDs required' });
+    if (payload.identityVerified !== true || payload.approvedInternalOnly !== true)
+      return json(400, { error: 'Independent identity verification and private-ticket approval required' });
+    // The service-only RPC is transaction-safe and revalidates both administrator
+    // and sender/client association. The new ticket is NOT published to DFP Command.
+    const { data, error } = await db.rpc('create_reviewed_inbound_client_ticket', {
+      p_inbound_id: inboundId, p_client_id: clientId, p_admin_user_id: user.id,
+    });
+    if (error || !Array.isArray(data) || !data[0])
+      return json(409, { error: 'Ticket could not be created; review ownership and schema' });
+    return json(200, { ticket: data[0] });
+  }
   if (action === 'attach') {
     const inboundId = payload.inboundId;
     const ticketId = payload.ticketId;
