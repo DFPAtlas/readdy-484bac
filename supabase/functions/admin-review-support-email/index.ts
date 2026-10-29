@@ -1,11 +1,20 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-const json = (status: number, data: unknown) =>
-  new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+const permittedOrigins = new Set(['https://quickguard.uk', 'https://www.quickguard.uk']);
+
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
 serve(async (req) => {
+  const origin = req.headers.get('Origin') || '';
+  const cors = {
+    ...(permittedOrigins.has(origin) ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' } : {}),
+    'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+  const json = (status: number, data: unknown) =>
+    new Response(JSON.stringify(data), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
   const base = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -16,6 +25,11 @@ serve(async (req) => {
   const db = createClient(base, serviceKey, { db: { schema: 'app' }, auth: { persistSession: false, autoRefreshToken: false } });
   const { data: { user }, error: authError } = await db.auth.getUser(token);
   if (authError || !user) return json(401, { error: 'Login required' });
+  // The privileged service-role client bypasses ticket RLS. Match the
+  // existing ticket administration policy by requiring an MFA AAL2 session.
+  const { data: assurance, error: assuranceError } = await db.auth.mfa.getAuthenticatorAssuranceLevel(token);
+  if (assuranceError || assurance?.currentLevel !== 'aal2')
+    return json(403, { error: 'Administrator MFA verification required' });
   const { data: admin, error: adminError } = await db.from('admin_users')
     .select('id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle();
   if (adminError || !admin || !['super_admin', 'admin'].includes(admin.role)) return json(403, { error: 'Admin access required' });
@@ -40,6 +54,35 @@ serve(async (req) => {
     if (!data || data.length !== 1) return json(404, { error: 'No unique active ticket found' });
     // This is advisory only; a matching reference does not prove email ownership.
     return json(200, { ticket: data[0], warning: 'Review sender ownership before attaching. Email addresses and references can be spoofed.' });
+  }
+  if (action === 'find_client') {
+    const inboundId = payload.inboundId;
+    if (typeof inboundId !== 'string' || !uuid.test(inboundId))
+      return json(400, { error: 'Valid email ID required' });
+    const { data: mail } = await db.from('support_inbound_emails')
+      .select('sender_email').eq('id', inboundId).eq('status', 'pending_review').maybeSingle();
+    if (!mail) return json(404, { error: 'Pending email not found' });
+    const { data: clients, error } = await db.from('clients')
+      .select('id, email').ilike('email', mail.sender_email).limit(3);
+    if (error) return json(500, { error: 'Client lookup unavailable' });
+    return json(200, { clients, warning: 'Email equality is not proof of sender identity. Verify independently.' });
+  }
+  if (action === 'create_ticket') {
+    const inboundId = payload.inboundId;
+    const clientId = payload.clientId;
+    if (typeof inboundId !== 'string' || !uuid.test(inboundId) ||
+        typeof clientId !== 'string' || !uuid.test(clientId))
+      return json(400, { error: 'Valid email and client IDs required' });
+    if (payload.identityVerified !== true || payload.approvedInternalOnly !== true)
+      return json(400, { error: 'Independent identity verification and private-ticket approval required' });
+    // The service-only RPC is transaction-safe and revalidates both administrator
+    // and sender/client association. The new ticket is NOT published to DFP Command.
+    const { data, error } = await db.rpc('create_reviewed_inbound_client_ticket', {
+      p_inbound_id: inboundId, p_client_id: clientId, p_admin_user_id: user.id,
+    });
+    if (error || !Array.isArray(data) || !data[0])
+      return json(409, { error: 'Ticket could not be created; review ownership and schema' });
+    return json(200, { ticket: data[0] });
   }
   if (action === 'attach') {
     const inboundId = payload.inboundId;
