@@ -1,11 +1,20 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-const json = (status: number, data: unknown) =>
-  new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+const permittedOrigins = new Set(['https://quickguard.uk', 'https://www.quickguard.uk']);
+
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
 serve(async (req) => {
+  const origin = req.headers.get('Origin') || '';
+  const cors = {
+    ...(permittedOrigins.has(origin) ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' } : {}),
+    'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+  const json = (status: number, data: unknown) =>
+    new Response(JSON.stringify(data), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
   const base = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
