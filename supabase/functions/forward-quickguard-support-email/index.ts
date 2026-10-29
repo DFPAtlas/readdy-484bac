@@ -9,8 +9,9 @@ async function hmac(secret:string,message:string){
 serve(async req=>{
  if(req.method!=="POST")return json(405,{error:"Method not allowed"});
  const service=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
- const authorization=req.headers.get("authorization")||"";
- if(!service||authorization!== "Bearer "+service)return json(401,{error:"Service authentication required"});
+ const authorization=req.headers.get("x-qg-worker-token")||"";
+ const workerToken=Deno.env.get("QG_DFP_WORKER_TOKEN")||"";
+ if(!workerToken||workerToken.length<32||authorization!==workerToken)return json(401,{error:"Service authentication required"});
  // Feature flag stays OFF until isolated UAT and receiver deployment.
  if(Deno.env.get("QG_DFP_EMAIL_FORWARDING_ENABLED")!=="true")return json(503,{error:"Forwarder disabled"});
  const secret=Deno.env.get("DFP_UNVERIFIED_EMAIL_SHARED_SECRET")||"";
@@ -24,7 +25,7 @@ serve(async req=>{
  let delivered=0,failed=0;
  for(const item of due||[]){
   const {data:email}=await db.from("support_inbound_emails").select("resend_email_id,sender_email,recipient_email,subject,body_text,received_at").eq("id",item.inbound_email_id).maybeSingle();
-  if(!email){await db.from("support_email_dfp_outbox").update({status:"failed",lease_until:null,last_error:"Staged email missing",next_attempt_at:new Date(Date.now()+3600000).toISOString()}).eq("id",item.id);failed++;continue;}
+  if(!email){await db.rpc("finish_support_email_dfp",{p_id:item.id,p_token:item.lease_token,p_success:false,p_error:"Staged email missing"});failed++;continue;}
   const raw=JSON.stringify({siteSlug:"quickguard",providerEmailId:email.resend_email_id,from:email.sender_email,to:email.recipient_email,
     subject:email.subject,text:email.body_text,receivedAt:email.received_at});
   const timestamp=new Date().toISOString();
@@ -32,15 +33,16 @@ serve(async req=>{
    const response=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json","x-dfp-timestamp":timestamp,
     "x-dfp-signature":await hmac(secret,timestamp+"\n"+raw)},body:raw,signal:AbortSignal.timeout(10000)});
    if(response.ok){
-    await db.from("support_email_dfp_outbox").update({status:"delivered",delivered_at:new Date().toISOString(),lease_until:null,last_error:null}).eq("id",item.id);
+    const ack=await response.json().catch(()=>null);
+    if(ack?.accepted!==true||ack?.providerEmailId!==email.resend_email_id)throw new Error("Invalid DFP acknowledgement");
+    const {data:finished,error:finishError}=await db.rpc("finish_support_email_dfp",{p_id:item.id,p_token:item.lease_token,p_success:true});
+    if(finishError||finished!==true)throw new Error("Lease acknowledgement failed");
     delivered++;continue;
    }
    throw new Error("HTTP "+response.status);
   }catch(error){
-   const attempt=item.attempt_count;
-   await db.from("support_email_dfp_outbox").update({status:"failed",lease_until:null,
-     last_error:error instanceof Error?error.message.slice(0,120):"Delivery failed",
-     next_attempt_at:new Date(Date.now()+Math.min(3600,Math.pow(2,Math.min(attempt,10))*30)*1000).toISOString()}).eq("id",item.id);
+   await db.rpc("finish_support_email_dfp",{p_id:item.id,p_token:item.lease_token,p_success:false,
+     p_error:error instanceof Error?error.message.slice(0,120):"Delivery failed"});
    failed++;
   }
  }
