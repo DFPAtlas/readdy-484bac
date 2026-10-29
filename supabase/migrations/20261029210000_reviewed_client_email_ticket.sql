@@ -43,7 +43,7 @@ begin
   insert into app.support_tickets
     (client_id,category,subject,description,status,priority,inbound_support_email_id)
   values (p_client_id,'general_support',coalesce(nullif(left(v_mail.subject,500),''),'Support email'),
-    left(v_mail.body_text,20000),'open','normal',p_inbound_id)
+    'Inbound email reviewed by support; message retained in internal notes','open','normal',p_inbound_id)
   returning id, support_tickets.ticket_reference into v_ticket_id,v_ref;
   insert into app.ticket_messages
     (ticket_id,sender_id,sender_type,sender_name,message_text,is_internal,inbound_support_email_id)
