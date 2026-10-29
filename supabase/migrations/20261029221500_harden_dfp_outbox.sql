@@ -5,6 +5,9 @@ alter table app.support_email_dfp_outbox drop constraint if exists support_email
 alter table app.support_email_dfp_outbox add constraint support_email_dfp_outbox_status_check
  check (status in ('pending','processing','delivered','failed','dead'));
 
+-- PostgreSQL cannot replace a function with a different OUT/RETURNS TABLE signature.
+-- Worker is not deployed; change the signature atomically in this migration.
+drop function if exists app.claim_due_support_email_dfp(integer);
 create or replace function app.claim_due_support_email_dfp(p_limit integer default 5)
 returns table(id uuid, inbound_email_id uuid, attempt_count integer, lease_token uuid)
 language plpgsql security definer set search_path='' as $$
