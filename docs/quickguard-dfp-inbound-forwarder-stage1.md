@@ -1,0 +1,5 @@
+# QuickGuard automatic DFP support forwarding
+
+The existing Resend signature-verified receiver must continue storing inbound emails in `app.support_inbound_emails`. A separate backend-only worker will forward staged records to a dedicated DFP Command unverified intake endpoint, using a server-to-server signed request and durable idempotency by `resend_email_id`. Never route unverified mail through the existing authenticated customer-message bridge or set client identity based on sender address. Require persisted delivery acknowledgements, bounded retries, ownership checks, sender spam controls and an off-switch. Production is not enabled by this change.
+
+Dependencies: DFP Command draft PR #12's restricted staging table; its receiving function, worker delivery tracking and operator inbox remain to be built and tested.
