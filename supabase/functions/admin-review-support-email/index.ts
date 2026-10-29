@@ -30,6 +30,17 @@ serve(async (req) => {
       .eq('status', 'pending_review').order('created_at', { ascending: false }).limit(50);
     return error ? json(500, { error: 'Inbox unavailable' }) : json(200, { emails: data });
   }
+  if (action === 'lookup_ticket') {
+    const reference = typeof payload.reference === 'string' ? payload.reference.trim().toUpperCase() : '';
+    if (!/^[A-Z0-9-]{4,60}$/.test(reference)) return json(400, { error: 'Valid ticket reference required' });
+    const { data, error } = await db.from('support_tickets')
+      .select('id, ticket_reference, subject, status, client_id, guard_id')
+      .eq('ticket_reference', reference).eq('is_deleted', false).limit(2);
+    if (error) return json(500, { error: 'Ticket lookup failed' });
+    if (!data || data.length !== 1) return json(404, { error: 'No unique active ticket found' });
+    // This is advisory only; a matching reference does not prove email ownership.
+    return json(200, { ticket: data[0], warning: 'Review sender ownership before attaching. Email addresses and references can be spoofed.' });
+  }
   if (action === 'attach') {
     const inboundId = payload.inboundId;
     const ticketId = payload.ticketId;
