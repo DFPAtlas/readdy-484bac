@@ -158,7 +158,7 @@ export default function ClientCompleteProfileWizard() {
       mountedRef.current = false;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, []);
+  }, [router]);
 
   const displayError = error || loadError || fieldsError || '';
 

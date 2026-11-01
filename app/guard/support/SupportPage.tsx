@@ -162,7 +162,7 @@ export default function SupportPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     loadTickets();
@@ -209,7 +209,7 @@ export default function SupportPage() {
     }
 
     setSelectedTicket(refreshedTicket);
-  }, [tickets]);
+  }, [tickets, selectedTicket]);
 
   const filteredTickets = tickets.filter((ticket) => {
     const statuses = STATUS_FILTERS[activeTab] || [];

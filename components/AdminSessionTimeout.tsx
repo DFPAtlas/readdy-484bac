@@ -77,7 +77,7 @@ export default function AdminSessionTimeout() {
 
   useEffect(() => {
     resetTimers();
-  }, [pathname]);
+  }, [pathname, resetTimers]);
 
   if (!isProtected || !showWarning) return null;
 

@@ -101,7 +101,7 @@ export function useAdminJobs() {
   const [stats, setStats] = useState<JobsStats>({ total: 0, open: 0, in_progress: 0, completed: 0, cancelled: 0, pending_apps: 0, flagged: 0, urgent: 0 });
   const [filters, setFilters] = useState<JobsFilters>(defaultFilters);
 
-  const fetchJobs = useCallback(async (p: number = page) => {
+  const fetchJobs = useCallback(async (p: number) => {
     setLoading(true);
     setError(null);
     try {
@@ -156,7 +156,7 @@ export function useAdminJobs() {
   useEffect(() => {
     setPage(1);
     fetchJobs(1);
-  }, [filters]);
+  }, [fetchJobs]);
 
   const deleteJob = async (jobId: string) => {
     await invokeEdgeFunction('delete', { jobId });

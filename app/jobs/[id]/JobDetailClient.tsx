@@ -216,7 +216,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     checkUserAndFetchJob();
 
     return () => { cancelled = true; };
-  }, [jobId]);
+  }, [router, jobId]);
 
   useEffect(() => {
     if (toast) {

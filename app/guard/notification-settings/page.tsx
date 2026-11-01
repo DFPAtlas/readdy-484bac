@@ -129,7 +129,7 @@ export default function NotificationSettingsPage() {
       await loadPreferences(user.id);
     };
     checkAuth();
-  }, [loadPreferences]);
+  }, [router, loadPreferences]);
 
   const handleSave = async () => {
     if (!userId) return;

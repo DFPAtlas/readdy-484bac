@@ -57,7 +57,7 @@ export default function ClientOnboardingPage() {
     return () => {
       mountedRef.current = false;
     };
-  }, []);
+  }, [router]);
 
   if (authLoading || !allowed) {
     return (
