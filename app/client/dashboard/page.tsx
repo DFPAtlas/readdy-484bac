@@ -315,7 +315,7 @@ export default function ClientDashboardPage() {
     } finally {
       loadingRef.current = false;
     }
-  }, [router, computeOnboarding]);
+  }, [router]);
 
   const debouncedReload = useCallback(() => {
     if (loadingRef.current) return;
