@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -77,6 +77,22 @@ interface Transaction {
   receipt_url: string | null;
 }
 
+function getInitials(name: string): string {
+  const parts = name.trim().split(' ');
+  if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+const calculateHours = (startTime: string, endTime: string, startDate: string, endDate?: string | null) => {
+  const start = new Date(`${startDate}T${startTime}`);
+  const end = new Date(`${endDate || startDate}T${endTime}`);
+  let h = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+  if (h < 0) h += 24;
+  const d = Math.max(1, Math.ceil((new Date(endDate || startDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  return { hours: h, days: d, totalHours: h * d };
+};
+
+
 export default function BookingConfirmationClient({ jobId }: { jobId: string }) {
   const router = useRouter();
   const { loading: authLoading, allowed } = useClientGuard();
@@ -107,24 +123,17 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
   const [total, setTotal] = useState(0);
   const [feesReady, setFeesReady] = useState(false);
 
-  function getInitials(name: string): string {
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-    return name.slice(0, 2).toUpperCase();
-  }
+  const requestRef = useRef(0);
+  const mountedRef = useRef(false);
 
-  const calculateHours = (startTime: string, endTime: string, startDate: string, endDate?: string | null) => {
-    const start = new Date(`${startDate}T${startTime}`);
-    const end = new Date(`${endDate || startDate}T${endTime}`);
-    let h = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-    if (h < 0) h += 24;
-    const d = Math.max(1, Math.ceil((new Date(endDate || startDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1);
-    return { hours: h, days: d, totalHours: h * d };
-  };
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    if (!mountedRef.current) return;
+    const request = ++requestRef.current;
+    const isCurrent = () => mountedRef.current && request === requestRef.current;
+    setFeesReady(false);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!isCurrent()) return;
       if (!user) { router.push('/client/login'); return; }
 
       const { data: client } = await supabase
@@ -133,6 +142,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
         .eq('user_id', user.id)
         .maybeSingle();
 
+      if (!isCurrent()) return;
       if (!client) { router.push('/client/login'); return; }
 
       setClientId(client.id);
@@ -148,6 +158,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
         .eq('client_id', client.id)
         .maybeSingle();
 
+      if (!isCurrent()) return;
       if (!jobData) { router.push('/client/jobs'); return; }
       setJob(jobData);
 
@@ -156,6 +167,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
         .select('*')
         .eq('job_id', jobId);
 
+      if (!isCurrent()) return;
       const rawAssignments = assignmentsData || [];
       const assignedGuardIds = [...new Set(rawAssignments.map((a: any) => a.guard_id).filter(Boolean))];
       const guardMap: Record<string, any> = {};
@@ -177,6 +189,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
         guards: guardMap[a.guard_id] || null,
       }));
 
+      if (!isCurrent()) return;
       setAssignments(hydratedAssignments);
 
       const { data: txData } = await supabase
@@ -188,6 +201,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
         .limit(1)
         .maybeSingle();
 
+      if (!isCurrent()) return;
       setTransaction(txData || null);
 
       const { hours: h, days: d, totalHours } = calculateHours(
@@ -197,6 +211,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
         jobData.end_date
       );
       const { data: fees, error: feeError } = await supabase.functions.invoke('calculate-job-fees', { body: { jobId } });
+      if (!isCurrent()) return;
       if (feeError || !fees || fees.error) throw new Error('Booking total unavailable');
       setHours(totalHours);
       setDays(d);
@@ -214,13 +229,35 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
       }
     } catch {
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  };
+  }, [jobId, router]);
 
   useEffect(() => {
+    mountedRef.current = true;
+    setLoading(true);
+    setJob(null);
+    setAssignments([]);
+    setTransaction(null);
+    setClientId('');
+    setAuthUserId('');
+    setTermsBooking(false);
+    setTermsCancellation(false);
+    setTermsSite(false);
+    setTermsPayment(false);
+    setShowReceipt(false);
+    setBookingRef('');
+    setConfirmedAt('');
+    setToast('');
+    setHours(0);
+    setDays(1);
+    setGuardPay(0);
+    setServiceFee(0);
+    setVat(0);
+    setTotal(0);
     loadData();
-  }, [jobId]);
+    return () => { mountedRef.current = false; };
+  }, [loadData]);
 
   const [disputing, setDisputing] = useState(false);
 
