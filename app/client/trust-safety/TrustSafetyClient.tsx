@@ -47,29 +47,42 @@ export default function TrustSafetyClient() {
   }, [loadClient]);
 
   useEffect(() => {
-    if (jobs.length === 0) return;
+    let cancelled = false;
+    if (jobs.length === 0) {
+      setAssignments({});
+      setLoadingAssignments(false);
+      return;
+    }
     const loadAssignments = async () => {
       setLoadingAssignments(true);
       const jobIds = jobs.map((j) => j.id);
-      const { data } = await supabase
+      const { data, error: assignmentError } = await supabase
         .from('job_assignments')
         .select('id, job_id, guard_id, status')
         .in('job_id', jobIds);
+      if (cancelled) return;
+      if (assignmentError) throw assignmentError;
 
       const guardIds = [...new Set((data || []).map((a: any) => a.guard_id).filter(Boolean))];
       const guardMap: Record<string, any> = {};
 
       if (guardIds.length > 0) {
-        const { data: safeProfiles } = await supabase
+        const { data: safeProfiles, error: profilesError } = await supabase
           .from('guard_public_profiles')
           .select('id, full_name, sia_verified, licence_types')
           .in('id', guardIds);
 
-        const { data: applicantCompliance } = await supabase
+        if (cancelled) return;
+        if (profilesError) throw profilesError;
+
+        const { data: applicantCompliance, error: complianceError } = await supabase
           .from('client_applicant_profiles')
           .select('guard_id, job_id, sia_licence_number, sia_expiry_date, licence_types')
           .in('job_id', jobIds)
           .in('guard_id', guardIds);
+
+        if (cancelled) return;
+        if (complianceError) throw complianceError;
 
         const complianceByJobGuard: Record<string, any> = {};
         (applicantCompliance || []).forEach((g: any) => {
@@ -101,11 +114,18 @@ export default function TrustSafetyClient() {
         if (!map[a.job_id]) map[a.job_id] = [];
         map[a.job_id].push(a as GuardAssignment);
       });
+      if (cancelled) return;
       setAssignments(map);
       setLoadingAssignments(false);
     };
-    loadAssignments();
-  }, [jobs.length]);
+    void loadAssignments().catch(error => {
+      if (cancelled) return;
+      console.error('Unable to load safety assignments:', error);
+      setAssignments({});
+      setLoadingAssignments(false);
+    });
+    return () => { cancelled = true; };
+  }, [jobs]);
 
   const handleToggle = async (jobId: string, checkId: string | undefined, field: string, value: boolean) => {
     if (!client) return;

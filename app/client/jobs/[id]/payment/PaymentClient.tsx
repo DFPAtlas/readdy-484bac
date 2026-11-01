@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -178,6 +178,17 @@ function formatTime(timeStr?: string) {
   return `${hour12}:${minutes} ${ampm}`;
 }
 
+function calculateHours(startTime: string, endTime: string, startDate: string, endDate: string) {
+    const start = new Date(`${startDate}T${startTime}`);
+    const end = new Date(`${endDate || startDate}T${endTime}`);
+    let hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    if (hours < 0) hours += 24;
+    const startD = new Date(startDate);
+    const endD = new Date(endDate || startDate);
+    const days = Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    return hours * days;
+  }
+
 export default function PaymentClient({ jobId }: { jobId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -205,89 +216,14 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
   const [feeError, setFeeError] = useState<string | null>(null);
   const invoiceRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    loadPaymentData();
-  }, [jobId]);
+  const generationRef = useRef(0);
+  const paymentActiveRef = useRef(false);
+  const pendingRequestRef = useRef<symbol | null>(null);
 
-  useEffect(() => {
-    if (loading || !job) return;
-    if (getPaymentStatus(job, transaction) !== "processing") return;
-    const interval = setInterval(() => {
-      loadPaymentData();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [job, transaction, loading]);
-
-  const loadPaymentData = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/client/login");
-        return;
-      }
-
-      const { data: clientData } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (!clientData) {
-        router.push("/client/login");
-        return;
-      }
-      setClient(clientData);
-
-      const { data: jobData, error: jobError } = await supabase
-        .from("jobs")
-        .select(`
-          *,
-          payment_status,
-          agreed_amount,
-          platform_fee,
-          guard_payout_amount,
-          clients (
-            id,
-            company_name,
-            email,
-            stripe_customer_id
-          )
-        `)
-        .eq("id", jobId)
-        .eq("client_id", clientData.id)
-        .maybeSingle();
-
-      if (jobError || !jobData) {
-        console.error("Error loading job:", jobError);
-        router.push("/client/jobs");
-        return;
-      }
-
-      const hydratedAssignments = await loadClientJobAssignments(supabase, jobData.id);
-      const hydratedJob = { ...jobData, job_assignments: hydratedAssignments } as Job;
-
-      setJob(hydratedJob);
-      setTaxDisclaimerAccepted(jobData.tax_disclaimer_accepted || false);
-
-      if (hydratedAssignments.length > 0) {
-        const guardsWithHours = hydratedAssignments.map((assignment: any) => ({
-          ...(assignment.guards || {}),
-          hours_worked: calculateHours(jobData.start_time, jobData.end_time, jobData.start_date, jobData.end_date)
-        }));
-        setGuards(guardsWithHours);
-      }
-
-      await loadTransaction(jobData.id, clientData.id);
-      await loadPaymentHistory(clientData.id);
-      await loadFeeBreakdown(jobData.id);
-    } catch (error) {
-      console.error("Error loading payment data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadFeeBreakdown = async (jobId: string) => {
+  const loadFeeBreakdown = useCallback(async (jobId: string, canApply?: () => boolean) => {
+    const generation = generationRef.current;
+    const current = canApply || (() => paymentActiveRef.current && generation === generationRef.current);
+    if (!current()) return;
     setFeeLoading(true);
     setFeeError(null);
     setFeeBreakdown(null);
@@ -314,16 +250,21 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
       if (typeof data.clientTotalCharge !== "number" || !Number.isFinite(data.clientTotalCharge) || data.clientTotalCharge <= 0) {
         throw new Error("The booking total is invalid. Please contact support.");
       }
+      if (!current()) return;
       setFeeBreakdown(data);
       setTaxDisclaimerAccepted(data.taxDisclaimerAccepted || false);
     } catch (error) {
+      if (!current()) return;
       setFeeError(error instanceof Error && error.name !== "TimeoutError" ? error.message : "Loading the booking total timed out. Please try again.");
     } finally {
-      setFeeLoading(false);
+      if (current()) setFeeLoading(false);
     }
-  };
+  }, []);
 
-  const loadTransaction = async (jobId: string, clientId: string) => {
+  const loadTransaction = useCallback(async (jobId: string, clientId: string, canApply?: () => boolean) => {
+    const generation = generationRef.current;
+    const current = canApply || (() => paymentActiveRef.current && generation === generationRef.current);
+    if (!current()) return;
     try {
       const { data: transactions } = await supabase
         .from("transactions")
@@ -333,6 +274,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
         .order("created_at", { ascending: false })
         .limit(1);
 
+      if (!current()) return;
       if (transactions && transactions.length > 0) {
         setTransaction(transactions[0]);
         setRetryCount(transactions[0].retry_count || 0);
@@ -347,9 +289,12 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
     } catch (error) {
       console.error("Error loading transaction:", error);
     }
-  };
+  }, []);
 
-  const loadPaymentHistory = async (clientId: string) => {
+  const loadPaymentHistory = useCallback(async (clientId: string, canApply?: () => boolean) => {
+    const generation = generationRef.current;
+    const current = canApply || (() => paymentActiveRef.current && generation === generationRef.current);
+    if (!current()) return;
     try {
       const { data: transactions } = await supabase
         .from("transactions")
@@ -358,6 +303,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
         .order("created_at", { ascending: false })
         .limit(5);
 
+      if (!current()) return;
       if (transactions) {
         const history = transactions.map((t: any) => ({
           id: t.id,
@@ -372,18 +318,117 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
     } catch (error) {
       console.error("Error loading payment history:", error);
     }
-  };
+  }, []);
 
-  const calculateHours = (startTime: string, endTime: string, startDate: string, endDate: string) => {
-    const start = new Date(`${startDate}T${startTime}`);
-    const end = new Date(`${endDate || startDate}T${endTime}`);
-    let hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-    if (hours < 0) hours += 24;
-    const startD = new Date(startDate);
-    const endD = new Date(endDate || startDate);
-    const days = Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-    return hours * days;
-  };
+  const loadPaymentData = useCallback(async (generation = generationRef.current) => {
+    if (pendingRequestRef.current) return;
+    const request = Symbol('payment-load');
+    pendingRequestRef.current = request;
+    const current = () => paymentActiveRef.current && generation === generationRef.current;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!current()) return;
+      if (!user) {
+        router.push("/client/login");
+        return;
+      }
+
+      const { data: clientData } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!current()) return;
+      if (!clientData) {
+        router.push("/client/login");
+        return;
+      }
+      setClient(clientData);
+
+      const { data: jobData, error: jobError } = await supabase
+        .from("jobs")
+        .select(`
+          *,
+          payment_status,
+          agreed_amount,
+          platform_fee,
+          guard_payout_amount,
+          clients (
+            id,
+            company_name,
+            email,
+            stripe_customer_id
+          )
+        `)
+        .eq("id", jobId)
+        .eq("client_id", clientData.id)
+        .maybeSingle();
+
+      if (!current()) return;
+      if (jobError || !jobData) {
+        console.error("Error loading job:", jobError);
+        router.push("/client/jobs");
+        return;
+      }
+
+      const hydratedAssignments = await loadClientJobAssignments(supabase, jobData.id);
+      if (!current()) return;
+      const hydratedJob = { ...jobData, job_assignments: hydratedAssignments } as Job;
+
+      setJob(hydratedJob);
+      setTaxDisclaimerAccepted(jobData.tax_disclaimer_accepted || false);
+
+      if (hydratedAssignments.length > 0) {
+        const guardsWithHours = hydratedAssignments.map((assignment: any) => ({
+          ...(assignment.guards || {}),
+          hours_worked: calculateHours(jobData.start_time, jobData.end_time, jobData.start_date, jobData.end_date)
+        }));
+        setGuards(guardsWithHours);
+      }
+
+      await loadTransaction(jobData.id, clientData.id, current);
+      if (!current()) return;
+      await loadPaymentHistory(clientData.id, current);
+      if (!current()) return;
+      await loadFeeBreakdown(jobData.id, current);
+    } catch (error) {
+      console.error("Error loading payment data:", error);
+    } finally {
+      if (pendingRequestRef.current === request) pendingRequestRef.current = null;
+      if (current()) setLoading(false);
+    }
+  }, [jobId, router, loadTransaction, loadPaymentHistory, loadFeeBreakdown]);
+
+  useEffect(() => {
+    paymentActiveRef.current = true;
+    const generation = ++generationRef.current;
+    setLoading(true);
+    setJob(null);
+    setClient(null);
+    setPaymentHistory([]);
+    setFeeLoading(false);
+    setRetryCount(0);
+    setFailureReason(null);
+    setMaxRetriesReached(false);
+    setTransaction(null);
+    setGuards([]);
+    setFeeBreakdown(null);
+    setFeeError(null);
+    setTaxDisclaimerAccepted(false);
+    void loadPaymentData(generation);
+    return () => {
+      paymentActiveRef.current = false;
+      generationRef.current = generation + 1;
+      pendingRequestRef.current = null;
+    };
+  }, [loadPaymentData]);
+
+  useEffect(() => {
+    if (loading || !job || getPaymentStatus(job, transaction) !== 'processing') return;
+    const interval = setInterval(() => { void loadPaymentData(); }, 5000);
+    return () => clearInterval(interval);
+  }, [job, transaction, loading, loadPaymentData]);
 
   const calculateCosts = () => ({
     hours: job ? calculateHours(job.start_time, job.end_time, job.start_date, job.end_date) : 0,
