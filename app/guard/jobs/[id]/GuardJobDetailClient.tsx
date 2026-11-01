@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -72,130 +72,47 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
     setTimeout(() => setToast(null), 4000);
   };
 
-  const load = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push('/guard/login'); return; }
-    setGuardUserId(user.id);
+  const jobLifetimeRef = useRef<{ jobId: string } | null>(null);
+  const jobRequestRef = useRef(0);
 
-    const { data: guard } = await supabase
-      .from('guards')
-      .select('id, full_name, verification_status, licence_types, sia_licence_number, sia_verified')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!guard) { router.push('/guard/login'); return; }
-    if (guard.verification_status !== 'approved' && guard.verification_status !== 'verified') {
-      router.push('/guard/onboarding');
-      return;
-    }
-
-    setGuardId(guard.id);
-    setGuardName(guard.full_name);
-    setGuardProfile(guard);
-
-    loadPaymentFlow(guard.id);
-
-    // Booked jobs are not public listings. The authenticated function checks
-    // this guard's application/assignment before returning a closed booking.
-    setJobError(null);
-    let jobData;
-    try {
-      const { data, error } = await supabase.functions.invoke('get-job-detail', {
-        body: { jobId },
-      });
-      if (error || data?.error) throw new Error('Unable to load this booking. Please retry or contact support.');
-      jobData = data?.job ?? null;
-      setJob(jobData);
-    } catch (error) {
-      setJob(null);
-      setJobError('Unable to load this booking. Please retry or contact support.');
-      setLoading(false);
-      return;
-    }
-
-    if (jobData?.client_id) {
-      const { data: clientRow } = await supabase
-        .from('clients')
-        .select('user_id')
-        .eq('id', jobData.client_id)
-        .maybeSingle();
-      if (clientRow?.user_id) setClientUserId(clientRow.user_id);
-    }
-
-    const { data: app } = await supabase
-      .from('job_applications')
-      .select('id, status')
-      .eq('job_id', jobId)
-      .eq('guard_id', guard.id)
-      .maybeSingle();
-
-    if (app) {
-      setHasApplied(true);
-    }
-
-    const { data: assignment } = await supabase
-      .from('job_assignments')
-      .select('id, status')
-      .eq('job_id', jobId)
-      .eq('guard_id', guard.id)
-      .maybeSingle();
-
-    if (assignment) {
-      setIsAssigned(true);
-    }
-
-    const { data: invite } = await supabase
-      .from('job_invites')
-      .select('id, status')
-      .eq('job_id', jobId)
-      .eq('guard_id', guard.id)
-      .maybeSingle();
-
-    if (invite) {
-      setHasInvite(true);
-    }
-
-    const { data: saved } = await supabase
-      .from('saved_jobs')
-      .select('id')
-      .eq('job_id', jobId)
-      .eq('guard_id', guard.id)
-      .maybeSingle();
-    if (saved) setIsSaved(true);
-
-    setLoading(false);
-  }, [jobId, router]);
-
-  const loadPaymentFlow = useCallback(async (gId: string) => {
+  const loadPaymentFlow = useCallback(async (gId: string, isCurrent: () => boolean) => {
+    if (!isCurrent()) return;
     setLoadingFlow(true);
     try {
-      const { data: assignment } = await supabase
+      const { data: assignment, error: assignmentError } = await supabase
         .from('job_assignments')
         .select('id, status, payment_amount, payment_status, payout_released, payout_released_at, payout_id')
         .eq('job_id', jobId)
         .eq('guard_id', gId)
         .maybeSingle();
+      if (assignmentError) throw assignmentError;
 
+      if (!isCurrent()) return;
       if (!assignment) { setFlowData(null); setLoadingFlow(false); return; }
 
       const historyJobs = await loadGuardHistoryJobs(supabase, gId);
+      if (!isCurrent()) return;
       const jobData = historyJobs.find(job => job.id === jobId);
       if (!jobData) throw new Error('Unable to load booking payment data');
 
-      const { data: completion } = await supabase
+      const { data: completion, error: completionError } = await supabase
         .from('job_completion_requests')
         .select('status, client_approved_at, client_disputed_at, dispute_reason')
         .eq('job_id', jobId)
         .eq('guard_id', gId)
         .maybeSingle();
+      if (completionError) throw completionError;
 
-      const { data: payout } = await supabase
+      if (!isCurrent()) return;
+      const { data: payout, error: payoutError } = await supabase
         .from('guard_payouts')
         .select('status, amount, net_amount, stripe_transfer_status, failure_reason, completed_date, expected_date')
         .eq('assignment_id', assignment.id)
         .eq('guard_id', gId)
         .maybeSingle();
+      if (payoutError) throw payoutError;
 
+      if (!isCurrent()) return;
       const data: FlowSourceData = {
         assignmentStatus: assignment.status,
         assignmentPaymentStatus: assignment.payment_status,
@@ -223,13 +140,147 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
       };
       setFlowData(data);
     } catch {
-      setFlowData(null);
+      if (isCurrent()) setFlowData(null);
     } finally {
-      setLoadingFlow(false);
+      if (isCurrent()) setLoadingFlow(false);
     }
   }, [jobId]);
 
-  useEffect(() => { load(); }, [load]);
+  const load = useCallback(async () => {
+    const lifetime = jobLifetimeRef.current;
+    if (!lifetime || lifetime.jobId !== jobId) return;
+    const request = ++jobRequestRef.current;
+    const isCurrent = () => jobLifetimeRef.current === lifetime && jobRequestRef.current === request;
+    setLoading(true);
+    setJobError(null);
+    setJob(null);
+    setHasApplied(false);
+    setIsAssigned(false);
+    setHasInvite(false);
+    setIsSaved(false);
+    setClientUserId(null);
+    setCanMessage(false);
+    setCanApply(false);
+    setFlowData(null);
+    setLoadingFlow(false);
+    setShowApplyModal(false);
+    setShowMessageModal(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!isCurrent()) return;
+      if (!user) { router.push('/guard/login'); return; }
+      setGuardUserId(user.id);
+
+      const { data: guard, error: guardError } = await supabase
+        .from('guards')
+        .select('id, full_name, verification_status, licence_types, sia_licence_number, sia_verified')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (guardError) throw guardError;
+
+      if (!isCurrent()) return;
+      if (!guard) { router.push('/guard/login'); return; }
+      if (guard.verification_status !== 'approved' && guard.verification_status !== 'verified') {
+        router.push('/guard/onboarding');
+        return;
+      }
+
+      setGuardId(guard.id);
+      setGuardName(guard.full_name);
+      setGuardProfile(guard);
+
+      void loadPaymentFlow(guard.id, isCurrent);
+
+      // Booked jobs are not public listings. The authenticated function checks
+      // this guard's application/assignment before returning a closed booking.
+      setJobError(null);
+      let jobData;
+      try {
+        const { data, error } = await supabase.functions.invoke('get-job-detail', {
+          body: { jobId },
+        });
+        if (!isCurrent()) return;
+        if (error || data?.error) throw new Error('Unable to load this booking. Please retry or contact support.');
+        jobData = data?.job ?? null;
+        setJob(jobData);
+      } catch (error) {
+        if (!isCurrent()) return;
+        setJob(null);
+        setJobError('Unable to load this booking. Please retry or contact support.');
+        setLoading(false);
+        return;
+      }
+
+      if (jobData?.client_id) {
+        const { data: clientRow, error: clientError } = await supabase
+          .from('clients')
+          .select('user_id')
+          .eq('id', jobData.client_id)
+          .maybeSingle();
+        if (clientError) throw clientError;
+        if (!isCurrent()) return;
+        if (clientRow?.user_id) setClientUserId(clientRow.user_id);
+      }
+
+      const { data: app, error: applicationError } = await supabase
+        .from('job_applications')
+        .select('id, status')
+        .eq('job_id', jobId)
+        .eq('guard_id', guard.id)
+        .maybeSingle();
+      if (applicationError) throw applicationError;
+
+      if (!isCurrent()) return;
+      setHasApplied(!!app);
+
+      const { data: assignment, error: assignmentError } = await supabase
+        .from('job_assignments')
+        .select('id, status')
+        .eq('job_id', jobId)
+        .eq('guard_id', guard.id)
+        .maybeSingle();
+      if (assignmentError) throw assignmentError;
+
+      if (!isCurrent()) return;
+      setIsAssigned(!!assignment);
+
+      const { data: invite, error: inviteError } = await supabase
+        .from('job_invites')
+        .select('id, status')
+        .eq('job_id', jobId)
+        .eq('guard_id', guard.id)
+        .maybeSingle();
+      if (inviteError) throw inviteError;
+
+      if (!isCurrent()) return;
+      setHasInvite(!!invite);
+
+      const { data: saved, error: savedError } = await supabase
+        .from('saved_jobs')
+        .select('id')
+        .eq('job_id', jobId)
+        .eq('guard_id', guard.id)
+        .maybeSingle();
+      if (savedError) throw savedError;
+      if (!isCurrent()) return;
+      setIsSaved(!!saved);
+
+    } catch {
+      if (isCurrent()) {
+        setJob(null);
+        setJobError('Unable to load this booking. Please retry or contact support.');
+      }
+    } finally {
+      if (isCurrent()) setLoading(false);
+    }
+  }, [jobId, router, loadPaymentFlow]);
+
+  useEffect(() => {
+    const lifetime = { jobId };
+    jobLifetimeRef.current = lifetime;
+    void load();
+    return () => { if (jobLifetimeRef.current === lifetime) jobLifetimeRef.current = null; };
+  }, [jobId, load]);
 
   useEffect(() => {
     const handleScroll = () => {
