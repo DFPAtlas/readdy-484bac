@@ -4,6 +4,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { logAdminAction } from '@/lib/admin-logger';
+import { parseApplicationLink, takeApplicationReturnPath } from '@/lib/admin-application-link';
+import ClientDetailModal from './ClientDetailModal';
+import GuardDetailModal from './GuardDetailModal';
 import AccountsTabs from './AccountsTabs';
 import ClientsTable from './ClientsTable';
 import GuardsTable from './GuardsTable';
@@ -26,7 +29,15 @@ export default function AccountsPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showBulkEmail, setShowBulkEmail] = useState(false);
 
+  const [applicationReview, setApplicationReview] = useState<{ role: 'client' | 'guard'; id: string } | null>(null);
+
   useEffect(() => {
+    const review = parseApplicationLink(window.location.pathname + window.location.search);
+    if (review) {
+      takeApplicationReturnPath();
+      setActiveTab(review.role === 'client' ? 'clients' : 'guards');
+      setApplicationReview(review);
+    }
     fetchAccounts();
   }, []);
 
@@ -421,6 +432,17 @@ export default function AccountsPage() {
           )}
         </div>
 
+        {applicationReview && !loading && (() => {
+          const record = (applicationReview.role === 'client' ? clients : guards).find(item => item.id === applicationReview.id);
+          const close = () => {
+            setApplicationReview(null);
+            window.history.replaceState(null, '', '/admin/accounts');
+          };
+          if (!record) return <div role="alert" className="text-amber-300">This application could not be loaded. It may have been removed or you may not have access. <button onClick={close}>Dismiss</button></div>;
+          return applicationReview.role === 'client'
+            ? <ClientDetailModal client={record} onClose={close} onUpdate={fetchAccounts} />
+            : <GuardDetailModal guard={record} onClose={close} onUpdate={fetchAccounts} />;
+        })()}
         <RecentActivityLog />
       </div>
 

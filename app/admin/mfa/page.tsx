@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { takeApplicationReturnPath } from '@/lib/admin-application-link';
 import { supabase } from '@/lib/supabase';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { clearAdminAuthCache } from '@/hooks/useAdminAuth';
@@ -49,7 +50,7 @@ export default function AdminMfaChallenge() {
         if (cancelled) return;
 
         if (route === 'authorized') {
-          router.push('/admin/dashboard');
+          router.push(takeApplicationReturnPath());
           return;
         }
         if (route === 'setup') {
@@ -149,7 +150,7 @@ export default function AdminMfaChallenge() {
         return;
       }
 
-      router.push('/admin/dashboard');
+      router.push(takeApplicationReturnPath());
     } catch {
       setError('An error occurred during verification. Please try again.');
       setVerifying(false);

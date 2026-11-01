@@ -40,10 +40,10 @@ async function logReconciliation(supabase: any, email: any, jobId: string | null
   }
 }
 
-async function sendEmailViaResend(apiKey: string, to: string, subject: string, html: string) {
+async function sendEmailViaResend(apiKey: string, to: string, subject: string, html: string, idempotencyKey?: string) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
     body: JSON.stringify({
       from: 'QuickGuard Notifications <notifications@quickguard.uk>',
       reply_to: 'support@quickguard.uk',
@@ -197,10 +197,11 @@ serve(async (req) => {
           RESEND_API_KEY,
           email.recipient_email,
           email.subject,
-          email.body_html || email.body_text || email.body
+          email.body_html || email.body_text || email.body,
+          email.email_type === 'admin_registration' ? `admin-registration:${email.id}` : undefined
         );
 
-        if (!result.success) throw new Error(result.error || 'Resend send failed');
+        if (!result.success || !result.data?.id) throw new Error(result.error || 'Resend did not confirm provider acceptance');
 
         const now = new Date().toISOString();
         await supabase.from('email_send_log').insert({
@@ -215,8 +216,10 @@ serve(async (req) => {
           created_at: now,
         });
 
-        const { error: completeError } = await supabase.rpc('complete_email_queue', { p_queue_id: email.id });
-        if (completeError) throw new Error(`Email sent but queue completion failed: ${completeError.message}`);
+        const { data: completion, error: completeError } = await supabase.rpc('complete_email_queue', { p_queue_id: email.id });
+        if (completeError || (email.email_type === 'admin_registration' && completion !== true)) {
+          throw new Error(`Email accepted but queue completion not confirmed: ${completeError?.message || 'completion returned false'}`);
+        }
         sent++;
       } catch (err: any) {
         const message = err?.message || 'Unknown email queue failure';

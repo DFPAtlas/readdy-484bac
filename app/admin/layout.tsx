@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
+import { rememberApplicationLink } from '@/lib/admin-application-link';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminSessionTimeout from '@/components/AdminSessionTimeout';
 import AdminSessionHeartbeat from '@/components/AdminSessionHeartbeat';
@@ -29,6 +30,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return () => { cancelled = true; };
     }
 
+    rememberApplicationLink();
     setLoading(true);
     setIsAuthorized(false);
 

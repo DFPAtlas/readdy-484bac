@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
+import { takeApplicationReturnPath } from '@/lib/admin-application-link';
 import { supabase } from '@/lib/supabase';
 import { logAdminAction } from '@/lib/admin-logger';
 import { resolveAdminMfaRoute } from '@/lib/admin-mfa';
@@ -87,7 +88,7 @@ export default function AdminLogin() {
       const mfaRoute = await resolveAdminMfaRoute();
 
       if (mfaRoute === 'authorized') {
-        router.push('/admin/dashboard');
+        router.push(takeApplicationReturnPath());
         return;
       }
       if (mfaRoute === 'mfa') {
