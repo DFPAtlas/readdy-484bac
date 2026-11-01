@@ -8,15 +8,18 @@ const user = '11111111-1111-4111-8111-111111111111';
 const id = '22222222-2222-4222-8222-222222222222';
 async function setup() {
   const db = new PGlite();
-  await db.exec(`create schema app; create role anon; create role authenticated;
-    create table app.email_queue(id uuid default gen_random_uuid() primary key, user_id uuid, email_type text, recipient_email text not null, recipient_name text, subject text not null, body_html text not null, status text, priority int, metadata jsonb, dedupe_key text, created_at timestamptz, updated_at timestamptz);
-    create table app.guards(id uuid primary key, user_id uuid unique, first_name text, last_name text, full_name text, email text, sia_verified boolean, created_at timestamptz default now());
-    create table app.clients(id uuid primary key, user_id uuid unique, contact_name text, email text, created_at timestamptz default now());`);
+  await db.exec(`create schema app; create schema auth; create role anon; create role authenticated;
+    create table auth.users(id uuid primary key);
+    create table app.users(id uuid primary key references auth.users(id));
+    create table app.email_queue(id uuid default gen_random_uuid() primary key, user_id uuid references app.users(id) on delete cascade, email_type text, recipient_email text not null, recipient_name text, subject text not null, body_html text not null, status text, priority int, metadata jsonb, dedupe_key text, created_at timestamptz, updated_at timestamptz);
+    create table app.guards(id uuid primary key, user_id uuid unique references auth.users(id) on delete cascade, first_name text, last_name text, full_name text, email text, sia_verified boolean, created_at timestamptz default now());
+    create table app.clients(id uuid primary key, user_id uuid unique references auth.users(id) on delete cascade, contact_name text, email text, created_at timestamptz default now());`);
   // Preserve the real queue's BEFORE INSERT key derivation behavior.
   const phase2 = fs.readFileSync('supabase/migrations/20261006212325_immediate_booking_phase2.sql', 'utf8');
   await db.exec(phase2.slice(phase2.indexOf('CREATE OR REPLACE FUNCTION app.set_email_queue_dedupe_key()'), phase2.indexOf('-- 6b-4.')));
   await db.exec('create trigger dedupe before insert on app.email_queue for each row execute function app.set_email_queue_dedupe_key()');
   await db.exec(migration);
+  await db.query('insert into auth.users(id) values($1)', [user]);
   return db;
 }
 test('email/social profile inserts queue fixed-recipient notifications; updates and retries do not duplicate', async () => {
@@ -27,7 +30,8 @@ test('email/social profile inserts queue fixed-recipient notifications; updates 
     await db.query('update app.guards set full_name=$1 where id=$2', ['Updated',id]);
     const rows = (await db.query('select * from app.email_queue order by dedupe_key')).rows;
     assert.equal(rows.length,2);
-    assert.ok(rows.every(r=>r.recipient_email==='martin.s.hewett@outlook.com' && r.status==='pending'));
+    assert.ok(rows.every(r=>r.recipient_email==='martin.s.hewett@outlook.com' && r.status==='pending' && r.user_id===null));
+    assert.ok(rows.every(r=>r.metadata.applicant_user_id===user));
     const guard = rows.find(r=>r.metadata.account_role==='guard');
     assert.match(guard.body_html,/&lt;img/); assert.doesNotMatch(guard.body_html,/<img/);
     assert.match(guard.body_html,new RegExp(`role=guard&amp;id=${id}`));
@@ -97,4 +101,37 @@ test('worker sends stable provider idempotency key and retries unconfirmed deliv
  const before=requests.length;
  const unauthorized=await handler(new Request('https://worker.test',{method:'POST'}));
  assert.equal(unauthorized.status,401);assert.equal(requests.length,before);
+});
+
+
+test('auth profile creation before app.users succeeds for guard and client with live foreign-key dependencies', async () => {
+  const db = await setup();
+  const guardUser = '33333333-3333-4333-8333-333333333333';
+  const clientUser = '44444444-4444-4444-8444-444444444444';
+  try {
+    await db.exec(`create function public.test_auth_profile() returns trigger language plpgsql as $$
+    begin
+      if new.id = '${guardUser}'::uuid then
+        insert into app.guards(id,user_id,full_name,email) values(new.id,new.id,'Social Guard','social-guard@example.com');
+      else
+        insert into app.clients(id,user_id,contact_name,email) values(new.id,new.id,'New Client','new-client@example.com');
+      end if;
+      return new;
+    end; $$;
+    create trigger on_auth_user_created after insert on auth.users for each row execute function public.test_auth_profile();`);
+    // auth.users -> profile -> notification, before app.users is provisioned.
+    await db.query('insert into auth.users(id) values($1),($2)', [guardUser,clientUser]);
+    assert.equal((await db.query('select count(*)::int count from app.users')).rows[0].count,0);
+    const queued = (await db.query('select * from app.email_queue order by dedupe_key')).rows;
+    assert.equal(queued.length,2);
+    assert.ok(queued.every(row=>row.user_id===null));
+    assert.deepEqual(new Set(queued.map(row=>row.metadata.applicant_user_id)), new Set([guardUser,clientUser]));
+    // Prove the queue FK is active, rather than passing because the fixture omits it.
+    await assert.rejects(db.query('update app.email_queue set user_id=$1',[guardUser]), /foreign key/i);
+    // Later app-user provisioning and profile updates must not enqueue duplicates.
+    await db.query('insert into app.users(id) values($1),($2)',[guardUser,clientUser]);
+    await db.query('update app.guards set full_name=$1 where user_id=$2',['Completed Guard',guardUser]);
+    await db.query('update app.clients set contact_name=$1 where user_id=$2',['Completed Client',clientUser]);
+    assert.equal((await db.query('select count(*)::int count from app.email_queue')).rows[0].count,2);
+  } finally { await db.close(); }
 });

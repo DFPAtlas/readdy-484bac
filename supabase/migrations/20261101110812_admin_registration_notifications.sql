@@ -32,12 +32,16 @@ begin
   end if;
   body := body || '<p><a href="' || review_link || '">Review application</a></p><p>Administrator sign-in and MFA are required. Documents remain in QuickGuard.</p>';
 
+  -- This is an admin-recipient email, not an email to the applicant.
+  -- auth.users can create the profile before app.users exists. Do not attach
+  -- this queue row to the applicant through email_queue.user_id's app.users FK.
+  -- Stable applicant identifiers remain in server-generated metadata and link.
   insert into app.email_queue
     (user_id, email_type, recipient_email, recipient_name, subject, body_html, status, priority, metadata, dedupe_key, created_at, updated_at)
   values
-    (new.user_id, 'admin_registration', 'martin.s.hewett@outlook.com', 'Martin Hewett',
+    (null, 'admin_registration', 'martin.s.hewett@outlook.com', 'Martin Hewett',
      'QuickGuard — New ' || account_role || ' application', body, 'pending', 5,
-     jsonb_build_object('source_record_id', source_key, 'account_role', account_role, 'profile_id', new.id), source_key, now(), now())
+     jsonb_build_object('source_record_id', source_key, 'account_role', account_role, 'profile_id', new.id, 'applicant_user_id', new.user_id), source_key, now(), now())
   on conflict do nothing;
   return new;
 end;

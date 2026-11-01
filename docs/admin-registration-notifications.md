@@ -10,13 +10,15 @@ The link contains only the role and profile UUID. Admin authorization and MFA re
 
 Queue insertion and profile creation are one database transaction. A rolled-back registration sends nothing. Resend calls happen asynchronously, so a provider outage does not hold up registration. A database queue-write failure rolls back the profile insert rather than silently losing the notification.
 
+Admin notification rows deliberately have `email_queue.user_id = NULL`: that foreign key points to `app.users`, which may not exist when the auth trigger creates a profile. The applicant auth user ID is stored as `metadata.applicant_user_id`, alongside the profile UUID and account role. This avoids changing applicant provisioning or creating placeholder application users. Queue retention still applies; these admin emails are not automatically removed by the applicant app-user foreign-key cascade.
+
 A scoped unique index deduplicates by account type and user ID while the queue record is retained. The current queue key trigger derives that key from server-set `source_record_id`. Retried provider requests use a stable Resend idempotency key based on the queue UUID. Resend retains idempotency keys for 24 hours; do not blindly replay an ambiguously accepted message after that window. Reconcile provider logs first. Provider acceptance requires a response message ID; acceptance does not establish inbox delivery.
 
 ## Deployment and verification
 
 This PR does not apply changes to production or send a live test email.
 
-1. Review the current `app.email_queue` schema/constraints and existing worker scheduler against the migration. Base schema is not fully represented in this repository; local regression tests use an explicit compatible schema.
+1. Read-only live inspection confirmed the required queue columns, dedupe trigger, nullable user reference, unconstrained email type and boolean completion RPC. The enabled worker is scheduled every minute. Regression tests enforce the observed auth-user/profile and app-user/queue foreign keys and simulate profile creation before app-user provisioning. No production migration has been applied.
 2. Deploy the updated `process-email-queue` worker, then apply `20261101110812_admin_registration_notifications.sql`. Publish the frontend from the same commit.
 3. Confirm the verified Resend sender, worker secret/API key and worker scheduler are functioning.
 4. Register one new guard and one new client; confirm exactly one queue row and provider message per account. Check actual receipt in the configured Outlook inbox.
