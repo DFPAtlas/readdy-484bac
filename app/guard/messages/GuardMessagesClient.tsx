@@ -249,8 +249,18 @@ export default function GuardMessagesClient() {
 
   const activeConversation = conversations.find(c => c.id === activeConversationId);
 
+  // Depend on conversation identity, not list objects replaced by unread/realtime updates.
+  const activeJobId = activeConversation?.job_id ?? null;
+  const activeOtherUserId = activeConversation?.other_user_id ?? null;
+  const messageContextKey = JSON.stringify([activeConversationId, activeJobId, activeOtherUserId, guardUserId]);
+  const messageLifetimeRef = useRef<{ key: string } | null>(null);
+  const messageRequestRef = useRef(0);
+
   const loadActiveMessages = useCallback(async () => {
-    if (!activeConversation || !guardUserId) return;
+    const lifetime = messageLifetimeRef.current;
+    if (!activeConversationId || !activeOtherUserId || !guardUserId || !lifetime || lifetime.key !== messageContextKey) return;
+    const request = ++messageRequestRef.current;
+    const isCurrent = () => messageLifetimeRef.current === lifetime && messageRequestRef.current === request;
 
     let query = supabase
       .from('messages')
@@ -258,28 +268,30 @@ export default function GuardMessagesClient() {
       .or(`sender_id.eq.${guardUserId},receiver_id.eq.${guardUserId}`)
       .order('created_at', { ascending: true });
 
-    if (activeConversation.job_id) {
-      query = query.eq('job_id', activeConversation.job_id);
+    if (activeJobId) {
+      query = query.eq('job_id', activeJobId);
     } else {
       query = query.is('job_id', null);
     }
 
     const { data } = await query;
+    if (!isCurrent()) return;
     const filtered = (data || []).filter(m => {
       const otherId = m.sender_id === guardUserId ? m.receiver_id : m.sender_id;
-      return otherId === activeConversation.other_user_id;
+      return otherId === activeOtherUserId;
     });
 
     setActiveMessages(filtered);
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    setTimeout(() => { if (isCurrent()) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 50);
 
-    if (activeConversation.job_id) {
+    if (activeJobId) {
       const { data: jobData } = await supabase
         .from('jobs')
         .select('id, job_title, venue_city, status, start_date, start_time')
-        .eq('id', activeConversation.job_id)
+        .eq('id', activeJobId)
         .maybeSingle();
-      if (jobData) setActiveJob(jobData);
+      if (!isCurrent()) return;
+      setActiveJob(jobData ?? null);
     } else {
       setActiveJob(null);
     }
@@ -287,24 +299,29 @@ export default function GuardMessagesClient() {
     const { data: clientData } = await supabase
       .from('clients')
       .select('id, company_name, contact_name, user_id')
-      .eq('user_id', activeConversation.other_user_id)
+      .eq('user_id', activeOtherUserId)
       .maybeSingle();
-    if (clientData) setActiveClient(clientData);
+    if (!isCurrent()) return;
+    setActiveClient(clientData ?? null);
 
     const unreadIds = filtered.filter(m => m.receiver_id === guardUserId && !m.read).map(m => m.id);
     if (unreadIds.length > 0) {
       await supabase.from('messages').update({ read: true }).in('id', unreadIds);
+      if (!isCurrent()) return;
       setConversations(prev => prev.map(c => c.id === activeConversationId ? { ...c, unread_count: 0 } : c));
       setTotalUnread(prev => Math.max(0, prev - unreadIds.length));
     }
-  }, [activeConversation, activeConversationId, guardUserId]);
+  }, [activeJobId, activeOtherUserId, activeConversationId, guardUserId, messageContextKey]);
 
   useEffect(() => {
-    if (activeConversationId) {
-      setActiveMessages([]);
-      loadActiveMessages();
-    }
-  }, [activeConversationId]);
+    const lifetime = { key: messageContextKey };
+    messageLifetimeRef.current = lifetime;
+    setActiveMessages([]);
+    setActiveJob(null);
+    setActiveClient(null);
+    if (activeConversationId) void loadActiveMessages();
+    return () => { if (messageLifetimeRef.current === lifetime) messageLifetimeRef.current = null; };
+  }, [activeConversationId, loadActiveMessages, messageContextKey]);
 
   const handleSend = async () => {
     if (!activeConversation || !guardUserId || !input.trim()) return;

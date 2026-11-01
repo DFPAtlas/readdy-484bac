@@ -393,7 +393,7 @@ export default function MessagesClient() {
     mountedRef.current = true;
     loadConversations(false);
     return () => { mountedRef.current = false; };
-  }, []);
+  }, [loadConversations]);
 
   useEffect(() => {
     if (!clientUserId) return;
@@ -451,8 +451,18 @@ export default function MessagesClient() {
 
   const activeConversation = conversations.find(c => c.id === activeConversationId);
 
+  // Depend on conversation identity, not list objects replaced by unread/realtime updates.
+  const activeJobId = activeConversation?.job_id ?? null;
+  const activeOtherUserId = activeConversation?.other_user_id ?? null;
+  const messageContextKey = JSON.stringify([activeConversationId, activeJobId, activeOtherUserId, clientUserId]);
+  const messageLifetimeRef = useRef<{ key: string } | null>(null);
+  const messageRequestRef = useRef(0);
+
   const loadActiveMessages = useCallback(async (beforeCreatedAt?: string) => {
-    if (!activeConversation || !clientUserId) return;
+    const lifetime = messageLifetimeRef.current;
+    if (!activeConversationId || !activeOtherUserId || !clientUserId || !lifetime || lifetime.key !== messageContextKey) return;
+    const request = ++messageRequestRef.current;
+    const isCurrent = () => messageLifetimeRef.current === lifetime && messageRequestRef.current === request;
 
     const isLoadMore = !!beforeCreatedAt;
     if (isLoadMore) setMsgLoadingOlder(true);
@@ -464,8 +474,8 @@ export default function MessagesClient() {
         .order('created_at', { ascending: false })
         .limit(MSG_PAGE_SIZE);
 
-      if (activeConversation.job_id) {
-        query = query.eq('job_id', activeConversation.job_id);
+      if (activeJobId) {
+        query = query.eq('job_id', activeJobId);
       } else {
         query = query.is('job_id', null);
       }
@@ -475,10 +485,11 @@ export default function MessagesClient() {
       }
 
       const { data } = await query;
+      if (!isCurrent()) return;
 
       const filtered = ((data || []) as Message[]).filter(m => {
         const otherId = m.sender_id === clientUserId ? m.receiver_id : m.sender_id;
-        return otherId === activeConversation.other_user_id;
+        return otherId === activeOtherUserId;
       }).reverse();
 
       if (!mountedRef.current) return;
@@ -488,7 +499,7 @@ export default function MessagesClient() {
         setActiveMessages(prev => [...filtered, ...prev]);
       } else {
         setActiveMessages(filtered);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        setTimeout(() => { if (isCurrent()) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 50);
       }
 
       setMsgHasMore(filtered.length >= MSG_PAGE_SIZE);
@@ -496,30 +507,33 @@ export default function MessagesClient() {
         setMsgOldestCreatedAt(filtered[0].created_at);
       }
 
-      if (!activeConversation.job_id) {
+      if (!activeJobId) {
         setActiveJob(null);
       } else if (!isLoadMore) {
         const { data: jobData } = await supabase
           .from('jobs')
           .select('id, job_title, venue_city, status, start_date, start_time')
-          .eq('id', activeConversation.job_id)
+          .eq('id', activeJobId)
           .maybeSingle();
-        if (jobData && mountedRef.current) setActiveJob(jobData);
+        if (!isCurrent()) return;
+        setActiveJob(jobData ?? null);
       }
 
       if (!isLoadMore) {
         const { data: guardData } = await supabase
           .from('guards')
           .select('id, full_name, profile_image_url, rating')
-          .eq('user_id', activeConversation.other_user_id)
+          .eq('user_id', activeOtherUserId)
           .maybeSingle();
-        if (guardData && mountedRef.current) setActiveGuard(guardData);
+        if (!isCurrent()) return;
+        setActiveGuard(guardData ?? null);
       }
 
       if (!isLoadMore) {
         const unreadIds = filtered.filter(m => m.receiver_id === clientUserId && !m.read).map(m => m.id);
         if (unreadIds.length > 0) {
           await supabase.from('messages').update({ read: true }).in('id', unreadIds);
+          if (!isCurrent()) return;
           setConversations(prev => prev.map(c =>
             c.id === activeConversationId ? { ...c, unread_count: 0 } : c
           ));
@@ -527,18 +541,22 @@ export default function MessagesClient() {
         }
       }
     } finally {
-      if (isLoadMore && mountedRef.current) setMsgLoadingOlder(false);
+      if (isLoadMore && isCurrent()) setMsgLoadingOlder(false);
     }
-  }, [activeConversation, activeConversationId, clientUserId]);
+  }, [activeJobId, activeOtherUserId, activeConversationId, clientUserId, messageContextKey]);
 
   useEffect(() => {
-    if (activeConversationId) {
-      setActiveMessages([]);
-      setMsgHasMore(false);
-      setMsgOldestCreatedAt(null);
-      loadActiveMessages();
-    }
-  }, [activeConversationId]);
+    const lifetime = { key: messageContextKey };
+    messageLifetimeRef.current = lifetime;
+    setActiveMessages([]);
+    setActiveJob(null);
+    setActiveGuard(null);
+    setMsgLoadingOlder(false);
+    setMsgHasMore(false);
+    setMsgOldestCreatedAt(null);
+    if (activeConversationId) void loadActiveMessages();
+    return () => { if (messageLifetimeRef.current === lifetime) messageLifetimeRef.current = null; };
+  }, [activeConversationId, loadActiveMessages, messageContextKey]);
 
   const handleLoadOlderMessages = () => {
     if (msgOldestCreatedAt) loadActiveMessages(msgOldestCreatedAt);
