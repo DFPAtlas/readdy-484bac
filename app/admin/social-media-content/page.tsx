@@ -88,7 +88,9 @@ export default function SocialMediaContent() {
   const [activeTab, setActiveTab] = useState<'posts' | 'ideas'>('posts');
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [ideas, setIdeas] = useState<SocialIdea[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [postsLoading, setPostsLoading] = useState(true);
+  const [ideasLoading, setIdeasLoading] = useState(true);
+  const loading = postsLoading || ideasLoading;
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showPostModal, setShowPostModal] = useState(false);
   const [editingPost, setEditingPost] = useState<SocialPost | null>(null);
@@ -121,68 +123,106 @@ export default function SocialMediaContent() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const fetchPosts = useCallback(async () => {
-    let query = supabase.from('social_media_posts').select('*', { count: 'exact', head: false });
-
-    if (postsSearchDebounced.trim()) {
-      const term = `%${postsSearchDebounced.trim()}%`;
-      query = query.or(`title.ilike.${term},content.ilike.${term}`);
-    }
-    if (postsPlatformFilter) {
-      query = query.contains('platforms', [postsPlatformFilter]);
-    }
-    if (postsStatusFilter) {
-      query = query.eq('status', postsStatusFilter);
-    }
-
-    const from = (postsPage - 1) * POSTS_PER_PAGE;
-    const to = from + POSTS_PER_PAGE - 1;
-
-    const { data, error, count } = await query
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (error) { showToast('Failed to load posts.', 'error'); return; }
-    setPosts(data || []);
-    setPostsTotal(count || 0);
-  }, [showToast, postsPage, postsSearchDebounced, postsPlatformFilter, postsStatusFilter]);
-
-  const fetchIdeas = useCallback(async () => {
-    let query = supabase.from('social_media_ideas').select('*', { count: 'exact', head: false });
-
-    if (ideasSearchDebounced.trim()) {
-      const term = `%${ideasSearchDebounced.trim()}%`;
-      query = query.or(`title.ilike.${term},description.ilike.${term}`);
-    }
-    if (ideasCategoryFilter) {
-      query = query.eq('category', ideasCategoryFilter);
-    }
-    if (ideasPriorityFilter) {
-      query = query.eq('priority', ideasPriorityFilter);
-    }
-    if (ideasUsedFilter !== '') {
-      query = query.eq('used', ideasUsedFilter === 'used');
-    }
-
-    const from = (ideasPage - 1) * IDEAS_PER_PAGE;
-    const to = from + IDEAS_PER_PAGE - 1;
-
-    const { data, error, count } = await query
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (error) { showToast('Failed to load ideas.', 'error'); return; }
-    setIdeas(data || []);
-    setIdeasTotal(count || 0);
-  }, [showToast, ideasPage, ideasSearchDebounced, ideasCategoryFilter, ideasPriorityFilter, ideasUsedFilter]);
+  const mounted = useRef(false);
+  const postsRequest = useRef(0);
+  const ideasRequest = useRef(0);
+  const postsScope = JSON.stringify([postsPage, postsSearchDebounced, postsPlatformFilter, postsStatusFilter]);
+  const ideasScope = JSON.stringify([ideasPage, ideasSearchDebounced, ideasCategoryFilter, ideasPriorityFilter, ideasUsedFilter]);
+  const currentPostsScope = useRef(postsScope);
+  const currentIdeasScope = useRef(ideasScope);
+  currentPostsScope.current = postsScope;
+  currentIdeasScope.current = ideasScope;
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([fetchPosts(), fetchIdeas()]).finally(() => setLoading(false));
+    mounted.current = true;
+    return () => { mounted.current = false; };
   }, []);
 
-  useEffect(() => { fetchPosts(); }, [fetchPosts]);
-  useEffect(() => { fetchIdeas(); }, [fetchIdeas]);
+  const fetchPosts = useCallback(async () => {
+    if (!mounted.current || currentPostsScope.current !== postsScope) return;
+    const request = ++postsRequest.current;
+    const isCurrent = () => mounted.current && request === postsRequest.current && currentPostsScope.current === postsScope;
+    setPostsLoading(true);
+    try {
+      let query = supabase.from('social_media_posts').select('*', { count: 'exact', head: false });
+
+      if (postsSearchDebounced.trim()) {
+        const term = `%${postsSearchDebounced.trim()}%`;
+        query = query.or(`title.ilike.${term},content.ilike.${term}`);
+      }
+      if (postsPlatformFilter) {
+        query = query.contains('platforms', [postsPlatformFilter]);
+      }
+      if (postsStatusFilter) {
+        query = query.eq('status', postsStatusFilter);
+      }
+
+      const from = (postsPage - 1) * POSTS_PER_PAGE;
+      const to = from + POSTS_PER_PAGE - 1;
+
+      const { data, error, count } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (!isCurrent()) return;
+      if (error) { showToast('Failed to load posts.', 'error'); return; }
+      setPosts(data || []);
+      setPostsTotal(count || 0);
+    } catch {
+      if (isCurrent()) showToast('Failed to load posts.', 'error');
+    } finally {
+      if (isCurrent()) setPostsLoading(false);
+    }
+  }, [postsScope, showToast, postsPage, postsSearchDebounced, postsPlatformFilter, postsStatusFilter]);
+
+  const fetchIdeas = useCallback(async () => {
+    if (!mounted.current || currentIdeasScope.current !== ideasScope) return;
+    const request = ++ideasRequest.current;
+    const isCurrent = () => mounted.current && request === ideasRequest.current && currentIdeasScope.current === ideasScope;
+    setIdeasLoading(true);
+    try {
+      let query = supabase.from('social_media_ideas').select('*', { count: 'exact', head: false });
+
+      if (ideasSearchDebounced.trim()) {
+        const term = `%${ideasSearchDebounced.trim()}%`;
+        query = query.or(`title.ilike.${term},description.ilike.${term}`);
+      }
+      if (ideasCategoryFilter) {
+        query = query.eq('category', ideasCategoryFilter);
+      }
+      if (ideasPriorityFilter) {
+        query = query.eq('priority', ideasPriorityFilter);
+      }
+      if (ideasUsedFilter !== '') {
+        query = query.eq('used', ideasUsedFilter === 'used');
+      }
+
+      const from = (ideasPage - 1) * IDEAS_PER_PAGE;
+      const to = from + IDEAS_PER_PAGE - 1;
+
+      const { data, error, count } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (!isCurrent()) return;
+      if (error) { showToast('Failed to load ideas.', 'error'); return; }
+      setIdeas(data || []);
+      setIdeasTotal(count || 0);
+    } catch {
+      if (isCurrent()) showToast('Failed to load ideas.', 'error');
+    } finally {
+      if (isCurrent()) setIdeasLoading(false);
+    }
+  }, [ideasScope, showToast, ideasPage, ideasSearchDebounced, ideasCategoryFilter, ideasPriorityFilter, ideasUsedFilter]);
+
+  useEffect(() => {
+    void fetchPosts();
+    return () => { postsRequest.current += 1; };
+  }, [fetchPosts]);
+  useEffect(() => {
+    void fetchIdeas();
+    return () => { ideasRequest.current += 1; };
+  }, [fetchIdeas]);
 
   useEffect(() => {
     if (postsSearchTimer.current) clearTimeout(postsSearchTimer.current);
