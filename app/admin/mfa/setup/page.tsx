@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { takeApplicationReturnPath } from '@/lib/admin-application-link';
 import { supabase } from '@/lib/supabase';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { clearAdminAuthCache } from '@/hooks/useAdminAuth';
@@ -68,7 +69,7 @@ export default function AdminMfaSetup() {
         if (cancelled) return;
 
         if (route === 'authorized') {
-          window.location.href = '/admin/dashboard';
+          window.location.href = takeApplicationReturnPath();
           return;
         }
         if (route === 'mfa') {
@@ -254,7 +255,7 @@ export default function AdminMfaSetup() {
       }
 
       setEnabled(true);
-      setTimeout(() => router.push('/admin/dashboard'), 1400);
+      setTimeout(() => router.push(takeApplicationReturnPath()), 1400);
     } catch {
       setVerifyError('An error occurred during verification. Please try again.');
       setVerifying(false);
