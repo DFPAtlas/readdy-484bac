@@ -137,88 +137,99 @@ export default function ClientMonitoringDetail({ client, onClose, onUpdate }: De
   const initials = displayName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 
   useEffect(() => {
-    if (activeTab === 'overview') fetchOverview();
-    if (activeTab === 'jobs') fetchJobs();
-    if (activeTab === 'payments') fetchPayments();
-    if (activeTab === 'tickets') fetchTickets();
-    if (activeTab === 'messages') fetchMessages();
-    if (activeTab === 'documents') fetchDocuments();
-  }, [activeTab]);
+    let current = true;
+    setContacts([]);
+    setJobs([]);
+    setPayments([]);
+    setTickets([]);
+    setMessages([]);
+    setDocuments([]);
+    setLoading(activeTab !== 'notes');
+
+    const fetchOverview = async () => {
+      const { data: contactsData, error } = await supabase
+        .from('client_contacts')
+        .select('*')
+        .eq('client_id', client.id)
+        .order('is_primary', { ascending: false });
+      if (error) throw error;
+      if (current) setContacts((contactsData || []) as ContactData[]);
+    };
+
+    const fetchJobs = async () => {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('id, job_title, status, start_date, venue_city, venue_name, guards_required, created_at, total_cost')
+        .eq('client_id', client.id)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      if (current) setJobs((data || []) as JobData[]);
+    };
+
+    const fetchPayments = async () => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('id, amount, status, created_at, description')
+        .eq('client_id', client.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      if (current) setPayments((data || []) as PaymentData[]);
+    };
+
+    const fetchTickets = async () => {
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .select('id, subject, status, priority, created_at, last_reply_at')
+        .eq('client_id', client.id)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      if (current) setTickets((data || []) as TicketData[]);
+    };
+
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('id, content, created_at, sender_id')
+        .or(`sender_id.eq.${client.user_id},receiver_id.eq.${client.user_id}`)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      if (current) setMessages((data || []) as MessageData[]);
+    };
+
+    const fetchDocuments = async () => {
+      const { data, error } = await supabase
+        .from('client_documents')
+        .select('id, file_name, file_type, created_at, document_type')
+        .eq('client_id', client.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      if (current) setDocuments((data || []) as DocumentData[]);
+    };
+
+    const loaders = {
+      overview: fetchOverview, jobs: fetchJobs, payments: fetchPayments,
+      tickets: fetchTickets, messages: fetchMessages, documents: fetchDocuments,
+    };
+    if (activeTab !== 'notes') {
+      void loaders[activeTab]().catch(() => {
+        if (current) setToast('Failed to load client details');
+      }).finally(() => {
+        if (current) setLoading(false);
+      });
+    }
+    return () => { current = false; };
+  }, [activeTab, client.id, client.user_id]);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
-  };
-
-  const fetchOverview = async () => {
-    const { data: contactsData } = await supabase
-      .from('client_contacts')
-      .select('*')
-      .eq('client_id', client.id)
-      .order('is_primary', { ascending: false });
-    setContacts((contactsData || []) as ContactData[]);
-  };
-
-  const fetchJobs = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('jobs')
-      .select('id, job_title, status, start_date, venue_city, venue_name, guards_required, created_at, total_cost')
-      .eq('client_id', client.id)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    setJobs((data || []) as JobData[]);
-    setLoading(false);
-  };
-
-  const fetchPayments = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('transactions')
-      .select('id, amount, status, created_at, description')
-      .eq('client_id', client.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    setPayments((data || []) as PaymentData[]);
-    setLoading(false);
-  };
-
-  const fetchTickets = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('support_tickets')
-      .select('id, subject, status, priority, created_at, last_reply_at')
-      .eq('client_id', client.id)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    setTickets((data || []) as TicketData[]);
-    setLoading(false);
-  };
-
-  const fetchMessages = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('messages')
-      .select('id, content, created_at, sender_id')
-      .or(`sender_id.eq.${client.user_id},receiver_id.eq.${client.user_id}`)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    setMessages((data || []) as MessageData[]);
-    setLoading(false);
-  };
-
-  const fetchDocuments = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('client_documents')
-      .select('id, file_name, file_type, created_at, document_type')
-      .eq('client_id', client.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    setDocuments((data || []) as DocumentData[]);
-    setLoading(false);
   };
 
   const handleSaveNotes = async () => {
