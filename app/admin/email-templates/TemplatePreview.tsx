@@ -10,6 +10,21 @@ interface TemplatePreviewProps {
   onClose: () => void;
 }
 
+function safeReplace(text: string, sampleData: Record<string, string>): string {
+  if (!text || typeof text !== 'string') return '';
+  try {
+    let result = text;
+    for (const [key, value] of Object.entries(sampleData)) {
+      result = result.split(`{{${key}}}`).join(value || `[${key}]`);
+    }
+    result = result.replace(/\{\{(\w+)\}\}/g, '[$1]');
+    return result;
+  } catch {
+    return text;
+  }
+}
+
+
 export default function TemplatePreview({
   bodyHtml = '',
   subject = '',
@@ -25,23 +40,9 @@ export default function TemplatePreview({
     setSampleData((prev) => ({ ...prev, [key]: value }));
   };
 
-  const safeReplace = (text: string): string => {
-    if (!text || typeof text !== 'string') return '';
-    try {
-      let result = text;
-      for (const [key, value] of Object.entries(sampleData)) {
-        result = result.split(`{{${key}}}`).join(value || `[${key}]`);
-      }
-      result = result.replace(/\{\{(\w+)\}\}/g, '[$1]');
-      return result;
-    } catch {
-      return text;
-    }
-  };
-
   const previewSubject = useMemo(() => {
     try {
-      return safeReplace(subject || '');
+      return safeReplace(subject || '', sampleData);
     } catch {
       return subject || '';
     }
@@ -49,7 +50,7 @@ export default function TemplatePreview({
 
   const resolvedBodyHtml = useMemo(() => {
     try {
-      return safeReplace(bodyHtml || '');
+      return safeReplace(bodyHtml || '', sampleData);
     } catch {
       return bodyHtml || '';
     }

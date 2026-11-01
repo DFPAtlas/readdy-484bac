@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 interface Notification {
@@ -24,7 +24,7 @@ export default function NotificationBell({ isSuperAdmin }: NotificationBellProps
   const [loading, setLoading] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     if (!isSuperAdmin) {
       setLoading(false);
       return;
@@ -37,13 +37,13 @@ export default function NotificationBell({ isSuperAdmin }: NotificationBellProps
       .limit(10);
     setNotifications(data || []);
     setLoading(false);
-  };
+  }, [isSuperAdmin]);
 
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, [isSuperAdmin]);
+  }, [fetchNotifications]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

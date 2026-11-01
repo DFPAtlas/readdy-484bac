@@ -75,7 +75,7 @@ export function useGuardSiaStatus() {
 
     init();
     return () => { mountedRef.current = false; stopTimers(); };
-  }, []);
+  }, [router]);
 
   return { state, rejectionReason, restrictedStatus };
 }

@@ -187,7 +187,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     verifyAdmin();
 
     return () => { cancelled = true; };
-  }, [pathname]);
+  }, [pathname, router]);
 
   if (loading) {
     return (

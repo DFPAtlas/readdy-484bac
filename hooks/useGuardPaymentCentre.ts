@@ -66,10 +66,10 @@ export function useGuardPaymentCentre() {
   const [stripeLoading, setStripeLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
   const fetchAll = useCallback(async () => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
     setLoading(true);
     setError(null);
     try {

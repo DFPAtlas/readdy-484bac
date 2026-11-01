@@ -45,14 +45,13 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
       <div className="space-y-6">
         <div>
           <label className="block text-sm font-semibold text-slate-300 mb-2">SIA Licence Required *</label>
-          <div className="flex gap-6">
+          <div className="flex gap-6" role="radiogroup" aria-label="SIA Licence Required" aria-invalid={!!errors.siaLicenceRequired} aria-describedby={errors.siaLicenceRequired ? "error-siaLicenceRequired" : undefined}>
             {['yes', 'no'].map(val => (
               <label key={val} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
                   name="siaLicenceRequired"
-              aria-invalid={!!errors.siaLicenceRequired}
-              aria-describedby={errors.siaLicenceRequired ? "error-siaLicenceRequired" : undefined}
+                  aria-describedby={errors.siaLicenceRequired ? "error-siaLicenceRequired" : undefined}
                   value={val}
                   checked={formData.siaLicenceRequired === val}
                   onChange={onChange}
@@ -62,6 +61,7 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
               </label>
             ))}
           </div>
+          {errors.siaLicenceRequired && <p id="error-siaLicenceRequired" role="alert" className="text-red-400 text-sm mt-1">{errors.siaLicenceRequired}</p>}
         </div>
 
         {formData.siaLicenceRequired === 'yes' && (
@@ -107,14 +107,13 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
 
         <div>
           <label className="block text-sm font-semibold text-slate-300 mb-2">Uniform Requirements</label>
-          <div className="flex gap-6 mb-3">
+          <div className="flex gap-6 mb-3" role="radiogroup" aria-label="Uniform Requirements" aria-invalid={!!errors.uniformRequired} aria-describedby={errors.uniformRequired ? "error-uniformRequired" : undefined}>
             {['yes', 'no'].map(val => (
               <label key={val} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
                   name="uniformRequired"
-              aria-invalid={!!errors.uniformRequired}
-              aria-describedby={errors.uniformRequired ? "error-uniformRequired" : undefined}
+                  aria-describedby={errors.uniformRequired ? "error-uniformRequired" : undefined}
                   value={val}
                   checked={formData.uniformRequired === val}
                   onChange={onChange}
@@ -124,6 +123,7 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
               </label>
             ))}
           </div>
+          {errors.uniformRequired && <p id="error-uniformRequired" role="alert" className="text-red-400 text-sm mt-1">{errors.uniformRequired}</p>}
           {formData.uniformRequired === 'yes' && (
             <input
               type="text"
@@ -140,14 +140,13 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
 
         <div>
           <label className="block text-sm font-semibold text-slate-300 mb-2">Driving Licence Required?</label>
-          <div className="flex gap-6">
+          <div className="flex gap-6" role="radiogroup" aria-label="Driving Licence Required" aria-invalid={!!errors.drivingRequired} aria-describedby={errors.drivingRequired ? "error-drivingRequired" : undefined}>
             {['yes', 'no'].map(val => (
               <label key={val} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
                   name="drivingRequired"
-              aria-invalid={!!errors.drivingRequired}
-              aria-describedby={errors.drivingRequired ? "error-drivingRequired" : undefined}
+                  aria-describedby={errors.drivingRequired ? "error-drivingRequired" : undefined}
                   value={val}
                   checked={formData.drivingRequired === val}
                   onChange={onChange}
@@ -157,6 +156,7 @@ export default function StepGuardRequirements({ formData, errors, onChange, onCh
               </label>
             ))}
           </div>
+          {errors.drivingRequired && <p id="error-drivingRequired" role="alert" className="text-red-400 text-sm mt-1">{errors.drivingRequired}</p>}
           {formData.drivingRequired === 'yes' && (
             <p className="text-xs text-slate-500 mt-1">Guards will be filtered for valid UK driving licence.</p>
           )}
