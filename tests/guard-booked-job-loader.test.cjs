@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const source = fs.readFileSync('app/guard/jobs/[id]/GuardJobDetailClient.tsx', 'utf8');
-const body = source.split('  const load = useCallback(async () => {')[1].split('  }, [jobId, router]);')[0];
+const body = source.split('  const load = useCallback(async () => {')[1].split('  }, [jobId, router, loadPaymentFlow]);')[0];
 async function run(result) {
   const state = {}, calls = [];
   const user = { id: 'guard-user' };
@@ -20,10 +20,10 @@ async function run(result) {
       return q;
     }
   };
-  const names = ['setGuardUserId','setGuardId','setGuardName','setGuardProfile','setJobError','setJob','setClientUserId','setHasApplied','setIsAssigned','setHasInvite','setIsSaved','setLoading'];
+  const names = ['setGuardUserId','setGuardId','setGuardName','setGuardProfile','setJobError','setJob','setClientUserId','setHasApplied','setIsAssigned','setHasInvite','setIsSaved','setLoading','setCanMessage','setCanApply','setFlowData','setLoadingFlow','setShowApplyModal','setShowMessageModal'];
   const setters = names.map(name => value => { state[name] = value; });
-  const fn = new Function('supabase','router','loadPaymentFlow','jobId', ...names, 'return (async () => {' + body + '})();');
-  await fn(db, { push: () => { throw Error('unexpected redirect'); } }, () => {}, 'booked-job', ...setters);
+  const fn = new Function('supabase','router','loadPaymentFlow','jobId','jobLifetimeRef','jobRequestRef', ...names, 'return (async () => {' + body + '})();');
+  await fn(db, { push: () => { throw Error('unexpected redirect'); } }, () => {}, 'booked-job', {current:{jobId:'booked-job'}}, {current:0}, ...setters);
   return { state, calls };
 }
 test('assigned confirmed booking loads through authenticated endpoint', async () => {
