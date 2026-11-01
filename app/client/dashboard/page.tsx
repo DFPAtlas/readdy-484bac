@@ -529,7 +529,7 @@ export default function ClientDashboardPage() {
     return () => {
       channels.forEach((ch) => supabase.removeChannel(ch));
     };
-  }, [userId, clientId, debouncedReload]);
+  }, [userId, clientId, debouncedReload, refreshEntitlements]);
 
   if (loading || checking) {
     return (
