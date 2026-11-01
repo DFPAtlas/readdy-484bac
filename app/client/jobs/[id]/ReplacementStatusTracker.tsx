@@ -82,23 +82,30 @@ export default function ReplacementStatusTracker({ jobId, clientId }: Replacemen
   const [requests, setRequests] = useState<ReplacementRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadRequests = async () => {
-    try {
-      const { data } = await supabase
-        .from('replacement_requests')
-        .select('*')
-        .eq('job_id', jobId)
-        .eq('client_id', clientId)
-        .order('created_at', { ascending: false });
-
-      setRequests(data || []);
-    } catch {
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let cancelled = false;
+    let latestRequest = 0;
+    setLoading(true);
+    setRequests([]);
+    const loadRequests = async () => {
+      if (cancelled) return;
+      const request = ++latestRequest;
+      try {
+        const { data } = await supabase
+          .from('replacement_requests')
+          .select('*')
+          .eq('job_id', jobId)
+          .eq('client_id', clientId)
+          .order('created_at', { ascending: false });
+
+        if (!cancelled && request === latestRequest) setRequests(data || []);
+      } catch {
+      } finally {
+        if (!cancelled && request === latestRequest) setLoading(false);
+      }
+    };
+
+
     loadRequests();
 
     const channel = supabase
@@ -108,7 +115,7 @@ export default function ReplacementStatusTracker({ jobId, clientId }: Replacemen
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [jobId, clientId]);
 
   if (loading) {

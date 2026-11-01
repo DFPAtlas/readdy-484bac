@@ -78,27 +78,35 @@ export default function ReplacementNotificationsSection({ clientId }: Replacemen
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const loadRequests = async () => {
-    try {
-      const { data } = await supabase
-        .from('replacement_requests')
-        .select('*, jobs:job_id(title, location)')
-        .eq('client_id', clientId)
-        .order('created_at', { ascending: false });
-
-      setRequests((data || []) as ReplacementRequest[]);
-    } catch {
-      setRequests([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let cancelled = false;
+    let latestRequest = 0;
+    setLoading(true);
+    setRequests([]);
+    setExpandedId(null);
+    const loadRequests = async () => {
+      if (cancelled) return;
+      const request = ++latestRequest;
+      try {
+        const { data } = await supabase
+          .from('replacement_requests')
+          .select('*, jobs:job_id(title, location)')
+          .eq('client_id', clientId)
+          .order('created_at', { ascending: false });
+
+        if (!cancelled && request === latestRequest) setRequests((data || []) as ReplacementRequest[]);
+      } catch {
+        if (!cancelled && request === latestRequest) setRequests([]);
+      } finally {
+        if (!cancelled && request === latestRequest) setLoading(false);
+      }
+    };
+
+
     loadRequests();
 
     const channel = supabase
-      .channel('replacement-notifications-section')
+      .channel(`replacement-notifications-${clientId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'app', table: 'replacement_requests', filter: `client_id=eq.${clientId}` },
@@ -108,7 +116,7 @@ export default function ReplacementNotificationsSection({ clientId }: Replacemen
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [clientId]);
 
   if (loading) {

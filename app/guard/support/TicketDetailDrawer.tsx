@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import StatusBadge from './StatusBadge';
 import PriorityBadge from './PriorityBadge';
@@ -66,28 +66,53 @@ export default function TicketDetailDrawer({ ticket, guardId, onClose, onUpdated
   const [ticketStatus, setTicketStatus] = useState(ticket.status);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const loadMessages = async () => {
+  const activeTicketRef = useRef<string | null>(null);
+  const requestRef = useRef(0);
+  const lifetimeRef = useRef<symbol | null>(null);
+
+  const loadMessages = useCallback(async () => {
+    if (activeTicketRef.current !== ticket.id) return;
+    const request = ++requestRef.current;
     setLoading(true);
-    const { data } = await supabase
-      .from('ticket_messages')
-      .select('*')
-      .eq('ticket_id', ticket.id)
-      .eq('is_internal', false)
-      .order('created_at', { ascending: true });
-    setMessages(data || []);
-    setLoading(false);
-  };
+    try {
+      const { data, error: loadError } = await supabase
+        .from('ticket_messages')
+        .select('*')
+        .eq('ticket_id', ticket.id)
+        .eq('is_internal', false)
+        .order('created_at', { ascending: true });
+      if (activeTicketRef.current !== ticket.id || request !== requestRef.current) return;
+      if (loadError) throw loadError;
+      setMessages(data || []);
+    } catch (loadError) {
+      if (activeTicketRef.current === ticket.id && request === requestRef.current) {
+        setError(loadError instanceof Error ? loadError.message : 'Unable to load ticket messages');
+      }
+    } finally {
+      if (activeTicketRef.current === ticket.id && request === requestRef.current) setLoading(false);
+    }
+  }, [ticket.id]);
 
   useEffect(() => {
-    loadMessages();
+    activeTicketRef.current = ticket.id;
+    lifetimeRef.current = Symbol('ticket');
+    setMessages([]);
+    setReplyText('');
+    setError('');
+    setSending(false);
+    void loadMessages();
     const channel = supabase
       .channel(`ticket-${ticket.id}-messages`)
       .on('postgres_changes', { event: 'INSERT', schema: 'app', table: 'ticket_messages', filter: `ticket_id=eq.${ticket.id}` }, () => {
-        loadMessages();
+        void loadMessages();
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [ticket.id]);
+    return () => {
+      activeTicketRef.current = null;
+      lifetimeRef.current = null;
+      supabase.removeChannel(channel);
+    };
+  }, [ticket.id, guardId, loadMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -101,6 +126,8 @@ export default function TicketDetailDrawer({ ticket, guardId, onClose, onUpdated
     if (!replyText.trim()) return;
     setError('');
     setSending(true);
+    const lifetime = lifetimeRef.current;
+    const current = () => activeTicketRef.current === ticket.id && lifetime === lifetimeRef.current;
     try {
       const { data: createdMessage, error: msgError } = await supabase
         .from('ticket_messages')
@@ -124,16 +151,18 @@ export default function TicketDetailDrawer({ ticket, guardId, onClose, onUpdated
           .update({ status: 'under_review', updated_at: new Date().toISOString() })
           .eq('id', ticket.id);
         if (updateError) throw updateError;
-        setTicketStatus('under_review');
+        if (current()) setTicketStatus('under_review');
       }
 
-      setReplyText('');
-      onUpdated();
-      loadMessages();
+      if (current()) {
+        setReplyText('');
+        onUpdated();
+        void loadMessages();
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to send reply');
+      if (current()) setError(err.message || 'Failed to send reply');
     } finally {
-      setSending(false);
+      if (current()) setSending(false);
     }
   };
 
