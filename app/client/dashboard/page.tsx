@@ -367,7 +367,7 @@ export default function ClientDashboardPage() {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [refreshEntitlements]);
+  }, [userId, refreshEntitlements]);
 
   useEffect(() => {
     if (!userId || !clientId) return;
