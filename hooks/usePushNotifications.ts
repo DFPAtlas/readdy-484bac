@@ -1,35 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const SW_CODE = `
-self.addEventListener('install', (e) => { self.skipWaiting(); });
-self.addEventListener('activate', (e) => { e.waitUntil(self.clients.claim()); });
-self.addEventListener('push', (e) => {
-  if (!e.data) return;
-  let data;
-  try { data = e.data.json(); } catch { data = { title: 'QuickGuard', body: e.data.text() }; }
-  const options = {
-    body: data.body || 'New notification',
-    icon: data.icon || 'https://public.readdy.ai/ai/img_res/66933a83-eb29-486f-86a7-dac739aa1e53.png',
-    badge: data.badge || 'https://public.readdy.ai/ai/img_res/66933a83-eb29-486f-86a7-dac739aa1e53.png',
-    tag: data.tag || 'quickguard-default',
-    requireInteraction: data.requireInteraction || false,
-    data: data.data || {},
-    actions: data.actions || [],
-  };
-  e.waitUntil(self.registration.showNotification(data.title || 'QuickGuard', options));
-});
-self.addEventListener('notificationclick', (e) => {
-  e.notification.close();
-  const url = e.notification.data?.url || '/';
-  e.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      for (const c of clients) { if (c.url === url && 'focus' in c) return c.focus(); }
-      if (self.clients.openWindow) return self.clients.openWindow(url);
-    })
-  );
-});
-`;
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -62,7 +33,7 @@ export function usePushNotifications(role: 'guard' | 'client') {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const supported = 'serviceWorker' in navigator && 'PushManager' in window;
+    const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     setState((s) => ({ ...s, supported, permission: supported ? Notification.permission : null }));
   }, []);
 
@@ -77,9 +48,8 @@ export function usePushNotifications(role: 'guard' | 'client') {
   const registerServiceWorker = useCallback(async () => {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const blob = new Blob([SW_CODE], { type: 'application/javascript' });
-      const swUrl = URL.createObjectURL(blob);
-      const registration = await navigator.serviceWorker.register(swUrl);
+      const registration = await navigator.serviceWorker.register('/push-sw.js');
+      await navigator.serviceWorker.ready;
       swRef.current = registration;
       await checkSubscription();
     } catch {
@@ -142,12 +112,16 @@ export function usePushNotifications(role: 'guard' | 'client') {
         return;
       }
 
+      if (!subJson.endpoint || !subJson.keys?.p256dh || !subJson.keys?.auth) {
+        throw new Error('Push subscription is missing its endpoint or encryption keys');
+      }
+
       const { error: upsertError } = await supabase.from('push_subscriptions').upsert({
         user_id: userId,
         role,
-        endpoint: subJson.endpoint!,
-        p256dh: subJson.keys?.p256dh!,
-        auth: subJson.keys?.auth!,
+        endpoint: subJson.endpoint,
+        p256dh: subJson.keys.p256dh,
+        auth: subJson.keys.auth,
       }, { onConflict: 'user_id,endpoint' });
 
       if (upsertError) {
