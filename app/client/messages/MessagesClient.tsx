@@ -438,16 +438,21 @@ export default function MessagesClient() {
     return () => { supabase.removeChannel(channel); };
   }, [clientUserId, refreshSingleConversation]);
 
-  // Auto-scroll to latest message when new message arrives
+  // Older-page inserts must not scroll away from the history being read.
+  const lastMessageId = activeMessages[activeMessages.length - 1]?.id;
+  const previousLastMessageIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
+    if (msgLoadingOlder) return;
+    const hasNewLastMessage = previousLastMessageIdRef.current !== lastMessageId;
+    previousLastMessageIdRef.current = lastMessageId;
     if (skipScrollRef.current) {
       skipScrollRef.current = false;
       return;
     }
-    if (activeMessages.length > 0 && !msgLoadingOlder) {
+    if (lastMessageId && hasNewLastMessage) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [activeMessages.length]);
+  }, [lastMessageId, msgLoadingOlder]);
 
   const activeConversation = conversations.find(c => c.id === activeConversationId);
 

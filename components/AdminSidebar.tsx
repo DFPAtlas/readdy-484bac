@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -78,8 +78,8 @@ export default function AdminSidebar() {
     }
   }, [collapsed]);
 
-  const isActive = (href: string) =>
-    pathname === href || (href !== '/admin/dashboard' && pathname.startsWith(`${href}/`));
+  const isActive = useCallback((href: string) =>
+    pathname === href || (href !== '/admin/dashboard' && pathname.startsWith(`${href}/`)), [pathname]);
 
   const Badge = ({ count, color = 'red' }: { count: number; color?: 'red' | 'yellow' }) => {
     if (count === 0) return null;
@@ -209,7 +209,7 @@ export default function AdminSidebar() {
     const activeGroup = groups.find(group => group.items.some(item => isActive(item.href)));
     if (!activeGroup) return;
     setOpenGroup(activeGroup.label);
-  }, [pathname, groups]);
+  }, [groups, isActive]);
 
   useEffect(() => {
     async function loadBadges() {

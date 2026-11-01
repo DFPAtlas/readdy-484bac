@@ -157,7 +157,7 @@ export default function ChatPanel({
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       prevLastIdRef.current = lastMsg.id;
     }
-  }, [messages]);
+  }, [messages, messagesEndRef]);
 
   const statusColor = (status: string) => {
     switch (status) {

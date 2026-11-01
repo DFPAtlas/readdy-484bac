@@ -119,7 +119,7 @@ export default function SubscriptionAnalyticsPage() {
   const [isLive, setIsLive] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  const buildDateFilter = () => {
+  const buildDateFilter = useCallback(() => {
     if (dateRange === 'all') return null;
     const now = new Date();
     const startDate = new Date();
@@ -130,7 +130,7 @@ export default function SubscriptionAnalyticsPage() {
       case 'year': startDate.setFullYear(now.getFullYear() - 1); break;
     }
     return startDate.toISOString();
-  };
+  }, [dateRange]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -288,7 +288,7 @@ export default function SubscriptionAnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, page]);
+  }, [buildDateFilter, page]);
 
   useEffect(() => {
     setPage(1);
@@ -398,7 +398,7 @@ export default function SubscriptionAnalyticsPage() {
       supabase.removeChannel(channel);
       setIsLive(false);
     };
-  }, [dateRange]);
+  }, [buildDateFilter]);
 
   const calculateAnalytics = (analyticsData: AnalyticsRow[], subsMap: Record<string, SubInfo>) => {
     const now = new Date();

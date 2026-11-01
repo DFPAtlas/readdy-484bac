@@ -15,15 +15,22 @@ export default function GuardUsageWidget({ guardId, refreshTrigger }: Props) {
   const [limitData, setLimitData] = useState<GuardApplicationLimit | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadUsage = async () => {
-    setLoading(true);
-    const result = await checkGuardApplicationLimit(supabase, guardId);
-    setLimitData(result);
-    setLoading(false);
-  };
-
   useEffect(() => {
-    loadUsage();
+    let cancelled = false;
+    setLoading(true);
+    setLimitData(null);
+    const loadUsage = async () => {
+      try {
+        const result = await checkGuardApplicationLimit(supabase, guardId);
+        if (!cancelled) setLimitData(result);
+      } catch {
+        if (!cancelled) setLimitData(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void loadUsage();
+    return () => { cancelled = true; };
   }, [guardId, refreshTrigger]);
 
   if (loading) {

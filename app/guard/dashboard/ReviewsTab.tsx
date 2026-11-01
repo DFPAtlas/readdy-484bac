@@ -59,23 +59,32 @@ function RatingBar({ star, count, total }: { star: number; count: number; total:
 export default function ReviewsTab({ guardId, rating, totalReviews }: ReviewsTabProps) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState(false);
 
   useEffect(() => {
-    fetchReviews();
-  }, [guardId]);
-
-  const fetchReviews = async () => {
+    let cancelled = false;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('reviews')
-      .select('id, rating, review_text, created_at, job_id, jobs(job_title)')
-      .eq('guard_id', guardId)
-      .eq('status', 'published')
-      .order('created_at', { ascending: false });
-
-    if (!error) setReviews((data || []).map(row => ({ ...row, jobs: oneRelation(row.jobs) })));
-    setLoading(false);
-  };
+    setReviews([]);
+    setReviewsError(false);
+    const fetchReviews = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('reviews')
+          .select('id, rating, review_text, created_at, job_id, jobs(job_title)')
+          .eq('guard_id', guardId)
+          .eq('status', 'published')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        if (!cancelled) setReviews((data || []).map(row => ({ ...row, jobs: oneRelation(row.jobs) })));
+      } catch {
+        if (!cancelled) setReviewsError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void fetchReviews();
+    return () => { cancelled = true; };
+  }, [guardId]);
 
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -95,6 +104,8 @@ export default function ReviewsTab({ guardId, rating, totalReviews }: ReviewsTab
       </div>
     );
   }
+
+  if (reviewsError) return <p role="alert" className="text-sm text-red-400">Unable to load reviews. Please reopen this tab to retry.</p>;
 
   return (
     <div>

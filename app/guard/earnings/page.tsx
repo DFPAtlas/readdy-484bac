@@ -1,6 +1,6 @@
 'use client';
 
-  import { useState, useEffect, useMemo } from 'react';
+  import { useState, useEffect, useMemo, useCallback } from 'react';
   import Link from 'next/link';
   import { supabase } from '@/lib/supabase';
   import PortalSidebar from '@/components/PortalSidebar';
@@ -120,11 +120,11 @@
       return map;
     }, [payouts]);
 
-    const getEffectiveStatus = (earning: any) => {
+    const getEffectiveStatus = useCallback((earning: any) => {
       const payout = payoutsMap[earning.id];
       if (payout) return payout.status;
       return earning.payment_status || 'pending';
-    };
+    }, [payoutsMap]);
 
     const filteredEarnings = useMemo(() => {
       let filtered = earnings.filter(e => {
@@ -156,7 +156,7 @@
       });
 
       return filtered;
-    }, [earnings, activeTab, searchTerm, sortBy, payoutsMap]);
+    }, [earnings, activeTab, searchTerm, sortBy, getEffectiveStatus]);
 
     const filteredPayouts = useMemo(() => {
       let filtered = [...payouts];
@@ -251,7 +251,7 @@
         months.push({ month: label, earned, pending });
       }
       return months;
-    }, [earnings, payoutsMap]);
+    }, [earnings, getEffectiveStatus]);
 
     const handleExport = () => {
       const headers = ['Job Title', 'Client', 'Date', 'Amount', 'Status', 'Reference'];

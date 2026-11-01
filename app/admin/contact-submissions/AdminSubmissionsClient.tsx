@@ -41,6 +41,8 @@ export default function AdminSubmissionsClient() {
   const [hasNewData, setHasNewData] = useState(false);
 
   const mountedRef = useRef(true);
+  const requestRef = useRef(0);
+  const invalidateRequests = useCallback(() => { requestRef.current++; }, []);
 
   const buildFilter = useCallback(() => {
     let q = supabase.from('contact_submissions').select('*', { count: 'exact', head: false });
@@ -63,6 +65,9 @@ export default function AdminSubmissionsClient() {
   }, [search, categoryFilter]);
 
   const fetchPage = useCallback(async (pageNum: number, showLoading: boolean) => {
+    if (!mountedRef.current) return;
+    const request = ++requestRef.current;
+    const isCurrent = () => mountedRef.current && requestRef.current === request;
     if (showLoading) setLoading(true);
     setError(null);
     setHasNewData(false);
@@ -80,7 +85,7 @@ export default function AdminSubmissionsClient() {
         supabase.from('contact_submissions').select('category').not('category', 'is', null),
       ]);
 
-      if (!mountedRef.current) return;
+      if (!isCurrent()) return;
 
       if (dataRes.error && dataRes.error.code !== 'PGRST116') {
         throw new Error(dataRes.error.message || 'Failed to load submissions');
@@ -111,14 +116,14 @@ export default function AdminSubmissionsClient() {
         setCategories(allCats);
       }
     } catch (err: unknown) {
-      if (!mountedRef.current) return;
+      if (!isCurrent()) return;
       setError(err instanceof Error ? err.message : 'Failed to load submissions');
       setSubmissions([]);
       setTotalCount(0);
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [buildFilter, buildStatsCount, search]);
+  }, [buildFilter, buildStatsCount]);
 
   const refresh = useCallback(() => {
     fetchPage(page, true);
@@ -130,7 +135,6 @@ export default function AdminSubmissionsClient() {
 
   useEffect(() => {
     mountedRef.current = true;
-    fetchPage(0, true);
 
     const channel = supabase
       .channel('contact-submissions-realtime')
@@ -141,13 +145,14 @@ export default function AdminSubmissionsClient() {
 
     return () => {
       mountedRef.current = false;
+      invalidateRequests();
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [invalidateRequests]);
 
   useEffect(() => {
     fetchPage(0, true);
-  }, [search, statusFilter, categoryFilter]);
+  }, [fetchPage]);
 
   const handleExport = () => {
     if (totalCount === 0) return;

@@ -64,14 +64,20 @@ export default function SIAVerificationsClient() {
   const [selectedCardUser, setSelectedCardUser] = useState<VerificationEntry | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
+  const pageRequestRef = useRef(0);
+  const statsRequestRef = useRef(0);
+  const invalidateRequests = useCallback(() => { pageRequestRef.current++; statsRequestRef.current++; }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
-    return () => { isMountedRef.current = false; };
-  }, []);
+    return () => { isMountedRef.current = false; invalidateRequests(); };
+  }, [invalidateRequests]);
 
   const fetchPage = useCallback(async (p: number, f: string, s: string, sb: string) => {
     if (!isMountedRef.current) return;
+    const request = ++pageRequestRef.current;
+    const statsRequest = ++statsRequestRef.current;
+    const isCurrent = () => isMountedRef.current && pageRequestRef.current === request;
     setLoading(true);
     setError(null);
     try {
@@ -79,7 +85,7 @@ export default function SIAVerificationsClient() {
         body: { action: 'list', page: p, pageSize: PAGE_SIZE, search: s, filter: f, sortBy: sb },
       });
 
-      if (!isMountedRef.current) return;
+      if (!isCurrent()) return;
       if (fnError) throw new Error(fnError.message || 'Failed to load verifications');
       if (result?.error) throw new Error(result.error);
 
@@ -87,26 +93,28 @@ export default function SIAVerificationsClient() {
       setEntries(list);
       setTotalCount(result?.totalCount || 0);
 
-      if (result?.stats) {
+      if (result?.stats && statsRequestRef.current === statsRequest) {
         setStats(result.stats);
       }
     } catch (err: any) {
-      if (!isMountedRef.current) return;
+      if (!isCurrent()) return;
       console.error('Error fetching SIA verifications:', err);
       setError(err.message || 'Failed to load verifications');
       setEntries([]);
       setTotalCount(0);
     } finally {
-      if (isMountedRef.current) setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, []);
 
   const fetchStats = useCallback(async () => {
+    if (!isMountedRef.current) return;
+    const request = ++statsRequestRef.current;
     try {
       const { data: result, error: fnError } = await supabase.functions.invoke('admin-sia-verifications', {
         body: { action: 'stats' },
       });
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || statsRequestRef.current !== request) return;
       if (!fnError && result?.stats) {
         setStats(result.stats);
       }
@@ -117,7 +125,7 @@ export default function SIAVerificationsClient() {
 
   useEffect(() => {
     fetchPage(page, filter, debouncedSearch, sortBy);
-  }, [page, filter, debouncedSearch, sortBy]);
+  }, [page, filter, debouncedSearch, sortBy, fetchPage]);
 
   useEffect(() => {
     const channel = supabase
@@ -138,7 +146,7 @@ export default function SIAVerificationsClient() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [page, filter, debouncedSearch, sortBy]);
+  }, [page, filter, debouncedSearch, sortBy, fetchPage, fetchStats]);
 
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);

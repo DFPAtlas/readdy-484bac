@@ -78,30 +78,38 @@ export default function AssignedGuardsSection({
   const router = useRouter();
   const [guardReviews, setGuardReviews] = useState<Record<string, GuardReview>>({});
   const [loadingReviews, setLoadingReviews] = useState(false);
+  const [reviewsError, setReviewsError] = useState(false);
   const [showReviewDetails, setShowReviewDetails] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!jobId || guards.length === 0) return;
-    loadGuardReviews();
+    let cancelled = false;
+    setGuardReviews({});
+    setReviewsError(false);
+    setShowReviewDetails(null);
+    if (!jobId || guards.length === 0) { setLoadingReviews(false); return; }
+    const loadGuardReviews = async () => {
+      setLoadingReviews(true);
+      try {
+        const { data: reviews, error } = await supabase
+          .from('reviews')
+          .select('*')
+          .eq('job_id', jobId);
+        if (cancelled) return;
+        if (error) throw error;
+        const map: Record<string, GuardReview> = {};
+        (reviews || []).forEach((r) => {
+          if (r.guard_id) map[r.guard_id] = r;
+        });
+        setGuardReviews(map);
+      } catch {
+        if (!cancelled) setReviewsError(true);
+      } finally {
+        if (!cancelled) setLoadingReviews(false);
+      }
+    };
+    void loadGuardReviews();
+    return () => { cancelled = true; };
   }, [jobId, guards.length]);
-
-  const loadGuardReviews = async () => {
-    setLoadingReviews(true);
-    try {
-      const { data: reviews } = await supabase
-        .from('reviews')
-        .select('*')
-        .eq('job_id', jobId);
-
-      const map: Record<string, GuardReview> = {};
-      (reviews || []).forEach((r) => {
-        if (r.guard_id) map[r.guard_id] = r;
-      });
-      setGuardReviews(map);
-    } finally {
-      setLoadingReviews(false);
-    }
-  };
 
   const handleMessage = (guard: Guard) => {
     if (onMessageGuard && guard.user_id) {
@@ -142,7 +150,7 @@ export default function AssignedGuardsSection({
           Assigned Guards
           <span className="ml-1 bg-teal-500/15 text-teal-400 text-xs font-bold px-2 py-0.5 rounded-full">{guards.length}</span>
         </h2>
-        {isReviewable && reviewedCount < guards.length && (
+        {isReviewable && !loadingReviews && !reviewsError && reviewedCount < guards.length && (
           <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full whitespace-nowrap">
             {unreviewedCount} awaiting review
           </span>
@@ -158,7 +166,7 @@ export default function AssignedGuardsSection({
         )}
       </div>
 
-      {isReviewable && reviewedCount < guards.length && (
+      {isReviewable && !loadingReviews && !reviewsError && reviewedCount < guards.length && (
         <div className="mb-4 bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-3 flex items-center gap-3">
           <div className="w-8 h-8 flex items-center justify-center bg-amber-500/15 rounded-lg shrink-0">
             <i className="ri-star-line text-amber-400 text-lg"></i>
@@ -171,6 +179,8 @@ export default function AssignedGuardsSection({
           </div>
         </div>
       )}
+
+      {reviewsError && <p role="alert" className="mb-4 text-sm text-red-400">Review status could not be loaded. Please reopen this job to retry.</p>}
 
       {/* Attendance Stats Banner */}
       {(checkedInCount > 0 || lateCount > 0 || noShowCount > 0 || issueCount > 0) && (
@@ -409,7 +419,7 @@ export default function AssignedGuardsSection({
                     />
                   </div>
                 )}
-                {isReviewable && g?.id && !review && (
+                {isReviewable && !loadingReviews && !reviewsError && g?.id && !review && (
                   <button
                     onClick={() => onLeaveReview?.(g.id, guardName)}
                     className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ml-auto"
