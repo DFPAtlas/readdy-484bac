@@ -157,7 +157,7 @@ export default function GuardRegister() {
             role: 'guard',
             first_name: firstName,
             last_name: lastName,
-            wizard_data: formData,
+            wizard_data: { ...formData, terms_accepted: termsAccepted },
             referral_code: typeof window !== 'undefined' ? (localStorage.getItem('qg_referral_code') || sessionStorage.getItem('qg_referral_code') || '') : '',
             source: 'qg_launch_rewards',
             tax_disclaimer_accepted: taxDisclaimerAccepted,
@@ -225,16 +225,16 @@ export default function GuardRegister() {
     }
   };
 
-  const enabledFields = wizardFields.filter((f) => f.is_enabled && f.field_key !== 'password' && f.field_key !== 'confirm_password');
+  const enabledFields = wizardFields.filter((f) => f.is_enabled && f.field_key !== 'password' && f.field_key !== 'confirm_password' && f.field_key !== 'terms_accepted' && f.field_key !== 'terms');
 
   const heroTitle = portalDefaults?.hero_title || 'Become a Verified QuickGuard Security Professional';
-  const heroSubtitle = portalDefaults?.hero_subtitle || 'Earn 15-30 per hour Flexible shifts Fast payments Full HMRC support';
+  const heroSubtitle = portalDefaults?.hero_subtitle || 'Find security shifts across the UK and manage your availability';
   const ctaPrimaryText = portalDefaults?.cta_primary_text || "Start Application - It's Free";
   const socialEnabled = portalDefaults?.social_login_enabled !== false;
   const trustBadges = portalDefaults?.trust_badges || [
-    { icon: 'ri-shield-star-line', text: 'SIA Approved' },
+    { icon: 'ri-shield-star-line', text: 'SIA licence checks' },
     { icon: 'ri-money-pound-circle-line', text: 'Weekly Payouts' },
-    { icon: 'ri-verified-badge-line', text: 'HMRC Compliant' },
+    { icon: 'ri-verified-badge-line', text: 'Manage your own tax' },
   ];
 
   // Role switch interstitials take over the full screen

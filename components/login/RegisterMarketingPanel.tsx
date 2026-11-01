@@ -82,8 +82,8 @@ export default function RegisterMarketingPanel() {
 
         <div className="mt-10 grid grid-cols-3 gap-4">
           {[
-            { value: '500+', label: 'UK businesses' },
-            { value: '4.9/5', label: 'Average rating' },
+            { value: 'UK-wide', label: 'Security staffing' },
+            { value: 'By the shift', label: 'Flexible booking' },
             { value: '24/7', label: 'AI support' },
           ].map((stat) => (
             <div key={stat.label} className="rounded-xl border border-white/10 bg-white/5 px-3 py-4 text-center">
@@ -100,7 +100,7 @@ export default function RegisterMarketingPanel() {
 
       <div className="relative z-10 flex items-center gap-2 text-xs text-[#AAB7C4]/60">
         <i className="ri-shield-check-fill text-[#1DA1F2]" />
-        <span>SIA Verified &middot; GDPR Compliant &middot; ISO 27001 Ready</span>
+        <span>SIA licence checks &middot; Secure account access</span>
       </div>
     </div>
   );
