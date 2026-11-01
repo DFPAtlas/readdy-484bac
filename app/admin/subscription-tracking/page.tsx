@@ -274,7 +274,7 @@ export default function SubscriptionTrackingPage() {
 
   useEffect(() => {
     fetchAll(page, pageSize);
-  }, [page, pageSize]);
+  }, [page, pageSize, fetchAll]);
 
   useEffect(() => {
     const channel = supabase

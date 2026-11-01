@@ -60,6 +60,7 @@ export default function SavedSitesPage() {
   const { loading: authLoading, allowed } = useClientGuard();
   const { checking, blocked } = useRouteGuard();
   const authCtx = useClientAuth();
+  const { clientId: contextClientId, companyName: contextCompanyName, subscriptionTier: contextSubscriptionTier, setAuth: setContextAuth } = authCtx;
 
   const [clientId, setClientId] = useState<string | null>(authCtx.clientId);
   const [companyName, setCompanyName] = useState(authCtx.companyName);
@@ -87,6 +88,7 @@ export default function SavedSitesPage() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
 
@@ -99,10 +101,10 @@ export default function SavedSitesPage() {
 
   // Bootstrap client identity if context hasn't hydrated yet
   useEffect(() => {
-    if (authCtx.clientId) {
-      setClientId(authCtx.clientId);
-      setCompanyName(authCtx.companyName);
-      setSubscriptionTier(authCtx.subscriptionTier);
+    if (contextClientId) {
+      setClientId(contextClientId);
+      setCompanyName(contextCompanyName);
+      setSubscriptionTier(contextSubscriptionTier);
       return;
     }
     let cancelled = false;
@@ -124,7 +126,7 @@ export default function SavedSitesPage() {
           setClientId(client.id);
           setCompanyName(cName);
           setSubscriptionTier(cTier);
-          authCtx.setAuth({ user, clientId: client.id, companyName: cName, subscriptionTier: cTier });
+          setContextAuth({ user, clientId: client.id, companyName: cName, subscriptionTier: cTier });
         }
       } catch (err: any) {
         console.error('[sites] bootstrap error:', err);
@@ -141,7 +143,7 @@ export default function SavedSitesPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [authCtx.clientId, authCtx.companyName, authCtx.subscriptionTier, authCtx.setAuth, router]);
+  }, [contextClientId, contextCompanyName, contextSubscriptionTier, setContextAuth, router]);
 
   const loadStats = useCallback(async () => {
     if (!clientId) return;

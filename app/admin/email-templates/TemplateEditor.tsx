@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 
 interface TemplateFormData {
   name: string;
@@ -82,7 +82,7 @@ export default function TemplateEditor({
   const generateSlug = (name: string) =>
     name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-  const insertAtCursor = (html: string) => {
+  const insertAtCursor = useCallback((html: string) => {
     const textarea = editorRef.current;
     if (!textarea) return;
 
@@ -98,14 +98,18 @@ export default function TemplateEditor({
       const newPos = start + html.length;
       textarea.setSelectionRange(newPos, newPos);
     });
-  };
+  }, [formData, onChange]);
+
+  const handledImageRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (imageToInsert) {
+    if (!imageToInsert) { handledImageRef.current = null; return; }
+    if (handledImageRef.current !== imageToInsert) {
+      handledImageRef.current = imageToInsert;
       insertAtCursor('\n' + imageToInsert + '\n');
       onImageInsertHandled?.();
     }
-  }, [imageToInsert]);
+  }, [imageToInsert, insertAtCursor, onImageInsertHandled]);
 
   const insertVariable = (varName: string) => {
     insertAtCursor(`{{${varName}}}`);

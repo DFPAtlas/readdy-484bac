@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 type InboundEmail = {
@@ -21,7 +21,7 @@ export default function SupportEmailReviewPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const invoke = async (body: Record<string, unknown>) => {
+  const invoke = useCallback(async (body: Record<string, unknown>) => {
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) throw new Error('Sign in as an administrator first');
     const { data, error: fnError } = await supabase.functions.invoke('admin-review-support-email', {
@@ -30,17 +30,17 @@ export default function SupportEmailReviewPage() {
     if (fnError) throw new Error('Email review request failed');
     if (data?.error) throw new Error(data.error);
     return data;
-  };
+  }, []);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setError(''); setLoading(true);
     try {
       const data = await invoke({ action: 'list' });
       setItems(data.emails || []);
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not load email'); }
     finally { setLoading(false); }
-  };
-  useEffect(() => { void refresh(); }, []);
+  }, [invoke]);
+  useEffect(() => { void refresh(); }, [refresh]);
 
   const findClient = async (email: InboundEmail) => {
     setBusy(email.id); setError('');

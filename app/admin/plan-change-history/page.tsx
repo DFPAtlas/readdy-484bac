@@ -110,7 +110,7 @@ export default function PlanChangeHistoryPage() {
 
   useEffect(() => {
     fetchData(page);
-  }, [page, sortDir]);
+  }, [page, fetchData]);
 
   useEffect(() => {
     setPage(1);

@@ -49,49 +49,49 @@ export default function AdminSettingsPage() {
     }
   }, [toast]);
 
-  async function loadAll() {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('key, value')
-        .in('key', ['maintenance_mode', 'maintenance_scheduled_start', 'maintenance_scheduled_end', 'maintenance_message']);
-
-      if (error) throw error;
-
-      const find = (key: string) => (data || []).find((d: any) => d.key === key)?.value || '';
-
-      const mode = find('maintenance_mode') === 'true';
-      const start = find('maintenance_scheduled_start');
-      const end = find('maintenance_scheduled_end');
-      const msg = find('maintenance_message');
-
-      const schedule: ScheduledMaintenance | null = (start && end)
-        ? { start, end, message: msg }
-        : null;
-
-      setState({ mode, schedule });
-
-      if (schedule) {
-        setScheduleForm({
-          start: toLocalInput(schedule.start),
-          end: toLocalInput(schedule.end),
-          message: schedule.message,
-          notify: false,
-          notifyMinutes: '60',
-          notifyRecipients: 'all',
-        });
-      }
-    } catch {
-      showToast('Failed to load settings', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    loadAll();
-  }, []);
+    async function loadAll() {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('settings')
+          .select('key, value')
+          .in('key', ['maintenance_mode', 'maintenance_scheduled_start', 'maintenance_scheduled_end', 'maintenance_message']);
+
+        if (error) throw error;
+
+        const find = (key: string) => (data || []).find((d: any) => d.key === key)?.value || '';
+
+        const mode = find('maintenance_mode') === 'true';
+        const start = find('maintenance_scheduled_start');
+        const end = find('maintenance_scheduled_end');
+        const msg = find('maintenance_message');
+
+        const schedule: ScheduledMaintenance | null = (start && end)
+          ? { start, end, message: msg }
+          : null;
+
+        setState({ mode, schedule });
+
+        if (schedule) {
+          setScheduleForm({
+            start: toLocalInput(schedule.start),
+            end: toLocalInput(schedule.end),
+            message: schedule.message,
+            notify: false,
+            notifyMinutes: '60',
+            notifyRecipients: 'all',
+          });
+        }
+      } catch {
+        showToast('Failed to load settings', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void loadAll();
+  }, [showToast]);
 
   // Countdown ticker
   useEffect(() => {
