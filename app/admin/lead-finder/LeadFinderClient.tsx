@@ -51,7 +51,9 @@ export default function LeadFinderClient() {
   const [totalCount, setTotalCount] = useState(0);
   const [stats, setStats] = useState({ total: 0, newThisWeek: 0, highScore: 0, withEmail: 0, optedOut: 0 });
 
-  const loadedRef = useRef(false);
+  const activeRef = useRef(true);
+  const requestRef = useRef(0);
+  const invalidateRequests = useCallback(() => { requestRef.current++; }, []);
   const loadRef = useRef<() => Promise<void>>(async () => {});
   const loadStatsRef = useRef<() => Promise<void>>(async () => {});
 
@@ -91,6 +93,8 @@ export default function LeadFinderClient() {
   }, [search, sectorFilter, statusFilter, emailStatusFilter, scoreMin, optOutFilter]);
 
   const load = useCallback(async () => {
+    if (!activeRef.current) return;
+    const request = ++requestRef.current;
     setLoading(true);
     setError(null);
 
@@ -99,6 +103,7 @@ export default function LeadFinderClient() {
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
     const { data, error: err, count } = await query;
+    if (!activeRef.current || requestRef.current !== request) return;
 
     if (err) {
       setError(err.message);
@@ -138,16 +143,14 @@ export default function LeadFinderClient() {
   loadStatsRef.current = loadStats;
 
   useEffect(() => {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
-    load();
-    loadStats();
-  }, []);
+    activeRef.current = true;
+    void loadStats();
+    return () => { activeRef.current = false; invalidateRequests(); };
+  }, [loadStats, invalidateRequests]);
 
   useEffect(() => {
-    if (!loadedRef.current) return;
-    load();
-  }, [page, search, sectorFilter, statusFilter, emailStatusFilter, scoreMin, optOutFilter]);
+    void load();
+  }, [load]);
 
   useEffect(() => {
     setPage(1);

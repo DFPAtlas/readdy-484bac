@@ -33,50 +33,50 @@ export default function AdminAccountPage() {
   const adminAuth = useAdminAuth();
 
   useEffect(() => {
-    loadAdmin();
-  }, []);
+    let cancelled = false;
+    async function loadAdmin() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
 
-  async function loadAdmin() {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) return;
 
-      if (!adminAuth.email) {
-        router.push('/admin/login');
-        return;
-      }
-
-      const token = session?.access_token;
-      if (!token) {
-        router.push('/admin/login');
-        return;
-      }
-
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/admin-account-profile`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ action: 'get_profile' }),
+        const token = session?.access_token;
+        if (!token) {
+          router.push('/admin/login');
+          return;
         }
-      );
 
-      const data = await res.json();
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/admin-account-profile`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ action: 'get_profile' }),
+          }
+        );
 
-      if (!res.ok || data.error) {
-        setLoading(false);
-        return;
+        const data = await res.json();
+        if (cancelled) return;
+
+        if (!res.ok || data.error) {
+          setLoading(false);
+          return;
+        }
+
+        setAdminUser({ ...data.admin, email: data.admin?.email || adminAuth.email });
+      } catch (err) {
+        // silently fail
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-
-      setAdminUser({ ...data.admin, email: adminAuth.email });
-    } catch (err) {
-      // silently fail
-    } finally {
-      setLoading(false);
     }
-  }
+
+    void loadAdmin();
+    return () => { cancelled = true; };
+  }, [adminAuth.email, router]);
 
   async function handleEmailUpdate(e: React.FormEvent) {
     e.preventDefault();
