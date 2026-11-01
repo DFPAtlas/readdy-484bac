@@ -237,7 +237,8 @@ export default function JobManagement() {
 
   const cancelledRef = useRef(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const initialLoadDone = useRef(false);
+  const requestRef = useRef(0);
+  const moreRequestRef = useRef(0);
 
   const showToast = useCallback((msg: string, type: 'success' | 'warning' = 'success') => {
     setToast(msg);
@@ -303,13 +304,18 @@ export default function JobManagement() {
   }, [clientId, activeTab, statusFilter, dateFrom, dateTo, searchQuery, sortBy]);
 
   const loadJobs = useCallback(async (silent = false) => {
-    if (!clientId) return;
+    if (!clientId || cancelledRef.current) return;
+    const request = ++requestRef.current;
+    moreRequestRef.current++;
+    setLoadingMore(false);
+    const isCurrent = () => !cancelledRef.current && request === requestRef.current;
     if (!silent) { setLoading(true); setLoadError(false); }
     else setRefreshing(true);
 
     try {
       const query = buildJobQuery();
       const [{ data: jobsData, count, error }, summary] = await Promise.all([query, supabase.from('jobs').select('id, status, applications_count, assigned_count, number_of_guards, is_featured, is_draft, publish_at, start_date, special_instructions').eq('client_id', clientId).eq('is_deleted', false)]);
+      if (!isCurrent()) return;
       if (summary.error) throw summary.error;
       setSummaryJobs((summary.data || []) as ClientJob[]);
       if (error) throw error;
@@ -330,7 +336,7 @@ export default function JobManagement() {
         (txRes.data || []).forEach((t: any) => { if (!pmap[t.job_id]) pmap[t.job_id] = t.status; });
         (cancelRes.data || []).forEach((c: any) => { cMap[c.job_id] = c; });
         (refundRes.data || []).forEach((r: any) => { if (!rMap[r.job_id]) rMap[r.job_id] = r.status; });
-        setPaymentMap(pmap);
+        if (!isCurrent()) return;
       }
 
       const formattedJobs = (jobsData || []).map((job: any) => ({
@@ -341,6 +347,8 @@ export default function JobManagement() {
         refund_status: rMap[job.id],
       }));
 
+      if (!isCurrent()) return;
+      setPaymentMap(pmap);
       setJobs(formattedJobs);
 
       if (activeTab === 'drafts') {
@@ -351,24 +359,32 @@ export default function JobManagement() {
             .select('id, draft_name, last_saved_at')
             .eq('client_id', clientId)
             .order('last_saved_at', { ascending: false });
+          if (!isCurrent()) return;
           setDrafts(draftsData || []);
         } catch {
-          setDrafts([]);
+          if (isCurrent()) setDrafts([]);
         }
       }
 
+      if (!isCurrent()) return;
       setLastUpdated(new Date());
     } catch {
+      if (!isCurrent()) return;
       if (!silent) setLoadError(true);
       else showToast('Background refresh failed — pull to retry', 'warning');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isCurrent()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [clientId, buildJobQuery, activeTab, showToast]);
 
   const loadMore = useCallback(async () => {
-    if (!clientId || loadingMore) return;
+    if (!clientId || loadingMore || cancelledRef.current) return;
+    const request = requestRef.current;
+    const moreRequest = ++moreRequestRef.current;
+    const isCurrent = () => !cancelledRef.current && request === requestRef.current && moreRequest === moreRequestRef.current;
     setLoadingMore(true);
     try {
       const q = searchQuery.trim();
@@ -392,6 +408,7 @@ export default function JobManagement() {
       query = query.order('created_at', { ascending: false }).range(jobs.length, jobs.length + JOBS_PER_PAGE - 1);
 
       const { data: moreData, count } = await query;
+      if (!isCurrent()) return;
       const moreJobs = moreData || [];
       setHasMore(jobs.length + moreJobs.length < (count || 0));
 
@@ -411,6 +428,7 @@ export default function JobManagement() {
         (refundRes.data || []).forEach((row: any) => { if (!rMap[row.job_id]) rMap[row.job_id] = row.status; });
         pmap = {};
         (txRes.data || []).forEach((t: any) => { if (!pmap[t.job_id]) pmap[t.job_id] = t.status; });
+        if (!isCurrent()) return;
         setPaymentMap(pmap);
       }
 
@@ -421,11 +439,12 @@ export default function JobManagement() {
         refund_status: rMap[job.id],
       }));
 
+      if (!isCurrent()) return;
       setJobs(prev => [...prev, ...formattedMore]);
     } catch {
-      showToast('Failed to load more jobs', 'warning');
+      if (isCurrent()) showToast('Failed to load more jobs', 'warning');
     } finally {
-      setLoadingMore(false);
+      if (isCurrent()) setLoadingMore(false);
     }
   }, [clientId, activeTab, statusFilter, dateFrom, dateTo, searchQuery, jobs, paymentMap, loadingMore, showToast]);
 
@@ -442,10 +461,6 @@ export default function JobManagement() {
   useEffect(() => {
     if (!clientId) return;
     cancelledRef.current = false;
-    initialLoadDone.current = false;
-
-    loadJobsRef.current();
-    initialLoadDone.current = true;
 
     const channels: any[] = [];
 
@@ -469,15 +484,30 @@ export default function JobManagement() {
 
     return () => {
       cancelledRef.current = true;
+      requestRef.current += 1;
+      moreRequestRef.current += 1;
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       channels.forEach(ch => supabase.removeChannel(ch));
     };
   }, [clientId, doSilentRefresh]);
 
   useEffect(() => {
-    if (!clientId || !navigationReady || !initialLoadDone.current) return;
+    if (!clientId || !navigationReady) return;
+    setSelectedJobIds(new Set());
+    setSelectedJob(null);
+    setCancelJob(null);
+    setEditJob(null);
+    setDuplicateJob(null);
+    setJobs([]);
+    setSummaryJobs([]);
+    setDrafts([]);
+    setPaymentMap({});
     loadJobs();
-  }, [navigationReady, activeTab, statusFilter, paymentFilter, dateFrom, dateTo, searchQuery, sortBy, locationFilter, needsActionFilter]);
+    return () => {
+      requestRef.current += 1;
+      moreRequestRef.current += 1;
+    };
+  }, [clientId, navigationReady, loadJobs]);
 
   useEffect(() => {
     if (toast) {
