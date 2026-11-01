@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -24,76 +24,86 @@ export default function VerificationPendingPage() {
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const userIdRef = useRef<string | null>(null);
 
-  const checkVerificationStatus = async (silent = false) => {
+  const activeRef = useRef(false);
+  const generationRef = useRef(0);
+  const requestInFlightRef = useRef(false);
+
+  const checkVerificationStatus = useCallback(async (silent = false) => {
+    if (!activeRef.current || requestInFlightRef.current || !userIdRef.current) return false;
+    const generation = generationRef.current;
+    requestInFlightRef.current = true;
     if (!silent) setCheckingStatus(true);
     setIsPolling(true);
     try {
-      const userId = userIdRef.current;
-      if (!userId) return;
-
       const { data: guardData, error } = await supabase
         .from('guards')
         .select('verification_status')
-        .eq('user_id', userId)
+        .eq('user_id', userIdRef.current)
         .maybeSingle();
-
-      if (error) return;
-
+      if (!activeRef.current || generation !== generationRef.current || error) return false;
       setLastChecked(new Date());
-
-      if (guardData?.verification_status === 'approved' || guardData?.verification_status === 'verified') {
-        clearBadStoredRedirects();
-        router.push('/guard/dashboard');
-        return;
-      } else if (guardData?.verification_status === 'rejected') {
-        router.push('/guard/verification-failed');
-        return;
+      const status = guardData?.verification_status;
+      if (status === 'approved' || status === 'verified' || status === 'rejected') {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        if (countdownRef.current) clearInterval(countdownRef.current);
+        if (status !== 'rejected') clearBadStoredRedirects();
+        router.push(status === 'rejected' ? '/guard/verification-failed' : '/guard/dashboard');
+        return true;
       }
+      return false;
+    } catch (error) {
+      console.error('Verification status check failed:', error);
+      return false;
     } finally {
-      if (!silent) setCheckingStatus(false);
-      setIsPolling(false);
-      setNextCheckIn(POLL_INTERVAL);
+      if (activeRef.current && generation === generationRef.current) {
+        requestInFlightRef.current = false;
+        if (!silent) setCheckingStatus(false);
+        setIsPolling(false);
+        setNextCheckIn(POLL_INTERVAL);
+      }
     }
-  };
+  }, [router]);
 
-  const startPolling = () => {
+  const startPolling = useCallback(() => {
+    if (!activeRef.current) return;
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     if (countdownRef.current) clearInterval(countdownRef.current);
-
-    pollIntervalRef.current = setInterval(() => {
-      checkVerificationStatus(true);
-    }, POLL_INTERVAL * 1000);
-
+    pollIntervalRef.current = setInterval(() => { void checkVerificationStatus(true); }, POLL_INTERVAL * 1000);
     countdownRef.current = setInterval(() => {
-      setNextCheckIn(prev => {
-        if (prev <= 1) return POLL_INTERVAL;
-        return prev - 1;
-      });
+      setNextCheckIn(prev => prev <= 1 ? POLL_INTERVAL : prev - 1);
     }, 1000);
-  };
+  }, [checkVerificationStatus]);
 
   useEffect(() => {
+    if (authLoading || !allowed) return;
+    activeRef.current = true;
+    const generation = ++generationRef.current;
+    const current = () => activeRef.current && generation === generationRef.current;
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!current() || !user) return;
         setUserEmail(user.email || '');
         userIdRef.current = user.id;
-        await checkVerificationStatus(true);
+        const terminal = await checkVerificationStatus(true);
+        if (!current() || terminal) return;
         startPolling();
+      } catch (error) {
+        console.error('Verification polling setup failed:', error);
       }
     };
-    init();
-
-    const timer = setInterval(() => {
-      setTimeElapsed(prev => prev + 1);
-    }, 1000);
-
+    void init();
+    const timer = setInterval(() => setTimeElapsed(prev => prev + 1), 1000);
     return () => {
+      activeRef.current = false;
+      generationRef.current = generation + 1;
+      requestInFlightRef.current = false;
+      userIdRef.current = null;
       clearInterval(timer);
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
-  }, []);
+  }, [authLoading, allowed, checkVerificationStatus, startPolling]);
 
   useEffect(() => {
     if (resendCooldown > 0) {
@@ -126,8 +136,9 @@ export default function VerificationPendingPage() {
   const handleManualCheck = async () => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     if (countdownRef.current) clearInterval(countdownRef.current);
-    await checkVerificationStatus(false);
-    startPolling();
+    const generation = generationRef.current;
+    const terminal = await checkVerificationStatus(false);
+    if (activeRef.current && generation === generationRef.current && !terminal) startPolling();
   };
 
   if (authLoading || !allowed) {
