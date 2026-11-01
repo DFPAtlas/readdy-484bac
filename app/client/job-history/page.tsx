@@ -192,6 +192,8 @@ const colorMap: Record<string, { bg: string; text: string }> = {
   slate: { bg: 'bg-slate-500/10', text: 'text-slate-400' },
 };
 
+const EMPTY_HISTORY_FILTERS = { searchQuery: '', statusFilter: 'all', paymentFilter: 'all', dateFrom: '', dateTo: '', guardFilter: '' };
+
 export default function ClientJobHistoryClient() {
   const router = useRouter();
   const { loading: authLoading, allowed, userId, clientData } = useClientGuard();
@@ -215,9 +217,13 @@ export default function ClientJobHistoryClient() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
+  const [appliedFilters, setAppliedFilters] = useState(EMPTY_HISTORY_FILTERS);
+  const fallbackClientName = clientData?.company_name || 'Client';
+
   const abortRef = useRef<AbortController | null>(null);
 
   const loadHistory = useCallback(async (pageNum: number, isRefresh = false) => {
+    const { searchQuery, statusFilter, paymentFilter, dateFrom, dateTo, guardFilter } = appliedFilters;
     if (abortRef.current) {
       abortRef.current.abort();
     }
@@ -233,6 +239,7 @@ export default function ClientJobHistoryClient() {
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
+      if (controller.signal.aborted) return;
       const token = sessionData.session?.access_token ?? '';
 
       const body: Record<string, any> = {
@@ -262,14 +269,15 @@ export default function ClientJobHistoryClient() {
       if (controller.signal.aborted) return;
 
       const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      if (controller.signal.aborted) return;
+      if (!response.ok || data.error) throw new Error(data.error || 'Failed to load job history');
       setJobs(data.jobs || []);
       setStats(data.stats || null);
       setTotalCount(data.totalCount || 0);
-      setClientName(data.client?.company_name || clientData?.company_name || 'Client');
+      setClientName(data.client?.company_name || fallbackClientName);
       setLastRefreshed(new Date());
     } catch (err: any) {
-      if (err.name === 'AbortError') return;
+      if (controller.signal.aborted || err.name === 'AbortError') return;
       setError(err.message || 'Failed to load history. Please try again.');
     } finally {
       if (!controller.signal.aborted) {
@@ -277,23 +285,25 @@ export default function ClientJobHistoryClient() {
         setRefreshing(false);
       }
     }
-  }, [searchQuery, statusFilter, paymentFilter, dateFrom, dateTo, guardFilter, clientData]);
+  }, [appliedFilters, fallbackClientName]);
+
+  const cancelHistory = useCallback(() => { abortRef.current?.abort(); }, []);
 
   useEffect(() => {
-    if (allowed && !checking && !blocked) {
-      loadHistory(currentPage);
+    if (allowed && userId && !checking && !blocked) {
+      void loadHistory(currentPage);
+      return cancelHistory;
     }
-  }, [allowed, checking, blocked]);
+  }, [allowed, userId, checking, blocked, currentPage, loadHistory, cancelHistory]);
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
-    loadHistory(newPage);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleFilterChange = () => {
     setCurrentPage(1);
-    loadHistory(1);
+    setAppliedFilters({ searchQuery, statusFilter, paymentFilter, dateFrom, dateTo, guardFilter });
   };
 
   const clearFilters = () => {
@@ -304,7 +314,7 @@ export default function ClientJobHistoryClient() {
     setDateTo('');
     setGuardFilter('');
     setCurrentPage(1);
-    loadHistory(1);
+    setAppliedFilters(EMPTY_HISTORY_FILTERS);
   };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -393,7 +403,7 @@ export default function ClientJobHistoryClient() {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => { setCurrentPage(1); loadHistory(1, true); }}
+                onClick={() => { void loadHistory(currentPage, true); }}
                 disabled={loading || refreshing}
                 className="flex items-center gap-2 bg-[#162036] text-slate-400 text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 border border-[#1e2d4d]"
               >
@@ -417,7 +427,7 @@ export default function ClientJobHistoryClient() {
                 <p className="text-sm text-red-400">{error}</p>
               </div>
               <button
-                onClick={() => { setCurrentPage(1); loadHistory(1, true); }}
+                onClick={() => { void loadHistory(currentPage, true); }}
                 className="px-4 py-2 bg-red-500/20 text-red-400 text-sm font-medium rounded-lg hover:bg-red-500/30 transition-colors cursor-pointer whitespace-nowrap"
               >
                 Retry
