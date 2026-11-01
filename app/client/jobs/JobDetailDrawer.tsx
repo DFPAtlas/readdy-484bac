@@ -1,7 +1,7 @@
 'use client';
 
 import { scheduledHoursPerGuard } from '@/lib/shift-hours';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { loadClientJobAssignments } from '@/lib/client-job-assignments';
@@ -21,47 +21,61 @@ interface JobDetailDrawerProps {
 export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDrawerProps) {
   const router = useRouter();
   const [assignments, setAssignments] = useState<any[]>([]);
-  const [assignmentsError, setAssignmentsError] = useState(false);
+  const [detailsError, setDetailsError] = useState(false);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [guardReviews, setGuardReviews] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [cancellation, setCancellation] = useState<any>(null);
   const [refundRequests, setRefundRequests] = useState<any[]>([]);
 
-  useEffect(() => {
-    loadDetails();
-  }, [job.id]);
+  const jobId = job.id;
+  const contextKey = JSON.stringify([jobId, clientId ?? null]);
+  const lifetimeRef = useRef<{ key: string } | null>(null);
+  const requestRef = useRef(0);
 
-  const loadDetails = async () => {
+  const loadDetails = useCallback(async () => {
+    const lifetime = lifetimeRef.current;
+    if (!lifetime || lifetime.key !== contextKey) return;
+    const request = ++requestRef.current;
+    const isCurrent = () => lifetimeRef.current === lifetime && requestRef.current === request;
     setLoading(true);
-    setAssignmentsError(false);
+    setDetailsError(false);
+    setAssignments([]);
+    setTransactions([]);
+    setGuardReviews({});
+    setCancellation(null);
+    setRefundRequests([]);
     try {
       const [assignmentsRes, transactionsRes, reviewsRes, cancellationRes, refundRes] = await Promise.all([
-        loadClientJobAssignments(supabase, job.id),
+        loadClientJobAssignments(supabase, jobId),
         supabase
           .from('transactions')
           .select('*')
-          .eq('job_id', job.id)
+          .eq('job_id', jobId)
           .order('created_at', { ascending: false })
           .limit(5),
         clientId ? supabase
           .from('reviews')
           .select('guard_id, rating, review_status, issue_reported')
-          .eq('job_id', job.id)
+          .eq('job_id', jobId)
           .eq('client_id', clientId) : Promise.resolve({ data: [] }),
         supabase
           .schema('app')
           .from('job_cancellations')
           .select('*')
-          .eq('job_id', job.id)
+          .eq('job_id', jobId)
           .maybeSingle(),
         supabase
           .schema('app')
           .from('refund_requests')
           .select('*')
-          .eq('job_id', job.id)
+          .eq('job_id', jobId)
           .order('created_at', { ascending: false }),
       ]);
+      if (!isCurrent()) return;
+      for (const result of [transactionsRes, reviewsRes, cancellationRes, refundRes]) {
+        if ('error' in result && result.error) throw result.error;
+      }
       setAssignments(assignmentsRes);
       setTransactions(transactionsRes.data || []);
       setCancellation(cancellationRes.data || null);
@@ -73,12 +87,20 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
       });
       setGuardReviews(reviewMap);
     } catch {
-      setAssignmentsError(true);
+      if (!isCurrent()) return;
+      setDetailsError(true);
       setAssignments([]);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  };
+  }, [jobId, clientId, contextKey]);
+
+  useEffect(() => {
+    const lifetime = { key: contextKey };
+    lifetimeRef.current = lifetime;
+    void loadDetails();
+    return () => { if (lifetimeRef.current === lifetime) lifetimeRef.current = null; };
+  }, [contextKey, loadDetails]);
 
   const formatDate = (d: string) =>
     d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
@@ -255,9 +277,9 @@ export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDra
           </div>
 
           {/* Selected Guards */}
-          {!loading && assignmentsError && (
+          {!loading && detailsError && (
             <div role="alert" className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-4">
-              <p className="text-sm font-semibold text-amber-400">Selected guards could not be loaded.</p>
+              <p className="text-sm font-semibold text-amber-400">Booking details could not be loaded. Please retry.</p>
               <button onClick={loadDetails} className="mt-2 px-3 py-1.5 bg-[#162036] text-slate-200 rounded-lg text-xs font-semibold border border-[#1e2d4d] hover:bg-[#1a2642] transition-colors cursor-pointer">
                 Try again
               </button>

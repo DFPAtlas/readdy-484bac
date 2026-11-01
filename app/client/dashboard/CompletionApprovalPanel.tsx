@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import CompletionReviewModal from './CompletionReviewModal';
@@ -29,15 +29,27 @@ export default function CompletionApprovalPanel({ clientId, jobId, onReviewed }:
   const [selectedRequest, setSelectedRequest] = useState<CompletionRequest | null>(null);
   const [error, setError] = useState('');
 
-  const loadRequests = async () => {
+  const contextKey = JSON.stringify([clientId, jobId ?? null]);
+  const activeContextRef = useRef<string | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+
+  const loadRequests = useCallback(async () => {
+    if (activeContextRef.current !== contextKey) return;
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const isCurrent = () => !controller.signal.aborted && requestRef.current === controller && activeContextRef.current === contextKey;
     setLoading(true);
     setError('');
+    setRequests([]);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
+      if (!isCurrent()) return;
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-completion-requests`,
         {
           method: 'POST',
+          signal: controller.signal,
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${sessionData.session?.access_token ?? ''}`,
@@ -46,21 +58,27 @@ export default function CompletionApprovalPanel({ clientId, jobId, onReviewed }:
         }
       );
       const data = await response.json();
+      if (!isCurrent()) return;
       if (!response.ok) throw new Error(data.error || 'Unable to load completion requests');
-      if (data.requests) {
-        const pending = data.requests.filter((r: CompletionRequest) => r.status === 'pending' && (!jobId || r.job_id === jobId));
-        setRequests(pending);
-      }
+      if (!Array.isArray(data.requests)) throw new Error('Unable to load completion requests');
+      const pending = data.requests.filter((r: CompletionRequest) => r.status === 'pending' && (!jobId || r.job_id === jobId));
+      setRequests(pending);
     } catch (err: any) {
-      setError(err.message || 'Unable to load completion requests');
+      if (isCurrent()) setError(err.message || 'Unable to load completion requests');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  };
+  }, [contextKey, jobId]);
 
   useEffect(() => {
-    loadRequests();
-  }, [clientId, jobId]);
+    activeContextRef.current = contextKey;
+    setSelectedRequest(null);
+    void loadRequests();
+    return () => {
+      activeContextRef.current = null;
+      requestRef.current?.abort();
+    };
+  }, [contextKey, loadRequests]);
 
   if (loading) {
     return (
