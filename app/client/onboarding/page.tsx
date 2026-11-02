@@ -10,7 +10,7 @@ import ClientOnboardingAgent from '@/components/ClientOnboardingAgent';
 export default function ClientOnboardingPage() {
   const router = useRouter();
   const { loading: authLoading, allowed } = useClientGuard();
-  const [userName, setUserName] = useState('');
+  const [, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [loading, setLoading] = useState(true);

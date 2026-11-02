@@ -59,7 +59,7 @@ export default function GuardAuthGate({ children }: { children: React.ReactNode 
   const [loading, setLoading] = useState(true)
   const [allowed, setAllowed] = useState(false)
   const [blockedStatus, setBlockedStatus] = useState<string | null>(null)
-  const [guardName, setGuardName] = useState<string>('')
+  const [, setGuardName] = useState<string>('')
 
   useEffect(() => {
     let cancelled = false

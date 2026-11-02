@@ -58,7 +58,6 @@ export default function FinanceReport({
   transactions,
   subscriptionPayments,
   client,
-  reportRange,
   onToast,
 }: {
   transactions: any[];

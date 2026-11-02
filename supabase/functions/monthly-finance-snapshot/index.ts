@@ -97,7 +97,6 @@ export default async function handler(req: Request) {
     }
 
     const monthStart = new Date(start);
-    const prevMonthStart = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() - 1, 1));
     const prevMonthEnd = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth(), 1));
 
     const payments:any[]=[];

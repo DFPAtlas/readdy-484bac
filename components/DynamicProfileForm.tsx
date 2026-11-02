@@ -117,7 +117,7 @@ export default function DynamicProfileForm({
   initialData,
   onDataChange,
 }: DynamicProfileFormProps) {
-  const { fields, loading, error } = useProfileWizardFields(wizardType);
+  const { fields, loading } = useProfileWizardFields(wizardType);
   const { formData, errors, setValue, toggleMultiValue } = useProfileFormData(fields, initialData);
 
   useEffect(() => {

@@ -34,7 +34,7 @@ export default function ProfileWizard({
           </div>
 
           <div className="relative flex items-start justify-between">
-            {steps.map((step, index) => {
+            {steps.map((step) => {
               const isCompleted = currentStep > step.id;
               const isCurrent = currentStep === step.id;
               const isClickable = allowSkipAhead || isCompleted || isCurrent;

@@ -31,7 +31,7 @@ export default function ClientLogin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [submitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [registerHref, setRegisterHref] = useState('/client/register');
   const router = useRouter();
   const appleAuthEnabled = process.env.NEXT_PUBLIC_APPLE_AUTH_ENABLED === 'true';

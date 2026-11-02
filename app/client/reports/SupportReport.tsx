@@ -31,7 +31,6 @@ function escapeCsv(value: string | number | null | undefined): string {
 
 export default function SupportReport({
   complaints,
-  reportRange,
   onToast,
 }: {
   complaints: any[];

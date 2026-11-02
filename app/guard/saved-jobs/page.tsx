@@ -90,7 +90,7 @@ export default function GuardSavedJobsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const unsave = async (savedId: string, jobId: string) => {
+  const unsave = async (savedId: string) => {
     setRemoving(savedId);
     await supabase.from('saved_jobs').delete().eq('id', savedId);
     setSavedJobs(prev => prev.filter(s => s.id !== savedId));
@@ -255,7 +255,7 @@ export default function GuardSavedJobsPage() {
                           )
                         )}
                         <button
-                          onClick={() => unsave(saved.id, job.id)}
+                          onClick={() => unsave(saved.id)}
                           disabled={removing === saved.id}
                           className="px-4 py-2 bg-red-500/10 text-red-400 text-sm font-medium rounded-xl border border-red-500/20 hover:bg-red-500/20 transition-colors whitespace-nowrap disabled:opacity-50"
                         >

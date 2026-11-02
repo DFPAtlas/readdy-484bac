@@ -334,7 +334,7 @@ export default function GuardVerificationsClient() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token || '';
       const unconfirmedSections = Object.entries(verificationChecks)
-        .filter(([_, checked]) => !checked)
+        .filter(([, checked]) => !checked)
         .map(([section]) => section.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()));
 
       const response = await fetch(

@@ -15,7 +15,7 @@ function harness(code,env){
 
 test('client monitoring rejects previous clients, tabs and closed-screen responses', async () => {
  const source=fs.readFileSync('app/admin/client-monitoring/ClientMonitoringDetail.tsx','utf8');
- const marker='export default function ClientMonitoringDetail({ client, onClose, onUpdate }: DetailProps) {';
+ const marker='export default function ClientMonitoringDetail({ client, onClose }: DetailProps) {';
  const body=source.slice(source.indexOf(marker)+marker.length, source.indexOf('  const handleSaveNotes'));
  const requests=[];
  const supabase={from(table){const d=deferred();const request={table,...d};requests.push(request);const query={select(){return this},eq(){return this},or(){return this},order(){return this},limit(){return this},then(resolve,reject){return d.promise.then(resolve,reject)}};return query}};

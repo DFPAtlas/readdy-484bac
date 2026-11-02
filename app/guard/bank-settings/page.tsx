@@ -393,11 +393,6 @@ export default function BankSettingsPage() {
     }
   };
 
-  const maskAccountNumber = (num: string) => {
-    if (!num || num.length < 4) return num;
-    return '****' + num.slice(-4);
-  };
-
   if (loading || authLoading || !allowed) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-[#0B1933] flex">

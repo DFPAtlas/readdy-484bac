@@ -56,7 +56,6 @@ export default function SearchAndFilterBar({
   onSearchChange,
   filters,
   onFiltersChange,
-  isSuperAdmin,
   blockedTaskSlugs,
   failedBuildSlugs,
   failedBackupSlugs,

@@ -110,7 +110,7 @@ export default function SearchFilterBar({
     ...(searchQuery ? [{ key: 'search', label: `"${searchQuery}"`, onRemove: () => onSearchChange('') }] : []),
     ...(sortBy ? [{ key: 'sort', label: `Sort: ${sortOptions.find((o) => o.value === sortBy)?.label || sortBy}`, onRemove: () => onSortChange('') }] : []),
     ...Object.entries(filters)
-      .filter(([_, v]) => v && v !== 'all' && v !== '')
+      .filter(([, v]) => v && v !== 'all' && v !== '')
       .map(([k, v]) => {
         const config = filterConfigs.find((c) => c.key === k);
         let displayLabel = v;

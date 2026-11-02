@@ -16,7 +16,6 @@ interface TestSendModalProps {
 export default function TestSendModal({
   templateSlug,
   variables,
-  subject,
   isOpen,
   onClose,
 }: TestSendModalProps) {

@@ -137,7 +137,6 @@ Deno.serve(async (req) => {
   let isSelfTrigger = false;
   let isAdminTrigger = false;
   let selfGuardId: string | null = null;
-  let adminId: string | null = null;
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: "app" } });
 
@@ -170,7 +169,6 @@ Deno.serve(async (req) => {
 
     if (adminUser && adminUser.is_active) {
       isAdminTrigger = true;
-      adminId = adminUser.id;
     } else {
       const { data: guardUser } = await supabase
         .from("guards")

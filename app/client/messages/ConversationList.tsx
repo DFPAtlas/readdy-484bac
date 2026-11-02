@@ -70,7 +70,6 @@ export default function ConversationList({
   activeId,
   filter,
   searchQuery,
-  totalUnread,
   onFilterChange,
   onSearchChange,
   onSelect,

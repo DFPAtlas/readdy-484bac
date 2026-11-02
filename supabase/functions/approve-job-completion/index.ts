@@ -174,7 +174,6 @@ serve(async (req: Request) => {
   }
 
   const now = new Date().toISOString();
-  const guardName = guard.full_name || 'Guard';
   const jobTitle = job.job_title || 'the job';
 
   if (isClientAction) {

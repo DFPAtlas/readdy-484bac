@@ -139,7 +139,7 @@ const guardTabs = [
 export default function MobileGuardDashboard() {
   const router = useRouter();
   const [guard, setGuard] = useState<Guard | null>(null);
-  const [guardUserId, setGuardUserId] = useState<string | null>(null);
+  const [, setGuardUserId] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<JobAssignment[]>([]);
   const [upcomingJobs, setUpcomingJobs] = useState<JobAssignment[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);

@@ -24,7 +24,7 @@ serve(async (req) => {
     );
   }
 
-  const stripe = new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' });
+  new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' });
   const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
 
   try {

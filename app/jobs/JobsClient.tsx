@@ -49,7 +49,7 @@ export default function JobsClient() {
   const [loadError, setLoadError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [selectedJobId, setSelectedJobId] = useState('');
+  const [, setSelectedJobId] = useState('');
   const [siaRequired, setSiaRequired] = useState(false);
   const [uniformRequired, setUniformRequired] = useState(false);
   const [selectedUrgency, setSelectedUrgency] = useState<string>('all');
@@ -360,7 +360,7 @@ export default function JobsClient() {
     }
   };
 
-  const getExpiryBadge = (startDate: string, urgency: string | null) => {
+  const getExpiryBadge = (startDate: string) => {
     const now = new Date();
     const start = new Date(startDate);
     const diffMs = start.getTime() - now.getTime();
@@ -842,7 +842,7 @@ export default function JobsClient() {
                               ) : null;
                             })()}
                             {(() => {
-                              const expiry = getExpiryBadge(job.start_date, job.urgency);
+                              const expiry = getExpiryBadge(job.start_date);
                               return expiry ? (
                                 <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${expiry.classes}`}>
                                   <i className={expiry.icon} aria-hidden="true"></i>

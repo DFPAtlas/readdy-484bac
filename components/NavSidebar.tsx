@@ -51,7 +51,7 @@ export default function NavSidebar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [loginModalOpen, setLoginModalOpen] = useState(false);
-  const [loginUserType, setLoginUserType] = useState<'guard' | 'client'>('guard');
+  const [loginUserType] = useState<'guard' | 'client'>('guard');
   const pathname = usePathname();
   const router = useSafeRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);

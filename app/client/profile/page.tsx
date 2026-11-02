@@ -119,7 +119,7 @@ function ClientProfileInner() {
   const { loading: authLoading, allowed } = useClientGuard();
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || "company");
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [, setLoadError] = useState(false);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [contacts, setContacts] = useState<ClientContact[]>([]);
   const [documents, setDocuments] = useState<ClientDocument[]>([]);

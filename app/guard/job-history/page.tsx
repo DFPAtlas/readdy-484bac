@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
@@ -127,7 +126,6 @@ const colorMap: Record<string, { bg: string; text: string; border: string }> = {
 };
 
 export default function GuardJobHistoryClient() {
-  const router = useRouter();
   const { loading: authLoading, allowed } = useGuardGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

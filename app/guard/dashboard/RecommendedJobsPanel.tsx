@@ -11,7 +11,7 @@ interface Props {
   hasApplied: (jobId: string) => boolean;
 }
 
-export default function RecommendedJobsPanel({ jobs, guard, onApply, hasApplied }: Props) {
+export default function RecommendedJobsPanel({ jobs, onApply, hasApplied }: Props) {
   const nearby = jobs.filter(job => job.distanceMiles !== null && job.distanceMiles <= 50);
   const displayed = nearby.length > 0 ? nearby.slice(0, 6) : jobs.slice(0, 6);
 

@@ -229,8 +229,6 @@ export default function EmailHealthClient() {
     URL.revokeObjectURL(url);
   };
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
-
   return (
     <div className="min-h-screen bg-[#0B1933]">
       <header className="sticky top-0 z-30 bg-[#111d35]/80 backdrop-blur-md border-b border-[#1a2b4a]">

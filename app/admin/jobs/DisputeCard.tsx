@@ -17,7 +17,7 @@ interface DisputeCardProps {
 }
 
 export default function DisputeCard({
-  jobTitle, status, statusLabel, statusBadgeClass,
+  jobTitle, statusLabel, statusBadgeClass,
   clientName, guardName, amount, currency,
   reason, createdAt, raisedBy, onClick,
 }: DisputeCardProps) {

@@ -49,7 +49,7 @@ function SuccessContent() {
   const [status, setStatus] = useState<PageStatus>('loading');
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [job, setJob] = useState<JobSummary | null>(null);
-  const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
+  const [, setAssignments] = useState<AssignmentSummary[]>([]);
   const [error, setError] = useState('');
   const [pollCount, setPollCount] = useState(0);
 

@@ -249,7 +249,6 @@ export default function JobTrackerClient() {
     loadJobs(true);
   };
 
-  const activeCount = jobs.filter(j => ['pending', 'awaiting_guard_selection', 'awaiting_payment', 'in_progress'].includes(j.status)).length;
   const needsActionCount = jobs.filter(j => ['awaiting_guard_selection', 'awaiting_payment'].includes(j.status)).length;
 
   const filters = [

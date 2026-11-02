@@ -504,7 +504,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const body = await req.json().catch((_err) => ({ action: "" }));
+    const body = await req.json().catch(() => ({ action: "" }));
     const action = body.action;
 
     if (action === "run" || action === "recheck") {

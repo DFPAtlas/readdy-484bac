@@ -67,7 +67,7 @@ function getSIAStatus(expiryDate: string | null) {
   return { text: "Valid", color: "text-emerald-400" };
 }
 
-function CompareRow({ label, values, highlightBest }: { label: string; values: React.ReactNode[]; highlightBest?: boolean }) {
+function CompareRow({ label, values }: { label: string; values: React.ReactNode[]; highlightBest?: boolean }) {
   return (
     <div className="grid gap-0" style={{ gridTemplateColumns: `200px repeat(${values.length}, minmax(220px, 1fr))` }}>
       <div className="px-4 py-3 text-sm font-medium text-slate-400 border-b border-r border-[#1e2d4d] flex items-center bg-[#0d1526]">

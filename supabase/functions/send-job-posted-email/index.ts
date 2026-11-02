@@ -52,7 +52,6 @@ serve(async (req: Request) => {
   }
 
   const resendApiKey = Deno.env.get('RESEND_API_KEY');
-  const fromDomain = Deno.env.get('RESEND_FROM_DOMAIN') || 'quickguard.uk';
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 

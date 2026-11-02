@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { guardName, guardEmail, tier, signupNumber, promoEndsAt, lifetimeFee } = await req.json();
+    const { guardName, guardEmail, tier, signupNumber, promoEndsAt } = await req.json();
 
     const tierMap: Record<string, string> = {
       founding: 'guard_promo_founding',

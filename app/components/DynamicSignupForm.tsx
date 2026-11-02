@@ -27,16 +27,11 @@ interface DynamicSignupFormProps {
   extraFormContent?: React.ReactNode;
 }
 
-function camelCase(str: string) {
-  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-}
-
 export default function DynamicSignupForm({
   wizardType,
   theme,
   onSubmit,
   loading,
-  socialButtons,
   error,
   extraFormContent,
 }: DynamicSignupFormProps) {

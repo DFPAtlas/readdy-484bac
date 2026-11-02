@@ -11,7 +11,7 @@ export default function PushNotificationPrompt({ role }: PushNotificationPromptP
   const { supported, permission, subscribed, loading, error, subscribe, unsubscribe } = usePushNotifications(role);
   const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -40,10 +40,6 @@ export default function PushNotificationPrompt({ role }: PushNotificationPromptP
 
   const handleUnsubscribe = async () => {
     await unsubscribe();
-  };
-
-  const handleOpenSettings = () => {
-    setShowSettings(true);
   };
 
   if (showSettings || (permission === 'denied' && !dismissed)) {

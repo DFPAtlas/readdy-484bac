@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, Suspense, useRef, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
   ensureUserRow,
@@ -37,7 +36,6 @@ function CallbackContent() {
   const [debugInfo, setDebugInfo] = useState('');
   const hasExchanged = useRef(false);
   const hasRun = useRef(false);
-  const searchParams = useSearchParams();
   const router = useRouter();
 
   const handleRedirect = useCallback(async (session: any, params: URLSearchParams, intent: any) => {

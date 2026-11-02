@@ -22,7 +22,6 @@ export default function GuardPaymentCentrePage() {
     stripeStatus,
     stripeLoading,
     jobPayments,
-    payouts,
     refreshStripeStatus,
     handleConnectStripe,
     handleOnboardingLink,

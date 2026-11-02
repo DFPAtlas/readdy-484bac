@@ -36,19 +36,6 @@ const STATUS_FILTERS: Record<string, string[]> = {
   closed: ['closed'],
 };
 
-const CATEGORY_FILTERS = [
-  { value: 'all', label: 'All Categories' },
-  { value: 'general_support', label: 'General Support' },
-  { value: 'payment_issue', label: 'Payment Issue' },
-  { value: 'guard_no_show', label: 'Guard No-Show' },
-  { value: 'late_arrival', label: 'Late Arrival' },
-  { value: 'poor_performance', label: 'Poor Performance' },
-  { value: 'refund_request', label: 'Refund Request' },
-  { value: 'job_cancellation', label: 'Job Cancellation' },
-  { value: 'technical_issue', label: 'Technical Issue' },
-  { value: 'account_billing', label: 'Account/Billing' },
-];
-
 const TICKET_SORT_OPTIONS = [
   { value: 'urgent', label: 'Urgent First' },
   { value: 'newest', label: 'Newest' },
@@ -428,7 +415,6 @@ export default function SupportPage() {
   };
 
   const handleBulkMarkResolved = async () => {
-    const ids = Array.from(selectedTicketIds);
     const resolvable = filteredTickets.filter(t => selectedTicketIds.has(t.id) && !['resolved', 'closed'].includes(t.status)).map(t => t.id);
     if (resolvable.length === 0) { setToast('No tickets that can be resolved'); return; }
     setBulkProcessing(true);

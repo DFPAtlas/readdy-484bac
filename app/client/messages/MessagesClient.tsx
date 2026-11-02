@@ -187,8 +187,7 @@ export default function MessagesClient() {
 
   const buildConversations = useCallback(async (
     messages: Message[],
-    userId: string,
-    existingConvs: Conversation[]
+    userId: string
   ): Promise<Conversation[]> => {
     const grouped: Record<string, { messages: Message[]; job_id: string | null; other_user_id: string; sender_type_by_partner: string }> = {};
 
@@ -299,7 +298,7 @@ export default function MessagesClient() {
         return;
       }
 
-      const convs = await buildConversations(messages as Message[], user.id, []);
+      const convs = await buildConversations(messages as Message[], user.id);
 
       if (!mountedRef.current) return;
 

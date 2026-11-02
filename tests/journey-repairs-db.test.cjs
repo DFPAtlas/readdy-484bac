@@ -1,7 +1,6 @@
 // Database regression tests for the journey-repair migrations (PGlite).
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const { PGlite } = require('@electric-sql/pglite');
 
 const { CLIENT_USER, CLIENT, JOB, GUARD_USER, GUARD, OTHER_USER, OTHER_GUARD, INVITE, MIGRATIONS, setupSql, migrationSql } = require('./helpers/journey-fixture.cjs');

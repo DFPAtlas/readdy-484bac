@@ -81,7 +81,7 @@ export default function AdminDashboard() {
     openSupportTickets: 0,
     newUsersThisMonth: 0,
   });
-  const [trends, setTrends] = useState({
+  const [, setTrends] = useState({
     newJobsThisMonthTrend: null as number | null,
     monthlyRevenueTrend: null as number | null,
     avgMatchTimeTrend: null as number | null,

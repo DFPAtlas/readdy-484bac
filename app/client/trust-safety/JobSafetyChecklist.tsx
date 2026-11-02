@@ -51,7 +51,7 @@ const riskOptions = [
   { value: 'urgent', label: 'Urgent Review', color: 'bg-red-500', text: 'text-red-400', border: 'border-red-500/25', bg: 'bg-red-500/15' },
 ];
 
-export default function JobSafetyChecklist({ jobs, onToggle, onChangeRisk, onChangeLoneWorker }: JobSafetyChecklistProps) {
+export default function JobSafetyChecklist({ jobs, onToggle, onChangeRisk }: JobSafetyChecklistProps) {
   const [selectedJob, setSelectedJob] = useState<string>(jobs[0]?.id || '');
   const [search, setSearch] = useState('');
   const [filterRisk, setFilterRisk] = useState<string>('all');

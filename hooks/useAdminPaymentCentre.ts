@@ -87,7 +87,7 @@ export function useAdminPaymentCentre() {
         guardsPendingRes,
         guardsRestrictedRes,
         guardsNotStartedRes,
-        failedPayoutsRes,
+        ,
         guardListRes,
         payoutsRes,
         assignmentsRes,

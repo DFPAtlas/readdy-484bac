@@ -11,7 +11,7 @@ function SuccessContent() {
   const [phase, setPhase] = useState<'verifying' | 'updating' | 'redirecting' | 'error'>('verifying');
   const [error, setError] = useState('');
   const [planName, setPlanName] = useState('');
-  const [planSlug, setPlanSlug] = useState('');
+  const [, setPlanSlug] = useState('');
   const [accountType, setAccountType] = useState<'client' | 'guard' | null>(null);
   const [trialEnd, setTrialEnd] = useState<string | null>(null);
   const [redirectTarget, setRedirectTarget] = useState('');

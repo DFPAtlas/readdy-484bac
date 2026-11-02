@@ -5,7 +5,7 @@ const ts=require('typescript');
 const compile=s=>ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
 const helper={exports:{}};
 new Function('module','exports',compile(fs.readFileSync('supabase/functions/_shared/invoice-lifecycle.ts','utf8')))(helper,helper.exports);
-const {invoiceReferences,invoiceOutcome,subscriptionStatus,stripeId}=helper.exports;
+const {invoiceReferences,invoiceOutcome}=helper.exports;
 const source=fs.readFileSync('supabase/functions/enhanced-stripe-webhook/index.ts','utf8');
 const block=source.slice(source.indexOf("      case 'invoice.payment_succeeded':"),source.indexOf("      case 'payment_intent.payment_failed':"));
 const run=new Function('stripe','appSupabase','event','requireAudit','subscriptionPeriod',...Object.keys(helper.exports),compile(`return (async()=>{switch(event.type){${block}}})();`));

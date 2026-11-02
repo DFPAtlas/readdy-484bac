@@ -16,7 +16,7 @@ function harness(code,env){
 function submissionsHarness(){
  const source=fs.readFileSync('app/admin/contact-submissions/AdminSubmissionsClient.tsx','utf8');const marker='export default function AdminSubmissionsClient() {';const body=source.slice(source.indexOf(marker)+marker.length,source.indexOf('  const handleExport ='));
  const reads=[],queue=[],channels=[],removed=[];
- const db={from:()=>{let head,fields,search;const q={select:(s,options)=>{fields=s;head=options?.head;return q},eq:()=>q,or:value=>{search=value;return q},order:()=>q,range:(from,to)=>{reads.push({search,from,to});return queue.shift()||Promise.resolve({data:[{id:search||'initial'}],count:1})},not:()=>Promise.resolve({data:[]}),then:resolve=>Promise.resolve({count:1,data:[]}).then(resolve)};return q},channel:name=>{const c={name,on:()=>c,subscribe:()=>{channels.push(c);return c}};return c},removeChannel:c=>removed.push(c.name)};
+ const db={from:()=>{let search;const q={select:()=>q,eq:()=>q,or:value=>{search=value;return q},order:()=>q,range:(from,to)=>{reads.push({search,from,to});return queue.shift()||Promise.resolve({data:[{id:search||'initial'}],count:1})},not:()=>Promise.resolve({data:[]}),then:resolve=>Promise.resolve({count:1,data:[]}).then(resolve)};return q},channel:name=>{const c={name,on:()=>c,subscribe:()=>{channels.push(c);return c}};return c},removeChannel:c=>removed.push(c.name)};
  const r=harness('const PAGE_SIZE=20;return function component(){'+body+'return {submissions,loading,page,setSearch,goToPage,refresh};}',{supabase:db});return {r,reads,queue,channels,removed};
 }
 test('admin submissions loads once initially, resets search pagination and drops out-of-order pages',async()=>{

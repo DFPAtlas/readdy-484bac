@@ -66,7 +66,6 @@ interface Warning {
 
 export default function ComplianceWarnings({ jobs, assignments }: ComplianceWarningsProps) {
   const [filter, setFilter] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
-  const [expanded, setExpanded] = useState(true);
 
   const warnings: Warning[] = [];
   const now = new Date();

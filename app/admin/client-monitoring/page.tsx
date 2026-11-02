@@ -32,12 +32,6 @@ interface ApplicationData {
   status: string;
 }
 
-interface AssignmentData {
-  id: string;
-  job_id: string;
-  status: string;
-}
-
 interface PaymentData {
   id: string;
   user_id: string;
@@ -208,7 +202,6 @@ export default function ClientMonitoringPage() {
         subsRes,
         jobsRes,
         appsRes,
-        assignRes,
         paymentsRes,
         ticketsRes,
         txRes,
@@ -217,7 +210,6 @@ export default function ClientMonitoringPage() {
         supabase.from('subscriptions').select('*'),
         supabase.from('jobs').select('id, client_id, status, start_date, created_at, guards_required, job_title').eq('is_deleted', false),
         supabase.from('job_applications').select('id, job_id, status'),
-        supabase.from('job_assignments').select('id, job_id, status'),
         supabase.from('subscription_payments').select('id, user_id, status, amount, created_at'),
         supabase.from('support_tickets').select('id, client_id, status, priority, created_at, subject').eq('is_deleted', false),
         supabase.from('transactions').select('id, client_id, amount, status, created_at'),
@@ -227,7 +219,6 @@ export default function ClientMonitoringPage() {
       const subsData = (subsRes.data || []) as SubscriptionData[];
       const jobsData = (jobsRes.data || []) as JobData[];
       const appsData = (appsRes.data || []) as ApplicationData[];
-      const assignData = (assignRes.data || []) as AssignmentData[];
       const paymentsData = (paymentsRes.data || []) as PaymentData[];
       const ticketsData = (ticketsRes.data || []) as TicketData[];
       const txData = (txRes.data || []) as TransactionData[];
@@ -238,7 +229,6 @@ export default function ClientMonitoringPage() {
       const enriched: ClientMonitoringData[] = clientsData.map((client) => {
         const clientJobs = jobsData.filter((j) => j.client_id === client.id);
         const clientApps = appsData.filter((a) => clientJobs.some((j) => j.id === a.job_id));
-        const clientAssignments = assignData.filter((a) => clientJobs.some((j) => j.id === a.job_id));
         const clientPayments = paymentsData.filter((p) => p.user_id === client.user_id);
         const clientTickets = ticketsData.filter((t) => t.client_id === client.id);
         const clientTx = txData.filter((t) => t.client_id === client.id);

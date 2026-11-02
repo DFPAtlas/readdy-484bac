@@ -8,7 +8,7 @@ import { getActivePlan, getPlansForAudience } from '@/lib/entitlements';
 
 export default function UpgradePrompt({ feature, compact = false }: { feature: string; compact?: boolean }) {
   const router = useSafeRouter();
-  const [audience, setAudience] = useState<'client' | 'guard' | null>(null);
+  const [, setAudience] = useState<'client' | 'guard' | null>(null);
   const [plans, setPlans] = useState<any[]>([]);
   const [currentPlan, setCurrentPlan] = useState<any>(null);
   const [loading, setLoading] = useState(true);

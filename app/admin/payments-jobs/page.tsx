@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { supabase } from '@/lib/supabase';
 import RefundRequestQueue from './RefundRequestQueue';
@@ -29,7 +28,6 @@ export default function PaymentsJobsPage() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [checkingRole, setCheckingRole] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const pathname = usePathname();
   const router = useSafeRouter();
 
   useEffect(() => {

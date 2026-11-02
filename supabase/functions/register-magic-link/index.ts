@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
     });
   }
   try {
-    const { email, role, first_name, last_name, wizard_data, referral_code, source, tax_disclaimer_accepted } = await req.json();
+    const { email, role, first_name, last_name, wizard_data, referral_code, tax_disclaimer_accepted } = await req.json();
     if (!email || !role) {
       return new Response(JSON.stringify({ error: 'Email and role are required' }), {
         status: 400,

@@ -16,7 +16,7 @@ export default function SupportEmailReviewPage() {
   const [clientCandidates, setClientCandidates] = useState<Record<string, {id:string;email:string}[]>>({});
   const [selectedClient, setSelectedClient] = useState<Record<string,string>>({});
   const [verified, setVerified] = useState<Record<string,boolean>>({});
-  const [createdTicket, setCreatedTicket] = useState<Record<string,string>>({});
+  const [, setCreatedTicket] = useState<Record<string,string>>({});
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

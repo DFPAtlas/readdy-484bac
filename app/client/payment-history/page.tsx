@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
@@ -91,11 +90,10 @@ const PAYMENT_FILTER_CONFIGS = [
 ];
 
 export default function ClientPaymentHistoryPage() {
-  const router = useRouter();
   const [subscriptionPayments, setSubscriptionPayments] = useState<any[]>([]);
   const [jobPayments, setJobPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [, setLoadError] = useState(false);
   const { loading: authLoading, allowed } = useClientGuard();
   const [activeTab, setActiveTab] = useState<'subscription' | 'jobs'>('subscription');
   const [searchTerm, setSearchTerm] = useState('');

@@ -58,7 +58,6 @@ const HELP_TOPICS: HelpTopic[] = [
 ];
 
 export default function ClientOnboardingAgent({
-  clientId,
   hasJobs,
   isFreeOrStarter,
   profileCompleted,
