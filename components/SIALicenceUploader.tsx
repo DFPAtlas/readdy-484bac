@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useRef } from 'react';
 
 interface SIALicenceUploaderProps {
@@ -128,7 +130,7 @@ export default function SIALicenceUploader({
                       <p className="text-xs text-slate-400">{frontFile?.name}</p>
                     </div>
                   ) : (
-                    <img src={frontPreview} alt="SIA Licence Front" className="w-full h-auto max-h-[200px] object-contain" />
+                    <QuickGuardImage src={frontPreview} alt="SIA Licence Front" className="w-full h-auto max-h-[200px] object-contain" />
                   )}
                 </div>
                 <div className="flex gap-2">
@@ -184,7 +186,7 @@ export default function SIALicenceUploader({
                       <p className="text-xs text-slate-400">{backFile?.name}</p>
                     </div>
                   ) : (
-                    <img src={backPreview} alt="SIA Licence Back" className="w-full h-auto max-h-[200px] object-contain" />
+                    <QuickGuardImage src={backPreview} alt="SIA Licence Back" className="w-full h-auto max-h-[200px] object-contain" />
                   )}
                 </div>
                 <div className="flex gap-2">
