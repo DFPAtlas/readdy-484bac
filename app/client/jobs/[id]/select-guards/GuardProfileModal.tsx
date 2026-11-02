@@ -1,5 +1,7 @@
 "use client";
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { computeComplianceInfo, GuardComplianceData } from "../compliance/useCompliance";
@@ -176,7 +178,7 @@ export default function GuardProfileModal({
           <div className="flex items-center gap-5">
             <div className="w-20 h-20 rounded-full bg-[#162036] flex items-center justify-center overflow-hidden flex-shrink-0 border-2 border-[#1e2d4d]">
               {guard.profile_image_url ? (
-                <img src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover object-top" />
+                <QuickGuardImage src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover object-top" />
               ) : (
                 <i className="ri-user-line text-3xl text-slate-500"></i>
               )}
