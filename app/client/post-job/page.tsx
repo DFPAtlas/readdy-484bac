@@ -117,6 +117,15 @@ function PostJobContent() {
   const clientId = clientData?.id || null;
   const isImmediateMode = searchParams.get('mode') === 'immediate';
 
+  const loadDraftsAndTemplates = useCallback(async (cId: string) => {
+    const [draftsRes, templatesRes] = await Promise.all([
+      supabase.schema('app').from('job_drafts').select('*').eq('client_id', cId).order('last_saved_at', { ascending: false }),
+      supabase.schema('app').from('job_templates').select('*').eq('client_id', cId).order('use_count', { ascending: false }),
+    ]);
+    setDrafts(draftsRes.data || []);
+    setTemplates(templatesRes.data || []);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     setPaygServiceFeePct(null);
@@ -162,7 +171,7 @@ function PostJobContent() {
 
     loadDraftsAndTemplates(clientData.id);
     loadSavedSites(clientData.id);
-  }, [clientData, userId, allowed]);
+  }, [clientData, userId, allowed, loadDraftsAndTemplates]);
 
   useEffect(() => {
     if (!allowed || !clientData || restoredDraftRef.current) return;
@@ -190,15 +199,6 @@ function PostJobContent() {
     }
   }, [isImmediateMode]);
 
-  const loadDraftsAndTemplates = async (cId: string) => {
-    const [draftsRes, templatesRes] = await Promise.all([
-      supabase.schema('app').from('job_drafts').select('*').eq('client_id', cId).order('last_saved_at', { ascending: false }),
-      supabase.schema('app').from('job_templates').select('*').eq('client_id', cId).order('use_count', { ascending: false }),
-    ]);
-    setDrafts(draftsRes.data || []);
-    setTemplates(templatesRes.data || []);
-  };
-
   const loadSavedSites = async (cId: string) => {
     setSitesLoading(true);
     const { data } = await supabase.from('saved_sites').select('*').eq('client_id', cId).eq('archived', false).order('created_at', { ascending: false });
@@ -212,26 +212,7 @@ function PostJobContent() {
     setSavedSites(data || []);
   };
 
-  useEffect(() => {
-    const templateId = searchParams.get('template');
-    const siteId = searchParams.get('site');
-    if (templateId && templates.length > 0) {
-      const t = templates.find(tpl => tpl.id === templateId);
-      if (t) {
-        loadTemplate(t);
-        setStartFrom('template');
-      }
-    }
-    if (siteId && savedSites.length > 0) {
-      const s = savedSites.find(sit => sit.id === siteId);
-      if (s) {
-        applySavedSite(s);
-        setStartFrom('site');
-      }
-    }
-  }, [searchParams, templates, savedSites]);
-
-  const applySavedSite = (site: any) => {
+  const applySavedSite = useCallback((site: any) => {
     setFormData(prev => ({
       ...prev,
       savedSiteId: site.id,
@@ -245,7 +226,7 @@ function PostJobContent() {
       siteInstructions: [site.access_instructions, site.parking_details, site.risk_notes].filter(Boolean).join('\n\n'),
     }));
     setToastMessage('Site details loaded');
-  };
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -301,7 +282,7 @@ function PostJobContent() {
     } catch {
       setDraftSaveStatus('idle');
     }
-  }, [clientId, currentDraftId, formData]);
+  }, [clientId, currentDraftId, formData, loadDraftsAndTemplates]);
 
   const loadDraft = (draft: any) => {
     const raw = draft.form_data || {};
@@ -326,7 +307,7 @@ function PostJobContent() {
     if (clientId) loadDraftsAndTemplates(clientId);
   };
 
-  const loadTemplate = async (template: any) => {
+  const loadTemplate = useCallback(async (template: any) => {
     setFormData(prev => ({
       ...defaultFormData,
       contactName: prev.contactName,
@@ -361,7 +342,36 @@ function PostJobContent() {
     setToastMessage('Template loaded');
     setActiveStep(1);
     if (clientId) loadDraftsAndTemplates(clientId);
-  };
+  }, [clientId, loadDraftsAndTemplates]);
+
+  const appliedUrlTemplateRef = useRef<string | null>(null);
+  const appliedUrlSiteRef = useRef<string | null>(null);
+  const templateId = searchParams.get('template');
+  const siteId = searchParams.get('site');
+
+  useEffect(() => {
+    if (!clientId) return;
+    const templateKey = templateId ? `${clientId}:${templateId}` : null;
+    const siteKey = siteId ? `${clientId}:${siteId}` : null;
+    if (!templateKey) appliedUrlTemplateRef.current = null;
+    if (!siteKey) appliedUrlSiteRef.current = null;
+    if (templateKey && appliedUrlTemplateRef.current !== templateKey) {
+      const template = templates.find(tpl => tpl.id === templateId);
+      if (template) {
+        appliedUrlTemplateRef.current = templateKey;
+        loadTemplate(template);
+        setStartFrom('template');
+      }
+    }
+    if (siteKey && appliedUrlSiteRef.current !== siteKey) {
+      const site = savedSites.find(item => item.id === siteId);
+      if (site) {
+        appliedUrlSiteRef.current = siteKey;
+        applySavedSite(site);
+        setStartFrom('site');
+      }
+    }
+  }, [clientId, templateId, siteId, templates, savedSites, loadTemplate, applySavedSite]);
 
   const saveTemplate = async (name: string) => {
     if (!clientId || !name.trim()) return;
