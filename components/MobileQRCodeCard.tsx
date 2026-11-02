@@ -1,5 +1,7 @@
 "use client";
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 
 import { useState, useEffect } from 'react';
 
@@ -50,7 +52,7 @@ export default function MobileQRCodeCard({ mobileUrl, label = "View on Mobile" }
       </div>
 
       <div className="flex items-center gap-4">
-        <img
+        <QuickGuardImage
           src={qrUrl}
           alt="QR code to mobile dashboard"
           className="w-20 h-20 rounded-lg border border-[#1a2b4a] bg-white p-1"
