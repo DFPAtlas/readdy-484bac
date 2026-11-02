@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useRef } from 'react';
 
 interface GuardDocumentsUploaderProps {
@@ -113,7 +115,7 @@ export default function GuardDocumentsUploader({
               <p className="text-xs text-slate-400">{file?.name}</p>
             </div>
           ) : (
-            <img src={preview} alt={label} className="w-full h-auto max-h-[200px] object-contain" />
+            <QuickGuardImage src={preview} alt={label} className="w-full h-auto max-h-[200px] object-contain" />
           )}
         </div>
       </div>
