@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { GuardVerification, getStatusBadge, getWarningBadges, formatDate } from './types';
 
 interface GuardTableProps {
@@ -34,7 +36,7 @@ export default function GuardTable({ guards, onReview, onRequestInfo }: GuardTab
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full overflow-hidden bg-[#1a2b4a] flex-shrink-0 border border-[#1a2b4a]">
                     {guard.profile_image_url ? (
-                      <img src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
+                      <QuickGuardImage src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-teal-500/20 to-sky-500/20">
                         <div className="w-4 h-4 flex items-center justify-center">
