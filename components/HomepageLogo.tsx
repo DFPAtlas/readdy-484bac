@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState } from 'react';
 import BrandLogo from '@/components/BrandLogo';
 
@@ -14,7 +16,7 @@ export default function HomepageLogo() {
   }
 
   return (
-    <img
+    <QuickGuardImage
       src={HOMEPAGE_LOGO_SRC}
       alt="QuickGuard — SIA-licensed security guards, booked by the shift"
       width={600}
