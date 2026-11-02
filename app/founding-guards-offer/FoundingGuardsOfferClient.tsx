@@ -335,7 +335,7 @@ export default function FoundingGuardsOfferClient() {
       <section className="py-20 border-t border-slate-200 dark:border-[#1e2d4d]">
         <div className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4">
-            Your Spot Won't Wait
+            Your Spot Won&apos;t Wait
           </h2>
           <p className="text-slate-500 dark:text-slate-400 mb-8">
             Every verified guard takes a number. The earlier you sign up and verify, the better your tier.

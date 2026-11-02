@@ -94,7 +94,7 @@ export default function AdminSessionTimeout() {
 
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Session Expiring Soon</h2>
           <p className="text-gray-500 mb-6 text-sm leading-relaxed">
-            You've been inactive for a while. For your security, you'll be automatically logged out in:
+            You&apos;ve been inactive for a while. For your security, you&apos;ll be automatically logged out in:
           </p>
 
           <div className="bg-orange-50 border border-orange-200 rounded-xl px-8 py-4 mb-6">

@@ -155,7 +155,7 @@ export default function GuardAttendanceCard({
       {within30Min && status === 'awaiting_confirmation' && (
         <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2 flex items-center gap-2">
           <i className="ri-alert-line text-amber-400 text-sm"></i>
-          <p className="text-xs text-amber-400 font-medium">Shift starts soon — guard hasn't confirmed</p>
+          <p className="text-xs text-amber-400 font-medium">Shift starts soon — guard hasn&apos;t confirmed</p>
         </div>
       )}
       {shiftStarted && (status === 'not_checked_in' || status === 'confirmed') && (

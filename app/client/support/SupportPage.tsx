@@ -10,8 +10,8 @@ import { useClientGuard } from '@/hooks/useClientGuard';
 import TicketCard from './TicketCard';
 import CreateTicketModal from './CreateTicketModal';
 import TicketDetailDrawer from './TicketDetailDrawer';
-import StatusBadge from './StatusBadge';
-import PriorityBadge from './PriorityBadge';
+
+
 import SearchFilterBar from '../components/SearchFilterBar';
 import BulkActionBar from '../components/BulkActionBar';
 import { useRouter } from 'next/navigation';

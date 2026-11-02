@@ -214,7 +214,7 @@ function GuardCompleteProfileWizardContent() {
         }
         setExistingData(initial);
       }
-    } catch (err) {
+    } catch {
       if (!isCurrent()) return;
       setLoadError('An unexpected error occurred. Please refresh the page.');
     }

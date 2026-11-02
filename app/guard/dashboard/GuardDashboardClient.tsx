@@ -802,7 +802,7 @@ export default function GuardDashboardClient() {
       await loadAvailableJobs();
       refreshUsage();
       showGuardToast('Application submitted successfully!');
-    } catch (error: any) {
+    } catch {
       showGuardToast('Failed to apply. Please try again.');
     }
   };
@@ -1200,7 +1200,7 @@ export default function GuardDashboardClient() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-blue-300">
-                    You're on the Guard Free plan — apply to up to 2 jobs per month. Upgrade for more applications and features.
+                    You&apos;re on the Guard Free plan — apply to up to 2 jobs per month. Upgrade for more applications and features.
                   </p>
                 </div>
               </div>

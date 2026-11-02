@@ -624,7 +624,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
             <i className="ri-error-warning-line text-4xl text-red-400"></i>
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Job Not Found</h2>
-          <p className="text-slate-400 mb-6">This job doesn't exist or you don't have access to it.</p>
+          <p className="text-slate-400 mb-6">This job doesn&apos;t exist or you don&apos;t have access to it.</p>
           <Link href="/client/jobs">
             <button className="bg-teal-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-teal-600 transition-colors whitespace-nowrap cursor-pointer">
               Back to Jobs
@@ -774,7 +774,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-blue-400">Payment is being confirmed</p>
                   <p className="text-sm text-blue-300 mt-1">
-                    We are verifying your payment with Stripe. This usually takes a few moments — please don't close this page or start another payment.
+                    We are verifying your payment with Stripe. This usually takes a few moments — please don&apos;t close this page or start another payment.
                   </p>
                 </div>
               </div>

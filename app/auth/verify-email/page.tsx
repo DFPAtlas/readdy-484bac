@@ -99,7 +99,7 @@ function VerifyEmailContent() {
               <li>Open your email inbox</li>
               <li>Look for an email from QuickGuard</li>
               <li>Click the verification link in the email</li>
-              <li>You'll be redirected to complete your registration</li>
+              <li>You&apos;ll be redirected to complete your registration</li>
             </ol>
           </div>
 
@@ -107,7 +107,7 @@ function VerifyEmailContent() {
             <div className="flex items-start gap-3">
               <i className="ri-spam-2-line text-amber-400 text-xl mt-0.5 w-5 h-5 flex items-center justify-center"></i>
               <div className="text-left">
-                <p className="text-sm text-amber-300 font-medium">Can't find the email?</p>
+                <p className="text-sm text-amber-300 font-medium">Can&apos;t find the email?</p>
                 <p className="text-sm text-amber-400/70 mt-1">Check your spam or junk folder. The email may take a few minutes to arrive.</p>
               </div>
             </div>

@@ -102,9 +102,9 @@ export function useClientPaymentCentre() {
       setSpendingSummary({ thisMonthSpend: monthTotals.collected, totalSpend: totals.collected, jobsPaid: paidJobs.size, outstandingAmount: outstanding, refundsTotal: totals.refunded, netSpend: totals.remaining });
 
       const jobIds = txData.map((t: any) => t.job_id).filter(Boolean);
-      let refundMap: Record<string, string> = {};
+      const refundMap: Record<string, string> = {};
       let jobsMap: Record<string, any> = {};
-      let guardMap: Record<string, string> = {};
+      const guardMap: Record<string, string> = {};
 
       if (jobIds.length > 0) {
         const {data: requests, error: requestError} = await supabase.schema('app').from('refund_requests').select('job_id, status').in('job_id', jobIds).order('created_at', {ascending:false});
@@ -153,7 +153,7 @@ export function useClientPaymentCentre() {
       }));
 
       setJobPayments(paymentsList);
-    } catch (err) {
+    } catch {
       setError('Failed to load payment data');
     } finally {
       setLoading(false);

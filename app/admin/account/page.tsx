@@ -67,7 +67,7 @@ export default function AdminAccountPage() {
         }
 
         setAdminUser({ ...data.admin, email: data.admin?.email || adminAuth.email });
-      } catch (err) {
+      } catch {
         // silently fail
       } finally {
         if (!cancelled) setLoading(false);

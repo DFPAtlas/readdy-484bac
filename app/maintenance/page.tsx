@@ -116,7 +116,7 @@ export default function MaintenancePage() {
         </div>
 
         <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
-          We'll be back soon
+          We&apos;ll be back soon
         </h1>
         <p className="text-lg text-slate-400 mb-8 leading-relaxed">
           {displayMessage}

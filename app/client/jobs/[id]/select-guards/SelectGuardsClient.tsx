@@ -397,7 +397,7 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
 
         setAllGuards(enrichedGuards);
       }
-    } catch (error) {
+    } catch {
       setLoadError(true);
     } finally {
       setLoading(false);

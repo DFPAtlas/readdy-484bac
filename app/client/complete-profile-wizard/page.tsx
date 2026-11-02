@@ -7,7 +7,7 @@ import { ensureEntitlement } from '@/lib/entitlements';
 import ProfileWizard from '@/components/ProfileWizard';
 import WizardNavigation from '@/components/WizardNavigation';
 import WizardCard from '@/components/WizardCard';
-import DynamicProfileForm, { useProfileWizardFields, useProfileFormData } from '@/components/DynamicProfileForm';
+import { useProfileWizardFields, useProfileFormData } from '@/components/DynamicProfileForm';
 import { sanitizeRedirectPath } from '@/lib/safe-redirect';
 import { getPendingBookingReturnPath } from '@/lib/pending-job-draft';
 
@@ -141,7 +141,7 @@ export default function ClientCompleteProfileWizard() {
           });
           setExistingData(initial);
         }
-      } catch (err) {
+      } catch {
         if (mountedRef.current) {
           setLoadError('An unexpected error occurred. Please refresh the page.');
         }

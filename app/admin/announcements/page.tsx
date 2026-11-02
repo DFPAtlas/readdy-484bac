@@ -646,7 +646,7 @@ export default function AdminAnnouncements() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-amber-400">Tip</p>
-                  <p className="text-xs text-amber-300 leading-relaxed">This announcement will appear at the top of every user's dashboard until you hide or delete it.</p>
+                  <p className="text-xs text-amber-300 leading-relaxed">This announcement will appear at the top of every user&apos;s dashboard until you hide or delete it.</p>
                 </div>
               </div>
             </div>

@@ -267,7 +267,7 @@ export default function AccessibilityPage() {
           <section className="bg-[#0e1628] border border-slate-700/50 rounded-2xl p-8">
             <h2 className="text-2xl font-bold text-white mb-4">Our Promise</h2>
             <p className="text-lg text-slate-400">
-              QuickGuard is dedicated to providing an inclusive experience for all users. We believe that accessibility is not just about compliance—it's about creating a better experience for everyone. We will continue to work towards making our platform accessible to all, and we appreciate your patience and feedback as we strive for continuous improvement.
+              QuickGuard is dedicated to providing an inclusive experience for all users. We believe that accessibility is not just about compliance—it&apos;s about creating a better experience for everyone. We will continue to work towards making our platform accessible to all, and we appreciate your patience and feedback as we strive for continuous improvement.
             </p>
           </section>
         </div>

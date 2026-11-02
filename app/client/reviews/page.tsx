@@ -468,7 +468,7 @@ export default function ClientReviewsPage() {
                         <ReviewStars rating={review.rating} size="sm" />
 
                         {review.review_text && (
-                          <p className="text-sm text-slate-400 mt-3 leading-relaxed">"{review.review_text}"</p>
+                          <p className="text-sm text-slate-400 mt-3 leading-relaxed">&quot;{review.review_text}&quot;</p>
                         )}
 
                         {/* Expandable details */}

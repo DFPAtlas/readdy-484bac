@@ -143,7 +143,7 @@ export default function CompletionApprovalPanel({ clientId, jobId, onReviewed }:
                       {req.jobs?.venue_city} • {req.jobs?.start_date ? formatDateOnly(req.jobs.start_date) : ''}
                     </p>
                     {req.notes && (
-                      <p className="text-xs text-slate-500 mt-1 italic">"{req.notes}"</p>
+                      <p className="text-xs text-slate-500 mt-1 italic">&quot;{req.notes}&quot;</p>
                     )}
                   </div>
                   <div className="flex-shrink-0 text-right">

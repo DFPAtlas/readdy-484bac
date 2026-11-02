@@ -5,7 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import LoginMarketingPanel from "@/components/login/LoginMarketingPanel";
 import LoginFormCard from "@/components/login/LoginFormCard";
-import BrandLogo from "@/components/BrandLogo";
+
 
 const mobileBg = "https://readdy.ai/api/search-image?query=Dark%20abstract%20futuristic%20security%20technology%20background%20with%20deep%20navy%20blue%20tones%2C%20subtle%20cyan%20geometric%20mesh%20network%20pattern%2C%20soft%20light%20rays%20and%20particle%20effects%2C%20premium%20enterprise%20SaaS%20aesthetic%2C%20minimal%20elegant%20low%20contrast%20style%2C%20perfect%20for%20dark%20mode%20mobile%20login%20page%20background%20overlay&width=800&height=1200&seq=4&orientation=portrait";
 
@@ -49,7 +49,7 @@ export default function GuardForgotPasswordPage() {
         setSubmitStatus("success");
         setEmail("");
       }
-    } catch (error) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
       setSubmitStatus("error");
     } finally {

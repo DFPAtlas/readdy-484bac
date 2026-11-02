@@ -56,6 +56,8 @@ function DropdownFilter({ label, options, value, onChange }: {
   return (
     <div className="relative" ref={ref}>
       <button
+        aria-label={label}
+        aria-expanded={open}
         onClick={() => setOpen(!open)}
         className="px-4 py-2.5 border border-[#1a2b4a] rounded-xl text-sm text-slate-300 bg-[#0a1628] hover:bg-[#1a2b4a] focus:outline-none cursor-pointer whitespace-nowrap flex items-center gap-2 min-w-[140px] justify-between"
       >

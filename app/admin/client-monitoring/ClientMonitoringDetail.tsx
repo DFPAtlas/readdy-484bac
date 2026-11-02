@@ -766,7 +766,7 @@ export default function ClientMonitoringDetail({ client, onClose, onUpdate }: De
                   {client.notes ? (
                     <p className="text-sm text-slate-700">{client.notes}</p>
                   ) : (
-                    <p className="text-sm text-slate-400 italic">No admin notes yet. Click "Add Notes" to add one.</p>
+                    <p className="text-sm text-slate-400 italic">No admin notes yet. Click &quot;Add Notes&quot; to add one.</p>
                   )}
                 </div>
               )}

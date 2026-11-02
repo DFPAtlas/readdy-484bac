@@ -119,7 +119,7 @@ export default function MobileInstallPrompt({ role = 'guard' }: MobileInstallPro
               {platform === 'ios' && (
                 <div className="flex-1 bg-[#162036] border border-[#1e2d4d] text-slate-300 text-xs font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 whitespace-nowrap">
                   <i className="ri-share-box-line text-teal-400"></i>
-                  Tap Share, then "Add to Home Screen"
+                  Tap Share, then &quot;Add to Home Screen&quot;
                 </div>
               )}
               {platform === 'other' && (

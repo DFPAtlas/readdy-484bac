@@ -94,7 +94,7 @@ export default function MobileSupervisorHome() {
         {/* Today's Shifts */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-white font-bold text-base">Today's Shifts</h2>
+            <h2 className="text-white font-bold text-base">Today&apos;s Shifts</h2>
             <button className="text-blue-400 text-sm font-medium cursor-pointer whitespace-nowrap">Manage</button>
           </div>
           <div className="space-y-2">

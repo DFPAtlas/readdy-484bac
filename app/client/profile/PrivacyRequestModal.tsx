@@ -146,7 +146,7 @@ export default function PrivacyRequestModal({ clientId, userId, requestType, onC
               className="w-full px-4 py-3 border border-[#1e2d4d] rounded-xl text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-[#162036] text-white"
               placeholder="your@email.com"
             />
-            <p className="text-xs text-slate-500 mt-1">Optional — we'll use your account email if left blank</p>
+            <p className="text-xs text-slate-500 mt-1">Optional — we&apos;ll use your account email if left blank</p>
           </div>
 
           <div className="flex items-center gap-2">

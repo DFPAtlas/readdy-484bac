@@ -67,7 +67,7 @@ export default function FailedPayments() {
 
       const subscriptionIds = [...new Set(spData.map(p => p.subscription_id).filter(Boolean))];
 
-      let subsMap = new Map<string, any>();
+      const subsMap = new Map<string, any>();
       if (subscriptionIds.length > 0) {
         const { data: subsData, error: subsError } = await supabase
           .from('subscriptions')
@@ -85,8 +85,8 @@ export default function FailedPayments() {
         Array.from(subsMap.values()).map((s: any) => s.user_id).filter(Boolean)
       )];
 
-      let clientsMap = new Map<string, any>();
-      let usersMap = new Map<string, any>();
+      const clientsMap = new Map<string, any>();
+      const usersMap = new Map<string, any>();
 
       if (clientIds.length > 0) {
         const { data: cData } = await supabase

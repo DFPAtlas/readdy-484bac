@@ -175,8 +175,8 @@ export function useAdminPaymentCentre() {
 
       const clientIds = [...new Set(jobs.map((j: any) => j.client_id).filter(Boolean))];
       const guardIds = [...new Set((assignmentsRes.data || []).map((a: any) => a.guard_id).filter(Boolean))];
-      let clientMap: Record<string, string> = {};
-      let guardMap: Record<string, string> = {};
+      const clientMap: Record<string, string> = {};
+      const guardMap: Record<string, string> = {};
       if (clientIds.length > 0) {
         const { data: clients } = await supabase.from('clients').select('id, company_name').in('id', clientIds as string[]);
         (clients || []).forEach((c: any) => { clientMap[c.id] = c.company_name || 'Unknown'; });
@@ -224,7 +224,7 @@ export function useAdminPaymentCentre() {
         };
       });
       setJobPayments(adminJobPayments);
-    } catch (err) {
+    } catch {
       setError('Failed to load admin payment data');
     } finally {
       setLoading(false);

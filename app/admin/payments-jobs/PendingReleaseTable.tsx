@@ -56,7 +56,7 @@ export default function PendingReleaseTable() {
       if (error) throw error;
 
       const clientIds = (data || []).map((r: any) => r.jobs?.client_id).filter(Boolean);
-      let clientMap: Record<string, any> = {};
+      const clientMap: Record<string, any> = {};
       if (clientIds.length > 0) {
         const { data: clients } = await supabase
           .from('clients')
@@ -119,7 +119,7 @@ export default function PendingReleaseTable() {
       };
 
       setPayoutChecks(result);
-    } catch (err: any) {
+    } catch {
       setToast({ message: 'Failed to check payout eligibility', type: 'error' });
     } finally {
       setCheckingPayout(false);
@@ -234,7 +234,7 @@ export default function PendingReleaseTable() {
         .limit(50);
 
       const guardIds = (data || []).map((p: any) => p.guard_id).filter(Boolean);
-      let guardMap: Record<string, any> = {};
+      const guardMap: Record<string, any> = {};
       if (guardIds.length > 0) {
         const { data: guards } = await supabase.from('guards').select('id, full_name, email').in('id', guardIds);
         (guards || []).forEach((g: any) => { guardMap[g.id] = g; });
@@ -426,7 +426,7 @@ export default function PendingReleaseTable() {
                 <i className="ri-bank-card-line text-2xl text-emerald-400"></i>
               </div>
               <h3 className="text-xl font-extrabold text-white mb-1">Approve Stripe Payout</h3>
-              <p className="text-sm text-slate-400">Send payment to guard's connected bank account</p>
+              <p className="text-sm text-slate-400">Send payment to guard&apos;s connected bank account</p>
             </div>
 
             <div className="bg-[#1a2b4a] rounded-xl p-4 mb-4 ring-1 ring-[#1e3048]">

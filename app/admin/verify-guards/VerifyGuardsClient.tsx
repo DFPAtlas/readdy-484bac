@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Link from 'next/link';
+
 import { supabase } from '@/lib/supabase';
 import { logAdminAction } from '@/lib/admin-logger';
 import SIALicenceImage from '@/components/SIALicenceImage';

@@ -401,7 +401,7 @@ export default function SIAVerificationsClient() {
                 This will queue a fresh register check for all <span className="font-bold text-white">{stats.needsReview}</span> guard{stats.needsReview !== 1 ? 's' : ''} currently in Needs review.
               </p>
               <div className="mt-3 bg-[#0B1933] rounded-xl p-4 ring-1 ring-[#1a2b4a]">
-                <p className="text-xs text-slate-400 font-medium">Results update automatically as each check completes. Any decision you've already made by hand stays in place.</p>
+                <p className="text-xs text-slate-400 font-medium">Results update automatically as each check completes. Any decision you&apos;ve already made by hand stays in place.</p>
               </div>
             </div>
             <div className="flex items-center gap-3 px-6 py-4 border-t border-[#1a2b4a]">

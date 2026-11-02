@@ -138,7 +138,7 @@ export function RecentFeedbackSnippet({ reviews }: { reviews: { review_text?: st
           {new Date(latest.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
         </span>
       </div>
-      <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">"{latest.review_text}"</p>
+      <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">&quot;{latest.review_text}&quot;</p>
     </div>
   );
 }
@@ -165,7 +165,7 @@ export function JobReviewBanner({
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-amber-400">Review your guards</p>
         <p className="text-xs text-amber-400/80">
-          {remaining} of {guardCount} guard{guardCount !== 1 ? 's' : ''} from "{jobTitle}" still need{remaining === 1 ? 's' : ''} a review
+          {remaining} of {guardCount} guard{guardCount !== 1 ? 's' : ''} from &quot;{jobTitle}&quot; still need{remaining === 1 ? 's' : ''} a review
         </p>
       </div>
       <Link

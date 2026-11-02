@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
@@ -13,23 +13,20 @@ const QGExitIntentPopup = dynamic(() => import('@/components/qg-rewards/QGExitIn
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
-  const mountedRef = useRef(false);
   const pathname = usePathname();
   const router = useSafeRouter();
 
   useEffect(() => {
     const t = setTimeout(() => {
-      mountedRef.current = true;
       setMounted(true);
     }, 300);
     return () => {
       clearTimeout(t);
-      mountedRef.current = false;
     };
   }, []);
 
   useEffect(() => {
-    if (!mountedRef.current) return;
+    if (!mounted) return;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') {
         if (
@@ -67,10 +64,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     });
 
     return () => subscription.unsubscribe();
-  }, [pathname, router]);
+  }, [mounted, pathname, router]);
 
   useEffect(() => {
-    if (!mountedRef.current) return;
+    if (!mounted) return;
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
       const message = typeof reason?.message === 'string' ? reason.message : String(reason);
@@ -101,7 +98,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     };
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
     return () => window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-  }, [pathname, router]);
+  }, [mounted, pathname, router]);
 
   return (
     <>

@@ -271,7 +271,7 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
       {snoozeToast.show && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-amber-500 text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-2.5 text-sm font-medium">
           <i className="ri-alarm-line text-lg"></i>
-          Snoozed — you'll be reminded in {snoozeToast.label.toLowerCase()}
+          Snoozed — you&apos;ll be reminded in {snoozeToast.label.toLowerCase()}
         </div>
       )}
 

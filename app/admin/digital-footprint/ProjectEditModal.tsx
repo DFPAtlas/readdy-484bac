@@ -177,7 +177,7 @@ export default function ProjectEditModal({ project, onClose, onSaved, isSuperAdm
       showToast('Project restored successfully', 'success');
       setRestoreConfirm(false);
       onSaved();
-    } catch (err) {
+    } catch {
       showToast('An unexpected error occurred', 'error');
     } finally {
       setSaving(false);
@@ -216,7 +216,7 @@ export default function ProjectEditModal({ project, onClose, onSaved, isSuperAdm
 
         showToast('Project archived', 'success');
         onSaved();
-      } catch (err) {
+      } catch {
         showToast('An unexpected error occurred', 'error');
       } finally {
         setSaving(false);
@@ -237,7 +237,7 @@ export default function ProjectEditModal({ project, onClose, onSaved, isSuperAdm
           showToast('Project archived', 'success');
           onSaved();
         }
-      } catch (err) {
+      } catch {
         showToast('An unexpected error occurred', 'error');
       } finally {
         setSaving(false);

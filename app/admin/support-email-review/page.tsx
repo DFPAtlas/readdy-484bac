@@ -114,7 +114,7 @@ export default function SupportEmailReviewPage() {
           <label className="flex items-start gap-2 text-sm my-3">
             <input type="checkbox" checked={Boolean(verified[email.id])}
               onChange={e => setVerified(old => ({ ...old, [email.id]: e.target.checked }))} />
-            I independently verified this sender's identity and ownership of the selected client account.
+            I independently verified this sender&apos;s identity and ownership of the selected client account.
             Email address matching alone is insufficient.
           </label>
           <button disabled={busy !== null || !selectedClient[email.id] || !verified[email.id]}

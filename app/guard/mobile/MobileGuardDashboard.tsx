@@ -11,9 +11,9 @@ import BottomNav from './BottomNav';
 import { submitGuardApplication } from '@/lib/guard-applications';
 import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
 import HomeSkeleton from './HomeSkeleton';
-import JobsSkeleton from './JobsSkeleton';
-import ShiftsSkeleton from './ShiftsSkeleton';
-import MessagesSkeleton from './MessagesSkeleton';
+
+
+
 import { formatDateOnly } from '@/lib/date-only';
 
 interface Guard {
@@ -742,7 +742,7 @@ export default function MobileGuardDashboard() {
             {/* Today's Jobs */}
             <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-white">Today's Shifts</h3>
+                <h3 className="text-sm font-semibold text-white">Today&apos;s Shifts</h3>
                 <button onClick={() => handleTabChange('shifts')} className="text-xs text-teal-400 font-medium cursor-pointer">
                   View All
                 </button>

@@ -13,7 +13,7 @@ export async function generateStaticParams() {
     if (jobs && jobs.length > 0) {
       return jobs.map((job: { id: string }) => ({ id: job.id }));
     }
-  } catch (_) { /* use mock fallback */ }
+  } catch { /* use mock fallback */ }
   return [{ id: '1' }, { id: '2' }, { id: '3' }];
 }
 

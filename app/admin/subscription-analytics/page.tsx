@@ -207,7 +207,7 @@ export default function SubscriptionAnalyticsPage() {
           .filter(Boolean)
       )] as string[];
 
-      let subsMap: Record<string, SubInfo> = {};
+      const subsMap: Record<string, SubInfo> = {};
       if (subscriptionIds.length > 0) {
         const { data: subsData, error: subsError } = await supabase
           .from('subscriptions')
@@ -231,7 +231,7 @@ export default function SubscriptionAnalyticsPage() {
         });
       }
 
-      let clientsMap: Record<string, ClientInfo> = {};
+      const clientsMap: Record<string, ClientInfo> = {};
       if (userIds.length > 0) {
         const { data: clientsData, error: clientsError } = await supabase
           .from('clients')

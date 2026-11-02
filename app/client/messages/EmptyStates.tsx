@@ -16,7 +16,7 @@ export default function EmptyStates({ type, onRetry }: Props) {
         </div>
         <h3 className="text-base font-semibold text-slate-200 mb-1">No messages yet</h3>
         <p className="text-xs text-slate-500 mb-5 max-w-xs leading-relaxed">
-          Messages from guards appear here after you post a job and receive applicants. You can also start a conversation from a guard's profile.
+          Messages from guards appear here after you post a job and receive applicants. You can also start a conversation from a guard&apos;s profile.
         </p>
         <div className="flex flex-col gap-2 w-full max-w-xs">
           <Link href="/client/post-job">

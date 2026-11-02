@@ -1045,7 +1045,7 @@ function PostModal({ post, onSave, onClose, parseHashtags, isValidImageUrl }: {
           <div className="bg-amber-500/5 border border-amber-500/10 rounded-lg px-3 py-2">
             <p className="text-[11px] text-amber-400/80">
               <i className="ri-information-line mr-1"></i>
-              Scheduled posts are saved as drafts with a target date. Use the "Publish Due" button in the header to publish all posts whose date has passed, or set up a cron job to call the publish-scheduled-posts edge function on a schedule.
+              Scheduled posts are saved as drafts with a target date. Use the &quot;Publish Due&quot; button in the header to publish all posts whose date has passed, or set up a cron job to call the publish-scheduled-posts edge function on a schedule.
             </p>
           </div>
           <div>

@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
       if (countErr) throw countErr;
       const allIds = (allJobRows || []).map((j: any) => j.id);
 
-      let guardMatchSet = new Set<string>();
+      const guardMatchSet = new Set<string>();
       if (allIds.length > 0) {
         const [assignRes, appRes] = await Promise.all([
           supabase.from('job_assignments')

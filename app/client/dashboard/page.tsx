@@ -6,18 +6,7 @@ import Link from "next/link";
 import { useRouteGuard } from "@/hooks/useRouteGuard";
 import { supabase } from "@/lib/supabase";
 import { getCurrentUser, getClientDashboardStats, getRecommendedGuards } from "@/lib/client-queries";
-import type {
-  Client,
-  SubscriptionInfo,
-  JobStat,
-  RecentJobSummary,
-  PipelineData,
-  BusinessData,
-  SafetyCounts,
-  ActionData,
-  DashboardData,
-  RecommendedGuard,
-} from "@/lib/client-types";
+import type { SubscriptionInfo, JobStat, RecentJobSummary, PipelineData, BusinessData, SafetyCounts, ActionData, DashboardData, RecommendedGuard } from "@/lib/client-types";
 import PortalSidebar from "@/components/PortalSidebar";
 import NotificationsPanel from "./NotificationsPanel";
 import ClientAnnouncements from "./ClientAnnouncements";
@@ -48,7 +37,7 @@ import { hasFeature, ensureEntitlement, CLIENT_FEATURE_KEYS, getAllClientFeature
 import UpgradeRequiredModal from "@/components/billing/UpgradeRequiredModal";
 import { useUsageLimits } from "@/hooks/useUsageLimits";
 import UsageLimitWidget from "@/components/UsageLimitWidget";
-import { getDaysUntil, computeOnboarding } from "@/lib/dashboard-helpers";
+import { computeOnboarding } from "@/lib/dashboard-helpers";
 import type { OnboardingItem } from "@/lib/dashboard-helpers";
 
 
@@ -229,13 +218,13 @@ export default function ClientDashboardPage() {
       const warnings: string[] = [];
 
       const [promoRes, subRes] = await Promise.all([
-        Promise.resolve(supabase.rpc("get_client_promo_stats")).then(r => ({ data: r.data, error: r.error })).catch(e => { warnings.push('Promo data failed to load'); return { data: null, error: null }; }),
-        Promise.resolve(supabase.from("subscriptions").select("*").eq("user_id", user.id).maybeSingle()).catch(e => { warnings.push('Subscription data failed to load'); return { data: null, error: null }; }),
+        Promise.resolve(supabase.rpc("get_client_promo_stats")).then(r => ({ data: r.data, error: r.error })).catch(() => { warnings.push('Promo data failed to load'); return { data: null, error: null }; }),
+        Promise.resolve(supabase.from("subscriptions").select("*").eq("user_id", user.id).maybeSingle()).catch(() => { warnings.push('Subscription data failed to load'); return { data: null, error: null }; }),
       ]);
 
       const [statsResult, topGuardsResult] = await Promise.all([
-        getClientDashboardStats(cid, user.id).catch(e => { warnings.push('Dashboard stats failed to load'); return { stats: null, actionData: {} as Partial<DashboardData>, error: null }; }),
-        getRecommendedGuards(5).catch(e => { warnings.push('Recommended guards failed to load'); return { guards: [], error: null }; }),
+        getClientDashboardStats(cid, user.id).catch(() => { warnings.push('Dashboard stats failed to load'); return { stats: null, actionData: {} as Partial<DashboardData>, error: null }; }),
+        getRecommendedGuards(5).catch(() => { warnings.push('Recommended guards failed to load'); return { guards: [], error: null }; }),
       ]);
 
       if (!mountedRef.current) return;
@@ -689,7 +678,7 @@ export default function ClientDashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-blue-300">
-                    You're on the QuickGuard Free plan — publish up to 1 job per month and pay per job. Upgrade for more posts and lower fees.
+                    You&apos;re on the QuickGuard Free plan — publish up to 1 job per month and pay per job. Upgrade for more posts and lower fees.
                   </p>
                 </div>
               </div>

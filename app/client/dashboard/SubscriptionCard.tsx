@@ -28,7 +28,7 @@ export default function SubscriptionCard({ sub }: { sub: SubscriptionInfo }) {
 
   let gradient = 'from-blue-600 to-indigo-700';
   let statusLabel = 'Active';
-  let statusBg = 'bg-white/20';
+  const statusBg = 'bg-white/20';
 
   if (isExpired) { gradient = 'from-red-500 to-rose-700'; statusLabel = 'Expired'; }
   else if (isCritical) { gradient = 'from-red-400 to-orange-600'; statusLabel = 'Expiring Soon'; }

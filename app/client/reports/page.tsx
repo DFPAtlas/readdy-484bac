@@ -10,7 +10,7 @@ import { useRouteGuard } from '@/hooks/useRouteGuard';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
-import ErrorState from '@/app/client/components/ErrorState';
+
 import JobHistoryReport from './JobHistoryReport';
 import FinanceReport from './FinanceReport';
 import AttendanceReport from './AttendanceReport';

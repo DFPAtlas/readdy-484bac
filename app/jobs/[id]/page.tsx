@@ -12,7 +12,7 @@ export async function generateStaticParams() {
     const { data: jobRows } = await supabase.rpc('get_public_jobs').select('id').eq('is_deleted', false).limit(200);
     const jobs = Array.isArray(jobRows) ? jobRows : [];
     if (jobs && jobs.length > 0) return jobs.map((job) => ({ id: job.id }));
-  } catch (_) { /* fallback for static export */ }
+  } catch { /* fallback for static export */ }
   return [{ id: '1' }, { id: '2' }, { id: '3' }];
 }
 
@@ -48,7 +48,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         },
       };
     }
-  } catch (_) { /* fallback */ }
+  } catch { /* fallback */ }
   return {
     title: 'Security Guard Job | QuickGuard UK',
     description: 'Find SIA-licensed security guard jobs across the UK on QuickGuard.',

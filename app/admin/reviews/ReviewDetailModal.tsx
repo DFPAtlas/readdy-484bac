@@ -62,7 +62,7 @@ export default function ReviewDetailModal({ review, guardStats, onClose, onToggl
                 <i className="ri-shield-star-line text-teal-400 text-lg"></i>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-teal-300 font-medium mb-0.5">Guard's Overall Rating</p>
+                <p className="text-xs text-teal-300 font-medium mb-0.5">Guard&apos;s Overall Rating</p>
                 <div className="flex items-center gap-2 flex-wrap">
                   <StarRow rating={guardStats.averageRating} size="sm" />
                   <span className="text-sm font-bold text-teal-300">
@@ -136,7 +136,7 @@ export default function ReviewDetailModal({ review, guardStats, onClose, onToggl
               <div className="w-4 h-4 flex items-center justify-center">
                 <i className="ri-shield-user-line"></i>
               </div>
-              View Guard's Full Account
+              View Guard&apos;s Full Account
               <div className="w-4 h-4 flex items-center justify-center ml-auto">
                 <i className="ri-arrow-right-line"></i>
               </div>

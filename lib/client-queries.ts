@@ -513,9 +513,9 @@ export async function getClientDashboardStats(clientId: string, userId: string):
   const totalGuardsHired = [...new Set(distinctGuards.map(a => a.guard_id))].length;
 
   // Safety counts
-  let missingSafetyInfo = 0;
+  const missingSafetyInfo = 0;
   let highRiskJobs = 0;
-  let complianceWarnings = 0;
+  const complianceWarnings = 0;
   let missingEmergencyContacts = 0;
 
   jobs.forEach(j => {

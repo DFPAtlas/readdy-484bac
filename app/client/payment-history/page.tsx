@@ -235,7 +235,7 @@ export default function ClientPaymentHistoryPage() {
         fetchSubscriptionPayments(user.id),
         fetchJobPayments(user.id)
       ]);
-    } catch (error) {
+    } catch {
       if (isCurrent()) setLoadError(true);
     } finally {
       if (isCurrent()) setLoading(false);

@@ -1,6 +1,6 @@
 'use client';
 
-import BookingStatusBadge from './BookingStatusBadge';
+
 
 interface JobStatusTrackerProps {
   status: string;

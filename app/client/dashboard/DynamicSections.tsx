@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Suspense } from 'react';
+
 
 const SectionFallback = ({ height = 'h-48' }: { height?: string }) => (
   <div className={`bg-[#111d35] rounded-2xl border border-[#1e2d4d] shadow-sm p-6 ${height} animate-pulse`}>

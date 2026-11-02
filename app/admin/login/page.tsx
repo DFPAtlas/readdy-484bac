@@ -321,7 +321,7 @@ export default function AdminLogin() {
                     </div>
                     <h2 className="text-lg font-semibold text-white mb-2">Check your inbox</h2>
                     <p className="text-[#AAB7C4] text-sm mb-6">
-                      We've sent a password reset link to <span className="font-medium text-white">{resetEmail}</span>. It may take a minute to arrive.
+                      We&apos;ve sent a password reset link to <span className="font-medium text-white">{resetEmail}</span>. It may take a minute to arrive.
                     </p>
                     <button
                       onClick={() => { setMode('login'); setResetStatus('idle'); setResetMessage(''); }}

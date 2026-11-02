@@ -121,7 +121,7 @@ export default function CookieConsent() {
             </div>
             
             <p className="text-xs text-gray-500 text-center">
-              By clicking "Accept All", you consent to our use of cookies. Read our{' '}
+              By clicking &quot;Accept All&quot;, you consent to our use of cookies. Read our{' '}
               <Link href="/privacy" prefetch={false} className="text-blue-600 hover:underline">Privacy Policy</Link> for more information.
             </p>
           </div>

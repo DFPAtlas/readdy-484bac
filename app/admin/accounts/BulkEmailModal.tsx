@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 interface Recipient {
@@ -326,7 +326,7 @@ ${messageText.split('\n').map(line => `<p style="color:#374151;font-size:16px;li
             />
             <p className="text-xs text-slate-400 mt-1.5">
               <div className="w-4 h-4 inline-flex items-center justify-center mr-1"><i className="ri-information-line"></i></div>
-              Each email will be personalised with the recipient's name automatically.
+              Each email will be personalised with the recipient&apos;s name automatically.
             </p>
           </div>
 

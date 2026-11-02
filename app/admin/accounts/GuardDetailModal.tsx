@@ -88,7 +88,7 @@ export default function GuardDetailModal({ guard, onClose, onUpdate }: GuardDeta
         }
 
         const clientIds = [...new Set(data.map(r => r.client_id).filter(Boolean))];
-        let clientMap: Record<string, string> = {};
+        const clientMap: Record<string, string> = {};
         if (clientIds.length > 0) {
           const { data: clientData } = await supabase
             .from('clients')
