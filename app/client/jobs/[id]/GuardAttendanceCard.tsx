@@ -85,7 +85,6 @@ function isShiftWithin30Min(jobStartDate?: string, jobStartTime?: string): boole
 export default function GuardAttendanceCard({
   assignment,
   jobStartTime,
-  jobEndTime,
   jobStartDate,
   onMessageGuard,
   onReportIssue,

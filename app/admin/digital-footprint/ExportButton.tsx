@@ -25,7 +25,6 @@ export default function ExportButton({ projects }: ExportButtonProps) {
   const exportCSV = () => {
     const header = 'Project,Category,Automated Cost,Manual Cost,Revenue Estimate,Build Status,Health,Blockers,Last Updated,Archived';
     const rows = projects.map((p) => {
-      const cost = p.manualCost ?? p.automatedCost ?? '';
       return [
         `"${p.projectName}"`,
         `"${p.category}"`,

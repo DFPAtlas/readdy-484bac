@@ -165,11 +165,6 @@ export default function CompanyDashboardClient() {
     return () => { supabase.removeChannel(ch); };
   }, [company?.id, loadDashboard]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
-  };
-
   const getSeverityColor = (s: string) => {
     if (s === 'critical') return 'bg-red-500/15 text-red-400 border-red-500/25';
     if (s === 'high') return 'bg-amber-500/15 text-amber-400 border-amber-500/25';

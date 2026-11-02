@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
-Deno.serve(async (_req: Request) => {
+Deno.serve(async () => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -10,7 +10,7 @@ Deno.serve(async (_req: Request) => {
 
   const startDb = Date.now();
   try {
-    const { data, error } = await supabase.from("jobs").select("id").limit(1);
+    const { error } = await supabase.from("jobs").select("id").limit(1);
     checks.database = { status: error ? "unhealthy" : "healthy", latency_ms: Date.now() - startDb };
     if (error) {
       checks.database.error = error.message;

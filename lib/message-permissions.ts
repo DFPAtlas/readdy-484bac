@@ -13,7 +13,6 @@ export async function canSendJobMessage({
   currentUserType,
   jobId,
   otherUserId,
-  otherUserType,
 }: CanSendJobMessageArgs): Promise<{ allowed: boolean; error?: string }> {
   try {
     const [jobRes, guardRes] = await Promise.all([

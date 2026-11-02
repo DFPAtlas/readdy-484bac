@@ -89,7 +89,6 @@ export default function ChatPanel({
   conversation,
   messages,
   job,
-  guard,
   clientUserId,
   sending,
   onSend,

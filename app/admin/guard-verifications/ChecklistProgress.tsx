@@ -26,7 +26,6 @@ export default function ChecklistProgress({
   items,
   color = 'blue',
   showList = false,
-  progressOnly = false,
   bare = false,
 }: ChecklistProgressProps) {
   const c = colorMap[color] || colorMap.blue;

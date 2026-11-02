@@ -34,8 +34,6 @@ function ProfileContent() {
   const [siaFrontPreview, setSiaFrontPreview] = useState<string>('');
   const [siaBackPreview, setSiaBackPreview] = useState<string>('');
   const [siaUploadError, setSiaUploadError] = useState('');
-  const [uploadingSia, setUploadingSia] = useState(false);
-
   const [profile, setProfile] = useState<any>(null);
   const [form, setForm] = useState<any>();
   const [authUserId, setAuthUserId] = useState<string | null>(null);

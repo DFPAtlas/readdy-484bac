@@ -234,6 +234,7 @@ export async function getPlansForAudience(audience: 'client' | 'guard') {
 }
 
 export async function ensureEntitlement(userId: string, _audience?: 'guard' | 'client'): Promise<Entitlement | null> {
+  void _audience;
   if (!userId) return null;
 
   const existing = await getUserEntitlements(userId);

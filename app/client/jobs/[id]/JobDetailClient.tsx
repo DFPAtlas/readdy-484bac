@@ -535,7 +535,6 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     { key: 'complaints', label: 'Raise Issue', icon: 'ri-error-warning-line' },
   ];
 
-  const isCompleted = job.status === 'completed';
   const isReviewable = job.status === 'paid_out' || job.status === 'review_pending';
   const isClosed = job.status === 'closed';
   const unreviewedGuards = assignedGuards.filter((a) => a.guards?.id && !guardReviews[a.guards.id]);

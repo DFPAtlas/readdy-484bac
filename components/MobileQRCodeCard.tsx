@@ -9,7 +9,7 @@ interface MobileQRCodeCardProps {
   accentColor?: string;
 }
 
-export default function MobileQRCodeCard({ mobileUrl, label = "View on Mobile", accentColor = "teal" }: MobileQRCodeCardProps) {
+export default function MobileQRCodeCard({ mobileUrl, label = "View on Mobile" }: MobileQRCodeCardProps) {
   const [copied, setCopied] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [fullUrl, setFullUrl] = useState(mobileUrl);

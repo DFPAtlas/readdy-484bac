@@ -315,7 +315,6 @@ export default function SecuritySOCClient() {
   }, [fetchSecurityData]);
 
   const hasAnyError = Object.values(fetchState).some(s => s === 'error');
-  const isFullyLoaded = Object.values(fetchState).every(s => s === 'idle');
 
   return (
     <div className="p-6 space-y-6 min-h-screen bg-[#0B1933] pb-12">

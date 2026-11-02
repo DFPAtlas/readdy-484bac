@@ -6,7 +6,6 @@ interface TrackerStatsBarProps {
 
 export default function TrackerStatsBar({ jobs }: TrackerStatsBarProps) {
   const total = jobs.length;
-  const pending = jobs.filter(j => j.status === 'pending').length;
   const awaitingSelection = jobs.filter(j => j.status === 'awaiting_guard_selection').length;
   const awaitingPayment = jobs.filter(j => j.status === 'awaiting_payment').length;
   const inProgress = jobs.filter(j => j.status === 'in_progress').length;

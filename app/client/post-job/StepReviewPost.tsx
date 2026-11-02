@@ -106,8 +106,6 @@ export default function StepReviewPost({
     serviceFeeFixedPence,
   }) : null;
 
-  const isScheduled = !!formData.publishAt && new Date(formData.publishAt) > new Date();
-
   return (
     <div className="space-y-6">
       {onFieldChange && (

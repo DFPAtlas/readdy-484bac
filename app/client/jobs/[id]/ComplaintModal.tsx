@@ -18,7 +18,6 @@ export default function ComplaintModal({
   jobId,
   jobTitle,
   assignedGuards,
-  currentUserId,
   onClose,
   onSuccess,
 }: ComplaintModalProps) {

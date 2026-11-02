@@ -31,7 +31,7 @@ serve(async (req) => {
   }
 
   try {
-    const { client_email, client_name, tier, signup_number, ends_at, discount, jobs_remaining } = await req.json();
+    const { client_email, client_name, tier, signup_number, ends_at, jobs_remaining } = await req.json();
     if (!client_email || !tier) return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     const num = signup_number ? String(signup_number).padStart(3, '0') : '';

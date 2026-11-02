@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
@@ -195,7 +194,6 @@ const colorMap: Record<string, { bg: string; text: string }> = {
 const EMPTY_HISTORY_FILTERS = { searchQuery: '', statusFilter: 'all', paymentFilter: 'all', dateFrom: '', dateTo: '', guardFilter: '' };
 
 export default function ClientJobHistoryClient() {
-  const router = useRouter();
   const { loading: authLoading, allowed, userId, clientData } = useClientGuard();
   const { checking, blocked } = useRouteGuard(userId);
   const [loading, setLoading] = useState(true);

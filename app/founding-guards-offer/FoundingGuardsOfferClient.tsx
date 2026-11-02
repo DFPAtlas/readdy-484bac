@@ -65,9 +65,6 @@ export default function FoundingGuardsOfferClient() {
     load();
   }, []);
 
-  const tier1Taken = stats ? Math.min(stats.verifiedCount, stats.tier1Cap) : 0;
-  const tier2Taken = stats ? Math.max(0, Math.min(stats.verifiedCount, stats.tier2Cap) - stats.tier1Cap) : 0;
-
   const faqs = [
     {
       id: 'tier-lock',

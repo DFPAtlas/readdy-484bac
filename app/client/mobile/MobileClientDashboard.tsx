@@ -83,7 +83,7 @@ export default function MobileClientDashboard() {
   const [client, setClient] = useState<ClientDetails | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
-  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('home');

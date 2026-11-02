@@ -181,7 +181,8 @@ serve(async (req) => {
         if (data && data.length > 0) {
           const headers = Object.keys(data[0]).filter(k => k !== "metadata").join(",");
           const rows = data.map((r: any) => {
-            const { metadata, ...rest } = r;
+            const rest = { ...r };
+            delete rest.metadata;
             return Object.values(rest).map((v: any) => typeof v === "string" ? `"${v.replace(/"/g, '""')}"` : v !== null ? v : "").join(",");
           });
           csv = [headers, ...rows].join("\n");

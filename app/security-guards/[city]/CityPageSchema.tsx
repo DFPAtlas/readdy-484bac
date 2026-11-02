@@ -7,7 +7,7 @@ interface CitySchemaProps {
   faqs: { question: string; answer: string }[];
 }
 
-export default function CityPageSchema({ city, region, description, faqs }: CitySchemaProps) {
+export default function CityPageSchema({ city, description, faqs }: CitySchemaProps) {
   const serviceSchema = {
     '@context': 'https://schema.org',
     '@type': 'Service',

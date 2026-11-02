@@ -85,7 +85,7 @@ export default function ClientReportsPage() {
   const { checking, blocked } = useRouteGuard();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [clientId, setClientId] = useState<string | null>(null);
+  const [, setClientId] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState('Client');
   const [subscriptionTier, setSubscriptionTier] = useState('Free');
   const [initials, setInitials] = useState('CL');

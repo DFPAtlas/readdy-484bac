@@ -99,7 +99,6 @@ Deno.serve(async function(req) {
         status: 401, headers: { ...headers, 'Content-Type': 'application/json' }
       });
     }
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
     const emailLower = recipient_email.toLowerCase().trim();
     const settingsRes = await supabase.from('qg_launch_reward_settings').select('key,value');
     const settings: Record<string, any> = {};
@@ -200,7 +199,6 @@ Deno.serve(async function(req) {
       .catch(err => console.error('[send-qg-launch-invite] Pre-account token creation error:', err));
 
     const clickTrackUrl = `https://quickguard.uk/api/qg-click?invite=${inviteData.id}&ref=${encodeURIComponent(referralCode)}`;
-    const directUrl = `https://quickguard.uk/qg-launch-rewards?ref=${referralCode}`;
     const unsubToken = btoa(`qg_unsub_${emailLower}_2025`).replace(/=/g, '').substring(0, 32);
     const unsubUrl = `https://quickguard.uk/api/qg-unsubscribe?email=${encodeURIComponent(emailLower)}&token=${unsubToken}`;
     await supabase.from('qg_launch_invites').update({ invite_url: clickTrackUrl, updated_at: new Date().toISOString() }).eq('id', inviteData.id);

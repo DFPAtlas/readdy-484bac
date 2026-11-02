@@ -49,7 +49,7 @@ const VENUE_TYPES = [
 ];
 
 export default function ClientHowItWorks() {
-  const [isVisible, setIsVisible] = useState<Record<string, boolean>>();
+  const [, setIsVisible] = useState<Record<string, boolean>>();
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const mountedRef = useRef(false);

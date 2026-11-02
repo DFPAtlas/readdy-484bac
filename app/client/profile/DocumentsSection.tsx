@@ -31,14 +31,6 @@ const DOC_TYPES = [
   { value: "other", label: "Other", icon: "ri-file-3-line", color: "text-slate-500" },
 ];
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-}
-
 export default function DocumentsSection({ clientId, documents, onRefresh, onMessage }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [uploading, setUploading] = useState(false);

@@ -119,7 +119,7 @@ interface ContactData {
   is_primary: boolean;
 }
 
-export default function ClientMonitoringDetail({ client, onClose, onUpdate }: DetailProps) {
+export default function ClientMonitoringDetail({ client, onClose }: DetailProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'jobs' | 'payments' | 'tickets' | 'messages' | 'documents' | 'notes'>('overview');
   const [loading, setLoading] = useState(false);
   const [jobs, setJobs] = useState<JobData[]>([]);

@@ -97,7 +97,7 @@ export default function GuardMessagesClient() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   const [activeJob, setActiveJob] = useState<JobInfo | null>(null);
-  const [activeClient, setActiveClient] = useState<ClientInfo | null>(null);
+  const [, setActiveClient] = useState<ClientInfo | null>(null);
   const [sending, setSending] = useState(false);
   const [filter, setFilter] = useState<'all' | 'job' | 'unread' | 'archived'>('all');
   const [searchQuery, setSearchQuery] = useState('');

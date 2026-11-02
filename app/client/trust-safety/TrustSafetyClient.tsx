@@ -25,9 +25,9 @@ export default function TrustSafetyClient() {
   const [client, setClient] = useState<ClientDetails | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [assignments, setAssignments] = useState<Record<string, GuardAssignment[]>>({});
-  const [loadingAssignments, setLoadingAssignments] = useState(false);
+  const [, setLoadingAssignments] = useState(false);
 
-  const { jobs, incidents, counts, loading, error } = useSafetyData();
+  const { jobs, incidents, counts, loading } = useSafetyData();
   const updateSafetyCheck = useUpdateSafetyCheck();
   const updateJobSafety = useUpdateJobSafety();
 

@@ -37,7 +37,6 @@ export default function CostBreakdown({
   quickguardNetFee,
   vat = 0,
   total,
-  paymentStatus,
   jobTitle,
   location,
   startDate,

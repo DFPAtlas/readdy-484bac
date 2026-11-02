@@ -128,7 +128,7 @@ serve(async (req) => {
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (err: any) {
+  } catch {
     console.error("[Geocode] Request failed");
     await recordRequest(publicClient, ip, userAgent, false);
     return new Response(JSON.stringify({ error: "Geocoding temporarily unavailable", code: "GEOCODING_UNAVAILABLE" }), {

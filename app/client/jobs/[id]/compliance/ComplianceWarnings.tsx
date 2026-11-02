@@ -15,7 +15,6 @@ export default function ComplianceWarnings({
   guardNames = [],
   guardsRequired = 0,
   guardsSelected = 0,
-  requiredLicenceTypes,
 }: Props) {
   const warnings: { type: string; message: string; guardName?: string; severity: "critical" | "warning" | "info" }[] = [];
 

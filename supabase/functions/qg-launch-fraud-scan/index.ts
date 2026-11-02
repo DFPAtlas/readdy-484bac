@@ -27,8 +27,6 @@ serve(async (req) => {
     authUser = user;
   }
 
-  const isServiceRole = req.headers.get("authorization")?.startsWith("Bearer eyJ") && !authUser;
-
   async function writeAuditLog(actorUserId: string | null, actorRole: string | null, action: string, targetType: string, targetId: string | null, beforeData?: any, afterData?: any) {
     await supabaseAdmin.from("qg_launch_reward_audit_log").insert({
       actor_user_id: actorUserId,

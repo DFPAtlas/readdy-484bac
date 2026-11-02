@@ -46,10 +46,12 @@ async function readMyUsage(supabase: AnyClient, featureKey: 'guard_application' 
  * apply-to-job re-checks and consumes usage atomically, so this is advisory.
  */
 export async function checkGuardApplicationLimit(supabase: AnyClient, _guardId?: string | null): Promise<GuardApplicationLimit> {
+  void _guardId;
   return readMyUsage(supabase, 'guard_application');
 }
 
 /** Pre-flight check for the signed-in client. `_userId` is accepted for compatibility only. */
 export async function checkClientJobLimit(supabase: AnyClient, _userId?: string | null): Promise<GuardApplicationLimit & { reason?: string }> {
+  void _userId;
   return readMyUsage(supabase, 'client_job_post');
 }

@@ -120,12 +120,6 @@ export default function AttendancePanel({ job, assignments: rawAssignments, clie
     setReplacementModal(null);
   };
 
-  const formatTime = (d: string) => {
-    if (!d) return '—';
-    const date = new Date(d);
-    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  };
-
   const formatDate = (d: string) => {
     return formatDateOnly(d, { day: 'numeric', month: 'short', year: 'numeric' });
   };

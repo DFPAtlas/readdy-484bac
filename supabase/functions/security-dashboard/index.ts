@@ -707,7 +707,7 @@ Deno.serve(async (req) => {
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      const [tablesRes, policiesRes, indexesRes, bucketsRes] = await Promise.allSettled([
+      const [tablesRes, policiesRes, , bucketsRes] = await Promise.allSettled([
         supabaseAdmin.rpc('security_audit_tables'),
         supabaseAdmin.rpc('security_audit_policies'),
         supabaseAdmin.rpc('security_audit_indexes'),
@@ -715,7 +715,7 @@ Deno.serve(async (req) => {
       ]);
 
       const tablesData = tablesRes.status === 'fulfilled' ? (tablesRes.value.data || []) : [];
-      const policiesData = policiesRes.status === 'fulfilled' ? (policiesRes.value.data || []) : [];
+      void policiesRes;
       const bucketsData = bucketsRes.status === 'fulfilled' ? (bucketsRes.value.data || []) : [];
 
       const appTables = tablesData.filter((t: any) => t.schema_name === 'app');

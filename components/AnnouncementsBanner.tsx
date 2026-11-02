@@ -28,7 +28,7 @@ export default function AnnouncementsBanner({ audience, wrapperClass }: Announce
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [userId, setUserId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
 
   // Load user and dismissed announcements
   const load = useCallback(async () => {

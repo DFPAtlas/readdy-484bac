@@ -34,7 +34,6 @@ export default function OnboardingPanel({
   nextAction,
   trialDaysLeft,
   isTrialActive,
-  subscriptionStatus,
   onDismiss,
   compact = false,
 }: OnboardingPanelProps) {

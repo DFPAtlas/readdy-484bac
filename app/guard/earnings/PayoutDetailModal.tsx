@@ -22,25 +22,6 @@ export default function PayoutDetailModal({
   const fee = payout?.fee_deducted ?? 0;
   const status = payout?.status ?? earning.payment_status ?? 'pending';
 
-  const getStatusBadge = (s: string) => {
-    switch (s) {
-      case 'paid':
-      case 'completed':
-        return 'bg-green-100 text-green-700';
-      case 'pending':
-        return 'bg-orange-100 text-orange-700';
-      case 'processing':
-      case 'initiated':
-        return 'bg-blue-100 text-blue-700';
-      case 'held':
-        return 'bg-red-100 text-red-700';
-      case 'failed':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
-    }
-  };
-
   const formatDate = (d: string) => {
     if (!d) return 'N/A';
     return new Date(d).toLocaleDateString('en-GB', {

@@ -76,7 +76,6 @@ export interface FlowSourceData {
 
 export function getPaymentFlowStatus(data: FlowSourceData): PaymentFlowStatus {
   const currency = data.jobCurrency || 'GBP';
-  const symbol = currency === 'GBP' ? '£' : currency === 'EUR' ? '€' : '$';
 
   const stage1Stat = normalizeStatus(
     data.jobPaymentStatus || data.assignmentPaymentStatus,

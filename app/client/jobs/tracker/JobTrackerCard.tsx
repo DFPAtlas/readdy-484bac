@@ -69,7 +69,7 @@ function getActionBanner(job: any) {
   return null;
 }
 
-export default function JobTrackerCard({ job, onRefresh }: JobTrackerCardProps) {
+export default function JobTrackerCard({ job }: JobTrackerCardProps) {
   const statusConfig = getStatusConfig(job.status);
   const actionBanner = getActionBanner(job);
   const isCancelled = job.status === 'cancelled';

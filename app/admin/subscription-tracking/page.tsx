@@ -86,8 +86,6 @@ interface StatsData {
   over_limit: number;
 }
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50];
-
 function getPlanColor(slug: string) {
   if (slug.includes('elite')) return 'bg-purple-500/15 text-purple-400';
   if (slug.includes('pro')) return 'bg-blue-500/15 text-blue-400';

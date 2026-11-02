@@ -25,7 +25,7 @@ export async function renderTemplate(
     .eq('is_active', true)
     .maybeSingle();
 
-  const defaults = getFallbackTemplate(templateSlug);
+  const defaults = getFallbackTemplate();
 
   if (!template) {
     return applyVariables(defaults, variables);
@@ -74,7 +74,7 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-function getFallbackTemplate(slug: string): RenderedTemplate {
+function getFallbackTemplate(): RenderedTemplate {
   return {
     subject: 'QuickGuard Notification',
     body_html: `<!DOCTYPE html>

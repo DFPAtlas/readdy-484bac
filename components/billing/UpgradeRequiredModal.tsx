@@ -10,7 +10,7 @@ interface UpgradeRequiredModalProps {
   audience?: 'client' | 'guard';
 }
 
-export default function UpgradeRequiredModal({ featureName, isOpen, onClose, audience }: UpgradeRequiredModalProps) {
+export default function UpgradeRequiredModal({ featureName, isOpen, onClose }: UpgradeRequiredModalProps) {
   const [closing, setClosing] = useState(false);
 
   if (!isOpen && !closing) return null;
@@ -23,7 +23,6 @@ export default function UpgradeRequiredModal({ featureName, isOpen, onClose, aud
     }, 200);
   };
 
-  const planRoute = audience === 'guard' ? '/guard/profile' : '/client/profile';
   const upgradeRoute = '/pricing';
 
   return (
