@@ -37,7 +37,7 @@ export async function listAccountStorageFiles(client: any, buckets: string[], ro
   return [...files].sort();
 }
 
-export async function removeAccountStorageFiles(client: any, files: string[], onBatch?: (deleted: string[]) => Promise<void>): Promise<string[]> {
+export async function removeAccountStorageFiles(client: any, files: string[], onBatch?: (deleted: string[]) => Promise<void>, beforeBatch?: () => Promise<void>): Promise<string[]> {
   const grouped = new Map<string, string[]>();
   for (const file of new Set(files)) {
     const slash = file.indexOf('/');
@@ -51,6 +51,7 @@ export async function removeAccountStorageFiles(client: any, files: string[], on
   for (const [bucket, paths] of grouped) {
     for (let offset = 0; offset < paths.length; offset += 1000) {
       const batch = paths.slice(offset, offset + 1000);
+      await beforeBatch?.();
       const { error } = await client.storage.from(bucket).remove(batch);
       if (error) throw new Error(`Cannot remove ${bucket} documents: ${error.message}`);
       deleted.push(...batch.map(path => `${bucket}/${path}`));
@@ -58,4 +59,26 @@ export async function removeAccountStorageFiles(client: any, files: string[], on
     }
   }
   return deleted;
+}
+
+// Legacy references outside the account's verified UUID folders require an
+// ownership review. Never clear their database reference and claim file erasure.
+export function assertAccountStorageReferences(record: Record<string, unknown>, roots: string[], stage: string): void {
+  const fields = stage === 'profile'
+    ? ['profile_image_url','profile_image_path','profile_photo_url','logo_url']
+    : ['sia_licence_front_url','sia_licence_back_url','sia_licence_front_path','sia_licence_back_path','sia_supporting_document_path','sia_licence_photo_url','driving_licence_front_url','driving_licence_back_url','proof_of_address_url'];
+  for (const field of fields) {
+    const value = record[field];
+    if (typeof value !== 'string' || !value.trim()) continue;
+    let path = value;
+    if (/^https?:\/\//i.test(value)) {
+      const match = new URL(value).pathname.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/[^/]+\/(.+)$/);
+      if (!match) {
+        if (stage === 'profile') continue;
+        throw new Error('External verification document requires ownership review');
+      }
+      path = decodeURIComponent(match[1]);
+    }
+    if (!roots.some(root => path.startsWith(`${root}/`))) throw new Error('Legacy document folder requires ownership review before cleanup');
+  }
 }

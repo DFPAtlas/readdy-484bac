@@ -52,3 +52,11 @@ verify_jwt = true
 
 [functions.update-after-payment]
 verify_jwt = true
+
+[functions.account-closure]
+# The handler validates the user token, ownership, and admin MFA where needed.
+verify_jwt = false
+
+[functions.process-account-retention]
+# Authenticated by a generated Vault scheduler token, never a browser flag.
+verify_jwt = false
