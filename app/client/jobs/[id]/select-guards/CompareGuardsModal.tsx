@@ -1,5 +1,7 @@
 "use client";
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useEffect } from "react";
 
 interface Guard {
@@ -134,7 +136,7 @@ export default function CompareGuardsModal({ guards, onClose, onRemove, onSelect
                     <div className="relative flex-shrink-0">
                       <div className="w-12 h-12 rounded-full bg-[#162036] flex items-center justify-center overflow-hidden border border-[#1e2d4d]">
                         {guard.profile_image_url ? (
-                          <img src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover object-top" />
+                          <QuickGuardImage src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover object-top" />
                         ) : (
                           <i className="ri-user-line text-xl text-slate-500"></i>
                         )}
