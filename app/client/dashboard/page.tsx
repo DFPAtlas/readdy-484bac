@@ -100,7 +100,7 @@ export default function ClientDashboardPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [promoStats, setPromoStats] = useState<Record<string, unknown> | null>(null);
+  const [, setPromoStats] = useState<Record<string, unknown> | null>(null);
   const [globalPromoCounts, setGlobalPromoCounts] = useState<GlobalPromoCounts | null>(null);
   const [actionData, setActionData] = useState<ActionData>({
     guardsAwaitingReview: 0,
@@ -157,7 +157,7 @@ export default function ClientDashboardPage() {
   const [nextAction, setNextAction] = useState<{ label: string; href: string } | null>(null);
   const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
   const [isTrialActive, setIsTrialActive] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showOnboarding] = useState(true);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [userEntitlement, setUserEntitlement] = useState<UserEntitlement | null>(null);
   const [dashboardError, setDashboardError] = useState<string | null>(null);

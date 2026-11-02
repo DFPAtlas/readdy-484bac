@@ -69,7 +69,7 @@ export default function GuardDashboardClient() {
   const [hasMoreAvailableJobs, setHasMoreAvailableJobs] = useState(true);
   const [loadingMoreJobs, setLoadingMoreJobs] = useState(false);
   const AVAILABLE_JOBS_PAGE_SIZE = 12;
-  const [contactSubmissions, setContactSubmissions] = useState<any[]>([]);
+  const [, setContactSubmissions] = useState<any[]>([]);
   const [bankDetails, setBankDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('assignments');
@@ -161,7 +161,7 @@ export default function GuardDashboardClient() {
       );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to request completion');
-      await loadJobAssignments(guardUserId!, isAdmin);
+      await loadJobAssignments(guardUserId!);
       await loadPendingApprovals();
       showGuardToast('Job marked complete — awaiting client approval');
     } catch (err: any) {
@@ -285,7 +285,7 @@ export default function GuardDashboardClient() {
     }
   }, [beginRead, traceLog]);
 
-  const loadJobAssignments = useCallback(async (userId: string, adminMode: boolean = false) => {
+  const loadJobAssignments = useCallback(async (userId: string) => {
     if (userId && readScopeRef.current.userId !== userId) return;
     const isCurrent = beginRead('loadJobAssignments');
     if (!isCurrent()) return;
@@ -335,7 +335,7 @@ export default function GuardDashboardClient() {
       setDataErrors(prev => [...prev, 'job_assignments']);
     }
   }, [beginRead, traceLog]);
-  const loadJobApplications = useCallback(async (userId?: string, adminMode: boolean = false) => {
+  const loadJobApplications = useCallback(async (userId?: string) => {
     if (userId && readScopeRef.current.userId !== userId) return;
     const isCurrent = beginRead('loadJobApplications');
     if (!isCurrent()) return;
@@ -370,7 +370,7 @@ export default function GuardDashboardClient() {
       setDataErrors(prev => [...prev, 'job_applications']);
     }
   }, [beginRead, traceLog]);
-  const loadClientResponses = useCallback(async (userId: string, adminMode: boolean = false) => {
+  const loadClientResponses = useCallback(async (userId: string) => {
     if (userId && readScopeRef.current.userId !== userId) return;
     const isCurrent = beginRead('loadClientResponses');
     if (!isCurrent()) return;
@@ -519,9 +519,9 @@ export default function GuardDashboardClient() {
     setIsAdmin(adminMode);
     await Promise.all([
       loadGuardProfile(userId, adminMode),
-      loadJobAssignments(userId, adminMode),
-      loadJobApplications(userId, adminMode),
-      loadClientResponses(userId, adminMode),
+      loadJobAssignments(userId),
+      loadJobApplications(userId),
+      loadClientResponses(userId),
       loadAvailableJobs(),
       loadContactSubmissions(userId),
       loadOpenTicketCount(userId),
@@ -594,9 +594,9 @@ export default function GuardDashboardClient() {
     const resolvedUserId = guardUserId;
     const channel = supabase
       .channel('guard-dashboard-live-v2')
-      .on('postgres_changes', { event: '*', schema: 'app', table: 'job_assignments' }, () => loadJobAssignments(resolvedUserId, false))
-      .on('postgres_changes', { event: '*', schema: 'app', table: 'job_applications' }, () => loadJobApplications(resolvedUserId, false))
-      .on('postgres_changes', { event: '*', schema: 'app', table: 'client_responses' }, () => loadClientResponses(resolvedUserId, false))
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'job_assignments' }, () => loadJobAssignments(resolvedUserId))
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'job_applications' }, () => loadJobApplications(resolvedUserId))
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'client_responses' }, () => loadClientResponses(resolvedUserId))
       .on('postgres_changes', { event: '*', schema: 'app', table: 'jobs' }, () => loadAvailableJobs(0))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -830,7 +830,7 @@ export default function GuardDashboardClient() {
       try { data = await response.json(); } catch { data = {}; }
       // Success only once the server has persisted guard_confirmed_at.
       if (!response.ok || !data.success || !data.guard_confirmed_at) throw new Error(data.error || 'Failed to confirm. Please try again.');
-      await loadJobAssignments(guardUserId!, isAdmin);
+      await loadJobAssignments(guardUserId!);
       showGuardToast(data.alreadyConfirmed ? 'Shift already confirmed.' : 'Shift confirmed!');
     } catch (err: any) {
       showGuardToast(err.message || 'Failed to confirm. Please try again.');
@@ -858,7 +858,7 @@ export default function GuardDashboardClient() {
       );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to check in');
-      await loadJobAssignments(guardUserId!, isAdmin);
+      await loadJobAssignments(guardUserId!);
       showGuardToast('Checked in successfully!');
     } catch (err: any) {
       showGuardToast(err.message || 'Failed to check in. Please try again.');
@@ -886,7 +886,7 @@ export default function GuardDashboardClient() {
       );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to check out');
-      await loadJobAssignments(guardUserId!, isAdmin);
+      await loadJobAssignments(guardUserId!);
       showGuardToast('Checked out successfully!');
     } catch (err: any) {
       showGuardToast(err.message || 'Failed to check out. Please try again.');
@@ -1156,9 +1156,9 @@ export default function GuardDashboardClient() {
                 onClick={() => {
                   setDataErrors([]);
                   if (guardUserId) {
-                    loadJobAssignments(guardUserId, isAdmin);
-                    loadJobApplications(guardUserId, isAdmin);
-                    loadClientResponses(guardUserId, isAdmin);
+                    loadJobAssignments(guardUserId);
+                    loadJobApplications(guardUserId);
+                    loadClientResponses(guardUserId);
                     loadAvailableJobs(0);
                     loadContactSubmissions(guardUserId);
                     loadOpenTicketCount(guardUserId);

@@ -103,8 +103,8 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
   const [companyName, setCompanyName] = useState('Client');
   const [subscriptionTier, setSubscriptionTier] = useState('Basic');
   const [initials, setInitials] = useState('CL');
-  const [clientId, setClientId] = useState('');
-  const [authUserId, setAuthUserId] = useState('');
+  const [, setClientId] = useState('');
+  const [, setAuthUserId] = useState('');
 
   const [termsBooking, setTermsBooking] = useState(false);
   const [termsCancellation, setTermsCancellation] = useState(false);
@@ -204,7 +204,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
       if (!isCurrent()) return;
       setTransaction(txData || null);
 
-      const { hours: h, days: d, totalHours } = calculateHours(
+      const { days: d, totalHours } = calculateHours(
         jobData.start_time,
         jobData.end_time,
         jobData.start_date,

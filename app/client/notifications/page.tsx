@@ -47,20 +47,6 @@ const CATEGORIES = [
   { id: 'booking_disputed', label: 'Booking Disputed' },
 ];
 
-const PRIORITIES = [
-  { value: 'all', label: 'All Priorities' },
-  { value: '3', label: 'Urgent' },
-  { value: '2', label: 'Important' },
-  { value: '1', label: 'Normal' },
-  { value: '0', label: 'Info' },
-];
-
-const STATUS_FILTERS = [
-  { value: 'all', label: 'All' },
-  { value: 'unread', label: 'Unread' },
-  { value: 'read', label: 'Read' },
-];
-
 const NOTIFICATION_SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
   { value: 'unread_first', label: 'Unread First' },

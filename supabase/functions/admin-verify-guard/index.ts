@@ -49,7 +49,7 @@ async function handlePreAccountVerification(supabaseQ: any, guard: any) {
   }
 }
 
-async function handleQGReferralOnApproval(supabaseQ: any, guard: any, supabaseUrl: string, supabaseServiceKey: string) {
+async function handleQGReferralOnApproval(supabaseQ: any, guard: any) {
   if (!guard.user_id) return;
   try {
     const { data: refData } = await supabaseQ.from('qg_referrals').select('id, referrer_user_id, referred_role, fraud_flags').eq('referred_user_id', guard.user_id).eq('status', 'account_created').maybeSingle();
@@ -69,7 +69,7 @@ async function handleQGReferralOnApproval(supabaseQ: any, guard: any, supabaseUr
           try {
             const { data: camp } = await supabaseQ.from('qg_launch_campaigns').select('verified_count').eq('id', inv.campaign_id).maybeSingle();
             if (camp) await supabaseQ.from('qg_launch_campaigns').update({ verified_count: (camp.verified_count || 0) + 1, updated_at: new Date().toISOString() }).eq('id', inv.campaign_id);
-          } catch (_) {}
+          } catch {}
         }
       }
     }
@@ -116,13 +116,12 @@ Deno.serve(async function(req) {
     let body;
     try {
       body = await req.json();
-    } catch (parseErr: any) {
+    } catch {
       return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
     }
     const guardId = body.guardId;
     const action = body.action;
     const rejectionReason = body.rejectionReason;
-    const unconfirmedSections = body.unconfirmedSections;
     const suspensionReason = body.suspensionReason;
     if (!guardId) {
       return new Response(JSON.stringify({ error: 'guardId is required' }), { status: 400, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
@@ -148,7 +147,6 @@ Deno.serve(async function(req) {
       if (guard.verification_status === 'approved' || guard.verification_status === 'verified') {
         return new Response(JSON.stringify({ error: 'Guard is already verified/approved' }), { status: 400, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
       }
-      const isOverride = body.override === true;
       await updateGuard(supabaseQ, guardId, { verification_status: 'approved', is_active: true, sia_verified: true, sia_verified_at: now, verified_at: now, dashboard_access: true, profile_completed: true, rejection_reason: null, rejected_at: null, updated_at: now });
       if (guard.user_id) {
         await safeExecute(async function() { await supabaseQ.from('users').update({ verification_status: 'approved', updated_at: now }).eq('id', guard.user_id); });
@@ -164,7 +162,7 @@ Deno.serve(async function(req) {
       await safeExecute(async function() {
         await fetch(supabaseUrl + '/functions/v1/send-guard-approval-email', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + supabaseServiceKey }, body: JSON.stringify({ guardId: guard.id, guardName: guard.full_name, guardEmail: guard.email, approved: true }) });
       });
-      await safeExecute(async function() { await handleQGReferralOnApproval(supabaseQ, guard, supabaseUrl, supabaseServiceKey); });
+      await safeExecute(async function() { await handleQGReferralOnApproval(supabaseQ, guard); });
       await safeExecute(async function() { await handlePreAccountVerification(supabaseQ, guard); });
       return new Response(JSON.stringify({ success: true, guard_id: guardId, status: 'approved', message: 'Guard approved successfully', action: 'approved' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
     }

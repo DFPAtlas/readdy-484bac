@@ -109,20 +109,6 @@ interface Warning {
   guardName?: string;
 }
 
-function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
 function getJobLicenceTypes(job: Job | null): string[] | null {
   if (!job) return null;
   if (job.required_licence_types && job.required_licence_types.length > 0) {
@@ -280,7 +266,7 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
   const [companyName, setCompanyName] = useState("Client");
   const [subscriptionTier, setSubscriptionTier] = useState("Basic");
   const [initials, setInitials] = useState("CL");
-  const [clientId, setClientId] = useState<string>("");
+  const [, setClientId] = useState<string>("");
 
   const [toast, setToast] = useState("");
 

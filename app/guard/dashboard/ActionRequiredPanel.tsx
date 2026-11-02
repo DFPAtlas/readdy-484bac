@@ -22,9 +22,8 @@ interface ActionItem {
   linkLabel: string;
 }
 
-export default function ActionRequiredPanel({ guard, unreadCount, applications, upcomingJobs, bankDetails }: Props) {
+export default function ActionRequiredPanel({ guard, unreadCount, bankDetails }: Props) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const today = new Date().toISOString().split('T')[0];
 
   const actions: ActionItem[] = [];
 

@@ -1,7 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-
 import Link from 'next/link';
 import CancellationStatusBadge from '../CancellationStatusBadge';
 
@@ -24,7 +22,6 @@ const statusConfig: Record<string, { label: string; color: string; icon: string 
 };
 
 export default function CancellationRefundPanel({ job, cancellation, refundRequests, transaction, onRequestRefund }: CancellationRefundPanelProps) {
-  const [showDetails, setShowDetails] = useState(false);
   const paidAmount = transaction?.amount || 0;
   const isCancelled = job.status === 'cancelled';
   const isRefunded = transaction?.refunded || false;

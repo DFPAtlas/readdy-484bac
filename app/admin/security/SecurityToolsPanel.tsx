@@ -25,7 +25,7 @@ interface ChecklistItem {
 
 type ToolTab = 'scanner' | 'audit' | 'checklist' | 'testing';
 
-export default function SecurityToolsPanel({ infrastructure, adminCounts, suspiciousActivity }: Props) {
+export default function SecurityToolsPanel({ infrastructure }: Props) {
   const [activeTab, setActiveTab] = useState<ToolTab>('scanner');
   const [searchQuery, setSearchQuery] = useState('');
   const [scanRunning, setScanRunning] = useState(false);
@@ -36,7 +36,6 @@ export default function SecurityToolsPanel({ infrastructure, adminCounts, suspic
     if (!infrastructure?.tables) return [];
     const appTables = infrastructure.tables.filter((t: any) => t.schema_name === 'app');
     const withoutRLS = appTables.filter((t: any) => !t.rls_enabled);
-    const publicTables = appTables.filter((t: any) => t.public_access);
     const buckets = infrastructure.buckets || [];
     const publicBuckets = buckets.filter((b: any) => b.public);
 

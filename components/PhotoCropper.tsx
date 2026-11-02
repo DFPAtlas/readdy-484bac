@@ -152,7 +152,7 @@ export default function PhotoCropper({
 
     return {
       x: Math.max(minX, Math.min(maxX, pan.x)),
-      y: Math.max(minY, Math.max(minY, pan.y)),
+      y: Math.max(minY, Math.min(maxY, pan.y)),
     };
   };
 
@@ -177,16 +177,7 @@ export default function PhotoCropper({
     canvas.width = outputSize;
     canvas.height = outputSize / aspectRatio;
 
-    const scaleX = naturalSize.width / (naturalSize.width * zoom);
-    const scaleY = naturalSize.height / (naturalSize.height * zoom);
-
     const constrained = constrainPan();
-    const displayScale = cropSize / (naturalSize.width * zoom);
-
-    const sourceX = (-constrained.x / displayScale) * (naturalSize.width / cropSize);
-    const sourceY = (-constrained.y / displayScale) * (naturalSize.height / cropSize);
-    const sourceW = outputSize / (zoom * displayScale * (naturalSize.width / cropSize));
-    const sourceH = (outputSize / aspectRatio) / (zoom * displayScale * (naturalSize.height / cropSize));
 
     ctx.fillStyle = '#162236';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
