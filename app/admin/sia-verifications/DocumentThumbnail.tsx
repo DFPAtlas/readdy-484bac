@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useEffect } from 'react';
 import { getSIALicenceSignedUrl } from '@/lib/supabase-storage';
 import { supabase } from '@/lib/supabase';
@@ -78,7 +80,7 @@ export default function DocumentThumbnail({ path, label, bucket }: DocumentThumb
             <span className="text-[9px] text-slate-400 font-medium leading-tight text-center">PDF</span>
           </div>
         ) : (
-          <img
+          <QuickGuardImage
             src={signedUrl}
             alt={label}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
@@ -92,7 +94,7 @@ export default function DocumentThumbnail({ path, label, bucket }: DocumentThumb
       {enlarged && signedUrl && (
         <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4" onClick={() => setEnlarged(false)}>
           <div className="relative max-w-4xl max-h-[90vh] w-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            <img src={signedUrl} alt={label} className="max-w-full max-h-[85vh] object-contain rounded-lg" />
+            <QuickGuardImage src={signedUrl} alt={label} className="max-w-full max-h-[85vh] object-contain rounded-lg" />
             <button
               className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer"
               onClick={() => setEnlarged(false)}
