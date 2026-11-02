@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -243,7 +245,7 @@ export default function ReplacementGuardSuggestions({
             <div key={guard.id} className="flex items-center gap-3 p-3 bg-[#162036] rounded-xl border border-[#1e2d4d] hover:border-violet-500/30 transition-colors">
               <div className="w-11 h-11 rounded-full bg-[#111d35] flex items-center justify-center flex-shrink-0 overflow-hidden border border-[#1e2d4d]">
                 {guard.profile_photo_url ? (
-                  <img src={guard.profile_photo_url} alt={initials} className="w-full h-full object-cover" />
+                  <QuickGuardImage src={guard.profile_photo_url} alt={initials} className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-teal-400 font-bold text-xs">{initials}</span>
                 )}
