@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import CloseAccountSection from "@/components/CloseAccountSection";
 import ExportDataModal from "./ExportDataModal";
 import PrivacyRequestModal from "./PrivacyRequestModal";
 
@@ -186,6 +187,8 @@ export default function DataPrivacySection({ profile, onMessage }: Props) {
         </div>
       </div>
 
+      <CloseAccountSection />
+
       {/* GDPR / Privacy Requests */}
       <div className="bg-white dark:bg-[#111d35] rounded-2xl border border-slate-200 dark:border-[#1e2d4d] shadow-sm p-6 mb-4">
         <div className="flex items-start justify-between mb-4">
@@ -307,7 +310,8 @@ export default function DataPrivacySection({ profile, onMessage }: Props) {
             { label: "Payment & invoice records", period: "7 years", reason: "HMRC and tax compliance" },
             { label: "Support tickets", period: "3 years after closure", reason: "Customer service and dispute resolution" },
             { label: "Messages", period: "1 year after job completion", reason: "Operational support and dispute evidence" },
-            { label: "Deleted account data", period: "Up to 90 days after deletion request", reason: "Safe deletion and backup clearing" },
+            { label: "Closed account profile", period: "2 years after closure", reason: "Scheduled profile minimisation; financial and legal records are handled separately" },
+            { label: "Verification documents", period: "3 years after closure", reason: "Scheduled deletion, subject to a documented legal hold" },
           ].map((item, i) => (
             <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-[#162036] border border-slate-200 dark:border-[#1e2d4d]">
               <div className="w-6 h-6 flex items-center justify-center rounded-full bg-white dark:bg-[#111d35] border border-slate-200 dark:border-[#1e2d4d] flex-shrink-0 mt-0.5">
