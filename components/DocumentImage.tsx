@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useEffect } from 'react';
 import { getDocumentSignedUrl } from '@/lib/supabase-storage';
 
@@ -101,7 +103,7 @@ export default function DocumentImage({ path, label, className = '' }: DocumentI
   return (
     <div className={`bg-gray-50 rounded-lg overflow-hidden ${className}`}>
       {label && <p className="text-sm font-medium text-gray-700 px-3 pt-3 mb-2">{label}</p>}
-      <img
+      <QuickGuardImage
         src={signedUrl}
         alt={label || 'Uploaded document'}
         className="w-full h-auto object-contain max-h-[300px] cursor-pointer hover:opacity-90 transition-opacity"
@@ -133,7 +135,7 @@ export default function DocumentImage({ path, label, className = '' }: DocumentI
       {enlarged && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setEnlarged(false)}>
           <div className="relative max-w-4xl max-h-[90vh] w-full flex items-center justify-center">
-            <img src={signedUrl} alt={label || 'Uploaded document'} className="max-w-full max-h-[85vh] object-contain" />
+            <QuickGuardImage src={signedUrl} alt={label || 'Uploaded document'} className="max-w-full max-h-[85vh] object-contain" />
             <button
               aria-label="Close preview"
               className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer"
