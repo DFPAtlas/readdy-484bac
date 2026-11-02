@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -208,7 +210,7 @@ function FindGuardContent() {
                     <div className="flex items-start gap-4 mb-4">
                       <div className="relative w-16 h-16 flex-shrink-0">
                         {guard.profile_image_url ? (
-                          <img src={guard.profile_image_url} alt={guard.full_name} title={guard.full_name} className="w-16 h-16 rounded-full object-cover" />
+                          <QuickGuardImage src={guard.profile_image_url} alt={guard.full_name} title={guard.full_name} className="w-16 h-16 rounded-full object-cover" />
                         ) : (
                           <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-teal-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
                             {guard.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'G'}
