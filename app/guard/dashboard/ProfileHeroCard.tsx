@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import Link from 'next/link';
 import { Guard } from './types';
 
@@ -65,7 +67,7 @@ export default function ProfileHeroCard({ guard, onAvailabilityToggle, planName,
           <div className="relative">
             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center overflow-hidden ring-4 ring-[#0B1933] shadow-lg">
               {guard.profile_image_url ? (
-                <img src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
+                <QuickGuardImage src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
               ) : (
                 <span className="text-2xl sm:text-3xl font-bold text-white">{initials}</span>
               )}
