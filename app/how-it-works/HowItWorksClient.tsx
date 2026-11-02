@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import Footer from '@/components/Footer';
 import NavSidebar from '@/components/NavSidebar';
 import Link from 'next/link';
@@ -177,7 +179,7 @@ export default function HowItWorksClient() {
                 </div>
 
                 <div className="relative h-80 overflow-hidden">
-                  <img
+                  <QuickGuardImage
                     src="https://readdy.ai/api/search-image?query=Modern%20dark-themed%20web%20application%20dashboard%20interface%20on%20a%20computer%20screen%20showing%20security%20guard%20matching%20platform%2C%20dark%20navy%20blue%20UI%20theme%20with%20data%20cards%20and%20profile%20listings%2C%20clean%20software%20screenshot%20aesthetic%2C%20professional%20SaaS%20product%20interface%20photography&width=640&height=360&seq=hiw-demo-002&orientation=landscape"
                     alt={`Platform demo step ${activeStep + 1}`}
                     title={`QuickGuard platform demo — step ${activeStep + 1}`}
@@ -345,7 +347,7 @@ export default function HowItWorksClient() {
               </div>
               <figure className="lg:w-1/2">
                 <div className="rounded-2xl overflow-hidden border border-slate-700/50 hover:border-teal-500/30 transition-all">
-                  <img
+                  <QuickGuardImage
                     src="https://readdy.ai/api/search-image?query=Professional%20British%20security%20guard%20in%20formal%20uniform%20holding%20a%20tablet%20device%20and%20smiling%2C%20modern%20office%20environment%20background%20with%20dark%20moody%20lighting%2C%20warm%20natural%20highlights%2C%20clean%20and%20friendly%20portrait%20style%20photography%2C%20high%20quality%20professional%20headshot%20aesthetic%2C%20representing%20online%20profile%20creation%2C%20dark%20navy%20blue%20color%20palette&width=600&height=350&seq=hiw-step1-002&orientation=landscape"
                     alt="Security guard creating profile"
                     title="Security guard creating a profile on QuickGuard"
@@ -389,7 +391,7 @@ export default function HowItWorksClient() {
               </div>
               <figure className="lg:w-1/2">
                 <div className="rounded-2xl overflow-hidden border border-slate-700/50 hover:border-blue-500/30 transition-all">
-                  <img
+                  <QuickGuardImage
                     src="https://readdy.ai/api/search-image?query=British%20business%20professional%20woman%20sitting%20at%20a%20modern%20desk%20using%20a%20laptop%20computer%20to%20post%20a%20job%20online%2C%20contemporary%20office%20interior%20with%20glass%20walls%20and%20dark%20ambient%20lighting%2C%20subtle%20teal%20accent%20lights%2C%20clean%20corporate%20photography%20style%2C%20professional%20and%20approachable%20mood%2C%20dark%20navy%20blue%20color%20palette&width=600&height=350&seq=hiw-step2-002&orientation=landscape"
                     alt="Client posting a security job online"
                     title="Client posting a security job on QuickGuard"
@@ -433,7 +435,7 @@ export default function HowItWorksClient() {
               </div>
               <figure className="lg:w-1/2">
                 <div className="rounded-2xl overflow-hidden border border-slate-700/50 hover:border-purple-500/30 transition-all">
-                  <img
+                  <QuickGuardImage
                     src="https://readdy.ai/api/search-image?query=Abstract%20digital%20network%20visualization%20showing%20connected%20nodes%20and%20glowing%20lines%20forming%20a%20matching%20pattern%2C%20deep%20navy%20blue%20and%20dark%20teal%20gradient%20background%2C%20futuristic%20AI%20technology%20concept%2C%20clean%20minimalist%20digital%20art%20style%2C%20representing%20intelligent%20algorithm%20matching%20security%20professionals%20with%20jobs%2C%20subtle%20purple%20and%20blue%20neon%20glow%20accents&width=600&height=350&seq=hiw-step3-002&orientation=landscape"
                     alt="AI-powered smart matching technology connecting security guards with clients"
                     title="QuickGuard AI smart matching for security jobs"
@@ -480,7 +482,7 @@ export default function HowItWorksClient() {
               </div>
               <figure className="lg:w-1/2">
                 <div className="rounded-2xl overflow-hidden border border-slate-700/50 hover:border-orange-500/30 transition-all">
-                  <img
+                  <QuickGuardImage
                     src="https://readdy.ai/api/search-image?query=Professional%20British%20businessman%20reviewing%20documents%20on%20a%20tablet%20screen%20while%20seated%20at%20a%20conference%20table%2C%20modern%20office%20meeting%20room%20background%20with%20dark%20ambient%20lighting%20and%20subtle%20teal%20accents%2C%20corporate%20photography%20style%2C%20selective%20focus%20on%20the%20tablet%20and%20hands%2C%20clean%20aesthetic%2C%20dark%20navy%20blue%20color%20palette&width=600&height=350&seq=hiw-step4-002&orientation=landscape"
                     alt="Client reviewing and selecting security guard applications"
                     title="Client reviewing guard applications on QuickGuard"
@@ -524,7 +526,7 @@ export default function HowItWorksClient() {
               </div>
               <figure className="lg:w-1/2">
                 <div className="rounded-2xl overflow-hidden border border-slate-700/50 hover:border-teal-500/30 transition-all">
-                  <img
+                  <QuickGuardImage
                     src="https://readdy.ai/api/search-image?query=Close%20up%20of%20a%20secure%20digital%20payment%20interface%20on%20a%20smartphone%20screen%20with%20shield%20security%20icon%2C%20professional%20hands%20holding%20the%20phone%2C%20dark%20blurred%20office%20background%2C%20teal%20and%20blue%20trust%20colors%20glowing%20softly%2C%20clean%20modern%20fintech%20photography%20style%2C%20representing%20secure%20held%20job%20payment%20system%2C%20dark%20navy%20blue%20color%20palette&width=600&height=350&seq=hiw-step5-002&orientation=landscape"
                     alt="Secure payment and job completion process"
                     title="Secure held job payment on QuickGuard"
