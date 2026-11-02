@@ -1,5 +1,7 @@
 "use client";
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { formatDateOnly, inclusiveDateOnlyDays } from "@/lib/date-only";
 
 interface Guard {
@@ -102,7 +104,7 @@ export default function ConfirmSelectionModal({
               <div key={guard.id} className="flex items-center gap-3 bg-[#162036] border border-[#1e2d4d] rounded-xl p-3">
                 <div className="w-10 h-10 rounded-full bg-[#111d35] flex items-center justify-center overflow-hidden flex-shrink-0 border border-[#1e2d4d]">
                   {guard.profile_image_url ? (
-                    <img src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover object-top" />
+                    <QuickGuardImage src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover object-top" />
                   ) : (
                     <i className="ri-user-line text-slate-500"></i>
                   )}
