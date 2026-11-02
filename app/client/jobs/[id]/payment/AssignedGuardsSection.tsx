@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 interface Guard {
   id: string;
   full_name: string;
@@ -45,7 +47,7 @@ export default function AssignedGuardsSection({ guards, hourlyRate, hours }: Ass
               <div className="flex items-center gap-4">
                 <div className="relative">
                   {guard.profile_image_url ? (
-                    <img
+                    <QuickGuardImage
                       src={guard.profile_image_url}
                       alt={guard.full_name}
                       className="w-12 h-12 rounded-full object-cover"
