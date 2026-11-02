@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -43,7 +45,7 @@ export default function ProfileAvatar({ path }: ProfileAvatarProps) {
   }
 
   return (
-    <img
+    <QuickGuardImage
       src={signedUrl}
       alt="Profile"
       className="w-full h-full object-cover"
