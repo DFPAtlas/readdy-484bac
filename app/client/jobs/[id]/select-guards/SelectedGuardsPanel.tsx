@@ -1,5 +1,7 @@
 "use client";
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 interface SelectedGuard {
   id: string;
   full_name: string;
@@ -77,7 +79,7 @@ export default function SelectedGuardsPanel({
               >
                 <div className="w-10 h-10 rounded-full bg-[#111d35] flex items-center justify-center overflow-hidden flex-shrink-0 border border-[#1e2d4d]">
                   {g.profile_image_url ? (
-                    <img
+                    <QuickGuardImage
                       src={g.profile_image_url}
                       alt={g.full_name}
                       className="w-full h-full object-cover object-top"
