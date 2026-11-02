@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { GuardVerification, getStatusBadge, getWarningBadges, formatDateShort } from './types';
 
 interface GuardMobileCardProps {
@@ -18,7 +20,7 @@ export default function GuardMobileCard({ guard, onReview, onRequestInfo }: Guar
       <div className="flex items-start gap-3">
         <div className="w-12 h-12 rounded-full overflow-hidden bg-[#1a2b4a] flex-shrink-0 border border-[#1a2b4a]">
           {guard.profile_image_url ? (
-            <img src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
+            <QuickGuardImage src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-teal-500/20 to-sky-500/20">
               <div className="w-5 h-5 flex items-center justify-center">

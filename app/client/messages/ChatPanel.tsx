@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useRef, useEffect } from 'react';
 import MessageTemplates from './MessageTemplates';
 import { formatDateOnly } from '@/lib/date-only';
@@ -182,7 +184,7 @@ export default function ChatPanel({
         <div className="relative flex-shrink-0">
           <div className="w-10 h-10 rounded-full bg-[#162036] flex items-center justify-center overflow-hidden border border-[#1e2d4d]">
             {conversation.other_avatar ? (
-              <img src={conversation.other_avatar} alt={conversation.other_name} className="w-full h-full object-cover" />
+              <QuickGuardImage src={conversation.other_avatar} alt={conversation.other_name} className="w-full h-full object-cover" />
             ) : (
               <span className="text-teal-400 font-bold text-xs">{conversation.other_initials}</span>
             )}
@@ -315,7 +317,7 @@ export default function ChatPanel({
                         {!clientSent && (
                           <div className="w-7 h-7 rounded-full bg-[#162036] flex items-center justify-center flex-shrink-0 border border-[#1e2d4d] mb-1">
                             {conversation.other_avatar ? (
-                              <img src={conversation.other_avatar} alt={conversation.other_name} className="w-full h-full object-cover rounded-full" />
+                              <QuickGuardImage src={conversation.other_avatar} alt={conversation.other_name} className="w-full h-full object-cover rounded-full" />
                             ) : (
                               <span className="text-teal-400 font-bold text-[10px]">{conversation.other_initials}</span>
                             )}

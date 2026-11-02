@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface PhotoCropperProps {
@@ -275,7 +277,7 @@ export default function PhotoCropper({
             onTouchEnd={handleTouchEnd}
             style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
           >
-            <img
+            <QuickGuardImage
               ref={imageRef}
               src={imageSrc}
               alt="Crop source"

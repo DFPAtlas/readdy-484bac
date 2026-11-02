@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -126,7 +128,7 @@ export default function CompletionApprovalPanel({ clientId, jobId, onReviewed }:
             <div key={req.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
               <div className="w-12 h-12 bg-[#162036] rounded-xl flex items-center justify-center flex-shrink-0">
                 {req.guards?.profile_image_url ? (
-                  <img src={req.guards.profile_image_url} alt="" className="w-12 h-12 rounded-xl object-cover" />
+                  <QuickGuardImage src={req.guards.profile_image_url} alt="" className="w-12 h-12 rounded-xl object-cover" />
                 ) : (
                   <i className="ri-user-line text-xl text-slate-500"></i>
                 )}

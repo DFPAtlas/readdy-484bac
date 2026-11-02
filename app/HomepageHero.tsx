@@ -1,3 +1,5 @@
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import Link from 'next/link';
 import HomepageLogo from '@/components/HomepageLogo';
 import HomepageIndustries from './HomepageIndustries';
@@ -11,7 +13,7 @@ export default function HomepageHero() {
       aria-labelledby="hero-heading"
       className="relative min-h-[720px] md:min-h-screen flex items-center pt-20 overflow-hidden"
     >
-      <img
+      <QuickGuardImage
         src={HERO_IMAGE}
         alt=""
         aria-hidden="true"

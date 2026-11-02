@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState } from 'react';
 import { BRAND_LOGO, BRAND_LOGO_LEGACY, BRAND_NAME } from '@/lib/brand';
 
@@ -36,7 +38,7 @@ export default function BrandLogo({
   const sizeClass = variant === 'symbol' ? 'h-9 w-9' : 'h-9 w-auto';
 
   return (
-    <img
+    <QuickGuardImage
       src={src}
       alt={alt}
       draggable={false}

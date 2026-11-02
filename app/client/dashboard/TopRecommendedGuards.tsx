@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useRouter } from 'next/navigation';
 
 import type { RecommendedGuard } from '@/lib/client-types';
@@ -53,7 +55,7 @@ export default function TopRecommendedGuards({ guards, loading = false }: TopRec
             >
               <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-[#1e2d4d] flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {guard.profile_image_url ? (
-                  <img src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
+                  <QuickGuardImage src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
                 ) : (
                   <i className="ri-user-line text-lg text-slate-500 dark:text-slate-400" />
                 )}

@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useEffect, useRef, useState } from 'react';
 import { takeApplicationReturnPath } from '@/lib/admin-application-link';
 import { supabase } from '@/lib/supabase';
@@ -356,7 +358,7 @@ export default function AdminMfaSetup() {
               <div className="flex flex-col items-center mb-5">
                 {qrCode ? (
                   <div className="bg-white p-5 rounded-2xl inline-block shadow-lg">
-                    <img src={qrCode} alt="MFA setup QR code" className="w-64 h-64" />
+                    <QuickGuardImage src={qrCode} alt="MFA setup QR code" className="w-64 h-64" />
                   </div>
                 ) : secret ? (
                   <div className="w-64 h-64 rounded-2xl bg-[#111d35] flex flex-col items-center justify-center p-4 text-center gap-3">

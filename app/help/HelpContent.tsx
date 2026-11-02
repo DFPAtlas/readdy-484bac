@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -469,7 +471,7 @@ export default function HelpContent() {
                 <Link key={guide.title} href={guide.href} className="group">
                   <div className="h-full bg-[#111d35] border border-slate-700/50 rounded-2xl overflow-hidden hover:border-teal-500/30 transition-all duration-200">
                     <div className="relative aspect-video bg-[#0e1628]">
-                      <img
+                      <QuickGuardImage
                         src={guide.image}
                         alt={guide.title}
                         className="absolute inset-0 w-full h-full object-cover object-top"

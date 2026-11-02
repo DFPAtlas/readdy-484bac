@@ -1,5 +1,7 @@
 "use client";
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { computeComplianceInfo, GuardComplianceData } from "../compliance/useCompliance";
 import GuardComplianceBadge from "../compliance/GuardComplianceBadge";
 
@@ -213,7 +215,7 @@ export default function ApplicantCard({
             <div className="relative">
               <div className="w-16 h-16 rounded-full bg-[#162036] flex items-center justify-center overflow-hidden border border-[#1e2d4d]">
                 {guard.profile_image_url ? (
-                  <img
+                  <QuickGuardImage
                     src={guard.profile_image_url}
                     alt={guard.full_name}
                     className="w-full h-full object-cover object-top"

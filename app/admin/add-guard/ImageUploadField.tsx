@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useRef, useState } from 'react';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -53,7 +55,7 @@ export default function ImageUploadField({ label, description, value, onChange, 
 
       {value ? (
         <div className="relative inline-block group">
-          <img
+          <QuickGuardImage
             src={value.base64}
             alt="Preview"
             className="w-32 h-32 object-cover rounded-lg border border-[#1a2b4a]"

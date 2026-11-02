@@ -1,3 +1,5 @@
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import ChecklistProgress from './ChecklistProgress';
 import { GuardVerification, getMissingProfileItems } from './types';
 
@@ -28,7 +30,7 @@ export default function IncompleteGuardCard({ guard }: IncompleteGuardCardProps)
       <div className="flex items-start gap-4">
         <div className="w-16 h-16 rounded-full overflow-hidden bg-[#1a2b4a] flex-shrink-0">
           {guard.profile_image_url ? (
-            <img src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
+            <QuickGuardImage src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-500/20 to-amber-500/10">
               <i className="ri-user-line text-2xl text-amber-400 w-6 h-6 flex items-center justify-center"></i>

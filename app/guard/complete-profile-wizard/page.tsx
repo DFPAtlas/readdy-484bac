@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -1024,7 +1026,7 @@ function GuardCompleteProfileWizardContent() {
                 <div className="relative">
                   <div className="w-40 h-40 rounded-full overflow-hidden bg-[#162236] border-4 border-slate-700/50 shadow-xl">
                     {photoPreview ? (
-                      <img src={photoPreview} alt="Profile" className="w-full h-full object-cover" />
+                      <QuickGuardImage src={photoPreview} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-[#162236]">
                         <i className="ri-user-line text-6xl text-teal-400"></i>

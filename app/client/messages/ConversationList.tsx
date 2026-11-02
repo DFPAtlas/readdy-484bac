@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState } from 'react';
 import SearchFilterBar, { FilterConfig } from '../components/SearchFilterBar';
 
@@ -201,7 +203,7 @@ export default function ConversationList({
                   <div className="relative flex-shrink-0">
                     <div className="w-11 h-11 rounded-full bg-[#162036] flex items-center justify-center overflow-hidden border border-[#1e2d4d]">
                       {conv.other_avatar ? (
-                        <img src={conv.other_avatar} alt={conv.other_name} className="w-full h-full object-cover" />
+                        <QuickGuardImage src={conv.other_avatar} alt={conv.other_name} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-teal-400 font-bold text-xs">{conv.other_initials}</span>
                       )}

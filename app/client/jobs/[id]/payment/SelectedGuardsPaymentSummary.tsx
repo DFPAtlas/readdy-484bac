@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 interface SelectedGuard {
   id: string;
   guard_id: string;
@@ -77,7 +79,7 @@ export default function SelectedGuardsPaymentSummary({ assignments }: Props) {
                 <div className="flex items-center gap-4 min-w-0">
                   <div className="relative flex-shrink-0">
                     {g?.profile_image_url ? (
-                      <img
+                      <QuickGuardImage
                         src={g.profile_image_url}
                         alt={g.full_name || ''}
                         className="w-12 h-12 rounded-full object-cover"

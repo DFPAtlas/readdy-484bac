@@ -10,18 +10,7 @@ export default function GlobalError({
 }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap"
-          rel="stylesheet"
-          media="print"
-          onLoad={(e) => {
-            (e.currentTarget as HTMLLinkElement).media = 'all';
-          }}
-        />
-      </head>
+      <head />
       <body>
         <div className="min-h-screen bg-[#0B1933] flex items-center justify-center p-4">
           <div className="max-w-md w-full text-center">

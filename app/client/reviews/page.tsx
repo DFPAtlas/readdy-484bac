@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -364,7 +366,7 @@ export default function ClientReviewsPage() {
                   <div key={`${pending.job_id}-${pending.guard_id}`} className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-5 flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-[#162036] flex items-center justify-center flex-shrink-0 overflow-hidden border border-[#1e2d4d]">
                       {pending.profile_photo_url ? (
-                        <img src={pending.profile_photo_url} alt="" className="w-full h-full object-cover" />
+                        <QuickGuardImage src={pending.profile_photo_url} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-teal-400 font-bold text-sm">
                           {pending.guard_name.split(' ').map((n) => n[0]).join('').toUpperCase()}
@@ -443,7 +445,7 @@ export default function ClientReviewsPage() {
                     <div className="flex items-start gap-4">
                       <div className="w-12 h-12 rounded-full bg-[#162036] flex items-center justify-center flex-shrink-0 overflow-hidden border border-[#1e2d4d]">
                         {review.guards?.profile_photo_url ? (
-                          <img src={review.guards.profile_photo_url} alt="" className="w-full h-full object-cover" />
+                          <QuickGuardImage src={review.guards.profile_photo_url} alt="" className="w-full h-full object-cover" />
                         ) : (
                           <span className="text-teal-400 font-bold text-sm">
                             {review.guards?.full_name?.split(' ').map((n) => n[0]).join('').toUpperCase() || '??'}

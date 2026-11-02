@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState } from 'react';
 import { getAttendanceStatus } from '@/lib/attendance-display.cjs';
 import { useRouter } from 'next/navigation';
@@ -123,7 +125,7 @@ export default function GuardAttendanceCard({
       <div className="flex items-center gap-4">
         <div className="w-12 h-12 rounded-full bg-[#111d35] flex items-center justify-center flex-shrink-0 overflow-hidden border border-[#1e2d4d]">
           {g?.profile_photo_url ? (
-            <img src={g.profile_photo_url} alt={initials} className="w-full h-full object-cover" />
+            <QuickGuardImage src={g.profile_photo_url} alt={initials} className="w-full h-full object-cover" />
           ) : (
             <span className="text-teal-400 font-bold text-sm">{initials}</span>
           )}
