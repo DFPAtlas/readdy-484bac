@@ -1,4 +1,6 @@
 "use client";
+
+import QuickGuardImage from '@/components/QuickGuardImage';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { oneRelation, requiredRelation } from '@/lib/relations';
 import { supabase } from '@/lib/supabase';
@@ -1072,7 +1074,7 @@ export default function MobileGuardDashboard() {
             <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-5 text-center">
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center mx-auto mb-3 overflow-hidden ring-4 ring-[#0B1933] shadow-lg shadow-teal-500/10">
                 {guard?.profile_image_url ? (
-                  <img src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
+                  <QuickGuardImage src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-2xl font-bold text-white">
                     {(guard?.full_name || 'GU').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
