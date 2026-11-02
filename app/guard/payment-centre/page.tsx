@@ -75,7 +75,7 @@ export default function GuardPaymentCentrePage() {
     if (window.location.search) {
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, []);
+  }, [refreshStripeStatus]);
 
   const filteredPayments = useMemo(() => {
     let filtered = jobPayments;

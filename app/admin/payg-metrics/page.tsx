@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
@@ -27,16 +27,18 @@ export default function AdminPaygMetricsPage() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  useEffect(() => {
-    fetchMetrics();
-  }, []);
+  const activeRef = useRef(true);
+  const requestRef = useRef(0);
 
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
-  };
+  }, []);
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = useCallback(async () => {
+    if (!activeRef.current) return;
+    const request = ++requestRef.current;
+    const isCurrent = () => activeRef.current && requestRef.current === request;
     try {
       setLoading(true);
       setError(null);
@@ -82,6 +84,7 @@ export default function AdminPaygMetricsPage() {
           .not('metadata', 'is', null),
       ]);
 
+      if (!isCurrent()) return;
       if (paygClientsRes.error) throw new Error(paygClientsRes.error.message);
       if (paygJobsRes.error) throw new Error(paygJobsRes.error.message);
       if (churnRes.error) throw new Error(churnRes.error.message);
@@ -133,13 +136,20 @@ export default function AdminPaygMetricsPage() {
       });
       setPromoBreakdown(breakdown);
     } catch (err: any) {
+      if (!isCurrent()) return;
       console.error(err);
       setError(err?.message || 'Failed to load PAYG metrics');
       showToast('Failed to load PAYG metrics', 'error');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    activeRef.current = true;
+    void fetchMetrics();
+    return () => { activeRef.current = false; };
+  }, [fetchMetrics]);
 
   const formatCurrency = (n: number) => '\u00a3' + (n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

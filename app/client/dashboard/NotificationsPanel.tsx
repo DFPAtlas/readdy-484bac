@@ -61,31 +61,39 @@ export default function NotificationsPanel({ userId }: { userId: string }) {
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   useEffect(() => {
-    if (userId) fetchNotifications();
-  }, [userId]);
-
-  useEffect(() => {
-    if (!userId) return;
+    let cancelled = false;
+    let latestRequest = 0;
+    setNotifications([]);
+    if (!userId) { setLoading(false); return; }
+    const fetchNotifications = async () => {
+      const request = ++latestRequest;
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('user_type', 'client')
+          .order('priority', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(20);
+        if (cancelled || request !== latestRequest) return;
+        if (error) throw error;
+        setNotifications(data || []);
+      } catch (error) {
+        if (!cancelled && request === latestRequest) console.error('Unable to load notifications:', error);
+      } finally {
+        if (!cancelled && request === latestRequest) setLoading(false);
+      }
+    };
+    const refresh = () => { if (!cancelled) void fetchNotifications(); };
+    refresh();
     const channel = supabase
-      .channel('client-notifications-panel')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'app', table: 'notifications', filter: `user_id=eq.${userId}` },
-        (payload) => {
-          const n = payload.new as Notification;
-          setNotifications((prev) => [n, ...prev].slice(0, 20));
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'app', table: 'notifications', filter: `user_id=eq.${userId}` },
-        (payload) => {
-          const n = payload.new as Notification;
-          setNotifications((prev) => prev.map((p) => p.id === n.id ? n : p));
-        }
-      )
+      .channel(`client-notifications-${userId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'app', table: 'notifications', filter: `user_id=eq.${userId}` }, refresh)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'app', table: 'notifications', filter: `user_id=eq.${userId}` }, refresh)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [userId]);
 
   useEffect(() => {
@@ -97,22 +105,6 @@ export default function NotificationsPanel({ userId }: { userId: string }) {
     if (open) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
-
-  const fetchNotifications = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('user_type', 'client')
-      .order('priority', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(20);
-    if (data) {
-      setNotifications(data);
-    }
-    setLoading(false);
-  };
 
   const markAllRead = async () => {
     const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);

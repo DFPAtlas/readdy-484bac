@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { logAdminAction } from '@/lib/admin-logger';
@@ -65,17 +65,16 @@ export default function VerifyGuardsClient() {
     status: 'approved'
   });
 
-  useEffect(() => {
-    fetchGuards();
-  }, [filter]);
+  const scopeRef = useRef<{ filter: string } | null>(null);
+  const requestRef = useRef(0);
 
-  const showToast = (message: string, type: 'success' | 'error') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 5000);
-  };
+  }, []);
 
   const getGuardName = (guard: Guard): string => {
     if (guard.full_name) return guard.full_name;
@@ -84,10 +83,15 @@ export default function VerifyGuardsClient() {
     return 'Unknown Guard';
   };
 
-  const fetchGuards = async () => {
+  const fetchGuards = useCallback(async () => {
+    const scope = scopeRef.current;
+    if (!scope || scope.filter !== filter) return;
+    const request = ++requestRef.current;
+    const isCurrent = () => scopeRef.current === scope && requestRef.current === request;
     setLoading(true);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
+      if (!isCurrent()) return;
       const token = sessionData.session?.access_token || '';
 
       const response = await fetch(
@@ -107,14 +111,25 @@ export default function VerifyGuardsClient() {
       }
 
       const result = await response.json();
+      if (!isCurrent()) return;
       setGuards(result.data || []);
     } catch (error: any) {
+      if (!isCurrent()) return;
       console.error('Error fetching guards:', error);
       showToast('Failed to load guards', 'error');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  };
+  }, [filter, showToast]);
+
+  useEffect(() => {
+    const scope = { filter };
+    scopeRef.current = scope;
+    setGuards([]);
+    setSelectedIds(new Set());
+    void fetchGuards();
+    return () => { if (scopeRef.current === scope) scopeRef.current = null; };
+  }, [filter, fetchGuards]);
 
   const openConfirmModal = (guardId: string, status: 'approved' | 'rejected') => {
     const guard = guards.find(g => g.id === guardId);

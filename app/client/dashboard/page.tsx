@@ -315,7 +315,7 @@ export default function ClientDashboardPage() {
     } finally {
       loadingRef.current = false;
     }
-  }, [router, computeOnboarding]);
+  }, [router]);
 
   const debouncedReload = useCallback(() => {
     if (loadingRef.current) return;
@@ -367,7 +367,7 @@ export default function ClientDashboardPage() {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [refreshEntitlements]);
+  }, [userId, refreshEntitlements]);
 
   useEffect(() => {
     if (!userId || !clientId) return;
@@ -529,7 +529,7 @@ export default function ClientDashboardPage() {
     return () => {
       channels.forEach((ch) => supabase.removeChannel(ch));
     };
-  }, [userId, clientId, debouncedReload]);
+  }, [userId, clientId, debouncedReload, refreshEntitlements]);
 
   if (loading || checking) {
     return (

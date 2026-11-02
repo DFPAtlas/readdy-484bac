@@ -1,7 +1,7 @@
 'use client';
 
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { paymentAmounts } from '@/lib/financeAmounts';
 import RefundRequestQueue from '../payments-jobs/RefundRequestQueue';
 import { supabase } from '@/lib/supabase';
@@ -34,19 +34,20 @@ export default function AdminPaymentsPage() {
   const [backfilling, setBackfilling] = useState(false);
   const [missingCount, setMissingCount] = useState(0);
 
-  useEffect(() => {
-    fetchPayments();
-    checkMissing();
-  }, []);
+  const activeRef = useRef(true);
+  const paymentsRequestRef = useRef(0);
+  const missingRequestRef = useRef(0);
 
-  const checkMissing = async () => {
+  const checkMissing = useCallback(async () => {
+    if (!activeRef.current) return;
+    const request = ++missingRequestRef.current;
     const { data: subs } = await supabase.from('subscriptions').select('id, user_id').not('stripe_subscription_id', 'is', null);
     const { data: pmts } = await supabase.from('subscription_payments').select('user_id');
-    if (!subs) return;
+    if (!activeRef.current || missingRequestRef.current !== request || !subs) return;
     const pmtUserIds = new Set((pmts ?? []).map((p: any) => p.user_id));
     const missing = subs.filter((s: any) => !pmtUserIds.has(s.user_id));
     setMissingCount(missing.length);
-  };
+  }, []);
 
   const runBackfill = async () => {
     setBackfilling(true);
@@ -68,12 +69,15 @@ export default function AdminPaymentsPage() {
     }
   };
 
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
-  };
+  }, []);
 
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
+    if (!activeRef.current) return;
+    const request = ++paymentsRequestRef.current;
+    const isCurrent = () => activeRef.current && paymentsRequestRef.current === request;
     try {
       setLoading(true);
 
@@ -82,6 +86,9 @@ export default function AdminPaymentsPage() {
         supabase.from('subscription_payments').select('*').order('created_at', { ascending: false }).limit(200),
       ]);
 
+      if (!isCurrent()) return;
+      if (transRes.error) throw transRes.error;
+      if (subRes.error) throw subRes.error;
       const transactions = transRes.data ?? [];
       const subscriptions = subRes.data ?? [];
 
@@ -105,6 +112,7 @@ export default function AdminPaymentsPage() {
           : Promise.resolve({ data: [] }),
       ]);
 
+      if (!isCurrent()) return;
       const assignMap = new Map((assignRes.data ?? []).map((a: any) => [a.id, a]));
       const transClientMap = new Map((clientsForTransRes.data ?? []).map((c: any) => [c.id, c]));
       const guardMap = new Map((guardsRes.data ?? []).map((g: any) => [g.id, g]));
@@ -159,12 +167,20 @@ export default function AdminPaymentsPage() {
       unified.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setPayments(unified);
     } catch (error) {
+      if (!isCurrent()) return;
       console.error('Error fetching payments:', error);
       showToast('Failed to load payments', 'error');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    activeRef.current = true;
+    void fetchPayments();
+    void checkMissing();
+    return () => { activeRef.current = false; };
+  }, [fetchPayments, checkMissing]);
 
   const getStatusStyle = (status: string) => {
     switch (status?.toLowerCase()) {

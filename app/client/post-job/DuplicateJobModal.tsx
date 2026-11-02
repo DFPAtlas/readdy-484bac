@@ -28,25 +28,29 @@ export default function DuplicateJobModal({ clientId, onSelectJob, onClose }: Du
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    loadPreviousJobs();
-  }, []);
-
-  const loadPreviousJobs = async () => {
-    try {
-      const { data } = await supabase
-        .from('jobs')
-        .select('id, job_title, security_type, venue_name, venue_city, hourly_rate, start_date, status')
-        .eq('client_id', clientId)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      setJobs(data || []);
-    } catch (error) {
-      console.error('Error loading jobs:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    let cancelled = false;
+    setLoading(true);
+    setJobs([]);
+    const loadPreviousJobs = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('jobs')
+          .select('id, job_title, security_type, venue_name, venue_city, hourly_rate, start_date, status')
+          .eq('client_id', clientId)
+          .order('created_at', { ascending: false })
+          .limit(20);
+        if (cancelled) return;
+        if (error) throw error;
+        setJobs(data || []);
+      } catch (error) {
+        if (!cancelled) console.error('Error loading jobs:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void loadPreviousJobs();
+    return () => { cancelled = true; };
+  }, [clientId]);
 
   const loadFullJob = async (jobId: string) => {
     const { data } = await supabase

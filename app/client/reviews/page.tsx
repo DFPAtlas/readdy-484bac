@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
@@ -63,14 +63,16 @@ export default function ClientReviewsPage() {
 
   const [expandedReview, setExpandedReview] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadReviews();
-  }, []);
-
-  const loadReviews = async () => {
+  const mountedRef = useRef(false);
+  const requestRef = useRef(0);
+  const loadReviews = useCallback(async () => {
+    if (!mountedRef.current) return;
+    const request = ++requestRef.current;
+    const isCurrent = () => mountedRef.current && request === requestRef.current;
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!isCurrent()) return;
       if (!user) { router.push('/client/login'); return; }
 
       const { data: client } = await supabase
@@ -79,6 +81,7 @@ export default function ClientReviewsPage() {
         .eq('user_id', user.id)
         .maybeSingle();
 
+      if (!isCurrent()) return;
       if (!client) { router.push('/client/login'); return; }
 
       if (client?.company_name) {
@@ -94,6 +97,7 @@ export default function ClientReviewsPage() {
         .eq('client_id', client.id)
         .eq('status', 'completed');
 
+      if (!isCurrent()) return;
       const jobIds = (jobsData || []).map(j => j.id);
 
       if (jobIds.length > 0) {
@@ -102,6 +106,7 @@ export default function ClientReviewsPage() {
           .select('job_id, guard_id')
           .in('job_id', jobIds);
 
+        if (!isCurrent()) return;
         // Security: scope reviews to current user as client (not auth.uid() as client_id)
         const { data: reviewsData } = await supabase
           .from('reviews')
@@ -110,6 +115,7 @@ export default function ClientReviewsPage() {
           .in('job_id', jobIds)
           .order('created_at', { ascending: false });
 
+        if (!isCurrent()) return;
         const guardIds = [...new Set([
           ...(assignments || []).map((a: any) => a.guard_id),
           ...(reviewsData || []).map((r: any) => r.guard_id),
@@ -149,6 +155,7 @@ export default function ClientReviewsPage() {
           jobs: r.jobs,
         }));
 
+        if (!isCurrent()) return;
         setReviews(typedReviews);
 
         // Calculate pending reviews
@@ -174,9 +181,15 @@ export default function ClientReviewsPage() {
         setPendingReviews([]);
       }
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    loadReviews();
+    return () => { mountedRef.current = false; };
+  }, [loadReviews]);
 
   const handleOpenReview = (pending: PendingReview) => {
     setReviewTarget({

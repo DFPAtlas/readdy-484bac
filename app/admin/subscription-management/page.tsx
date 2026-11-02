@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -58,17 +58,29 @@ function SubscriptionManagementInner() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [autoOpened, setAutoOpened] = useState(false);
-  const [mountedRef] = useState({ current: true });
+  const mountedRef = useRef(false);
+  const requestRef = useRef(0);
+  const filterScope = JSON.stringify([searchQuery, statusFilter, typeFilter, planFilter, sortBy, sortDir]);
+  const previousFilterScope = useRef(filterScope);
+  const effectivePage = previousFilterScope.current === filterScope ? page : 1;
+  previousFilterScope.current = filterScope;
+  const scope = JSON.stringify([filterScope, effectivePage]);
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
 
   const fetchData = useCallback(async (currentPage?: number) => {
-    const p = currentPage ?? page;
+    if (!mountedRef.current || currentScope.current !== scope) return;
+    const request = ++requestRef.current;
+    const isCurrent = () => mountedRef.current && requestRef.current === request && currentScope.current === scope;
+    const p = currentPage ?? effectivePage;
     setLoading(true);
     setError(null);
     try {
       const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!isCurrent()) return;
       const accessToken = currentSession?.access_token;
       if (!accessToken) {
-        if (mountedRef.current) {
+        if (isCurrent()) {
           setError('Session expired. Please log in again.');
           setLoading(false);
         }
@@ -98,11 +110,12 @@ function SubscriptionManagementInner() {
       );
       const data = await res.json();
 
+      if (!isCurrent()) return;
       if (!res.ok || data.error) {
         throw new Error(data.error || 'Failed to fetch subscriptions');
       }
 
-      if (mountedRef.current) {
+      if (isCurrent()) {
         setSubscriptions(data.subscriptions || []);
         setUsers(data.users || {});
         setPlans(data.plans || []);
@@ -112,15 +125,15 @@ function SubscriptionManagementInner() {
         setLastUpdated(new Date());
       }
     } catch (err: any) {
-      if (mountedRef.current) {
+      if (isCurrent()) {
         setError(err.message || 'Failed to load subscriptions');
       }
     } finally {
-      if (mountedRef.current) {
+      if (isCurrent()) {
         setLoading(false);
       }
     }
-  }, [page, searchQuery, statusFilter, typeFilter, planFilter, sortBy, sortDir, mountedRef]);
+  }, [effectivePage, scope, searchQuery, statusFilter, typeFilter, planFilter, sortBy, sortDir]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -128,13 +141,13 @@ function SubscriptionManagementInner() {
   }, []);
 
   useEffect(() => {
-    fetchData(1);
-    setPage(1);
-  }, [searchQuery, statusFilter, typeFilter, planFilter, sortBy, sortDir]);
+    if (effectivePage !== page) setPage(effectivePage);
+  }, [effectivePage, page]);
 
   useEffect(() => {
-    fetchData(page);
-  }, [page]);
+    void fetchData();
+    return () => { requestRef.current += 1; };
+  }, [fetchData]);
 
   useEffect(() => {
     if (toast) {

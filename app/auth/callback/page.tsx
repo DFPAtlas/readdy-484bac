@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense, useRef } from 'react';
+import { useEffect, useState, Suspense, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
@@ -12,15 +12,6 @@ import {
 import { useRouter } from 'next/navigation';
 import { sanitizeRedirectPath, clearBadStoredRedirects } from '@/lib/safe-redirect';
 import { getPendingBookingReturnPath } from '@/lib/pending-job-draft';
-
-function CallbackContent() {
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('');
-  const [debugInfo, setDebugInfo] = useState('');
-  const hasExchanged = useRef(false);
-  const hasRun = useRef(false);
-  const searchParams = useSearchParams();
-  const router = useRouter();
 
   const extractNames = (metadata: any) => {
     const firstName =
@@ -39,7 +30,17 @@ function CallbackContent() {
     return { firstName, lastName, fullName };
   };
 
-  const handleRedirect = async (session: any, params: URLSearchParams, intent: any) => {
+
+function CallbackContent() {
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [message, setMessage] = useState('');
+  const [debugInfo, setDebugInfo] = useState('');
+  const hasExchanged = useRef(false);
+  const hasRun = useRef(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const handleRedirect = useCallback(async (session: any, params: URLSearchParams, intent: any) => {
     const errorParam = params.get('error');
     const errorDescription = params.get('error_description');
     const type = params.get('type');
@@ -316,7 +317,7 @@ function CallbackContent() {
       setMessage('Account created! Redirecting to complete your profile...');
       setTimeout(() => { router.push('/client/complete-profile-wizard'); }, 2500);
     }
-  };
+  }, [router]);
 
   useEffect(() => {
     if (hasRun.current) return;
@@ -451,7 +452,7 @@ function CallbackContent() {
 
     handleCallback();
     return () => clearTimeout(timeoutId);
-  }, []);
+  }, [handleRedirect]);
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4">

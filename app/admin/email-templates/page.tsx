@@ -62,9 +62,7 @@ export default function EmailTemplatesPage() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  useEffect(() => { fetchTemplates(); }, []);
-
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('email_templates')
@@ -79,7 +77,9 @@ export default function EmailTemplatesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => { void fetchTemplates(); }, [fetchTemplates]);
 
   const handleCreate = () => {
     setSelectedId(null);

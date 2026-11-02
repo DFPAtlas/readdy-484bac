@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { oneRelation } from '@/lib/relations';
 import { supabase } from '@/lib/supabase';
 import { hydrateGuardJobRows } from '@/lib/guard-bookings';
@@ -90,6 +90,15 @@ export default function GuardDashboardClient() {
   const { collapsed: sidebarCollapsed } = useSidebar();
   const { guardLimit, loading: usageLoading, refresh: refreshUsage } = useUsageLimits(guardUserId);
 
+  const readScopeRef = useRef({ active: false, epoch: 0, userId: null as string | null, requests: {} as Record<string, number> });
+  const beginRead = useCallback((key: string) => {
+    const scope = readScopeRef.current;
+    const epoch = scope.epoch;
+    const request = (scope.requests[key] || 0) + 1;
+    scope.requests[key] = request;
+    return () => scope.active && scope.epoch === epoch && scope.requests[key] === request;
+  }, []);
+
   const traceLog = useCallback((label: string, data: Record<string, unknown>) => {
     if (process.env.NODE_ENV !== 'production') {
       console.log(`[GuardDashboard:${label}]`, JSON.stringify({ timestamp: new Date().toISOString(), ...data }, null, 2));
@@ -162,63 +171,7 @@ export default function GuardDashboardClient() {
     }
   };
 
-  useEffect(() => {
-    let mounted = true;
-    const pendingLoads = new Set<ReturnType<typeof setTimeout>>();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-        traceLog('authEvent', { event, userId: session?.user?.id, pathname: typeof window !== 'undefined' ? window.location.pathname : '' });
-        if (!session?.user) return;
-        const userId = session.user.id;
-        // Run database work after the auth callback releases the session lock.
-        const timer = setTimeout(async () => {
-          pendingLoads.delete(timer);
-          if (!mounted) return;
-          try {
-        const { data: adminData } = await supabase
-          .from('admin_users')
-          .select('id')
-          .eq('user_id', userId)
-          .maybeSingle();
-        if (!mounted) return;
-        if (adminData) {
-          setIsAdmin(true);
-          setGuardUserId(userId);
-        }
-        await loadDashboardData(userId, !!adminData);
-          } catch (err) {
-            if (!mounted) return;
-            console.error('Guard dashboard session load failed:', err);
-            setDataErrors(['Unable to load your dashboard. Please retry.']);
-            setDataLoadFailed(true);
-            setLoading(false);
-          }
-        }, 0);
-        pendingLoads.add(timer);
-      } else if (event === 'SIGNED_OUT') {
-        if (mounted) router.push('/guard/login');
-      }
-    });
 
-    return () => {
-      mounted = false;
-      pendingLoads.forEach(timer => clearTimeout(timer));
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!guardUserId) return;
-    const resolvedUserId = guardUserId;
-    const channel = supabase
-      .channel('guard-dashboard-live-v2')
-      .on('postgres_changes', { event: '*', schema: 'app', table: 'job_assignments' }, () => loadJobAssignments(resolvedUserId, false))
-      .on('postgres_changes', { event: '*', schema: 'app', table: 'job_applications' }, () => loadJobApplications(resolvedUserId, false))
-      .on('postgres_changes', { event: '*', schema: 'app', table: 'client_responses' }, () => loadClientResponses(resolvedUserId, false))
-      .on('postgres_changes', { event: '*', schema: 'app', table: 'jobs' }, () => loadAvailableJobs(0))
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [guardUserId, isAdmin]);
 
   useEffect(() => {
     if (isAdmin) return;
@@ -248,16 +201,6 @@ export default function GuardDashboardClient() {
     }
   }, [guard?.id]);
 
-  useEffect(() => {
-    if (!guard?.id || !guardUserId) return;
-    const channel = supabase
-      .channel(`guard-dashboard-support-${guard.id}`)
-      .on('postgres_changes', { event: '*', schema: 'app', table: 'support_tickets', filter: `guard_id=eq.${guard.id}` }, () => {
-        loadOpenTicketCount(guardUserId);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [guard?.id, guardUserId]);
 
   useEffect(() => {
     const hash = window.location.hash.replace('#', '');
@@ -266,39 +209,26 @@ export default function GuardDashboardClient() {
     }
   }, []);
 
-  const loadDashboardData = async (userId: string, adminMode: boolean = false) => {
-    setLoading(true);
-    setDataErrors([]);
-    setDataLoadFailed(false);
-    traceLog('loadDashboardData', { userId, adminMode, pathname: typeof window !== 'undefined' ? window.location.pathname : '' });
-    if (adminMode) setIsAdmin(true);
-    await Promise.all([
-      loadGuardProfile(userId, adminMode),
-      loadJobAssignments(userId, adminMode),
-      loadJobApplications(userId, adminMode),
-      loadClientResponses(userId, adminMode),
-      loadAvailableJobs(),
-      loadContactSubmissions(userId),
-      loadOpenTicketCount(userId),
-      loadUserEntitlement(userId),
-    ]);
-    traceLog('loadDashboardDataComplete', { dataErrors, guardLoaded: !!guard });
-    setLoading(false);
-  };
-
-  const loadGuardProfile = async (userId: string, adminMode: boolean = false) => {
+  const loadGuardProfile = useCallback(async (userId: string, adminMode: boolean = false) => {
+    if (userId && readScopeRef.current.userId !== userId) return;
+    const isCurrent = beginRead('loadGuardProfile');
+    if (!isCurrent()) return;
     try {
+      if (!isCurrent()) return;
       setGuardUserId(userId);
       const { data, error } = await supabase
         .from('guards')
         .select('id, full_name, email, profile_image_url, location, postcode, years_experience, rating, total_reviews, total_jobs_completed, total_earnings, verification_status, profile_completed, subscription_status, accepts_direct_bookings, sia_licence_front_url, sia_expiry_date, licence_types, sia_licence_number, phone, sia_verified, is_active, dashboard_access, home_latitude, home_longitude, stripe_details_submitted, stripe_payouts_enabled')
         .eq('user_id', userId)
         .maybeSingle();
+      if (!isCurrent()) return;
       if (error) throw error;
       traceLog('loadGuardProfile', { userId, hasData: !!data, verificationStatus: data?.verification_status, profileCompleted: data?.profile_completed, dashboardAccess: data?.dashboard_access });
       if (!data) {
         if (!adminMode) {
+          if (!isCurrent()) return;
           setDataErrors(prev => [...prev, 'guard_profile']);
+          if (!isCurrent()) return;
           setDataLoadFailed(true);
         }
         return;
@@ -307,6 +237,8 @@ export default function GuardDashboardClient() {
         .from('guard_payouts')
         .select('status, amount, net_amount')
         .eq('guard_id', data.id);
+
+      if (!isCurrent()) return;
 
       setGuard({
         ...data,
@@ -317,15 +249,21 @@ export default function GuardDashboardClient() {
           : sumPaidGuardPayouts(paidPayouts || []),
       });
     } catch {
+      if (!isCurrent()) return;
       setDataErrors(prev => [...prev, 'guard_profile']);
+      if (!isCurrent()) return;
       setDataLoadFailed(true);
     }
-  };
-
-  const loadUserEntitlement = async (userId: string) => {
+  }, [beginRead, traceLog]);
+  const loadUserEntitlement = useCallback(async (userId: string) => {
+    if (userId && readScopeRef.current.userId !== userId) return;
+    const isCurrent = beginRead('loadUserEntitlement');
+    if (!isCurrent()) return;
     try {
       const data = await ensureEntitlement(userId, 'guard');
+      if (!isCurrent()) return;
       traceLog('loadUserEntitlement', { hasData: !!data, planSlug: data?.plan_slug });
+      if (!isCurrent()) return;
       setUserEntitlement(data as UserEntitlement | null);
 
       const flags: Record<string, boolean> = {};
@@ -336,40 +274,28 @@ export default function GuardDashboardClient() {
       for (const key of keys) {
         flags[key] = await hasFeature(userId, key);
       }
+      if (!isCurrent()) return;
       setFeatureFlags(flags);
+      if (!isCurrent()) return;
       setEntitlementsLoaded(true);
     } catch {
       traceLog('loadUserEntitlement', { error: true });
+      if (!isCurrent()) return;
       setEntitlementsLoaded(true);
     }
-  };
+  }, [beginRead, traceLog]);
 
-  useEffect(() => {
-    if (!guardUserId) return;
-    const channel = supabase
-      .channel(`guard-entitlement-${guardUserId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'app', table: 'user_entitlements_data', filter: `user_id=eq.${guardUserId}` },
-        () => { loadUserEntitlement(guardUserId); refreshUsage(); }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'app', table: 'subscriptions', filter: `user_id=eq.${guardUserId}` },
-        () => { loadUserEntitlement(guardUserId); refreshUsage(); }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [guardUserId, refreshUsage]);
-
-  const loadJobAssignments = async (userId: string, adminMode: boolean = false) => {
+  const loadJobAssignments = useCallback(async (userId: string, adminMode: boolean = false) => {
+    if (userId && readScopeRef.current.userId !== userId) return;
+    const isCurrent = beginRead('loadJobAssignments');
+    if (!isCurrent()) return;
     try {
       const { data: guardData } = await supabase
         .from('guards')
         .select('id')
         .eq('user_id', userId)
         .maybeSingle();
-      if (!guardData) return;
+      if (!isCurrent() || !guardData) return;
       const { data, error } = await supabase
         .from('job_assignments')
         .select(`
@@ -389,9 +315,11 @@ export default function GuardDashboardClient() {
         .eq('guard_id', guardData.id)
         .in('status', ['confirmed', 'in_progress', 'pending', 'awaiting_payment', 'selected'])
         .order('assigned_at', { ascending: false });
+      if (!isCurrent()) return;
       if (error) throw error;
       const all = await hydrateGuardJobRows(supabase, guardData.id, data || []);
       traceLog('loadJobAssignments', { count: all.length });
+      if (!isCurrent()) return;
       setAssignments(all);
       const today = new Date().toISOString().split('T')[0];
       const upcoming = all
@@ -399,14 +327,18 @@ export default function GuardDashboardClient() {
         .sort((a, b) =>
           ((a.jobs as any)?.start_date || '').localeCompare((b.jobs as any)?.start_date || '')
         );
+      if (!isCurrent()) return;
       setUpcomingJobs(upcoming);
     } catch {
       traceLog('loadJobAssignments', { error: true });
+      if (!isCurrent()) return;
       setDataErrors(prev => [...prev, 'job_assignments']);
     }
-  };
-
-  const loadJobApplications = async (userId?: string, adminMode: boolean = false) => {
+  }, [beginRead, traceLog]);
+  const loadJobApplications = useCallback(async (userId?: string, adminMode: boolean = false) => {
+    if (userId && readScopeRef.current.userId !== userId) return;
+    const isCurrent = beginRead('loadJobApplications');
+    if (!isCurrent()) return;
     try {
       const resolvedUserId = userId || (await supabase.auth.getUser()).data.user?.id;
       if (!resolvedUserId) return;
@@ -415,7 +347,7 @@ export default function GuardDashboardClient() {
         .select('id')
         .eq('user_id', resolvedUserId)
         .maybeSingle();
-      if (!guardData) return;
+      if (!isCurrent() || !guardData) return;
       const { data, error } = await supabase
         .from('job_applications')
         .select(`
@@ -426,23 +358,29 @@ export default function GuardDashboardClient() {
         `)
         .eq('guard_id', guardData.id)
         .order('applied_at', { ascending: false });
+      if (!isCurrent()) return;
       if (error) throw error;
       traceLog('loadJobApplications', { count: (data || []).length });
-      setApplications(await hydrateGuardJobRows(supabase, guardData.id, data || []));
+      const hydrated = await hydrateGuardJobRows(supabase, guardData.id, data || []);
+      if (!isCurrent()) return;
+      setApplications(hydrated);
     } catch {
       traceLog('loadJobApplications', { error: true });
+      if (!isCurrent()) return;
       setDataErrors(prev => [...prev, 'job_applications']);
     }
-  };
-
-  const loadClientResponses = async (userId: string, adminMode: boolean = false) => {
+  }, [beginRead, traceLog]);
+  const loadClientResponses = useCallback(async (userId: string, adminMode: boolean = false) => {
+    if (userId && readScopeRef.current.userId !== userId) return;
+    const isCurrent = beginRead('loadClientResponses');
+    if (!isCurrent()) return;
     try {
       const { data: guardData } = await supabase
         .from('guards')
         .select('id')
         .eq('user_id', userId)
         .maybeSingle();
-      if (!guardData) return;
+      if (!isCurrent() || !guardData) return;
       const { data, error } = await supabase
         .from('client_responses')
         .select(`
@@ -461,17 +399,23 @@ export default function GuardDashboardClient() {
         `)
         .eq('guard_id', guardData.id)
         .order('created_at', { ascending: false });
+      if (!isCurrent()) return;
       if (error) throw error;
       traceLog('loadClientResponses', { count: (data || []).length });
+      if (!isCurrent()) return;
       setResponses((data || []).map(row => ({ ...row, jobs: oneRelation(row.jobs), clients: oneRelation(row.clients) })));
+      if (!isCurrent()) return;
       setUnreadCount(data?.filter(r => !r.is_read).length || 0);
     } catch {
       traceLog('loadClientResponses', { error: true });
+      if (!isCurrent()) return;
       setDataErrors(prev => [...prev, 'client_responses']);
     }
-  };
-
-  const loadContactSubmissions = async (userId: string) => {
+  }, [beginRead, traceLog]);
+  const loadContactSubmissions = useCallback(async (userId: string) => {
+    if (userId && readScopeRef.current.userId !== userId) return;
+    const isCurrent = beginRead('loadContactSubmissions');
+    if (!isCurrent()) return;
     try {
       const { data, error } = await supabase
         .from('contact_submissions')
@@ -479,35 +423,44 @@ export default function GuardDashboardClient() {
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(10);
+      if (!isCurrent()) return;
       if (error) throw error;
+      if (!isCurrent()) return;
       setContactSubmissions(data || []);
     } catch {
+      if (!isCurrent()) return;
       setDataErrors(prev => [...prev, 'contact_submissions']);
     }
-  };
-
-  const loadOpenTicketCount = async (userId: string) => {
+  }, [beginRead]);
+  const loadOpenTicketCount = useCallback(async (userId: string) => {
+    if (userId && readScopeRef.current.userId !== userId) return;
+    const isCurrent = beginRead('loadOpenTicketCount');
+    if (!isCurrent()) return;
     try {
       const { data: guardData } = await supabase
         .from('guards')
         .select('id')
         .eq('user_id', userId)
         .maybeSingle();
-      if (!guardData) return;
+      if (!isCurrent() || !guardData) return;
       const { data, error } = await supabase
         .from('support_tickets')
         .select('id')
         .eq('guard_id', guardData.id)
         .eq('is_deleted', false)
         .in('status', ['open', 'awaiting_guard', 'under_review', 'escalated']);
+      if (!isCurrent()) return;
       if (error) throw error;
+      if (!isCurrent()) return;
       setOpenTicketCount((data || []).length);
     } catch {
+      if (!isCurrent()) return;
       setDataErrors(prev => [...prev, 'support_tickets']);
     }
-  };
-
-  const loadAvailableJobs = async (page: number = 0) => {
+  }, [beginRead]);
+  const loadAvailableJobs = useCallback(async (page: number = 0) => {
+    const isCurrent = beginRead('loadAvailableJobs');
+    if (!isCurrent()) return;
     try {
       const from = page * AVAILABLE_JOBS_PAGE_SIZE;
       const to = from + AVAILABLE_JOBS_PAGE_SIZE - 1;
@@ -534,21 +487,149 @@ export default function GuardDashboardClient() {
         .gte('start_date', new Date().toISOString().split('T')[0])
         .order('start_date', { ascending: true })
         .range(from, to);
+      if (!isCurrent()) return;
       if (error) throw error;
       const fetched = (data || []).map(row => ({ ...row, clients: oneRelation(row.clients) }));
       traceLog('loadAvailableJobs', { page, count: fetched.length });
       if (page === 0) {
+        if (!isCurrent()) return;
         setAvailableJobs(fetched);
       } else {
+        if (!isCurrent()) return;
         setAvailableJobs(prev => [...prev, ...fetched]);
       }
+      if (!isCurrent()) return;
       setHasMoreAvailableJobs(fetched.length === AVAILABLE_JOBS_PAGE_SIZE);
+      if (!isCurrent()) return;
       setAvailableJobsPage(page);
     } catch {
       traceLog('loadAvailableJobs', { error: true });
+      if (!isCurrent()) return;
       setDataErrors(prev => [...prev, 'available_jobs']);
     }
-  };
+  }, [beginRead, traceLog]);
+  const loadDashboardData = useCallback(async (userId: string, adminMode: boolean = false) => {
+    if (userId && readScopeRef.current.userId !== userId) return;
+    const isCurrent = beginRead('dashboard');
+    if (!isCurrent()) return;
+    setLoading(true);
+    setDataErrors([]);
+    setDataLoadFailed(false);
+    traceLog('loadDashboardData', { userId, adminMode, pathname: typeof window !== 'undefined' ? window.location.pathname : '' });
+    setIsAdmin(adminMode);
+    await Promise.all([
+      loadGuardProfile(userId, adminMode),
+      loadJobAssignments(userId, adminMode),
+      loadJobApplications(userId, adminMode),
+      loadClientResponses(userId, adminMode),
+      loadAvailableJobs(),
+      loadContactSubmissions(userId),
+      loadOpenTicketCount(userId),
+      loadUserEntitlement(userId),
+    ]);
+    if (!isCurrent()) return;
+    traceLog('loadDashboardDataComplete', { userId });
+    setLoading(false);
+  }, [beginRead, traceLog, loadGuardProfile, loadUserEntitlement, loadJobAssignments, loadJobApplications, loadClientResponses, loadContactSubmissions, loadOpenTicketCount, loadAvailableJobs]);
+
+  useEffect(() => {
+    let mounted = true;
+    const scope = readScopeRef.current;
+    scope.active = true;
+    const pendingLoads = new Set<ReturnType<typeof setTimeout>>();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+        traceLog('authEvent', { event, userId: session?.user?.id, pathname: typeof window !== 'undefined' ? window.location.pathname : '' });
+        if (!session?.user) return;
+        const userId = session.user.id;
+        if (scope.userId === userId) return;
+        scope.active = true;
+        scope.userId = userId;
+        const epoch = ++scope.epoch;
+        // Run database work after the auth callback releases the session lock.
+        const timer = setTimeout(async () => {
+          pendingLoads.delete(timer);
+          if (!mounted || scope.epoch !== epoch) return;
+          try {
+        const { data: adminData } = await supabase
+          .from('admin_users')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (!mounted || scope.epoch !== epoch) return;
+        if (adminData) {
+          setIsAdmin(true);
+          setGuardUserId(userId);
+        }
+        await loadDashboardData(userId, !!adminData);
+          } catch (err) {
+            if (!mounted || scope.epoch !== epoch) return;
+            console.error('Guard dashboard session load failed:', err);
+            setDataErrors(['Unable to load your dashboard. Please retry.']);
+            setDataLoadFailed(true);
+            setLoading(false);
+          }
+        }, 0);
+        pendingLoads.add(timer);
+      } else if (event === 'SIGNED_OUT') {
+        scope.epoch++;
+        scope.active = false;
+        scope.userId = null;
+        if (mounted) router.push('/guard/login');
+      }
+    });
+
+    return () => {
+      mounted = false;
+      scope.active = false;
+      scope.epoch++;
+      scope.userId = null;
+      pendingLoads.forEach(timer => clearTimeout(timer));
+      subscription.unsubscribe();
+    };
+  }, [loadDashboardData, router, traceLog]);
+
+  useEffect(() => {
+    if (!guardUserId) return;
+    const resolvedUserId = guardUserId;
+    const channel = supabase
+      .channel('guard-dashboard-live-v2')
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'job_assignments' }, () => loadJobAssignments(resolvedUserId, false))
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'job_applications' }, () => loadJobApplications(resolvedUserId, false))
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'client_responses' }, () => loadClientResponses(resolvedUserId, false))
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'jobs' }, () => loadAvailableJobs(0))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [guardUserId, isAdmin, loadJobAssignments, loadJobApplications, loadClientResponses, loadAvailableJobs]);
+
+  useEffect(() => {
+    if (!guardUserId) return;
+    const channel = supabase
+      .channel(`guard-entitlement-${guardUserId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'app', table: 'user_entitlements_data', filter: `user_id=eq.${guardUserId}` },
+        () => { loadUserEntitlement(guardUserId); refreshUsage(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'app', table: 'subscriptions', filter: `user_id=eq.${guardUserId}` },
+        () => { loadUserEntitlement(guardUserId); refreshUsage(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [guardUserId, refreshUsage, loadUserEntitlement]);
+
+  useEffect(() => {
+    if (!guard?.id || !guardUserId) return;
+    const channel = supabase
+      .channel(`guard-dashboard-support-${guard.id}`)
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'support_tickets', filter: `guard_id=eq.${guard.id}` }, () => {
+        loadOpenTicketCount(guardUserId);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [guard?.id, guardUserId, loadOpenTicketCount]);
 
   const handleLoadMoreAvailable = async () => {
     setLoadingMoreJobs(true);

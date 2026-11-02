@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -33,251 +33,12 @@ interface GuardReview {
   issue_reported: boolean;
 }
 
-export default function JobDetailClient({ jobId }: { jobId: string }) {
-  const router = useRouter();
-  const { loading: authLoading, allowed } = useClientGuard();
-  const [loading, setLoading] = useState(true);
-  const [job, setJob] = useState<any>(null);
-  const [assignedGuards, setAssignedGuards] = useState<any[]>([]);
-  const [timeline, setTimeline] = useState<any[]>([]);
-  const [companyName, setCompanyName] = useState('Client');
-  const [subscriptionTier, setSubscriptionTier] = useState('Basic');
-  const [initials, setInitials] = useState('CL');
-  const [activeTab, setActiveTab] = useState<'info' | 'guards' | 'timeline' | 'complaints' | 'attendance' | 'cancellation' | 'confirmation'>('info');
-  const [currentUserId, setCurrentUserId] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [showComplaintModal, setShowComplaintModal] = useState(false);
-  const [complaintSuccess, setComplaintSuccess] = useState(false);
-
-  const [guardReviews, setGuardReviews] = useState<Record<string, GuardReview>>({});
-  const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [reviewGuard, setReviewGuard] = useState<{ guardId: string; guardName: string } | null>(null);
-
-  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
-  const [markingComplete, setMarkingComplete] = useState(false);
-  const [completeError, setCompleteError] = useState('');
-
-  const [messageGuard, setMessageGuard] = useState<any>(null);
-  const [sendingMessage, setSendingMessage] = useState(false);
-
-  const [cancellation, setCancellation] = useState<any>(null);
-  const [refundRequests, setRefundRequests] = useState<any[]>([]);
-  const [transaction, setTransaction] = useState<any>(null);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [showRefundModal, setShowRefundModal] = useState(false);
-  const [cancelSuccess, setCancelSuccess] = useState(false);
-
   function getInitials(name: string): string {
     const parts = name.trim().split(' ');
     if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
     return name.slice(0, 2).toUpperCase();
   }
 
-  useEffect(() => {
-    loadJobDetail();
-
-    const channels: any[] = [];
-
-    const jobChannel = supabase
-      .channel(`job-detail-${jobId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'app',
-        table: 'jobs',
-        filter: `id=eq.${jobId}`,
-      }, () => {
-        loadJobDetail();
-      })
-      .subscribe();
-    channels.push(jobChannel);
-
-    const assignmentsChannel = supabase
-      .channel(`job-detail-assignments-${jobId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'app',
-        table: 'job_assignments',
-        filter: `job_id=eq.${jobId}`,
-      }, () => {
-        loadJobDetail();
-      })
-      .subscribe();
-    channels.push(assignmentsChannel);
-
-    const reviewsChannel = supabase
-      .channel(`job-detail-reviews-${jobId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'app',
-        table: 'reviews',
-        filter: `job_id=eq.${jobId}`,
-      }, () => {
-        loadJobDetail();
-      })
-      .subscribe();
-    channels.push(reviewsChannel);
-
-    const cancellationsChannel = supabase
-      .channel(`job-detail-cancellations-${jobId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'app',
-        table: 'support_tickets',
-        // NOTE: no job_id filter available in realtime for support_tickets — RLS enforces client ownership at query time
-        // NOTE: no job_id filter available in realtime for cancellations
-        // RLS enforces client ownership at query time
-      }, () => {
-        loadJobDetail();
-      })
-      .subscribe();
-    channels.push(cancellationsChannel);
-
-    const refundsChannel = supabase
-      .channel(`job-detail-refunds-${jobId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'app',
-        table: 'transactions',
-        filter: `job_id=eq.${jobId}`,
-      }, () => {
-        loadJobDetail();
-      })
-      .subscribe();
-    channels.push(refundsChannel);
-
-    return () => {
-      channels.forEach(ch => supabase.removeChannel(ch));
-    };
-  }, [jobId]);
-
-  const fetchGuardReviews = async (clientIdValue: string) => {
-    const { data } = await supabase
-      .from('reviews')
-      .select('id, guard_id, rating, review_text, review_status, issue_reported')
-      .eq('job_id', jobId)
-      .eq('client_id', clientIdValue);
-
-    const map: Record<string, GuardReview> = {};
-    (data || []).forEach((r) => {
-      if (r.guard_id) map[r.guard_id] = r;
-    });
-    setGuardReviews(map);
-  };
-
-  const loadJobDetail = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/client/login'); return; }
-
-      setCurrentUserId(user.id);
-
-      const { data: client } = await supabase
-        .from('clients')
-        .select('id, company_name, subscription_tier')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!client) { router.push('/client/login'); return; }
-
-      setClientId(client.id);
-      setCompanyName(client.company_name || 'Client');
-      setSubscriptionTier(client.subscription_tier || 'Basic');
-      setInitials(getInitials(client.company_name || 'Client'));
-
-      const { data: jobData } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('id', jobId)
-        .eq('client_id', client.id)
-        .maybeSingle();
-
-      if (!jobData) { router.push('/client/jobs'); return; }
-      setJob(jobData);
-
-      const [assignmentsData, cancellationData, refundData, transactionData, activityData] = await Promise.all([
-        supabase
-          .from('job_assignments')
-          .select('*')
-          .eq('job_id', jobId),
-        supabase
-          .schema('app')
-          .from('job_cancellations')
-          .select('*')
-          .eq('job_id', jobId)
-          .maybeSingle(),
-        supabase
-          .schema('app')
-          .from('refund_requests')
-          .select('*')
-          .eq('job_id', jobId)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('transactions')
-          .select('*')
-          .eq('job_id', jobId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from('client_activity_log')
-          .select('*')
-          .eq('client_id', client.id)
-          .eq('related_job_id', jobId)
-          .order('created_at', { ascending: false })
-          .limit(50),
-      ]);
-
-      const rawAssignments = assignmentsData.data || [];
-      const assignedGuardIds = [...new Set(rawAssignments.map((a: any) => a.guard_id).filter(Boolean))];
-      const guardMap: Record<string, any> = {};
-
-      if (assignedGuardIds.length > 0) {
-        const { data: safeGuardProfiles } = await supabase
-          .from('client_applicant_profiles')
-          .select('id:guard_id, user_id:guard_user_id, full_name, profile_photo_url:profile_image_url, sia_licence_number, sia_verified, sia_expiry_date, licence_types, profile_completed, verification_status, certifications, sia_verified_at, average_rating:rating, total_reviews, total_jobs_completed')
-          .eq('job_id', jobId)
-          .in('guard_id', assignedGuardIds);
-
-        (safeGuardProfiles || []).forEach((g: any) => {
-          guardMap[g.id] = {
-            ...g,
-            phone: null,
-            sia_licence_front_url: null,
-            sia_licence_back_url: null,
-          };
-        });
-      }
-
-      const hydratedAssignments = rawAssignments.map((a: any) => ({
-        ...a,
-        guards: guardMap[a.guard_id] || null,
-      }));
-
-      setAssignedGuards(hydratedAssignments);
-      setCancellation(cancellationData.data || null);
-      setRefundRequests(refundData.data || []);
-      setTransaction(transactionData.data || null);
-
-      const timelineEvents = buildTimeline(jobData, hydratedAssignments, activityData.data || []);
-      setTimeline(timelineEvents);
-
-      await fetchGuardReviews(client.id);
-    } catch {
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMarkComplete = async () => {
-    setMarkingComplete(true);
-    setCompleteError('');
-    try {
-      setCompleteError('The guard must check out and submit a completion request before the client can approve completion and release payout.');
-      setShowCompleteConfirm(false);
-    } finally {
-      setMarkingComplete(false);
-    }
-  };
 
   const buildTimeline = (jobData: any, assignments: any[], activityLog: any[]) => {
     const events: { date: string; label: string; icon: string; color: string; source?: string }[] = [];
@@ -408,6 +169,270 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
     return deduped.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   };
+
+
+export default function JobDetailClient({ jobId }: { jobId: string }) {
+  const router = useRouter();
+  const { loading: authLoading, allowed } = useClientGuard();
+  const [loading, setLoading] = useState(true);
+  const [job, setJob] = useState<any>(null);
+  const [assignedGuards, setAssignedGuards] = useState<any[]>([]);
+  const [timeline, setTimeline] = useState<any[]>([]);
+  const [companyName, setCompanyName] = useState('Client');
+  const [subscriptionTier, setSubscriptionTier] = useState('Basic');
+  const [initials, setInitials] = useState('CL');
+  const [activeTab, setActiveTab] = useState<'info' | 'guards' | 'timeline' | 'complaints' | 'attendance' | 'cancellation' | 'confirmation'>('info');
+  const [currentUserId, setCurrentUserId] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [showComplaintModal, setShowComplaintModal] = useState(false);
+  const [complaintSuccess, setComplaintSuccess] = useState(false);
+
+  const [guardReviews, setGuardReviews] = useState<Record<string, GuardReview>>({});
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewGuard, setReviewGuard] = useState<{ guardId: string; guardName: string } | null>(null);
+
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+  const [markingComplete, setMarkingComplete] = useState(false);
+  const [completeError, setCompleteError] = useState('');
+
+  const [messageGuard, setMessageGuard] = useState<any>(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
+
+  const [cancellation, setCancellation] = useState<any>(null);
+  const [refundRequests, setRefundRequests] = useState<any[]>([]);
+  const [transaction, setTransaction] = useState<any>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [cancelSuccess, setCancelSuccess] = useState(false);
+
+
+  const requestRef = useRef(0);
+  const mountedRef = useRef(false);
+
+  const fetchGuardReviews = useCallback(async (clientIdValue: string, request = requestRef.current) => {
+    const { data } = await supabase
+      .from('reviews')
+      .select('id, guard_id, rating, review_text, review_status, issue_reported')
+      .eq('job_id', jobId)
+      .eq('client_id', clientIdValue);
+
+    const map: Record<string, GuardReview> = {};
+    (data || []).forEach((r) => {
+      if (r.guard_id) map[r.guard_id] = r;
+    });
+    if (mountedRef.current && request === requestRef.current) setGuardReviews(map);
+  }, [jobId]);
+
+  const loadJobDetail = useCallback(async () => {
+    if (!mountedRef.current) return;
+    const request = ++requestRef.current;
+    const isCurrent = () => mountedRef.current && request === requestRef.current;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!isCurrent()) return;
+      if (!user) { router.push('/client/login'); return; }
+
+      setCurrentUserId(user.id);
+
+      const { data: client } = await supabase
+        .from('clients')
+        .select('id, company_name, subscription_tier')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!isCurrent()) return;
+      if (!client) { router.push('/client/login'); return; }
+
+      setClientId(client.id);
+      setCompanyName(client.company_name || 'Client');
+      setSubscriptionTier(client.subscription_tier || 'Basic');
+      setInitials(getInitials(client.company_name || 'Client'));
+
+      const { data: jobData } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('id', jobId)
+        .eq('client_id', client.id)
+        .maybeSingle();
+
+      if (!isCurrent()) return;
+      if (!jobData) { router.push('/client/jobs'); return; }
+      setJob(jobData);
+
+      const [assignmentsData, cancellationData, refundData, transactionData, activityData] = await Promise.all([
+        supabase
+          .from('job_assignments')
+          .select('*')
+          .eq('job_id', jobId),
+        supabase
+          .schema('app')
+          .from('job_cancellations')
+          .select('*')
+          .eq('job_id', jobId)
+          .maybeSingle(),
+        supabase
+          .schema('app')
+          .from('refund_requests')
+          .select('*')
+          .eq('job_id', jobId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('transactions')
+          .select('*')
+          .eq('job_id', jobId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('client_activity_log')
+          .select('*')
+          .eq('client_id', client.id)
+          .eq('related_job_id', jobId)
+          .order('created_at', { ascending: false })
+          .limit(50),
+      ]);
+
+      if (!isCurrent()) return;
+      const rawAssignments = assignmentsData.data || [];
+      const assignedGuardIds = [...new Set(rawAssignments.map((a: any) => a.guard_id).filter(Boolean))];
+      const guardMap: Record<string, any> = {};
+
+      if (assignedGuardIds.length > 0) {
+        const { data: safeGuardProfiles } = await supabase
+          .from('client_applicant_profiles')
+          .select('id:guard_id, user_id:guard_user_id, full_name, profile_photo_url:profile_image_url, sia_licence_number, sia_verified, sia_expiry_date, licence_types, profile_completed, verification_status, certifications, sia_verified_at, average_rating:rating, total_reviews, total_jobs_completed')
+          .eq('job_id', jobId)
+          .in('guard_id', assignedGuardIds);
+
+        (safeGuardProfiles || []).forEach((g: any) => {
+          guardMap[g.id] = {
+            ...g,
+            phone: null,
+            sia_licence_front_url: null,
+            sia_licence_back_url: null,
+          };
+        });
+      }
+
+      const hydratedAssignments = rawAssignments.map((a: any) => ({
+        ...a,
+        guards: guardMap[a.guard_id] || null,
+      }));
+
+      if (!isCurrent()) return;
+      setAssignedGuards(hydratedAssignments);
+      setCancellation(cancellationData.data || null);
+      setRefundRequests(refundData.data || []);
+      setTransaction(transactionData.data || null);
+
+      const timelineEvents = buildTimeline(jobData, hydratedAssignments, activityData.data || []);
+      setTimeline(timelineEvents);
+
+      await fetchGuardReviews(client.id, request);
+    } catch {
+    } finally {
+      if (isCurrent()) setLoading(false);
+    }
+  }, [jobId, router, fetchGuardReviews]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    setLoading(true);
+    setJob(null);
+    setAssignedGuards([]);
+    setTimeline([]);
+    setGuardReviews({});
+    setCancellation(null);
+    setRefundRequests([]);
+    setTransaction(null);
+    loadJobDetail();
+
+    const channels: any[] = [];
+
+    const jobChannel = supabase
+      .channel(`job-detail-${jobId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'app',
+        table: 'jobs',
+        filter: `id=eq.${jobId}`,
+      }, () => {
+        loadJobDetail();
+      })
+      .subscribe();
+    channels.push(jobChannel);
+
+    const assignmentsChannel = supabase
+      .channel(`job-detail-assignments-${jobId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'app',
+        table: 'job_assignments',
+        filter: `job_id=eq.${jobId}`,
+      }, () => {
+        loadJobDetail();
+      })
+      .subscribe();
+    channels.push(assignmentsChannel);
+
+    const reviewsChannel = supabase
+      .channel(`job-detail-reviews-${jobId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'app',
+        table: 'reviews',
+        filter: `job_id=eq.${jobId}`,
+      }, () => {
+        loadJobDetail();
+      })
+      .subscribe();
+    channels.push(reviewsChannel);
+
+    const cancellationsChannel = supabase
+      .channel(`job-detail-cancellations-${jobId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'app',
+        table: 'support_tickets',
+        // NOTE: no job_id filter available in realtime for support_tickets — RLS enforces client ownership at query time
+        // NOTE: no job_id filter available in realtime for cancellations
+        // RLS enforces client ownership at query time
+      }, () => {
+        loadJobDetail();
+      })
+      .subscribe();
+    channels.push(cancellationsChannel);
+
+    const refundsChannel = supabase
+      .channel(`job-detail-refunds-${jobId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'app',
+        table: 'transactions',
+        filter: `job_id=eq.${jobId}`,
+      }, () => {
+        loadJobDetail();
+      })
+      .subscribe();
+    channels.push(refundsChannel);
+
+    return () => {
+      mountedRef.current = false;
+      channels.forEach(ch => supabase.removeChannel(ch));
+    };
+  }, [jobId, loadJobDetail]);
+
+  const handleMarkComplete = async () => {
+    setMarkingComplete(true);
+    setCompleteError('');
+    try {
+      setCompleteError('The guard must check out and submit a completion request before the client can approve completion and release payout.');
+      setShowCompleteConfirm(false);
+    } finally {
+      setMarkingComplete(false);
+    }
+  };
+
 
   const handleComplaintSuccess = () => {
     setShowComplaintModal(false);

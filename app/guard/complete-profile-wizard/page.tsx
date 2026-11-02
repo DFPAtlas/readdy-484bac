@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { ensureEntitlement } from '@/lib/entitlements';
@@ -47,6 +47,8 @@ function GuardCompleteProfileWizardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mountedRef = useRef(true);
+  const editParam = searchParams.get('edit');
+  const providerParam = searchParams.get('provider');
   const initialStep = (() => {
     const raw = parseInt(searchParams.get('step') || '', 10);
     return Number.isFinite(raw) && raw >= 1 && raw <= WIZARD_STEPS.length ? raw : 1;
@@ -104,77 +106,13 @@ function GuardCompleteProfileWizardContent() {
   const [drivingBackPath, setDrivingBackPath] = useState<string>('');
   const [poaPath, setPoaPath] = useState<string>('');
 
-  useEffect(() => {
-    mountedRef.current = true;
-    let unsubscribe: (() => void) | null = null;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const initWizard = async () => {
-      timeoutId = setTimeout(() => {
-        if (!mountedRef.current) return;
-        setLoadError('Loading timed out. Please refresh the page.');
-        setLoading(false);
-      }, 5000);
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!mountedRef.current) return;
-
-      if (!session?.user) {
-        if (timeoutId) clearTimeout(timeoutId);
-        const urlHasEdit = typeof window !== 'undefined' && window.location.search.includes('edit=1');
-        const editParam = searchParams.get('edit') === '1' || urlHasEdit;
-        if (editParam) {
-          setGuardWizardEditFlag();
-          router.push('/guard/login?redirect=' + encodeURIComponent('/guard/complete-profile-wizard?edit=1'));
-        } else {
-          router.push('/guard/login');
-        }
-        return;
-      }
-
-      const user = session.user;
-      const [{ data: guardData }, { data: clientData }] = await Promise.all([
-        supabase.from('guards').select('id').eq('user_id', user.id).maybeSingle(),
-        supabase.from('clients').select('id').eq('user_id', user.id).maybeSingle(),
-      ]);
-
-      if (!mountedRef.current) return;
-
-      if (!guardData && clientData) {
-        if (timeoutId) clearTimeout(timeoutId);
-        setRoleSwitch('client');
-        setLoading(false);
-        return;
-      }
-
-      setRoleSwitch('none');
-      await loadProfile(user);
-      if (timeoutId && mountedRef.current) clearTimeout(timeoutId);
-    };
-
-    initWizard();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
-      if (!mountedRef.current) return;
-      if (event === 'SIGNED_OUT') {
-        router.push('/guard/login');
-      }
-    });
-
-    unsubscribe = () => subscription.unsubscribe();
-    return () => {
-      mountedRef.current = false;
-      if (unsubscribe) unsubscribe();
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, []);
-
-  const loadProfile = async (user: any) => {
+  const loadProfile = useCallback(async (user: any, isCurrent: () => boolean) => {
+    if (!isCurrent()) return;
     try {
       setUserId(user.id);
       setUserEmail(user.email || '');
 
-      const provider = searchParams.get('provider') || user.app_metadata?.provider;
+      const provider = providerParam || user.app_metadata?.provider;
       const isOAuth = provider === 'google' || provider === 'apple' || !!user.app_metadata?.providers?.find((p: string) => p === 'google' || p === 'apple');
       setIsOAuthUser(isOAuth);
       setOauthProvider(provider || null);
@@ -199,16 +137,17 @@ function GuardCompleteProfileWizardContent() {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (!mountedRef.current) return;
+      if (!isCurrent()) return;
 
       if (guardError) {
         setLoadError('Failed to load your profile. Please refresh and try again.');
       }
 
-      const isEditing = hasGuardWizardEditFlag(searchParams.get('edit'));
+      const isEditing = hasGuardWizardEditFlag(editParam);
 
       if (guardData?.profile_completed && !isEditing) {
         const ent = await ensureEntitlement(user.id, 'guard');
+        if (!isCurrent()) return;
         if (ent?.is_active) {
           if (isDashboardAllowedStatus(guardData.verification_status)) {
             router.push('/guard/dashboard');
@@ -276,12 +215,88 @@ function GuardCompleteProfileWizardContent() {
         setExistingData(initial);
       }
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!isCurrent()) return;
       setLoadError('An unexpected error occurred. Please refresh the page.');
     }
 
-    if (mountedRef.current) setLoading(false);
-  };
+    if (isCurrent()) setLoading(false);
+  }, [editParam, providerParam, router]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    let active = true;
+    const isCurrent = () => active && mountedRef.current;
+    setLoading(true);
+    setLoadError('');
+    let unsubscribe: (() => void) | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const initWizard = async () => {
+      timeoutId = setTimeout(() => {
+        if (!isCurrent()) return;
+        setLoadError('Loading timed out. Please refresh the page.');
+        setLoading(false);
+      }, 5000);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!isCurrent()) return;
+
+      if (!session?.user) {
+        if (timeoutId) clearTimeout(timeoutId);
+        const urlHasEdit = typeof window !== 'undefined' && window.location.search.includes('edit=1');
+        const editing = editParam === '1' || urlHasEdit;
+        if (editing) {
+          setGuardWizardEditFlag();
+          router.push('/guard/login?redirect=' + encodeURIComponent('/guard/complete-profile-wizard?edit=1'));
+        } else {
+          router.push('/guard/login');
+        }
+        return;
+      }
+
+      const user = session.user;
+      const [{ data: guardData }, { data: clientData }] = await Promise.all([
+        supabase.from('guards').select('id').eq('user_id', user.id).maybeSingle(),
+        supabase.from('clients').select('id').eq('user_id', user.id).maybeSingle(),
+      ]);
+
+      if (!isCurrent()) return;
+
+      if (!guardData && clientData) {
+        if (timeoutId) clearTimeout(timeoutId);
+        setRoleSwitch('client');
+        setLoading(false);
+        return;
+      }
+
+      setRoleSwitch('none');
+      await loadProfile(user, isCurrent);
+      if (timeoutId && isCurrent()) clearTimeout(timeoutId);
+    };
+
+    initWizard().catch(() => {
+      if (!isCurrent()) return;
+      if (timeoutId) clearTimeout(timeoutId);
+      setLoadError('An unexpected error occurred. Please refresh the page.');
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (!isCurrent()) return;
+      if (event === 'SIGNED_OUT') {
+        active = false;
+        router.push('/guard/login');
+      }
+    });
+
+    unsubscribe = () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      mountedRef.current = false;
+      if (unsubscribe) unsubscribe();
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [editParam, loadProfile, router]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

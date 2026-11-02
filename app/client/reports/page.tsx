@@ -179,7 +179,9 @@ export default function ClientReportsPage() {
   }, []);
 
   useEffect(() => {
-    setReportRange({ from: thirtyDaysAgo, to: today });
+    const to = new Date().toISOString().split('T')[0];
+    const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    setReportRange({ from, to });
     loadData();
   }, [loadData]);
 

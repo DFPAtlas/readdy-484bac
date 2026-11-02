@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -140,7 +140,7 @@ export default function AdvancedMatchingPage() {
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [guards, setGuards] = useState<MatchedGuard[]>([]);
+  const [rawGuards, setRawGuards] = useState<MatchedGuard[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [specialityFilter, setSpecialityFilter] = useState('all');
   const [experienceFilter, setExperienceFilter] = useState('all');
@@ -158,7 +158,8 @@ export default function AdvancedMatchingPage() {
   const [inviteJobId, setInviteJobId] = useState<string | null>(null);
   const [inviteMessage, setInviteMessage] = useState('');
 
-  const preferences = { speciality: specialityFilter, experience: experienceFilter, rate: rateFilter };
+  const preferences = useMemo(() => ({ speciality: specialityFilter, experience: experienceFilter, rate: rateFilter }), [specialityFilter, experienceFilter, rateFilter]);
+  const guards = useMemo(() => rawGuards.map(g => ({ ...g, match_score: computeMatchScore(g, preferences) })), [rawGuards, preferences]);
 
   const loadData = useCallback(async () => {
     setLoadError(false);
@@ -199,9 +200,9 @@ export default function AdvancedMatchingPage() {
       if (verifiedGuards) {
         const scored = verifiedGuards.map((g: any) => ({
           ...g,
-          match_score: computeMatchScore(g, preferences),
+          match_score: 0,
         }));
-        setGuards(scored);
+        setRawGuards(scored);
       }
 
       const { data: invites } = await supabase
@@ -220,10 +221,6 @@ export default function AdvancedMatchingPage() {
   }, [router]);
 
   useEffect(() => { loadData(); }, [loadData]);
-
-  useEffect(() => {
-    setGuards(prev => prev.map(g => ({ ...g, match_score: computeMatchScore(g, preferences) })));
-  }, [specialityFilter, experienceFilter, rateFilter]);
 
   useEffect(() => {
     if (!toast) return;

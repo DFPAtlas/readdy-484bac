@@ -1,7 +1,7 @@
 'use client';
 
 import ChecklistProgress from '../guard-verifications/ChecklistProgress';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import SIALicenceImage from '@/components/SIALicenceImage';
 
@@ -77,16 +77,29 @@ export default function GuardProfileDetailModal({ guard, onClose, onUpdate, onAf
     setTimeout(() => setToast(null), 3000);
   };
 
+  const scopeRef = useRef<{ id: string } | null>(null);
+  const reviewsRequestRef = useRef(0);
+  const payoutsRequestRef = useRef(0);
   useEffect(() => {
-    if (activeTab === 'reviews' && reviews.length === 0) fetchReviews();
-    if (activeTab === 'earnings' && payouts.length === 0) fetchPayouts();
-  }, [activeTab]);
+    const scope = { id: local.id };
+    scopeRef.current = scope;
+    setReviews([]);
+    setPayouts([]);
+    setReviewsError(null);
+    setPayoutsError(null);
+    return () => { if (scopeRef.current === scope) scopeRef.current = null; };
+  }, [local.id]);
 
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
+    const scope = scopeRef.current;
+    if (!scope || scope.id !== local.id) return;
+    const request = ++reviewsRequestRef.current;
+    const isCurrent = () => scopeRef.current === scope && reviewsRequestRef.current === request;
     setReviewsLoading(true);
     setReviewsError(null);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
+      if (!isCurrent()) return;
       const token = sessionData?.session?.access_token;
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/admin-guards`,
@@ -99,8 +112,10 @@ export default function GuardProfileDetailModal({ guard, onClose, onUpdate, onAf
           body: JSON.stringify({ action: 'get-reviews', guardId: local.id }),
         }
       );
+      if (!isCurrent()) return;
       if (res.ok) {
         const result = await res.json();
+        if (!isCurrent()) return;
         const reviewsArr = Array.isArray(result.data)
           ? result.data
           : Array.isArray(result)
@@ -114,17 +129,23 @@ export default function GuardProfileDetailModal({ guard, onClose, onUpdate, onAf
         setReviewsError('Failed to load reviews');
       }
     } catch (err: any) {
+      if (!isCurrent()) return;
       console.error('[GuardProfiles] Reviews fetch error:', err);
       setReviewsError(err?.message || 'Network error loading reviews');
     }
-    setReviewsLoading(false);
-  };
+    if (isCurrent()) setReviewsLoading(false);
+  }, [local.id]);
 
-  const fetchPayouts = async () => {
+  const fetchPayouts = useCallback(async () => {
+    const scope = scopeRef.current;
+    if (!scope || scope.id !== local.id) return;
+    const request = ++payoutsRequestRef.current;
+    const isCurrent = () => scopeRef.current === scope && payoutsRequestRef.current === request;
     setPayoutsLoading(true);
     setPayoutsError(null);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
+      if (!isCurrent()) return;
       const token = sessionData?.session?.access_token;
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/admin-guards`,
@@ -137,8 +158,10 @@ export default function GuardProfileDetailModal({ guard, onClose, onUpdate, onAf
           body: JSON.stringify({ action: 'get-payouts', guardId: local.id }),
         }
       );
+      if (!isCurrent()) return;
       if (res.ok) {
         const result = await res.json();
+        if (!isCurrent()) return;
         const payoutsArr = Array.isArray(result.data)
           ? result.data
           : Array.isArray(result)
@@ -152,11 +175,17 @@ export default function GuardProfileDetailModal({ guard, onClose, onUpdate, onAf
         setPayoutsError('Failed to load payouts');
       }
     } catch (err: any) {
+      if (!isCurrent()) return;
       console.error('[GuardProfiles] Payouts fetch error:', err);
       setPayoutsError(err?.message || 'Network error loading payouts');
     }
-    setPayoutsLoading(false);
-  };
+    if (isCurrent()) setPayoutsLoading(false);
+  }, [local.id]);
+
+  useEffect(() => {
+    if (activeTab === 'reviews') void fetchReviews();
+    if (activeTab === 'earnings') void fetchPayouts();
+  }, [activeTab, fetchReviews, fetchPayouts]);
 
   const handleApprove = async () => {
     setLoading('approve');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
@@ -54,26 +54,15 @@ export default function BankSettingsPage() {
 
   const [payoutHistory, setPayoutHistory] = useState<any[]>([]);
 
-  useEffect(() => {
-    checkAuthAndLoadData();
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('stripe_onboarding') === 'return') {
-      setToast({ message: 'Stripe setup complete! Your account is being verified.', type: 'success' });
-      refreshStripeStatus();
-    } else if (params.get('stripe_onboarding') === 'refresh') {
-      setToast({ message: 'Please complete your Stripe Express setup to receive payouts.', type: 'warning' });
-    }
-    if (window.location.search) {
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, []);
-
-  const checkAuthAndLoadData = async () => {
+  const mountedRef = useRef(false);
+  const requestRef = useRef(0);
+  const checkAuthAndLoadData = useCallback(async () => {
+    if (!mountedRef.current) return;
+    const request = ++requestRef.current;
+    const isCurrent = () => mountedRef.current && request === requestRef.current;
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!isCurrent()) return;
       if (!user) {
         router.push('/guard/login');
         return;
@@ -85,6 +74,7 @@ export default function BankSettingsPage() {
         .eq('user_id', user.id)
         .maybeSingle();
 
+      if (!isCurrent()) return;
       if (guard) {
         setGuardId(guard.id);
         setDisplayName(guard.full_name || 'Guard');
@@ -102,6 +92,7 @@ export default function BankSettingsPage() {
           .eq('guard_id', guard.id)
           .maybeSingle();
 
+        if (!isCurrent()) return;
         if (bankData) {
           setBankDetails({
             accountHolderName: bankData.account_holder || '',
@@ -124,6 +115,7 @@ export default function BankSettingsPage() {
         }
 
         const { data: { session } } = await supabase.auth.getSession();
+        if (!isCurrent()) return;
         try {
           const res = await fetch(
             `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-guard-stripe-status`,
@@ -137,7 +129,7 @@ export default function BankSettingsPage() {
           );
           if (res.ok) {
             const status = await res.json();
-            setConnectStatus(status);
+            if (isCurrent()) setConnectStatus(status);
           } else {
             console.error('get-guard-stripe-status failed:', res.status);
           }
@@ -145,6 +137,7 @@ export default function BankSettingsPage() {
           console.error('Error checking connect status:', err);
         }
 
+        if (!isCurrent()) return;
         const { data: payouts } = await supabase
           .from('guard_payouts')
           .select('*')
@@ -152,14 +145,33 @@ export default function BankSettingsPage() {
           .order('created_at', { ascending: false })
           .limit(10);
 
-        setPayoutHistory(payouts || []);
+        if (isCurrent()) setPayoutHistory(payouts || []);
       }
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    checkAuthAndLoadData();
+    return () => { mountedRef.current = false; };
+  }, [checkAuthAndLoadData]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('stripe_onboarding') === 'return') {
+      setToast({ message: 'Stripe setup complete! Your account is being verified.', type: 'success' });
+      refreshStripeStatus();
+    } else if (params.get('stripe_onboarding') === 'refresh') {
+      setToast({ message: 'Please complete your Stripe Express setup to receive payouts.', type: 'warning' });
+    }
+    if (window.location.search) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const formatSortCode = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 6);

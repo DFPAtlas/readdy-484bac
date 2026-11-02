@@ -44,31 +44,41 @@ export default function PlanManagementCard({ userId, audience }: { userId: strin
   const [cancelSuccess, setCancelSuccess] = useState(false);
   const [toastData, setToastData] = useState<{ show: boolean; oldPlanName: string; newPlanName: string }>({ show: false, oldPlanName: '', newPlanName: '' });
   const prevPlanSlug = useRef<string>('');
+  const prevPlanName = useRef('');
+  const contextKey = JSON.stringify([userId, audience]);
+  const lifetimeRef = useRef<{ key: string } | null>(null);
+  const requestRef = useRef(0);
 
   const load = useCallback(async () => {
+    const lifetime = lifetimeRef.current;
+    if (!lifetime || lifetime.key !== contextKey) return;
+    const request = ++requestRef.current;
+    const isCurrent = () => lifetimeRef.current === lifetime && requestRef.current === request;
     const { data: entData } = await supabase
       .from('user_entitlements_data')
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
 
+    if (!isCurrent()) return;
     const { data: subData } = await supabase
       .from('subscriptions')
       .select('stripe_subscription_id, plan_slug, current_period_end, cancel_at_period_end')
       .eq('user_id', userId)
       .maybeSingle();
 
+    if (!isCurrent()) return;
     if (entData) {
       const d = entData as EntitlementData;
       const newPlanSlug = d.plan_slug;
       const newPlanName = d.plan_name;
 
       if (prevPlanSlug.current && prevPlanSlug.current !== newPlanSlug && prevPlanSlug.current !== '') {
-        const oldPlan = allPlans.find(p => p.slug === prevPlanSlug.current);
-        setToastData({ show: true, oldPlanName: oldPlan?.name || prevPlanSlug.current, newPlanName: newPlanName });
+        setToastData({ show: true, oldPlanName: prevPlanName.current || prevPlanSlug.current, newPlanName: newPlanName });
       }
 
       prevPlanSlug.current = newPlanSlug;
+      prevPlanName.current = newPlanName;
 
       setSubscription({
         plan_name: newPlanName,
@@ -85,6 +95,7 @@ export default function PlanManagementCard({ userId, audience }: { userId: strin
         .select('name, monthly_price_pence')
         .eq('slug', subData.plan_slug || '')
         .maybeSingle();
+      if (!isCurrent()) return;
       setSubscription({
         plan_name: planData?.name || 'Unknown',
         plan_slug: subData.plan_slug || '',
@@ -103,13 +114,23 @@ export default function PlanManagementCard({ userId, audience }: { userId: strin
       .eq('active', true)
       .order('monthly_price_pence', { ascending: true });
 
+    if (!isCurrent()) return;
     if (planData) setAllPlans(planData as Plan[]);
     setLoading(false);
-  }, [userId, audience, allPlans]);
+  }, [userId, audience, contextKey]);
 
   useEffect(() => {
-    load();
-  }, []);
+    const lifetime = { key: contextKey };
+    lifetimeRef.current = lifetime;
+    prevPlanSlug.current = '';
+    prevPlanName.current = '';
+    setSubscription(null);
+    setAllPlans([]);
+    setLoading(true);
+    setToastData({ show: false, oldPlanName: '', newPlanName: '' });
+    void load();
+    return () => { if (lifetimeRef.current === lifetime) lifetimeRef.current = null; };
+  }, [contextKey, load]);
 
   useEffect(() => {
     if (!userId) return;

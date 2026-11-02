@@ -20,6 +20,8 @@ export default function GuardPromoCard({ guardId }: Props) {
   const [countdown, setCountdown] = useState<string>('');
 
   useEffect(() => {
+    let cancelled = false;
+    setPromo(null);
     async function loadPromo() {
       const { data } = await supabase
         .from('guards')
@@ -27,7 +29,7 @@ export default function GuardPromoCard({ guardId }: Props) {
         .eq('id', guardId)
         .maybeSingle();
 
-      if (data) {
+      if (!cancelled && data) {
         setPromo({
           tier: data.promo_tier || 'standard',
           signupNumber: data.signup_number || 0,
@@ -38,14 +40,16 @@ export default function GuardPromoCard({ guardId }: Props) {
       }
     }
 
-    loadPromo();
+    void loadPromo();
+    return () => { cancelled = true; };
   }, [guardId]);
 
+  const promoEndsAt = promo?.promoEndsAt;
   useEffect(() => {
-    if (!promo?.promoEndsAt) return;
+    if (!promoEndsAt) { setCountdown(''); return; }
 
+    const end = new Date(promoEndsAt).getTime();
     function updateCountdown() {
-      const end = new Date(promo!.promoEndsAt!).getTime();
       const now = Date.now();
       const diff = end - now;
 
@@ -62,7 +66,7 @@ export default function GuardPromoCard({ guardId }: Props) {
     updateCountdown();
     const interval = setInterval(updateCountdown, 60000);
     return () => clearInterval(interval);
-  }, [promo?.promoEndsAt]);
+  }, [promoEndsAt]);
 
   if (!promo || promo.tier === 'standard') return null;
 
