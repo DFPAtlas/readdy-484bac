@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
@@ -592,7 +594,7 @@ export default function AdvancedMatchingPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-12 rounded-full bg-[#162036] flex items-center justify-center flex-shrink-0 overflow-hidden border border-[#1e2d4d]">
                               {guard.profile_image_url ? (
-                                <img src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
+                                <QuickGuardImage src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
                               ) : (
                                 <i className="ri-user-line text-xl text-slate-500"></i>
                               )}
@@ -728,7 +730,7 @@ export default function AdvancedMatchingPage() {
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-[#162036] flex items-center justify-center flex-shrink-0 overflow-hidden border border-[#1e2d4d]">
                   {selectedGuard.profile_image_url ? (
-                    <img src={selectedGuard.profile_image_url} alt={selectedGuard.full_name} className="w-full h-full object-cover" />
+                    <QuickGuardImage src={selectedGuard.profile_image_url} alt={selectedGuard.full_name} className="w-full h-full object-cover" />
                   ) : (
                     <i className="ri-user-line text-2xl text-slate-500"></i>
                   )}
