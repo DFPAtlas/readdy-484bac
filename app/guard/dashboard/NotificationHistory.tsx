@@ -1,7 +1,7 @@
 'use client';
 
 import { normalizeJobLink } from '@/lib/job-links';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
@@ -140,32 +140,49 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const PER_PAGE = 15;
 
-  useEffect(() => {
-    fetchAll();
-    const channel = supabase
-      .channel(`notif-history-${guardUserId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'app', table: 'notifications', filter: `user_id=eq.${guardUserId}` }, (payload) => {
-        setNotifications(prev => [payload.new as Notification, ...prev]);
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'app', table: 'notifications', filter: `user_id=eq.${guardUserId}` }, (payload) => {
-        setNotifications(prev => prev.map(n => n.id === payload.new.id ? { ...n, ...(payload.new as Notification) } : n));
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+  const mountedRef = useRef(false);
+  const requestRef = useRef(0);
+  const fetchAll = useCallback(async () => {
+    if (!mountedRef.current || !guardUserId) return;
+    const request = ++requestRef.current;
+    const isCurrent = () => mountedRef.current && request === requestRef.current;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id, title, message, type, is_read, link, created_at, snoozed_until')
+        .eq('user_id', guardUserId)
+        .eq('user_type', 'guard')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (isCurrent() && !error) setNotifications(data || []);
+    } finally {
+      if (isCurrent()) setLoading(false);
+    }
   }, [guardUserId]);
 
-  const fetchAll = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('id, title, message, type, is_read, link, created_at, snoozed_until')
-      .eq('user_id', guardUserId)
-      .eq('user_type', 'guard')
-      .order('created_at', { ascending: false })
-      .limit(200);
-    if (!error) setNotifications(data || []);
-    setLoading(false);
-  };
+  useEffect(() => {
+    mountedRef.current = true;
+    let active = true;
+    setNotifications([]);
+    setPage(1);
+    setExpandedId(null);
+    setConfirmDeleteId(null);
+    setSnoozeOpenId(null);
+    setShowClearConfirm(false);
+    fetchAll();
+    const refresh = () => { if (active) fetchAll(); };
+    const channel = supabase
+      .channel(`notif-history-${guardUserId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'app', table: 'notifications', filter: `user_id=eq.${guardUserId}` }, refresh)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'app', table: 'notifications', filter: `user_id=eq.${guardUserId}` }, refresh)
+      .subscribe();
+    return () => {
+      active = false;
+      mountedRef.current = false;
+      supabase.removeChannel(channel);
+    };
+  }, [guardUserId, fetchAll]);
 
   const markAsRead = async (id: string) => {
     await supabase.from('notifications').update({ is_read: true }).eq('id', id);
