@@ -20,10 +20,6 @@ const WIZARD_STEPS = [
   { id: 6, title: 'Complete', description: 'Review', icon: 'ri-shield-check-line' }
 ];
 
-function safeRedirect(url: string) {
-  // no-op — use router.push instead to avoid breaking the iframe
-}
-
 const SECTION_MAP: Record<string, number> = {
   first_name: 2, last_name: 2, phone: 2,
   company_name: 3, industry: 3, company_size: 3, website: 3,

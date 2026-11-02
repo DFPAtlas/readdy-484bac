@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
@@ -44,7 +43,6 @@ function getStatusBadge(status: string | null) {
 }
 
 export default function AdminHeldPayments() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [allPayments, setAllPayments] = useState<HeldPayment[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -286,7 +284,6 @@ export default function AdminHeldPayments() {
   const paginatedPayments = filteredPayments.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const totalHeld = allPayments.reduce((sum, p) => sum + (Number(p.payment_amount) || 0), 0);
-  const totalFiltered = filteredPayments.reduce((sum, p) => sum + (Number(p.payment_amount) || 0), 0);
   const readyCount = allPayments.filter(p => p.payment_status === 'payout_pending').length;
   const awaitingCount = allPayments.filter(p => p.payment_status !== 'payout_pending').length;
 

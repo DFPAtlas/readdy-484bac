@@ -1,18 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
-
-interface ClientContact {
-  id: string;
-  client_id: string;
-  contact_type: string;
-  name: string;
-  role: string | null;
-  email: string | null;
-  phone: string | null;
-  is_default: boolean;
-}
 
 interface JobWithSafety {
   id: string;
@@ -33,13 +21,9 @@ interface EmergencyContactsPanelProps {
   onSaveJobContact: (jobId: string, field: string, value: string | null) => void;
 }
 
-export default function EmergencyContactsPanel({ jobs, clientId, onSaveJobContact }: EmergencyContactsPanelProps) {
+export default function EmergencyContactsPanel({ jobs, onSaveJobContact }: EmergencyContactsPanelProps) {
   const [selectedJob, setSelectedJob] = useState<string>(jobs[0]?.id || '');
   const [search, setSearch] = useState('');
-  const [clientContacts, setClientContacts] = useState<ClientContact[]>([]);
-  const [loadingContacts, setLoadingContacts] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newContact, setNewContact] = useState({ name: '', role: '', phone: '', email: '', contact_type: 'site' });
   const [editingJob, setEditingJob] = useState(false);
   const [jobForm, setJobForm] = useState<Record<string, string>>({});
 
@@ -49,35 +33,6 @@ export default function EmergencyContactsPanel({ jobs, clientId, onSaveJobContac
   );
 
   const job = jobs.find((j) => j.id === selectedJob) || filtered[0];
-
-  const loadContacts = async () => {
-    setLoadingContacts(true);
-    const { data } = await supabase
-      .from('client_contacts')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('created_at', { ascending: false });
-    setClientContacts((data || []) as ClientContact[]);
-    setLoadingContacts(false);
-  };
-
-  const addContact = async () => {
-    if (!newContact.name.trim()) return;
-    const { error } = await supabase.from('client_contacts').insert({
-      client_id: clientId,
-      name: newContact.name.trim(),
-      role: newContact.role.trim() || null,
-      phone: newContact.phone.trim() || null,
-      email: newContact.email.trim() || null,
-      contact_type: newContact.contact_type,
-      is_default: false,
-    });
-    if (!error) {
-      setNewContact({ name: '', role: '', phone: '', email: '', contact_type: 'site' });
-      setShowAddForm(false);
-      loadContacts();
-    }
-  };
 
   const startEditingJob = () => {
     if (!job) return;
@@ -100,10 +55,6 @@ export default function EmergencyContactsPanel({ jobs, clientId, onSaveJobContac
     });
     setEditingJob(false);
   };
-
-  const contactRows = (label: string, name: string | null, phone: string | null, email: string | null) => [
-    { label, name, phone, email },
-  ];
 
   return (
     <div className="space-y-4">

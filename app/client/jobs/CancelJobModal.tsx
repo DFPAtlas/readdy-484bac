@@ -38,7 +38,7 @@ const CONTACT_PREFS = [
 
 const ALLOWED_CANCEL_STATUSES = ['draft', 'open', 'pending', 'awaiting_guard_selection', 'awaiting_payment', 'in_progress'];
 
-export default function CancelJobModal({ job, clientId, onClose, onSuccess }: CancelJobModalProps) {
+export default function CancelJobModal({ job, onClose, onSuccess }: CancelJobModalProps) {
   const router = useRouter();
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
@@ -47,8 +47,6 @@ export default function CancelJobModal({ job, clientId, onClose, onSuccess }: Ca
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
-  const [showRefundModal, setShowRefundModal] = useState(false);
-
   const canCancel = ALLOWED_CANCEL_STATUSES.includes(job.status);
   const isCompleted = job.status === 'completed';
   const isDisputed = job.status === 'disputed';

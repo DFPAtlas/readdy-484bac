@@ -41,7 +41,7 @@ const STEPS = [
   },
 ];
 
-export default function JobStatusTracker({ status, applicationsCount, assignedGuards }: JobStatusTrackerProps) {
+export default function JobStatusTracker({ status }: JobStatusTrackerProps) {
   const isCancelled = status === 'cancelled';
   const isDisputed = status === 'disputed';
 

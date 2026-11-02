@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
@@ -109,7 +108,6 @@ function formatTime(dateStr: string) {
 }
 
 function ActivityLogContent() {
-  const router = useRouter();
   const { loading: authLoading, allowed } = useClientGuard();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -117,7 +115,7 @@ function ActivityLogContent() {
   const [filteredActivities, setFilteredActivities] = useState<ActivityEntry[]>([]);
   const [companyName, setCompanyName] = useState('Client');
   const [initials, setInitials] = useState('CL');
-  const [clientId, setClientId] = useState('');
+  const [, setClientId] = useState('');
   const [stats, setStats] = useState({
     total: 0,
     today: 0,

@@ -169,15 +169,6 @@ function formatDate(dateStr?: string) {
   });
 }
 
-function formatTime(timeStr?: string) {
-  if (!timeStr) return "N/A";
-  const [hours, minutes] = timeStr.split(":");
-  const hour = parseInt(hours);
-  const ampm = hour >= 12 ? "PM" : "AM";
-  const hour12 = hour % 12 || 12;
-  return `${hour12}:${minutes} ${ampm}`;
-}
-
 function calculateHours(startTime: string, endTime: string, startDate: string, endDate: string) {
     const start = new Date(`${startDate}T${startTime}`);
     const end = new Date(`${endDate || startDate}T${endTime}`);
@@ -214,8 +205,6 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [feeLoading, setFeeLoading] = useState(false);
   const [feeError, setFeeError] = useState<string | null>(null);
-  const invoiceRef = useRef<HTMLDivElement>(null);
-
   const generationRef = useRef(0);
   const paymentActiveRef = useRef(false);
   const pendingRequestRef = useRef<symbol | null>(null);
@@ -640,7 +629,6 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
   const bookingConfirmation = computeBookingConfirmation(job, job.job_assignments || []);
   const canPay = paymentStatus === "pending_payment" || paymentStatus === "not_required" || paymentStatus === "failed" || paymentStatus === "checkout_open";
   const hasReceipt = !!transaction?.receipt_url;
-  const hasInvoice = !!transaction?.invoice_url;
   const receiptUrl = transaction?.receipt_url || null;
   const invoiceUrl = transaction?.invoice_url || null;
 

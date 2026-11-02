@@ -39,10 +39,6 @@ function getFieldStep(fieldKey: string): number {
   return SECTION_MAP[fieldKey] || 4;
 }
 
-function safeRedirect(url: string) {
-  // no-op — use router.push instead to avoid breaking the iframe
-}
-
 function GuardCompleteProfileWizardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -120,8 +116,6 @@ function GuardCompleteProfileWizardContent() {
       const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
       const nameParts = fullName.split(' ');
       const firstName = user.user_metadata?.first_name || nameParts[0] || '';
-      const lastName = user.user_metadata?.last_name || nameParts.slice(1).join(' ') || '';
-
       setUserName(firstName || user.email?.split('@')[0] || 'there');
 
       const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture;

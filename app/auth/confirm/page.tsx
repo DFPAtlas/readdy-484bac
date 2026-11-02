@@ -16,7 +16,7 @@ import { getPendingBookingReturnPath } from '@/lib/pending-job-draft';
 function ConfirmContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
-  const [debugInfo, setDebugInfo] = useState('');
+  const [, setDebugInfo] = useState('');
   const searchParams = useSearchParams();
   const hasRun = useRef(false);
   const hasExchanged = useRef(false);
@@ -28,7 +28,6 @@ function ConfirmContent() {
 
     const handleRedirect = async (session: any) => {
       const metadataRole = session.user.user_metadata?.role || session.user.user_metadata?.user_type;
-      const userType = searchParams.get('type') || metadataRole || 'guard';
       const userId = session.user.id;
       const urlType = searchParams.get('type');
       const isNewUser = searchParams.get('new') === 'true';

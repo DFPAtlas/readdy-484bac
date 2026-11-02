@@ -39,9 +39,7 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showGuardDropdown, setShowGuardDropdown] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
-  const [showMegaMenu, setShowMegaMenu] = useState(false);
   const [showIndustriesDropdown, setShowIndustriesDropdown] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<LoggedInUser | null>(null);
@@ -51,7 +49,6 @@ export default function Header() {
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [showRoleSwitchModal, setShowRoleSwitchModal] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const megaMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileDropdownRef = useRef<HTMLLIElement>(null);
   const pathname = usePathname();
   const router = useSafeRouter();
@@ -199,13 +196,9 @@ export default function Header() {
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      if (currentScrollY < lastScrollY || currentScrollY < 10) {
-        setIsVisible(true);
-      } else if (currentScrollY > lastScrollY && currentScrollY > 100) {
-        setIsVisible(false);
+      if (currentScrollY > lastScrollY && currentScrollY > 100) {
         setShowGuardDropdown(false);
         setShowClientDropdown(false);
-        setShowMegaMenu(false);
         setShowIndustriesDropdown(false);
         setShowProfileDropdown(false);
       }
@@ -214,17 +207,6 @@ export default function Header() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
-
-  const handleMegaMenuEnter = () => {
-    if (megaMenuTimeoutRef.current) clearTimeout(megaMenuTimeoutRef.current);
-    setShowMegaMenu(true);
-  };
-
-  const handleMegaMenuLeave = () => {
-    megaMenuTimeoutRef.current = setTimeout(() => setShowMegaMenu(false), 200);
-  };
-
-  const handleMegaMenuLinkClick = () => setShowMegaMenu(false);
 
   const handleLinkClick = (e: React.MouseEvent) => {
     if (isMaintenanceMode) {
@@ -356,13 +338,6 @@ export default function Header() {
     { label: 'Corporate', icon: 'ri-building-2-line' },
     { label: 'Construction', icon: 'ri-hammer-line' },
     { label: 'Night Patrol', icon: 'ri-moon-line' },
-  ];
-
-  const venuePages = [
-    { label: 'Nightclubs', href: '/security-for-nightclubs' },
-    { label: 'Shops', href: '/security-for-shops' },
-    { label: 'Building Sites', href: '/security-for-building-sites' },
-    { label: 'Events', href: '/security-for-events' },
   ];
 
   const industryPages = [

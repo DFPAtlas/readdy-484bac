@@ -53,7 +53,6 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
   const isDisputed = job.status === 'disputed';
 
   const cancellationStatus = job.cancellation_status;
-  const cancellationReason = job.cancellation_reason;
   const hasRefundPending = job.refund_status === 'pending';
   const hasRefundApproved = paymentStatus === 'refunded' || job.payment_status === 'refunded' || job.refund_status === 'processed';
   const nextAction = nextJobAction({...job, payment_status: paymentStatus || job.payment_status});
@@ -103,12 +102,6 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
     } finally {
       setSavingTemplate(false);
     }
-  };
-
-  const handleRepost = () => {
-    const searchParams = new URLSearchParams();
-    if (job.venue_name) searchParams.set('site', job.venue_name);
-    router.push(`/client/post-job?${searchParams.toString()}`);
   };
 
   return (

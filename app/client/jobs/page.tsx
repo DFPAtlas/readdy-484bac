@@ -15,7 +15,6 @@ import QuickDuplicateModal from './QuickDuplicateModal';
 import { getAttentionItems } from './NeedsAttentionBadge';
 import SearchFilterBar from '../components/SearchFilterBar';
 import BulkActionBar from '../components/BulkActionBar';
-import { useRouter } from 'next/navigation';
 import { planLabel, paymentLabel, bookingLabels } from '@/lib/client-journey';
 
 interface Draft {
@@ -56,15 +55,6 @@ const STATUS_FILTERS: Record<string, string[]> = {
 };
 
 const STATUS_LABELS = bookingLabels;
-
-const PAYMENT_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  completed: 'Paid',
-  failed: 'Failed',
-  refunded: 'Refunded',
-  disputed: 'Disputed',
-  none: 'No Payment',
-};
 
 const JOB_SORT_OPTIONS = [
   { value: 'start_date_asc', label: 'Start Date Soonest' },
@@ -161,8 +151,7 @@ function buildCsvRows(jobs: ClientJob[], paymentMap: Record<string, string>): st
 }
 
 export default function JobManagement() {
-  const router = useRouter();
-  const { loading: authLoading, allowed, userId, clientData } = useClientGuard();
+  const { loading: authLoading, allowed, clientData } = useClientGuard();
   const clientId = clientData?.id || null;
   const companyName = clientData?.company_name || 'Client';
   const subscriptionTier = planLabel(clientData?.subscription_tier);

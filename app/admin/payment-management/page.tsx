@@ -62,7 +62,6 @@ export default function AdminPaymentManagementPage() {
   const [selectedGuardId, setSelectedGuardId] = useState('');
   const [testAmount, setTestAmount] = useState('100.00');
 
-  const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [snapshot, setSnapshot] = useState<StatusSnapshot | null>(null);

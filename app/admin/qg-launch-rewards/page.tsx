@@ -45,7 +45,6 @@ export default function AdminQGLaunchRewardsPage() {
   const [preAccountFilter, setPreAccountFilter] = useState('all');
   const [preAccountTokens, setPreAccountTokens] = useState<any[]>([]);
   const [preAccountLoading, setPreAccountLoading] = useState(false);
-  const [preAccountNote, setPreAccountNote] = useState('');
   const [showLinkModal, setShowLinkModal] = useState<string | null>(null);
   const [linkUserId, setLinkUserId] = useState('');
 
@@ -220,7 +219,7 @@ export default function AdminQGLaunchRewardsPage() {
     if (data.length === 0) return;
     const headers = Object.keys(data[0]).filter(k => k !== 'metadata').join(',');
     const rows = data.map((r: any) => {
-      const { metadata, ...rest } = r;
+      const rest = Object.fromEntries(Object.entries(r).filter(([key]) => key !== 'metadata'));
       return Object.values(rest).map(v => typeof v === 'string' ? `"${v.replace(/"/g, '""')}"` : v !== null ? v : '').join(',');
     });
     const csv = [headers, ...rows].join('\n');
@@ -433,7 +432,7 @@ export default function AdminQGLaunchRewardsPage() {
     setPreAccountLoading(false);
   };
 
-  const handlePreAccountAction = async (id: string, action: string, note?: string) => {
+  const handlePreAccountAction = async (id: string, action: string) => {
     setActionLoading(`pre_${id}`); setActionMsg(''); setActionErr('');
     try {
       const { data: { session } } = await supabase.auth.getSession();

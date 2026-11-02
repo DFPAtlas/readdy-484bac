@@ -2,7 +2,6 @@
 
 import { routeTicketToCommandCentre } from '@/lib/support-routing';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 interface ReplacementRequestModalProps {
@@ -44,7 +43,6 @@ export default function ReplacementRequestModal({
   onClose,
   onSuccess,
 }: ReplacementRequestModalProps) {
-  const router = useRouter();
   const [selectedAssignmentId, setSelectedAssignmentId] = useState(assignmentId || '');
   const [urgency, setUrgency] = useState('urgent');
   const [reason, setReason] = useState('no_show');
@@ -95,7 +93,6 @@ export default function ReplacementRequestModal({
       if (reqError) throw reqError;
 
       // If urgent or emergency, create a support ticket
-      let supportTicketId: string | null = null;
       if (createTicket && (urgency === 'urgent' || urgency === 'emergency')) {
         const { data: ticketData, error: ticketError } = await supabase
           .from('support_tickets')
@@ -116,7 +113,6 @@ export default function ReplacementRequestModal({
           console.error('[ReplacementRequestModal] Support ticket was not created', ticketError);
         }
         if (!ticketError && ticketData) {
-          supportTicketId = ticketData.id;
           // Same Command Centre hand-over as ordinary support tickets.
           const routed = await routeTicketToCommandCentre(ticketData.id);
           if (!routed.ok) console.warn('[ReplacementRequestModal] Command Centre sync pending for ticket', ticketData.id);
