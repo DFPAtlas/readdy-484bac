@@ -660,7 +660,7 @@ export default function PlatformFinancesClient() {
         setToast({ message: 'Cost added', type: 'success' });
       }
       setCostModalOpen(false);
-    } catch (err) {
+    } catch {
       setToast({ message: 'Failed to save cost', type: 'error' });
     } finally {
       setIsSavingCost(false);

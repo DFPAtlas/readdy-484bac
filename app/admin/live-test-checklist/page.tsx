@@ -514,7 +514,7 @@ export default function LiveTestChecklistPage() {
               {backfillResult.summary.dry_run && (
                 <p className="text-xs text-amber-400">
                   <i className="ri-information-line mr-1"></i>
-                  This was a preview — no data was written. Toggle "Dry run" off and click again to write coordinates.
+                  This was a preview — no data was written. Toggle &quot;Dry run&quot; off and click again to write coordinates.
                 </p>
               )}
             </div>

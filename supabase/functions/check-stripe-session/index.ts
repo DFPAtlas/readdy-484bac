@@ -151,7 +151,7 @@ serve(async (req) => {
     let guardVerificationStatus: string | null = null;
     let subscriptionUpdated = false;
     let entitlementSynced = false;
-    let dbErrors: string[] = [];
+    const dbErrors: string[] = [];
 
     if (isValidSubscription) {
       const subPayload: any = {

@@ -392,7 +392,7 @@ export default function PlanFeeRulesPage() {
                         />
                         <span className="text-sm text-slate-500">% of guard fees</span>
                       </div>
-                      <p className="text-xs text-slate-500">This is QuickGuard's revenue. Only this portion counts as platform income.</p>
+                      <p className="text-xs text-slate-500">This is QuickGuard&apos;s revenue. Only this portion counts as platform income.</p>
                     </div>
 
                     <div className="space-y-2">

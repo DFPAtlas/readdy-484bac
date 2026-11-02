@@ -18,7 +18,7 @@ export default function FooterExitPopupTestIcon() {
         const data = await res.json();
         const val = data?.settings?.exit_popup_test_icon_enabled;
         enabled = val === true || val === 'true';
-      } catch (_) {}
+      } catch {}
 
       if (cancelled) return;
 

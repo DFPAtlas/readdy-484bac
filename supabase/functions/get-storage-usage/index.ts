@@ -165,7 +165,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    let policyMap: Record<string, boolean> = {};
+    const policyMap: Record<string, boolean> = {};
 
     try {
       const rpcPolicies = await rpcCall(supabaseUrl, serviceRoleKey, "app", "get_storage_policies");
@@ -193,7 +193,7 @@ Deno.serve(async (req: Request) => {
 
       const nearLimit = limit && limit > 0 && stats.total_bytes > limit * 0.9;
 
-      let warnings: string[] = [];
+      const warnings: string[] = [];
 
       if ((name === "avatars" || name === "guard-profiles") && bucket?.public) {
         warnings.push("Public bucket — sensitive files may be exposed");

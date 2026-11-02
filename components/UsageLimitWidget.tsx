@@ -141,14 +141,14 @@ export default function UsageLimitWidget({
       {isAtLimit && (
         <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
           <p className="text-xs text-red-400 font-medium">
-            You've reached your monthly limit. Upgrade to {audience === 'guard' ? 'apply for more jobs' : 'post more jobs'}.
+            You&apos;ve reached your monthly limit. Upgrade to {audience === 'guard' ? 'apply for more jobs' : 'post more jobs'}.
           </p>
         </div>
       )}
       {isNearLimit && (
         <div className="mt-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
           <p className="text-xs text-amber-400 font-medium">
-            You're almost at your limit. Consider upgrading to avoid interruption.
+            You&apos;re almost at your limit. Consider upgrading to avoid interruption.
           </p>
         </div>
       )}

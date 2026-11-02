@@ -7,7 +7,7 @@ import Link from 'next/link';
 import GuardPromoBanner from './GuardPromoBanner';
 import TaxDisclaimerCheckbox from '@/components/TaxDisclaimerCheckbox';
 import RegisterMarketingPanel from '@/components/login/RegisterMarketingPanel';
-import RegisterFormCard from '@/components/login/RegisterFormCard';
+
 import BrandLogo from '@/components/BrandLogo';
 import SocialConsentNotice from '@/components/login/SocialConsentNotice';
 import QGExitIntentPopup from '@/components/qg-rewards/QGExitIntentPopup';

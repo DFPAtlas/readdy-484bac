@@ -326,7 +326,7 @@ export default function GuardGuidePage() {
                 <h2 className="text-2xl font-bold text-white">Find & Apply for Jobs</h2>
               </div>
             </div>
-            <p className="text-slate-400 mb-8 max-w-2xl">Once verified, browse available security jobs near you. Each listing shows everything you need to decide if it's the right fit.</p>
+            <p className="text-slate-400 mb-8 max-w-2xl">Once verified, browse available security jobs near you. Each listing shows everything you need to decide if it&apos;s the right fit.</p>
 
             <div className="grid grid-cols-4 gap-5 mb-8">
               {steps[2].cards!.map((card, i) => (

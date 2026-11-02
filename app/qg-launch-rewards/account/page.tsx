@@ -369,7 +369,7 @@ export default function QGLaunchAccountPage() {
                     </>
                   ) : (
                     <div className="bg-[#0B1933] border border-[#1a2b4a] rounded-xl p-4 mb-4 text-center">
-                      <p className="text-slate-400 text-sm mb-3">You don't have a referral code yet.</p>
+                      <p className="text-slate-400 text-sm mb-3">You don&apos;t have a referral code yet.</p>
                       <button
                         onClick={handleCreateReferralCode}
                         disabled={creatingRef}

@@ -40,7 +40,7 @@ export default function MobileAreaManagerHome() {
       <div className="flex-1 px-4 pb-24 space-y-5 pt-4">
         {/* Revenue Overview */}
         <div className="bg-gradient-to-br from-purple-600 to-purple-900 rounded-2xl p-5 shadow-lg">
-          <p className="text-purple-200 text-xs font-semibold uppercase tracking-wide mb-1">Today's Revenue</p>
+          <p className="text-purple-200 text-xs font-semibold uppercase tracking-wide mb-1">Today&apos;s Revenue</p>
           <p className="text-white text-4xl font-bold">£12,460</p>
           <p className="text-purple-300 text-sm mt-1">+8.4% vs yesterday</p>
           <div className="flex gap-3 mt-4">

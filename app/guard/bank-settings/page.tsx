@@ -1243,7 +1243,7 @@ export default function BankSettingsPage() {
             </div>
             <h3 className="text-xl font-bold text-white text-center mb-2">Remove Bank Account?</h3>
             <p className="text-slate-400 text-center mb-6">
-              This will remove your bank account details. You won't be able to receive payouts until you add a new account.
+              This will remove your bank account details. You won&apos;t be able to receive payouts until you add a new account.
             </p>
             <div className="flex gap-3">
               <button

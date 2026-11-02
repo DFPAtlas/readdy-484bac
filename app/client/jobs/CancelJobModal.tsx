@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { ClientJob } from '@/lib/client-types';
-import CancellationStatusBadge from './CancellationStatusBadge';
+
 import { useRouter } from 'next/navigation';
 
 interface CancelJobModalProps {

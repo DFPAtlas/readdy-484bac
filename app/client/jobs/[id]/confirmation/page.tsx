@@ -11,7 +11,7 @@ export async function generateStaticParams() {
     );
     const { data: jobs } = await supabase.from('jobs').select('id');
     if (jobs && jobs.length > 0) return jobs.map((job) => ({ id: job.id }));
-  } catch (_) { /* fallback for static export */ }
+  } catch { /* fallback for static export */ }
   return [{ id: '1' }, { id: '2' }, { id: '3' }];
 }
 

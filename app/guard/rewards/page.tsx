@@ -72,7 +72,7 @@ export default function GuardRewardsPage() {
       try {
         const { data: dashData } = await supabase.rpc('get_my_qg_token_dashboard', { user_uuid: user.id });
         if (dashData) setPreAccountData(dashData);
-      } catch (_) {}
+      } catch {}
 
       const today = new Date().toISOString().slice(0, 10);
       const { data: rateData } = await supabase.from('qg_invite_rate_limits').select('invite_count').eq('user_id', user.id).eq('date', today).maybeSingle();

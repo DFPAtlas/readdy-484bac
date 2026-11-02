@@ -134,14 +134,14 @@ export default function ContactClient() {
             <div className="w-4 h-4 flex items-center justify-center">
               <i className="ri-customer-service-2-line text-sm" />
             </div>
-            <span>We're here to help</span>
+            <span>We&apos;re here to help</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-5 leading-tight">
             Get in Touch with<br />
             <span className="text-teal-400">QuickGuard</span>
           </h1>
           <p className="text-slate-400 text-xl max-w-2xl mx-auto leading-relaxed">
-            Whether you're a guard, a client, or just curious — QuickGuard AI Support is available 24/7 for platform questions and common issues, and our UK team is here during business hours.
+            Whether you&apos;re a guard, a client, or just curious — QuickGuard AI Support is available 24/7 for platform questions and common issues, and our UK team is here during business hours.
           </p>
         </div>
       </section>
@@ -169,7 +169,7 @@ export default function ContactClient() {
         <div className="grid lg:grid-cols-5 gap-12">
           <div className="lg:col-span-2 space-y-8 pt-8">
             <div>
-              <h2 className="text-3xl font-bold text-white mb-3">Let's Talk</h2>
+              <h2 className="text-3xl font-bold text-white mb-3">Let&apos;s Talk</h2>
               <p className="text-slate-400 leading-relaxed">
                 Fill in the form and our UK team will get back to you during business hours. For instant platform help, QuickGuard AI Support is available 24/7.
               </p>

@@ -185,7 +185,7 @@ export default function ReplacementGuardSuggestions({
             <i className="ri-user-search-line text-2xl text-slate-600"></i>
           </div>
           {error && <p role="alert" className="text-sm text-red-400 mb-3">{error}</p>}
-          <p className="text-sm text-slate-500">Click "Find Replacements" to see available guards</p>
+          <p className="text-sm text-slate-500">Click &quot;Find Replacements&quot; to see available guards</p>
         </div>
       </div>
     );

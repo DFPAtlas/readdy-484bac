@@ -62,7 +62,7 @@ export default function PrivacyPolicy() {
                   1. Introduction
                 </h2>
                 <p className="text-slate-400 mb-4">
-                  QuickGuard.uk ("we", "our", "us") is committed to protecting and respecting your privacy. This Privacy Policy explains how we collect, use, store, and protect your personal data when you use our platform.
+                  QuickGuard.uk (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) is committed to protecting and respecting your privacy. This Privacy Policy explains how we collect, use, store, and protect your personal data when you use our platform.
                 </p>
 
                 <h3 className="text-xl font-semibold text-white mb-3">Who we are</h3>
@@ -79,7 +79,7 @@ export default function PrivacyPolicy() {
                   </p>
                 </div>
                 <p className="text-slate-400">
-                  This policy applies to all users of our platform, including security guards ("Guards") and clients ("Clients") who use our services to connect and book security services across the United Kingdom.
+                  This policy applies to all users of our platform, including security guards (&quot;Guards&quot;) and clients (&quot;Clients&quot;) who use our services to connect and book security services across the United Kingdom.
                 </p>
               </section>
 
@@ -197,7 +197,7 @@ export default function PrivacyPolicy() {
                       <li>✓ Store your Google data securely in our encrypted database</li>
                       <li>✓ Use your email only for QuickGuard-related communications</li>
                       <li>✓ Allow you to disconnect Google OAuth at any time</li>
-                      <li>✓ Comply with Google's API Services User Data Policy</li>
+                      <li>✓ Comply with Google&apos;s API Services User Data Policy</li>
                     </ul>
                   </div>
 
@@ -219,7 +219,7 @@ export default function PrivacyPolicy() {
                 <div className="bg-[#0e1628] border border-slate-700/50 p-4 rounded-xl mt-6">
                   <h4 className="font-semibold text-white mb-2">Revoking Google OAuth Access</h4>
                   <p className="text-sm text-slate-400 mb-3">
-                    You can revoke QuickGuard's access to your Google account at any time by visiting your Google Account settings.
+                    You can revoke QuickGuard&apos;s access to your Google account at any time by visiting your Google Account settings.
                   </p>
                   <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-teal-400 hover:text-teal-300 text-sm">
                     <i className="ri-external-link-line" />
@@ -230,7 +230,7 @@ export default function PrivacyPolicy() {
                 <div className="bg-amber-500/10 border border-amber-400/20 p-4 rounded-xl mt-4">
                   <h4 className="font-semibold text-amber-400 mb-2">Google API Services User Data Policy</h4>
                   <p className="text-sm text-slate-400">
-                    QuickGuard's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-teal-400 mx-1">Google API Services User Data Policy</a>, including the Limited Use requirements.
+                    QuickGuard&apos;s use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-teal-400 mx-1">Google API Services User Data Policy</a>, including the Limited Use requirements.
                   </p>
                 </div>
 
@@ -563,7 +563,7 @@ export default function PrivacyPolicy() {
                   <div className="mt-6 pt-4 border-t border-slate-700/50">
                     <h4 className="font-semibold text-teal-400 mb-2">Supervisory Authority</h4>
                     <p className="text-sm text-slate-400">
-                      You have the right to lodge a complaint with the Information Commissioner's Office (ICO) if you believe your data protection rights have been violated.
+                      You have the right to lodge a complaint with the Information Commissioner&apos;s Office (ICO) if you believe your data protection rights have been violated.
                     </p>
                     <a href="https://ico.org.uk/make-a-complaint/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-teal-400 hover:text-teal-300 mt-2 text-sm">
                       <i className="ri-external-link-line" />

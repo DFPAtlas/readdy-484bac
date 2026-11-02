@@ -64,7 +64,7 @@ export default function ClientMonitoringAlerts({ alerts }: AlertsProps) {
       </div>
       {alerts.length > 8 && (
         <p className="text-xs text-slate-500 pl-1">
-          +{alerts.length - 8} more alerts — filter by "Has Alerts" to see all
+          +{alerts.length - 8} more alerts — filter by &quot;Has Alerts&quot; to see all
         </p>
       )}
     </div>

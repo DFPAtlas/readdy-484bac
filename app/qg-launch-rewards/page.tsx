@@ -34,7 +34,7 @@ export default function QGLaunchRewardsPage() {
         const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/qg-public-launch-settings`);
         const data = await res.json();
         if (data?.settings) setSettings(data.settings);
-      } catch (_) {}
+      } catch {}
     }
     loadSettings();
   }, []);

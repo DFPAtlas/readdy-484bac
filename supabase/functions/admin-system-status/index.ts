@@ -173,7 +173,7 @@ Deno.serve(async (req: Request) => {
   });
 
   // --- Payment pipeline (app schema) ---
-  let pipelineCounts: Record<string, number> = {};
+  const pipelineCounts: Record<string, number> = {};
   try {
     const { data: statusRows, error: statusErr } = await app
       .from("job_assignments")

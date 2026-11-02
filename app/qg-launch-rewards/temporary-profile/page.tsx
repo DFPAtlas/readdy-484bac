@@ -301,7 +301,7 @@ export default function TemporaryProfilePage() {
                   className="mt-1 w-4 h-4 rounded border-[#1a2b4a] bg-[#0B1933] accent-teal-500"
                 />
                 <span className="text-xs text-slate-400 leading-relaxed">
-                  I'd like to receive email updates about the QuickGuard launch and QG Launch Rewards. (Optional)
+                  I&apos;d like to receive email updates about the QuickGuard launch and QG Launch Rewards. (Optional)
                 </span>
               </label>
             </div>

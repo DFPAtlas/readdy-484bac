@@ -83,7 +83,7 @@ function FindGuardContent() {
 
   const fetchGuards = async () => {
     setLoading(true);
-    let query = supabase
+    const query = supabase
       .from('guard_public_profiles')
       .select('id, full_name, profile_image_url, sia_verified, rating, total_reviews, hourly_rate, location, city, postcode_area, licence_types, years_experience, willing_to_travel, has_transport, bio, accepts_direct_bookings, preferred_venue_categories')
       .eq('verification_status', 'verified')

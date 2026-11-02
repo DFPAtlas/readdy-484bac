@@ -199,7 +199,7 @@ export function useGuardPaymentCentre() {
           lastCheckedAt: guard.stripe_last_checked_at,
         });
       }
-    } catch (err) {
+    } catch {
       setError('Failed to load payment data');
     } finally {
       setLoading(false);

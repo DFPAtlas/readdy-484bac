@@ -385,7 +385,7 @@ export default function AssignedGuardsSection({
                       {review.appearance && <p className="text-xs text-slate-500">Appearance: {review.appearance}/5</p>}
                       {review.reliability && <p className="text-xs text-slate-500">Reliability: {review.reliability}/5</p>}
                       {review.review_text && (
-                        <p className="text-xs text-slate-400 italic mt-1">"{review.review_text}"</p>
+                        <p className="text-xs text-slate-400 italic mt-1">&quot;{review.review_text}&quot;</p>
                       )}
                     </div>
                   )}

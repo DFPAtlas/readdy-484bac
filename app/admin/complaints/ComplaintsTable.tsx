@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+
 import { StatusBadge, SeverityBadge } from './ComplaintStatusBadge';
 
 interface Complaint {

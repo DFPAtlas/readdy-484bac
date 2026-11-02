@@ -1,7 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+
 
 interface EmptyDashboardProps {
   onPostJob: () => void;
@@ -18,7 +17,6 @@ export default function EmptyDashboard({
   isTrialActive,
   trialDaysLeft,
 }: EmptyDashboardProps) {
-  const router = useRouter();
 
   return (
     <div className="bg-white dark:bg-[#111d35] rounded-2xl border border-slate-200 dark:border-[#1e2d4d] shadow-sm p-6 mb-6">
@@ -38,14 +36,14 @@ export default function EmptyDashboard({
           <div className="inline-flex items-center gap-2 bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 rounded-xl px-4 py-2 mb-6">
             <i className="ri-gift-line text-violet-500"></i>
             <span className="text-sm font-semibold">
-              You're on the Free plan — publish up to 1 job per month
+              You&apos;re on the Free plan — publish up to 1 job per month
             </span>
           </div>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
           <button
-            onClick={() => router.push('/client/post-job')}
+            onClick={onPostJob}
             className="flex flex-col items-center gap-3 p-5 rounded-xl bg-teal-500 text-white hover:bg-teal-600 transition-colors cursor-pointer"
           >
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
@@ -58,7 +56,7 @@ export default function EmptyDashboard({
           </button>
 
           <button
-            onClick={() => router.push('/client/profile')}
+            onClick={onCompleteProfile}
             className="flex flex-col items-center gap-3 p-5 rounded-xl bg-slate-50 dark:bg-[#162036] border border-slate-200 dark:border-[#1e2d4d] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1a2642] transition-colors cursor-pointer"
           >
             <div className="w-10 h-10 bg-teal-500/10 rounded-lg flex items-center justify-center">
@@ -71,7 +69,7 @@ export default function EmptyDashboard({
           </button>
 
           <button
-            onClick={() => router.push('/client/support')}
+            onClick={onContactSupport}
             className="flex flex-col items-center gap-3 p-5 rounded-xl bg-slate-50 dark:bg-[#162036] border border-slate-200 dark:border-[#1e2d4d] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1a2642] transition-colors cursor-pointer"
           >
             <div className="w-10 h-10 bg-teal-500/10 rounded-lg flex items-center justify-center">

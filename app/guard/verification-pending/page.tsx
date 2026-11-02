@@ -172,7 +172,7 @@ export default function VerificationPendingPage() {
             <h1 className="text-3xl font-bold text-white mb-3">SIA License Verification in Progress</h1>
 
             <p className="text-lg text-slate-300 mb-2">
-              We're verifying your SIA license details
+              We&apos;re verifying your SIA license details
             </p>
 
             {userEmail && (
@@ -257,11 +257,11 @@ export default function VerificationPendingPage() {
               <ul className="space-y-2 text-sm text-slate-300">
                 <li className="flex items-start gap-2">
                   <i className="ri-checkbox-circle-line text-teal-400 mt-0.5 w-4 h-4 flex items-center justify-center"></i>
-                  <span>We'll verify your SIA license number with the official SIA database</span>
+                  <span>We&apos;ll verify your SIA license number with the official SIA database</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <i className="ri-checkbox-circle-line text-teal-400 mt-0.5 w-4 h-4 flex items-center justify-center"></i>
-                  <span>You'll receive an email notification once verification is complete</span>
+                  <span>You&apos;ll receive an email notification once verification is complete</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <i className="ri-checkbox-circle-line text-teal-400 mt-0.5 w-4 h-4 flex items-center justify-center"></i>
@@ -269,7 +269,7 @@ export default function VerificationPendingPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <i className="ri-checkbox-circle-line text-teal-400 mt-0.5 w-4 h-4 flex items-center justify-center"></i>
-                  <span>If there are any issues, we'll contact you via email</span>
+                  <span>If there are any issues, we&apos;ll contact you via email</span>
                 </li>
               </ul>
             </div>
@@ -295,10 +295,10 @@ export default function VerificationPendingPage() {
             <div className="bg-[#162036] border border-[#1e2d4d] rounded-xl p-5 mb-6 text-left">
               <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
                 <i className="ri-mail-send-line text-teal-400 w-5 h-5 flex items-center justify-center"></i>
-                Didn't receive the confirmation email?
+                Didn&apos;t receive the confirmation email?
               </h3>
               <p className="text-sm text-slate-400 mb-3">
-                Check your spam folder first. If it's not there, you can resend the verification email to <span className="text-slate-300 font-medium">{userEmail || 'your registered address'}</span>.
+                Check your spam folder first. If it&apos;s not there, you can resend the verification email to <span className="text-slate-300 font-medium">{userEmail || 'your registered address'}</span>.
               </p>
               <button
                 onClick={handleResendVerification}
@@ -363,11 +363,11 @@ export default function VerificationPendingPage() {
               </div>
               <div>
                 <p className="font-medium text-slate-200 mb-1">What if my verification fails?</p>
-                <p className="text-slate-400">You'll receive an email explaining the reason. You can then update your information or contact support for assistance.</p>
+                <p className="text-slate-400">You&apos;ll receive an email explaining the reason. You can then update your information or contact support for assistance.</p>
               </div>
               <div>
                 <p className="font-medium text-slate-200 mb-1">Can I use the platform while waiting?</p>
-                <p className="text-slate-400">You can log in and view your profile, but you'll need to complete verification before applying for jobs.</p>
+                <p className="text-slate-400">You can log in and view your profile, but you&apos;ll need to complete verification before applying for jobs.</p>
               </div>
             </div>
           </div>

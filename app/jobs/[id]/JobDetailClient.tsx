@@ -7,7 +7,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { JobPostingSchema } from "@/components/JobPostingSchema";
 import SimilarJobs from "./SimilarJobs";
-import { sendPushToUser } from "@/lib/push-notifications";
+
 import { formatDateOnly } from "@/lib/date-only";
 
 interface Job {

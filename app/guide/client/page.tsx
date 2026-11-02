@@ -315,7 +315,7 @@ export default function ClientGuidePage() {
                 <h2 className="text-2xl font-bold text-white">Review & Select Guards</h2>
               </div>
             </div>
-            <p className="text-slate-400 mb-8 max-w-2xl">When guards apply, you'll see their complete verified profiles. Review each applicant and choose the best fit for your job.</p>
+            <p className="text-slate-400 mb-8 max-w-2xl">When guards apply, you&apos;ll see their complete verified profiles. Review each applicant and choose the best fit for your job.</p>
 
             <div className="grid grid-cols-4 gap-5 mb-8">
               {steps[2].cards!.map((card, i) => (
@@ -492,7 +492,7 @@ export default function ClientGuidePage() {
                 </Link>
               </div>
               <p className="text-slate-500 text-sm mt-6">
-                Also check out the <Link href="/guide/guard" className="text-teal-400 hover:text-teal-300 underline cursor-pointer">Guard Guide</Link> if you're a security professional.
+                Also check out the <Link href="/guide/guard" className="text-teal-400 hover:text-teal-300 underline cursor-pointer">Guard Guide</Link> if you&apos;re a security professional.
               </p>
             </div>
           </div>

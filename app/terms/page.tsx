@@ -59,11 +59,11 @@ export default function Terms() {
                   1. Agreement to Terms
                 </h2>
                 <p className="text-slate-400 mb-4">
-                  By accessing and using QuickGuard.uk ("Platform"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not use our Platform.
+                  By accessing and using QuickGuard.uk (&quot;Platform&quot;), you agree to be bound by these Terms of Service (&quot;Terms&quot;). If you do not agree to these Terms, you may not use our Platform.
                 </p>
                 <div className="bg-teal-500/10 border border-teal-400/20 p-4 my-4 rounded-xl">
                   <p className="text-teal-400">
-                    <strong className="text-teal-300">Important:</strong> These Terms apply to both security guards ("Guards") and clients ("Clients") using our platform to connect and book security services.
+                    <strong className="text-teal-300">Important:</strong> These Terms apply to both security guards (&quot;Guards&quot;) and clients (&quot;Clients&quot;) using our platform to connect and book security services.
                   </p>
                 </div>
 
@@ -178,7 +178,7 @@ export default function Terms() {
                   6. Stripe Payment Terms
                 </h2>
                 <p className="text-slate-400 mb-4">
-                  All payments processed through QuickGuard.uk are handled by Stripe, Inc. and its affiliates ("Stripe"). By making a payment on our Platform, you agree to these Stripe-specific terms in addition to our general Payment Terms.
+                  All payments processed through QuickGuard.uk are handled by Stripe, Inc. and its affiliates (&quot;Stripe&quot;). By making a payment on our Platform, you agree to these Stripe-specific terms in addition to our general Payment Terms.
                 </p>
 
                 <h3 className="text-xl font-semibold text-white mb-3">Payment Authorisation:</h3>
@@ -222,9 +222,9 @@ export default function Terms() {
                 <div className="bg-purple-500/10 border border-purple-400/20 p-4 rounded-xl mb-4">
                   <ul className="space-y-2 text-slate-400 text-sm">
                     <li>• QuickGuard does not store your full credit or debit card details on our servers</li>
-                    <li>• All card data is encrypted and processed through Stripe's PCI DSS Level 1 certified infrastructure</li>
+                    <li>• All card data is encrypted and processed through Stripe&apos;s PCI DSS Level 1 certified infrastructure</li>
                     <li>• Stripe handles all payment authentication, including 3D Secure where required by your bank</li>
-                    <li>• You agree to Stripe's <a href="https://stripe.com/gb/legal/consumer" target="_blank" rel="noopener noreferrer" className="underline hover:text-purple-400">Consumer Terms of Service</a> and <a href="https://stripe.com/gb/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-purple-400">Privacy Policy</a></li>
+                    <li>• You agree to Stripe&apos;s <a href="https://stripe.com/gb/legal/consumer" target="_blank" rel="noopener noreferrer" className="underline hover:text-purple-400">Consumer Terms of Service</a> and <a href="https://stripe.com/gb/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-purple-400">Privacy Policy</a></li>
                   </ul>
                 </div>
 
@@ -237,7 +237,7 @@ export default function Terms() {
 
                 <h3 className="text-xl font-semibold text-white mb-3">Stripe Account Responsibility:</h3>
                 <p className="text-slate-400 mb-4">
-                  QuickGuard.uk relies on Stripe to process all financial transactions. While we maintain a commercial relationship with Stripe, we are not responsible for Stripe's service availability, processing errors, or changes to Stripe's own terms and policies. Any disputes regarding Stripe's core payment services should be directed to Stripe support in the first instance.
+                  QuickGuard.uk relies on Stripe to process all financial transactions. While we maintain a commercial relationship with Stripe, we are not responsible for Stripe&apos;s service availability, processing errors, or changes to Stripe&apos;s own terms and policies. Any disputes regarding Stripe&apos;s core payment services should be directed to Stripe support in the first instance.
                 </p>
 
                 <div className="bg-[#0e1628] border border-slate-700/50 p-4 rounded-xl">
@@ -265,8 +265,8 @@ export default function Terms() {
                     <li>• We receive your email address and basic profile information (name, profile photo)</li>
                     <li>• This data is used solely for account creation, authentication, and platform communication</li>
                     <li>• We do not access your Gmail, Google Drive, Calendar, or other Google services</li>
-                    <li>• You can revoke QuickGuard's access anytime via your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="underline hover:text-teal-400">Google Account permissions</a></li>
-                    <li>• By using Google Sign-In, you also agree to Google's <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-teal-400">Terms of Service</a> and <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-teal-400">Privacy Policy</a></li>
+                    <li>• You can revoke QuickGuard&apos;s access anytime via your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="underline hover:text-teal-400">Google Account permissions</a></li>
+                    <li>• By using Google Sign-In, you also agree to Google&apos;s <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-teal-400">Terms of Service</a> and <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-teal-400">Privacy Policy</a></li>
                   </ul>
                 </div>
 
@@ -278,9 +278,9 @@ export default function Terms() {
                   </p>
                   <ul className="space-y-2 text-slate-400 text-sm">
                     <li>• QuickGuard does not store your full credit card details on our servers</li>
-                    <li>• Payment information is encrypted and handled by Stripe's secure infrastructure</li>
-                    <li>• Stripe's services are subject to their <a href="https://stripe.com/gb/legal/consumer" target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-400">Terms of Service</a></li>
-                    <li>• Transaction data is processed in accordance with Stripe's <a href="https://stripe.com/gb/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-400">Privacy Policy</a></li>
+                    <li>• Payment information is encrypted and handled by Stripe&apos;s secure infrastructure</li>
+                    <li>• Stripe&apos;s services are subject to their <a href="https://stripe.com/gb/legal/consumer" target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-400">Terms of Service</a></li>
+                    <li>• Transaction data is processed in accordance with Stripe&apos;s <a href="https://stripe.com/gb/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-400">Privacy Policy</a></li>
                   </ul>
                   <p className="text-slate-400 mt-3 text-sm">
                     Full Stripe-specific terms are detailed in Section 6 above.
@@ -424,7 +424,7 @@ export default function Terms() {
                     </div>
                     <div className="flex items-start gap-2">
                       <i className="ri-bank-line text-amber-400 mt-0.5 flex-shrink-0"></i>
-                      <p><strong className="text-amber-300">QuickGuard:</strong> QuickGuard only collects platform service fees as its revenue. Funds held with Stripe for job payments are not QuickGuard revenue and are not subject to QuickGuard tax obligations. Stripe processes payments as a third-party processor and is not responsible for any user's tax obligations.</p>
+                      <p><strong className="text-amber-300">QuickGuard:</strong> QuickGuard only collects platform service fees as its revenue. Funds held with Stripe for job payments are not QuickGuard revenue and are not subject to QuickGuard tax obligations. Stripe processes payments as a third-party processor and is not responsible for any user&apos;s tax obligations.</p>
                     </div>
                   </div>
                 </div>
@@ -436,7 +436,7 @@ export default function Terms() {
 
                 <h3 className="text-xl font-semibold text-white mb-3">VAT:</h3>
                 <p className="text-slate-400 mb-4">
-                  QuickGuard's platform service fee may be subject to UK VAT at the applicable rate. Guard services are provided by the guards directly; VAT obligations on those services are the guard's responsibility. VAT estimates shown in dashboards are indicative only and not a substitute for professional accounting advice.
+                  QuickGuard&apos;s platform service fee may be subject to UK VAT at the applicable rate. Guard services are provided by the guards directly; VAT obligations on those services are the guard&apos;s responsibility. VAT estimates shown in dashboards are indicative only and not a substitute for professional accounting advice.
                 </p>
 
                 <div className="bg-[#0e1628] border border-slate-700/50 p-4 rounded-xl">

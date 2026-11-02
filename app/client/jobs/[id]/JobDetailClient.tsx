@@ -12,7 +12,7 @@ import ComplaintModal from './ComplaintModal';
 import RateGuardModal from '@/components/reviews/RateGuardModal';
 import LiveIndicator from '@/components/LiveIndicator';
 import { useClientGuard } from '@/hooks/useClientGuard';
-import { sendPushToUser } from '@/lib/push-notifications';
+
 import MessageGuardModal from './select-guards/MessageGuardModal';
 import { computeComplianceInfo, GuardComplianceData } from './compliance/useCompliance';
 import JobCompliancePanel from './compliance/JobCompliancePanel';

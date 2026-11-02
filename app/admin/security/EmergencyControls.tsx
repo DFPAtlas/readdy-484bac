@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 interface EmergencyAction {
@@ -74,7 +74,7 @@ export default function EmergencyControls({ settings, onSettingChange }: Props) 
       {lastAction && (
         <div className="mx-5 mt-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-2 flex items-center gap-2">
           <i className="ri-checkbox-circle-fill text-emerald-400"></i>
-          <p className="text-sm text-emerald-300">Action "{lastAction}" executed successfully</p>
+          <p className="text-sm text-emerald-300">Action &quot;{lastAction}&quot; executed successfully</p>
           <button onClick={() => setLastAction(null)} className="ml-auto text-emerald-400 hover:text-emerald-300 text-xs cursor-pointer"><i className="ri-close-line"></i></button>
         </div>
       )}

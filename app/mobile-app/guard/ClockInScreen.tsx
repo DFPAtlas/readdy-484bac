@@ -75,7 +75,7 @@ export default function ClockInScreen() {
     return () => clearInterval(t);
   }, [clockState]);
 
-  const requestLocation = useCallback((intent: 'in' | 'out') => {
+  const requestLocation = useCallback(() => {
     setClockState('locating');
     setLocationError(null);
 
@@ -88,7 +88,6 @@ export default function ClockInScreen() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude, accuracy } = pos.coords;
-        const dist = getDistanceMeters(latitude, longitude, activeShift.lat, activeShift.lng);
         setLocation({
           lat: latitude,
           lng: longitude,
@@ -290,7 +289,7 @@ export default function ClockInScreen() {
           <div className="pt-2">
             {clockState === 'idle' && (
               <button
-                onClick={() => requestLocation('in')}
+                onClick={() => requestLocation()}
                 className="w-full py-5 rounded-2xl bg-gradient-to-r from-teal-500 to-teal-600 text-white font-bold text-lg shadow-lg shadow-teal-500/30 cursor-pointer whitespace-nowrap active:scale-[0.98] transition-transform"
               >
                 <span className="flex items-center justify-center gap-3">
@@ -301,7 +300,7 @@ export default function ClockInScreen() {
             )}
             {clockState === 'clocked-in' && (
               <button
-                onClick={() => requestLocation('out')}
+                onClick={() => requestLocation()}
                 className="w-full py-5 rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 text-white font-bold text-lg shadow-lg shadow-red-500/30 cursor-pointer whitespace-nowrap active:scale-[0.98] transition-transform"
               >
                 <span className="flex items-center justify-center gap-3">

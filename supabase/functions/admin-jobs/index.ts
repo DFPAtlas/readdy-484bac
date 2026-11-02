@@ -127,9 +127,9 @@ serve(async (req) => {
     const jobs = (rawJobs || []) as any[];
     const jobIds = jobs.map((j: any) => j.id);
 
-    let appCountMap: Record<string, number> = {};
-    let pendingCountMap: Record<string, number> = {};
-    let assignCountMap: Record<string, number> = {};
+    const appCountMap: Record<string, number> = {};
+    const pendingCountMap: Record<string, number> = {};
+    const assignCountMap: Record<string, number> = {};
 
     if (jobIds.length > 0) {
       const [appsRes, pendingRes, assignRes] = await Promise.all([

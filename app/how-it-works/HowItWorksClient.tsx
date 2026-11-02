@@ -300,7 +300,7 @@ export default function HowItWorksClient() {
               Our 5-Step Process
             </h2>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-              From profile creation to secure payment — here's exactly how QuickGuard connects guards and clients
+              From profile creation to secure payment — here&apos;s exactly how QuickGuard connects guards and clients
             </p>
             <Link
               href="/how-it-works/clients"

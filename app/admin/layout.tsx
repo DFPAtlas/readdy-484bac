@@ -172,7 +172,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (adminLookup) {
           setAdminUser({ id: adminLookup.id, email: adminLookup.email });
         }
-      } catch (err) {
+      } catch {
         await supabase.auth.signOut();
         clearAdminAuthCache();
         if (typeof window !== 'undefined') {

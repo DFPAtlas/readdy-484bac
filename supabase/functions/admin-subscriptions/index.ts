@@ -139,7 +139,7 @@ serve(async (req) => {
     const subscriptions = (rawSubs || []) as any[];
 
     const userIds = [...new Set(subscriptions.map(s => s.user_id).filter(Boolean))];
-    let users: Record<string, any> = {};
+    const users: Record<string, any> = {};
     if (userIds.length > 0) {
       const { data: userData } = await supabase
         .from('users')
@@ -153,7 +153,7 @@ serve(async (req) => {
       .select('slug, name, audience, monthly_price_pence')
       .eq('active', true);
 
-    let statsTotal = count || 0;
+    const statsTotal = count || 0;
     let statsActive = 0;
     let statsPending = 0;
     let statsPastDue = 0;

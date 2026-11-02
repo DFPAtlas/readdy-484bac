@@ -49,7 +49,7 @@ export default function MaintenanceBannerPreview({ message }: Props) {
         </div>
 
         <h2 className={`text-2xl md:text-3xl font-bold mb-3 transition-colors duration-300 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-          We'll be back soon
+          We&apos;ll be back soon
         </h2>
         <p className={`text-base mb-6 max-w-md leading-relaxed transition-colors duration-300 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
           {displayMessage || "QuickGuard is currently undergoing scheduled maintenance. We're making things better and will be back online shortly."}

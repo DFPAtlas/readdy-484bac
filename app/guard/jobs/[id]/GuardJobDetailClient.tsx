@@ -203,7 +203,7 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
         if (error || data?.error) throw new Error('Unable to load this booking. Please retry or contact support.');
         jobData = data?.job ?? null;
         setJob(jobData);
-      } catch (error) {
+      } catch {
         if (!isCurrent()) return;
         setJob(null);
         setJobError('Unable to load this booking. Please retry or contact support.');

@@ -8,7 +8,7 @@ import { loadClientJobAssignments } from '@/lib/client-job-assignments';
 import type { ClientJob } from '@/lib/client-types';
 import Link from 'next/link';
 import { paymentLabel } from '@/lib/client-journey';
-import BookingStatusBadge from './BookingStatusBadge';
+
 import ReviewStatusBadge from '@/components/reviews/ReviewStatusBadge';
 import { formatDateOnly } from '@/lib/date-only';
 

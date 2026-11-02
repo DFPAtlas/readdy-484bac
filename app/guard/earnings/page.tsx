@@ -127,7 +127,7 @@
     }, [payoutsMap]);
 
     const filteredEarnings = useMemo(() => {
-      let filtered = earnings.filter(e => {
+      const filtered = earnings.filter(e => {
         const status = getEffectiveStatus(e);
         const matchesTab =
           activeTab === 'all' ||

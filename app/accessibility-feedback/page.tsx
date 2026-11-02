@@ -174,7 +174,7 @@ export default function AccessibilityFeedback() {
             Accessibility Feedback
           </h1>
           <p className="text-lg text-gray-700">
-            We're committed to making QuickGuard accessible to everyone. If you've encountered any accessibility barriers while using our website, please let us know so we can address them.
+            We&apos;re committed to making QuickGuard accessible to everyone. If you&apos;ve encountered any accessibility barriers while using our website, please let us know so we can address them.
           </p>
         </div>
 
@@ -213,7 +213,7 @@ export default function AccessibilityFeedback() {
                 <i className="ri-checkbox-circle-line w-6 h-6 flex items-center justify-center mr-2 text-green-600" aria-hidden="true"></i>
                 <span className="font-semibold text-lg">Thank you for your feedback!</span>
               </div>
-              <p className="mb-4">We've received your report and will review it shortly.</p>
+              <p className="mb-4">We&apos;ve received your report and will review it shortly.</p>
               {ticketId && (
                 <div className="bg-white border border-green-300 rounded-lg p-4">
                   <p className="text-sm text-green-700 mb-1">Your Reference Number:</p>

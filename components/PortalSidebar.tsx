@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
-import { hasFeature, CLIENT_FEATURE_KEYS, getAllClientFeatures } from '@/lib/entitlements';
+import { getAllClientFeatures } from '@/lib/entitlements';
 import { useSidebar } from '@/lib/SidebarContext';
 import type React from 'react';
 import NotificationBadge from '@/components/NotificationBadge';

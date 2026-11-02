@@ -26,6 +26,6 @@ for(const [path,marker,key] of [
 test('template image insertion runs once while callbacks and form objects change',async()=>{
  const source=fs.readFileSync('app/admin/email-templates/TemplateEditor.tsx','utf8');const body=source.slice(source.indexOf('  const editorRef ='),source.indexOf('  const insertVariable ='));
  const changes=[],handled=[];const r=harness('return function component({formData,onChange,imageToInsert,onImageInsertHandled}){'+body+'return {editorRef};}',{requestAnimationFrame:fn=>fn()});
- let props={formData:{body_html:'original'},imageToInsert:'<img>',onChange:v=>changes.push(v),onImageInsertHandled:()=>handled.push(true)};let api=r.render(props);api.editorRef.current={selectionStart:8,selectionEnd:8,focus(){},setSelectionRange(){}};await r.runEffects();assert.equal(changes.length,1);assert.equal(handled.length,1);
+ let props={formData:{body_html:'original'},imageToInsert:'<img>',onChange:v=>changes.push(v),onImageInsertHandled:()=>handled.push(true)};const api=r.render(props);api.editorRef.current={selectionStart:8,selectionEnd:8,focus(){},setSelectionRange(){}};await r.runEffects();assert.equal(changes.length,1);assert.equal(handled.length,1);
  props={...props,formData:changes[0],onChange:v=>changes.push(v),onImageInsertHandled:()=>handled.push(true)};r.render(props);await r.runEffects();assert.equal(changes.length,1);r.render({...props,imageToInsert:null});await r.runEffects();r.render(props);await r.runEffects();assert.equal(changes.length,2);assert.equal(handled.length,2);
 });

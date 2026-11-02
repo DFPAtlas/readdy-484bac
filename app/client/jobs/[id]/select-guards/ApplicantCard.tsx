@@ -2,7 +2,7 @@
 
 import { computeComplianceInfo, GuardComplianceData } from "../compliance/useCompliance";
 import GuardComplianceBadge from "../compliance/GuardComplianceBadge";
-import GuardComplianceSummary from "../compliance/GuardComplianceSummary";
+
 
 interface Guard {
   id: string;

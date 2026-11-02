@@ -78,7 +78,7 @@ function SubscriptionSummary({ guard }: { guard: GuardVerification }) {
             <i className="ri-vip-crown-line text-slate-500 text-lg w-5 h-5 flex items-center justify-center"></i>
           </div>
           <p className="text-slate-400 text-sm">No subscription on file</p>
-          <p className="text-slate-500 text-xs mt-0.5">This guard may be on a free tier or hasn't chosen a plan yet</p>
+          <p className="text-slate-500 text-xs mt-0.5">This guard may be on a free tier or hasn&apos;t chosen a plan yet</p>
         </div>
       )}
     </div>

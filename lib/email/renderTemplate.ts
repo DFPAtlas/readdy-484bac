@@ -49,7 +49,7 @@ export async function renderTemplate(
 }
 
 function applyVariables(template: RenderedTemplate, variables: Record<string, string>): RenderedTemplate {
-  let result = { ...template };
+  const result = { ...template };
   for (const [key, value] of Object.entries(variables)) {
     const placeholder = `{{${key}}}`;
     result.subject = result.subject.split(placeholder).join(value || '');

@@ -4,7 +4,7 @@ import { routeTicketToCommandCentre } from '@/lib/support-routing';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { logClientActivity, ACTIVITY_TYPES, ACTIVITY_CATEGORIES } from '@/lib/client-activity';
-import PriorityBadge, { getSuggestedPriority } from './PriorityBadge';
+import { getSuggestedPriority } from './PriorityBadge';
 
 interface CreateTicketModalProps {
   clientId: string;

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import MobileGuardHome from './MobileGuardHome';
 import ClockInScreen from './ClockInScreen';
-import MobileBottomNav from '../components/MobileBottomNav';
+
 
 export default function MobileGuardApp() {
   const [activeTab, setActiveTab] = useState('home');

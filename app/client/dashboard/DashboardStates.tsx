@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import ErrorState from '@/app/client/components/ErrorState';
-import LoadingSkeleton from '@/app/client/components/LoadingSkeleton';
-import PaymentRequiredState from '@/app/client/components/PaymentRequiredState';
-import EmptyState from '@/app/client/components/EmptyState';
+
+
+
+
 
 interface PaymentRequiredBannerProps {
   jobId: string;
@@ -142,7 +142,7 @@ export function DashboardErrorBanner({ message, onRetry }: DashboardErrorBannerP
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-red-400">Could not load dashboard data</p>
-        <p className="text-xs text-red-400/70">Some sections may be unavailable. Check your connection and try again.</p>
+        <p className="text-xs text-red-400/70">{message || 'Some sections may be unavailable. Check your connection and try again.'}</p>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <button

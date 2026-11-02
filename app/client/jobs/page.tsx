@@ -12,7 +12,7 @@ import JobDetailDrawer from './JobDetailDrawer';
 import CancelJobModal from './CancelJobModal';
 import EditJobModal from './EditJobModal';
 import QuickDuplicateModal from './QuickDuplicateModal';
-import NeedsAttentionBadge, { getAttentionItems } from './NeedsAttentionBadge';
+import { getAttentionItems } from './NeedsAttentionBadge';
 import SearchFilterBar from '../components/SearchFilterBar';
 import BulkActionBar from '../components/BulkActionBar';
 import { useRouter } from 'next/navigation';
@@ -323,9 +323,9 @@ export default function JobManagement() {
       setHasMore((count || 0) > JOBS_PER_PAGE);
 
       const jobIds = (jobsData || []).map((j: any) => j.id);
-      let pmap: Record<string, string> = {};
-      let cMap: Record<string, any> = {};
-      let rMap: Record<string, string> = {};
+      const pmap: Record<string, string> = {};
+      const cMap: Record<string, any> = {};
+      const rMap: Record<string, string> = {};
 
       if (jobIds.length > 0) {
         const [txRes, cancelRes, refundRes] = await Promise.all([

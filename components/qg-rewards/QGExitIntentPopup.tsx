@@ -137,7 +137,7 @@ export default function QGExitIntentPopup() {
         const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/qg-public-launch-settings`);
         const data = await res.json();
         if (data?.settings) setSettings(data.settings);
-      } catch (_) {}
+      } catch {}
       settingsLoadedRef.current = true;
     }
     loadSettings();
@@ -243,7 +243,7 @@ export default function QGExitIntentPopup() {
             onClick={closePopup}
             className="w-full mt-4 py-2.5 text-slate-500 hover:text-slate-300 text-sm transition-colors cursor-pointer whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-teal-400 rounded-lg"
           >
-            No thanks, I'll continue browsing
+            No thanks, I&apos;ll continue browsing
           </button>
         </div>
 

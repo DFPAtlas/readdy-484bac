@@ -280,7 +280,7 @@ export default function RateGuardModal({
           {/* Written Feedback */}
           <div className="space-y-2">
             <label className="text-sm font-semibold text-white">Written Feedback</label>
-            <p className="text-xs text-slate-500">This will be visible on the guard's public profile</p>
+            <p className="text-xs text-slate-500">This will be visible on the guard&apos;s public profile</p>
             <textarea
               value={reviewText}
               onChange={(e) => { if (e.target.value.length <= 500) setReviewText(e.target.value) }}
@@ -429,7 +429,7 @@ export default function RateGuardModal({
           {showEscalation && (
             <div className="bg-[#162036] border border-[#1e2d4d] rounded-xl p-4">
               <p className="text-sm font-semibold text-white mb-2">Message QuickGuard Support</p>
-              <p className="text-xs text-slate-500 mb-2">We'll look into your concern and reply within 24 hours.</p>
+              <p className="text-xs text-slate-500 mb-2">We&apos;ll look into your concern and reply within 24 hours.</p>
               <Link
                 href={`/client/support?new=general_support&job=${jobId}&guard=${guardId}`}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-teal-500 text-white rounded-lg text-xs font-semibold hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap"

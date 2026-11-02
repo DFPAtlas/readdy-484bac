@@ -397,7 +397,7 @@ export default function ClientLogin() {
 
           <div className="mt-6 text-center">
             <p className="text-sm text-[#AAB7C4]">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Link href={registerHref} className="font-medium transition-colors hover:text-[#3B82F6]" style={{ color: "#1DA1F2" }}>
                 Create account
               </Link>

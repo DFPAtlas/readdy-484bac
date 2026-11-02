@@ -261,7 +261,7 @@ export default function ExportDataModal({ clientId, userId, companyName, onClose
       ];
       if (rows.length > 5) lines.push(`... and ${rows.length - 5} more rows`);
       setPreview(lines.join("\n"));
-    } catch (e) {
+    } catch {
       setPreview("Failed to load preview.");
     }
   };
