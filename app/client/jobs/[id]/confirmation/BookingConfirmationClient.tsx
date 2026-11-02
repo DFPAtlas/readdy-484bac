@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -568,7 +570,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
                             <div key={a.id} className="flex items-center gap-3 p-3 bg-[#162036] rounded-xl border border-[#1e2d4d]">
                               <div className="w-10 h-10 rounded-full bg-[#111d35] flex items-center justify-center overflow-hidden border border-[#1e2d4d] flex-shrink-0">
                                 {g?.profile_photo_url ? (
-                                  <img src={g.profile_photo_url} alt={initials} className="w-full h-full object-cover" />
+                                  <QuickGuardImage src={g.profile_photo_url} alt={initials} className="w-full h-full object-cover" />
                                 ) : (
                                   <span className="text-teal-400 font-bold text-xs">{initials}</span>
                                 )}
