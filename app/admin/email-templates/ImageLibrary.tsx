@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -138,7 +140,7 @@ export default function ImageLibrary({ onInsertImage }: ImageLibraryProps) {
   };
 
   const handleInsert = (asset: EmailAsset) => {
-    const imgHtml = `<img src="${asset.public_url}" alt="QuickGuard image" width="600" style="width:100%;max-width:600px;height:auto;display:block;border:0;margin:0 auto;" />`;
+    const imgHtml = `<QuickGuardImage src="${asset.public_url}" alt="QuickGuard image" width="600" style="width:100%;max-width:600px;height:auto;display:block;border:0;margin:0 auto;" />`;
     onInsertImage(imgHtml);
     showToast('Image inserted into template');
   };
@@ -261,7 +263,7 @@ export default function ImageLibrary({ onInsertImage }: ImageLibraryProps) {
               className="bg-[#111d35] rounded-xl border border-[#1e2d4a] overflow-hidden hover:border-teal-500/30 hover:shadow-lg transition-all group"
             >
               <div className="aspect-video bg-[#0a1628] flex items-center justify-center overflow-hidden">
-                <img
+                <QuickGuardImage
                   src={asset.public_url}
                   alt={asset.file_name}
                   className="w-full h-full object-contain p-2"
