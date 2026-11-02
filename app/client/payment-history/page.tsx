@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -123,9 +123,130 @@ export default function ClientPaymentHistoryPage() {
   const [subscriptionTier, setSubscriptionTier] = useState('Free');
   const [initials, setInitials] = useState('CL');
 
-  useEffect(() => {
-    fetchUserAndPayments();
+  const mountedRef = useRef(false);
+  const authRequestRef = useRef(0);
+  const subscriptionRequestRef = useRef(0);
+  const jobsRequestRef = useRef(0);
+
+  const fetchSubscriptionPayments = useCallback(async (userId: string) => {
+    if (!mountedRef.current) return;
+    const request = ++subscriptionRequestRef.current;
+    const authRequest = authRequestRef.current;
+    const isCurrent = () => mountedRef.current && request === subscriptionRequestRef.current && authRequest === authRequestRef.current;
+    try {
+      const { data, error } = await supabase
+        .from('subscription_payments')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (!isCurrent()) return;
+      if (error) throw error;
+      setSubscriptionPayments(data || []);
+    } catch (error) {
+      console.error('Error fetching subscription payments:', error);
+    }
   }, []);
+
+  const fetchJobPayments = useCallback(async (userId: string) => {
+    if (!mountedRef.current) return;
+    const request = ++jobsRequestRef.current;
+    const authRequest = authRequestRef.current;
+    const isCurrent = () => mountedRef.current && request === jobsRequestRef.current && authRequest === authRequestRef.current;
+    try {
+      const { data: clientData } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (!isCurrent()) return;
+      if (!clientData) { setJobPayments([]); return; }
+
+      const { data: transactions, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('client_id', clientData.id)
+        .order('created_at', { ascending: false });
+
+      if (!isCurrent()) return;
+      if (error) throw error;
+      if (!transactions || transactions.length === 0) {
+        setJobPayments([]);
+        return;
+      }
+
+      const jobIds = transactions.map(t => t.job_id).filter(Boolean);
+      let jobsMap: Record<string, any> = {};
+      if (jobIds.length > 0) {
+        const { data: jobsData } = await supabase
+          .from('jobs')
+          .select('id, job_title, venue_city, start_date, start_time, end_time')
+          .in('id', jobIds);
+
+        if (jobsData) {
+          jobsMap = Object.fromEntries(jobsData.map(j => [j.id, j]));
+        }
+      }
+
+      const merged = transactions.map(t => ({
+        ...t,
+        jobs: jobsMap[t.job_id] || null,
+      }));
+
+      if (isCurrent()) setJobPayments(merged);
+    } catch (error) {
+      console.error('Error fetching job payments:', error);
+    }
+  }, []);
+
+  const fetchUserAndPayments = useCallback(async () => {
+    if (!mountedRef.current) return;
+    const request = ++authRequestRef.current;
+    const isCurrent = () => mountedRef.current && request === authRequestRef.current;
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!isCurrent()) return;
+      if (!user) return;
+
+      setUserId(user.id);
+
+      const { data: client } = await supabase
+        .from('clients')
+        .select('company_name, subscription_tier')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!isCurrent()) return;
+      if (client) {
+        setCompanyName(client.company_name || 'Client');
+        setSubscriptionTier(client.subscription_tier || 'Free');
+        const parts = (client.company_name || 'Client').trim().split(' ');
+        if (parts.length >= 2) {
+          setInitials(`${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase());
+        } else {
+          setInitials((client.company_name || 'Client').slice(0, 2).toUpperCase());
+        }
+      }
+
+      await Promise.all([
+        fetchSubscriptionPayments(user.id),
+        fetchJobPayments(user.id)
+      ]);
+    } catch (error) {
+      if (isCurrent()) setLoadError(true);
+    } finally {
+      if (isCurrent()) setLoading(false);
+    }
+  }, [fetchSubscriptionPayments, fetchJobPayments]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    fetchUserAndPayments();
+    return () => { mountedRef.current = false; };
+  }, [fetchUserAndPayments]);
 
   useEffect(() => {
     if (!userId) return;
@@ -162,104 +283,7 @@ export default function ClientPaymentHistoryPage() {
     return () => {
       channels.forEach(ch => supabase.removeChannel(ch));
     };
-  }, [userId]);
-
-  const fetchUserAndPayments = async () => {
-    setLoadError(false);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      setUserId(user.id);
-
-      const { data: client } = await supabase
-        .from('clients')
-        .select('company_name, subscription_tier')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (client) {
-        setCompanyName(client.company_name || 'Client');
-        setSubscriptionTier(client.subscription_tier || 'Free');
-        const parts = (client.company_name || 'Client').trim().split(' ');
-        if (parts.length >= 2) {
-          setInitials(`${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase());
-        } else {
-          setInitials((client.company_name || 'Client').slice(0, 2).toUpperCase());
-        }
-      }
-
-      await Promise.all([
-        fetchSubscriptionPayments(user.id),
-        fetchJobPayments(user.id)
-      ]);
-    } catch (error) {
-      setLoadError(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSubscriptionPayments = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('subscription_payments')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setSubscriptionPayments(data || []);
-    } catch (error) {
-      console.error('Error fetching subscription payments:', error);
-    }
-  };
-
-  const fetchJobPayments = async (userId: string) => {
-    try {
-      const { data: clientData } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (!clientData) return;
-
-      const { data: transactions, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('client_id', clientData.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      if (!transactions || transactions.length === 0) {
-        setJobPayments([]);
-        return;
-      }
-
-      const jobIds = transactions.map(t => t.job_id).filter(Boolean);
-      let jobsMap: Record<string, any> = {};
-      if (jobIds.length > 0) {
-        const { data: jobsData } = await supabase
-          .from('jobs')
-          .select('id, job_title, venue_city, start_date, start_time, end_time')
-          .in('id', jobIds);
-
-        if (jobsData) {
-          jobsMap = Object.fromEntries(jobsData.map(j => [j.id, j]));
-        }
-      }
-
-      const merged = transactions.map(t => ({
-        ...t,
-        jobs: jobsMap[t.job_id] || null,
-      }));
-
-      setJobPayments(merged);
-    } catch (error) {
-      console.error('Error fetching job payments:', error);
-    }
-  };
+  }, [userId, fetchSubscriptionPayments, fetchJobPayments]);
 
   const calculateHours = (startTime: string, endTime: string, startDate: string, endDate: string | null) => {
     const start = new Date(`${startDate}T${startTime}`);
