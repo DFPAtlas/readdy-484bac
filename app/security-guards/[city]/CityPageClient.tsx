@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState } from 'react';
 import Link from 'next/link';
 import NavSidebar from '@/components/NavSidebar';
@@ -40,7 +42,7 @@ export default function CityPageClient({ data }: { data: CityData }) {
         }}
         aria-labelledby="city-hero-heading"
       >
-        <img src={data.heroImage} alt={data.heroImageAlt} title={`SIA licensed security guards in ${data.city}`} className="sr-only" />
+        <QuickGuardImage src={data.heroImage} alt={data.heroImageAlt} title={`SIA licensed security guards in ${data.city}`} className="sr-only" />
         <div className="w-full max-w-7xl mx-auto px-6 md:px-8">
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 bg-teal-500/15 border border-teal-400/30 text-teal-300 px-4 py-1.5 rounded-full text-sm font-medium mb-6">
@@ -109,7 +111,7 @@ export default function CityPageClient({ data }: { data: CityData }) {
               </div>
             </div>
             <div className="rounded-2xl overflow-hidden border border-slate-700/50">
-              <img
+              <QuickGuardImage
                 src={data.heroImage}
                 alt={`SIA licensed security guard on duty in ${data.city}`}
                 title={`SIA licensed security guard on duty in ${data.city}`}
