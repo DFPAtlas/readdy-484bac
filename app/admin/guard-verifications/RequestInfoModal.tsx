@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useMemo } from 'react';
 import { GuardVerification, getMissingProfileItems } from './types';
 import { supabase } from '@/lib/supabase';
@@ -186,7 +188,7 @@ export default function RequestInfoModal({ guard, onClose, onSent }: RequestInfo
           <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
             <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200 flex-shrink-0">
               {guard.profile_image_url ? (
-                <img src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
+                <QuickGuardImage src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-teal-100 to-sky-100">
                   <i className="ri-user-line text-teal-600"></i>
