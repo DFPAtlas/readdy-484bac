@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -149,7 +151,7 @@ export default function FoundingGuardsWall() {
                 >
                   <div className={`w-14 h-14 mx-auto rounded-full ${style.bg} flex items-center justify-center mb-3 overflow-hidden`}>
                     {guard.profile_image_url ? (
-                      <img
+                      <QuickGuardImage
                         src={guard.profile_image_url}
                         alt={guard.full_name}
                         className="w-full h-full object-cover"
