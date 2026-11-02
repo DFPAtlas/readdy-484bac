@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { supabase } from '@/lib/supabase';
@@ -45,7 +45,6 @@ interface Job {
 export default function JobsClient() {
   const router = useSafeRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -69,22 +68,12 @@ export default function JobsClient() {
   const [myApplications, setMyApplications] = useState<Record<string, string>>({});
   const [clientProfile, setClientProfile] = useState<any>(null);
 
+  const mountedRef = useRef(false);
+  const requestRef = useRef(0);
   useEffect(() => {
-    fetchJobs();
-    checkGuardSession();
-    checkClientSession();
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const id = params.get('id');
-      if (id) {
-        window.location.replace(`/jobs/detail?id=${encodeURIComponent(id)}`);
-      }
-    }
-  }, [showExpired]);
-
-  useEffect(() => {
-    applyFilters();
-  }, [jobs, searchQuery, siaRequired, uniformRequired, selectedUrgency, selectedCity, selectedSiaType, dateFrom, dateTo, sortBy, minRate, showExpired, foundingClientsOnly, myApplications]);
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -94,39 +83,38 @@ export default function JobsClient() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const checkClientSession = async () => {
+  const checkClientSession = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!mountedRef.current || !session) return;
       const { data: clientData } = await supabase
         .from('clients')
         .select('id')
         .eq('user_id', session.user.id)
         .maybeSingle();
-      if (clientData) {
+      if (mountedRef.current && clientData) {
         setClientProfile(clientData);
       }
     } catch (e) {
       console.error(e);
     }
-  };
-
-  const checkGuardSession = async () => {
+  }, []);
+  const checkGuardSession = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!mountedRef.current || !session) return;
       const { data: guardData } = await supabase
         .from('guards')
         .select('id, verification_status, licence_types, sia_licence_number, sia_verified')
         .eq('user_id', session.user.id)
         .maybeSingle();
-      if (guardData) {
+      if (mountedRef.current && guardData) {
         setGuardProfile(guardData);
         const { data: apps } = await supabase
           .from('job_applications')
           .select('job_id, status')
           .eq('guard_id', guardData.id);
-        if (apps) {
+        if (mountedRef.current && apps) {
           const map: Record<string, string> = {};
           apps.forEach((a: any) => { map[a.job_id] = a.status; });
           setMyApplications(map);
@@ -135,9 +123,11 @@ export default function JobsClient() {
     } catch (e) {
       console.error(e);
     }
-  };
-
-  const fetchJobs = async () => {
+  }, []);
+  const fetchJobs = useCallback(async () => {
+    if (!mountedRef.current) return;
+    const request = ++requestRef.current;
+    const isCurrent = () => mountedRef.current && request === requestRef.current;
     setLoading(true);
     setLoadError(false);
     try {
@@ -177,6 +167,7 @@ export default function JobsClient() {
 
       const { data, error } = await query;
 
+      if (!isCurrent()) return;
       if (error) {
         console.error('Error fetching jobs:', error);
         throw error;
@@ -184,6 +175,7 @@ export default function JobsClient() {
 
       const jobList = ((data || []) as unknown) as Job[];
       setJobs(jobList);
+      setApplicantCounts({});
 
       if (jobList.length > 0) {
         const jobIds = jobList.map((j) => j.id);
@@ -192,7 +184,7 @@ export default function JobsClient() {
           .select('job_id')
           .in('job_id', jobIds);
 
-        if (appData) {
+        if (isCurrent() && appData) {
           const counts: Record<string, number> = {};
           appData.forEach((row: { job_id: string }) => {
             counts[row.job_id] = (counts[row.job_id] || 0) + 1;
@@ -201,15 +193,28 @@ export default function JobsClient() {
         }
       }
     } catch (error) {
+      if (!isCurrent()) return;
       console.error('Error fetching jobs:', error);
       setLoadError(true);
       setJobs([]);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  };
+  }, [showExpired]);
 
-  const applyFilters = () => {
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
+
+  useEffect(() => {
+    checkGuardSession();
+    checkClientSession();
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    if (id) window.location.replace(`/jobs/detail?id=${encodeURIComponent(id)}`);
+  }, [checkGuardSession, checkClientSession]);
+
+  const filteredJobs = useMemo(() => {
     let filtered = [...jobs];
 
     if (searchQuery) {
@@ -287,8 +292,8 @@ export default function JobsClient() {
       return 0;
     });
 
-    setFilteredJobs(filtered);
-  };
+    return filtered;
+  }, [jobs, searchQuery, siaRequired, uniformRequired, selectedUrgency, selectedCity, selectedSiaType, dateFrom, dateTo, sortBy, minRate, foundingClientsOnly]);
 
   const clearFilters = () => {
     setSearchQuery('');
