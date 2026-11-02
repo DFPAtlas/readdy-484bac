@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { GuardVerification, getSiaCheckStatusBadge } from './types';
 
 interface GuardHeaderCardProps {
@@ -15,7 +17,7 @@ export default function GuardHeaderCard({ guard, hasLicenceImages }: GuardHeader
       <div className="flex items-start gap-4">
         <div className="w-20 h-20 rounded-full overflow-hidden bg-[#0a1628] flex-shrink-0 border-4 border-[#1a2b4a] shadow-lg">
           {guard.profile_image_url ? (
-            <img src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
+            <QuickGuardImage src={guard.profile_image_url} alt={guard.full_name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-teal-500/20 to-sky-500/20">
               <i className="ri-user-line text-3xl text-teal-400 w-8 h-8 flex items-center justify-center"></i>
