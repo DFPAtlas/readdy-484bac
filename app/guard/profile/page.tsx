@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -239,9 +241,9 @@ function ProfileContent() {
             <div className="flex items-start gap-6">
               <div className="relative">
                 {resolvedPhotoUrl ? (
-                  <img src={resolvedPhotoUrl} alt="" className="w-24 h-24 rounded-2xl object-cover object-top border border-[#1e2d4d]" />
+                  <QuickGuardImage src={resolvedPhotoUrl} alt="" className="w-24 h-24 rounded-2xl object-cover object-top border border-[#1e2d4d]" />
                 ) : profile.profile_image_url ? (
-                  <img src={profile.profile_image_url} alt="" className="w-24 h-24 rounded-2xl object-cover object-top border border-[#1e2d4d]" />
+                  <QuickGuardImage src={profile.profile_image_url} alt="" className="w-24 h-24 rounded-2xl object-cover object-top border border-[#1e2d4d]" />
                 ) : (
                   <div className="w-24 h-24 rounded-2xl bg-teal-500 flex items-center justify-center text-white text-2xl font-bold border border-[#1e2d4d]">
                     {initials}
@@ -443,7 +445,7 @@ function ProfileContent() {
                         <div className="space-y-3">
                           {siaFrontPreview ? (
                             <div className="bg-[#0B1933] rounded-xl overflow-hidden border border-[#1e2d4d]">
-                              <img src={siaFrontPreview} alt="Front preview" className="w-full h-auto max-h-[200px] object-contain" />
+                              <QuickGuardImage src={siaFrontPreview} alt="Front preview" className="w-full h-auto max-h-[200px] object-contain" />
                             </div>
                           ) : profile.sia_licence_front_url ? (
                             <SIALicenceImage path={profile.sia_licence_front_url} label="Front of Licence" className="border border-[#1e2d4d] rounded-xl" />
@@ -484,7 +486,7 @@ function ProfileContent() {
                         <div className="space-y-3">
                           {siaBackPreview ? (
                             <div className="bg-[#0B1933] rounded-xl overflow-hidden border border-[#1e2d4d]">
-                              <img src={siaBackPreview} alt="Back preview" className="w-full h-auto max-h-[200px] object-contain" />
+                              <QuickGuardImage src={siaBackPreview} alt="Back preview" className="w-full h-auto max-h-[200px] object-contain" />
                             </div>
                           ) : profile.sia_licence_back_url ? (
                             <SIALicenceImage path={profile.sia_licence_back_url} label="Back of Licence" className="border border-[#1e2d4d] rounded-xl" />
