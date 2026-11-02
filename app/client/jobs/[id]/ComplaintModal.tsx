@@ -1,5 +1,7 @@
 'use client';
 
+import QuickGuardImage from '@/components/QuickGuardImage';
+
 import { routeTicketToCommandCentre } from '@/lib/support-routing';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -191,7 +193,7 @@ export default function ComplaintModal({
                         }`}
                       >
                         {photo ? (
-                          <img src={photo} alt={name} className="w-9 h-9 rounded-full object-cover object-top" />
+                          <QuickGuardImage src={photo} alt={name} className="w-9 h-9 rounded-full object-cover object-top" />
                         ) : (
                           <div className="w-9 h-9 rounded-full bg-[#162036] flex items-center justify-center text-teal-400 font-bold text-sm">
                             {name.slice(0, 2).toUpperCase()}
