@@ -105,7 +105,7 @@ export default function TeamAccessClient() {
       setAdminFeatures(features);
 
       const { data: configs, error: configsErr } = await supabase
-        .schema('public')
+        .schema('app')
         .from('team_member_configs')
         .select('id, member_user_id, enabled_features')
         .eq('admin_user_id', authUser.id);
@@ -204,7 +204,7 @@ export default function TeamAccessClient() {
     setError(null);
 
     const { data: insertData, error: insertErr } = await supabase
-      .schema('public')
+      .schema('app')
       .from('team_member_configs')
       .insert({
         admin_user_id: userId,
@@ -265,7 +265,7 @@ export default function TeamAccessClient() {
     ));
 
     const { error: updateErr } = await supabase
-      .schema('public')
+      .schema('app')
       .from('team_member_configs')
       .update({ enabled_features: newFeatures })
       .eq('id', configId);
@@ -285,7 +285,7 @@ export default function TeamAccessClient() {
     setError(null);
 
     const { error: deleteErr } = await supabase
-      .schema('public')
+      .schema('app')
       .from('team_member_configs')
       .delete()
       .eq('id', configId);
