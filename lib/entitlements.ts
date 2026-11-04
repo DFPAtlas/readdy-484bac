@@ -158,7 +158,7 @@ export async function hasFeature(userId: string, featureKey: FeatureKey): Promis
   if (features.includes(featureKey)) return true;
 
   const { data: teamConfig } = await supabase
-    .schema('public')
+    .schema('app')
     .from('team_member_configs')
     .select('admin_user_id, enabled_features')
     .eq('member_user_id', userId)
@@ -300,7 +300,7 @@ export async function getAllClientFeaturesFromEntitlement(
   let teamFeatures: string[] = [];
   try {
     const { data: teamConfig } = await supabase
-      .schema('public')
+      .schema('app')
       .from('team_member_configs')
       .select('admin_user_id, enabled_features')
       .eq('member_user_id', userId)
