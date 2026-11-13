@@ -472,6 +472,26 @@ Check each item, note any issues in the "Result" column.
      Result: ___
 
 
+18. ACCOUNT CLOSURE
+-------------------
+18.1 Verify that a pre-closure client session cannot renew
+     Setup: Create a disposable client with no bookings or Stripe subscription.
+     Sign in as that client in two independent browser profiles and confirm
+     both can open the Client Dashboard.
+     Steps: Close the account in the first browser via Profile > Data & Privacy.
+     Keep the second browser open and signed in during closure. Revisit the
+     dashboard, then leave the tab active until the app attempts to renew its
+     session. Check the corresponding Supabase Auth result.
+     Expected: The second browser cannot access the Client Dashboard or load
+     protected client data. Supabase rejects the refresh attempt and issues no
+     new session tokens.
+     Evidence: Record closure and refresh times (UTC), the dashboard outcome
+     and the Auth status or error. If no refresh attempt is observed, leave
+     session renewal pending.
+     Result: Pending. The 13 Nov 2026 dashboard check passed (redirected to
+     the homepage). Session renewal was not observed.
+
+
 =================================================================
 NOTES
 =================================================================
