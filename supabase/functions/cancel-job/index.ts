@@ -18,7 +18,7 @@ serve(async (req) => {
     if (authError || !user) return respond({ error: 'Unauthorized' }, 401);
     const body = await req.json();
     if (body.cancelledBy !== 'client' || !body.jobId) return respond({ error: 'Client cancellation and jobId required' }, 400);
-    const { data, error } = await client.rpc('cancel_client_job', { p_job_id: body.jobId, p_reason: body.reason || null, p_notes: body.notes || null, p_resolution: body.preferredResolution || null, p_contact: body.contactPreference || null });
+    const { data, error } = await client.schema('app').rpc('cancel_client_job', { p_job_id: body.jobId, p_reason: body.reason || null, p_notes: body.notes || null, p_resolution: body.preferredResolution || null, p_contact: body.contactPreference || null });
     if (error) return respond({ error: error.message }, 400);
     return respond(data, 200);
   } catch {
