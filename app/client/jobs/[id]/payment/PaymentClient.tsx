@@ -437,27 +437,6 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
     }
     setProcessing(true);
     try {
-      if (!job.tax_disclaimer_accepted) {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) throw new Error("Sign in before recording tax disclaimer acceptance.");
-
-        const acceptedAt = new Date().toISOString();
-        const { error: acceptanceError } = await supabase.from('tax_disclaimers_accepted').insert({
-          user_id: user.id,
-          user_type: 'client',
-          disclaimer_type: 'job_payment',
-          accepted_at: acceptedAt,
-        });
-        if (acceptanceError) throw acceptanceError;
-
-        const { error: bookingError } = await supabase.from('jobs').update({
-          tax_disclaimer_accepted: true,
-          tax_disclaimer_accepted_at: acceptedAt,
-        }).eq('id', job.id);
-        if (bookingError) throw bookingError;
-        setJob({ ...job, tax_disclaimer_accepted: true, tax_disclaimer_accepted_at: acceptedAt });
-      }
-
       const { data: sessionData } = await supabase.auth.getSession();
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-job-payment`,
@@ -468,7 +447,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
             "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
             "Authorization": `Bearer ${sessionData.session?.access_token ?? ""}`,
           },
-          body: JSON.stringify({ jobId: job.id }),
+          body: JSON.stringify({ jobId: job.id, taxDisclaimerAccepted }),
           signal: AbortSignal.timeout(30000),
         }
       );
@@ -506,6 +485,11 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
 
   const handleRetry = async () => {
     if (!job || !client || !feeBreakdown || feeLoading || maxRetriesReached) return;
+    if (!taxDisclaimerAccepted) {
+      setToast("Please accept the tax responsibility statement before proceeding.");
+      setTimeout(() => setToast(""), 4000);
+      return;
+    }
     setProcessing(true);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -518,7 +502,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
             "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
             "Authorization": `Bearer ${sessionData.session?.access_token ?? ""}`,
           },
-          body: JSON.stringify({ jobId: job.id }),
+          body: JSON.stringify({ jobId: job.id, taxDisclaimerAccepted }),
           signal: AbortSignal.timeout(30000),
         }
       );
