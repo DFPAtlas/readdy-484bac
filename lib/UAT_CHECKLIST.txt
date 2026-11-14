@@ -504,7 +504,12 @@ Check each item, note any issues in the "Result" column.
      was pending and QuickGuard's job payment status was processing.
 
 19.2 Verify the refund flow after cancelling a paid booking
-     Result: Pending.
+     Result: PASS in Stripe sandbox on 3 Oct 2026. Live Stripe retest
+     after PR #134 remains pending.
+     Evidence: Checkout Retest job a0cc62ce-7cf8-4c14-be5f-c285818204a9.
+     Supabase shows a completed GBP 92 refund linked to the client
+     cancellation, a Stripe refund reference, and job payment marked
+     refunded.
 
 
 =================================================================
