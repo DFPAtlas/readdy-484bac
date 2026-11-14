@@ -7,7 +7,7 @@ import Link from 'next/link';
 interface SupportTicket {
   id: string;
   ticket_reference: string | null;
-  client_id: string;
+  client_id: string | null;
   guard_id: string | null;
   related_job_id: string | null;
   category: string;
@@ -306,7 +306,7 @@ export default function AdminSupportTicketsPage() {
                           <p className="text-sm font-medium text-white truncate max-w-[200px]">{ticket.subject}</p>
                         </td>
                         <td className="px-4 py-3">
-                          <p className="text-sm text-slate-300">{ticket.client_name}</p>
+                          <p className="text-sm text-slate-300">{ticket.client_id ? ticket.client_name : ticket.guard_name || 'Guard'}</p>
                           {ticket.client_email && <p className="text-xs text-slate-500">{ticket.client_email}</p>}
                         </td>
                         <td className="px-4 py-3">
@@ -381,7 +381,7 @@ export default function AdminSupportTicketsPage() {
                 </div>
                 <div className="bg-[#0a1628] rounded-xl p-3">
                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Requester</p>
-                  <p className="text-sm font-semibold text-white">{selected.client_name}</p>
+                  <p className="text-sm font-semibold text-white">{selected.client_id ? selected.client_name : selected.guard_name || 'Guard'}</p>
                 </div>
               </div>
 
