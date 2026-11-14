@@ -492,6 +492,21 @@ Check each item, note any issues in the "Result" column.
      the homepage). Session renewal was not observed.
 
 
+19. CLIENT JOB CANCELLATION
+---------------------------
+19.1 Cancel a test booking with a pending payment
+     Expected: The job is marked Cancelled, one client cancellation is
+     recorded, and no refund request is created.
+     Result: PASS (production, 14 Nov 2026 at 00:12 GMT).
+     Evidence: Atlas Booking Checkout test job
+     26afbd0c-20be-4f04-9801-c7cf30149f6c. Supabase recorded one client
+     cancellation and zero refund requests. The job payment transaction
+     was pending and QuickGuard's job payment status was processing.
+
+19.2 Verify the refund flow after cancelling a paid booking
+     Result: Pending.
+
+
 =================================================================
 NOTES
 =================================================================
