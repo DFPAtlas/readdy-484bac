@@ -437,19 +437,25 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
     }
     setProcessing(true);
     try {
-      // Save tax disclaimer acceptance
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user && !job.tax_disclaimer_accepted) {
-        await supabase.from('jobs').update({
-          tax_disclaimer_accepted: true,
-          tax_disclaimer_accepted_at: new Date().toISOString(),
-        }).eq('id', job.id);
-        await supabase.from('tax_disclaimers_accepted').upsert({
+      if (!job.tax_disclaimer_accepted) {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) throw new Error("Sign in before recording tax disclaimer acceptance.");
+
+        const acceptedAt = new Date().toISOString();
+        const { error: acceptanceError } = await supabase.from('tax_disclaimers_accepted').insert({
           user_id: user.id,
           user_type: 'client',
           disclaimer_type: 'job_payment',
-          accepted_at: new Date().toISOString(),
-        }, { onConflict: 'user_id, user_type, disclaimer_type' });
+          accepted_at: acceptedAt,
+        });
+        if (acceptanceError) throw acceptanceError;
+
+        const { error: bookingError } = await supabase.from('jobs').update({
+          tax_disclaimer_accepted: true,
+          tax_disclaimer_accepted_at: acceptedAt,
+        }).eq('id', job.id);
+        if (bookingError) throw bookingError;
+        setJob({ ...job, tax_disclaimer_accepted: true, tax_disclaimer_accepted_at: acceptedAt });
       }
 
       const { data: sessionData } = await supabase.auth.getSession();
