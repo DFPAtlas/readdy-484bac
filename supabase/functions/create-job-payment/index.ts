@@ -181,6 +181,22 @@ serve(async (req) => {
       );
     }
 
+    const { data: guardsEligible, error: eligibilityError } = await supabaseService.rpc(
+      'checkout_guards_are_eligible',
+      { booking_id: jobId, assignment_ids: assignments.map((assignment) => assignment.id) },
+    );
+    if (eligibilityError) {
+      console.error('[create-job-payment] Guard eligibility check failed:', eligibilityError.message);
+      return new Response(JSON.stringify({ error: 'Unable to check guard eligibility' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (guardsEligible !== true) {
+      return new Response(JSON.stringify({ error: 'A selected guard no longer meets the booking requirements. Review your guard selection before paying.' }), {
+        status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Stored agreed amounts must match the authoritative schedule
     // (daily shift hours x number of days). Bookings priced by the old
     // span x days calculation are refused, never silently re-priced or charged.

@@ -47,24 +47,96 @@ test('configured consent fields do not duplicate the canonical guard consent con
  assert.doesNotMatch(html,/SIA Approved|HMRC Compliant|500\+|4\.9\/5/);
 });
 
-function guardAdminHarness({updateError=null,updated=true,status='pending'}={}) {
- let handler; const writes=[];
- const guard={id:'guard-id',user_id:null,email:'guard@example.invalid',verification_status:status};
- const db={from:()=>{
-  let mutation=false;
-  const query={select:()=>query,eq:()=>query,update:changes=>{mutation=true;writes.push(changes);return query},maybeSingle:async()=>mutation?{data:updated?{id:guard.id}:null,error:updateError}:{data:guard,error:null}};
-  return query;
- }};
- const mod={exports:{}};
- new Function('module','exports','require','Deno',compile('supabase/functions/admin-verify-guard/index.ts'))(mod,mod.exports,()=>({createClient:()=>db}),{env:{get:key=>({SUPABASE_URL:'https://test.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'service-secret'})[key]},serve:fn=>handler=fn});
- return {writes,call:(action,token='service-secret')=>handler(new Request('https://worker.test',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({guardId:'guard-id',action})}))};
+const guardReviewAdminId = 'admin-user-id';
+const guardReviewAdminToken = 'header.' + Buffer.from(JSON.stringify({ aal: 'aal2' })).toString('base64url') + '.signature';
+
+function guardAdminHarness({ updateError = null, updated = true, status = 'pending' } = {}) {
+  let handler;
+  const writes = [];
+  const guard = {
+    id: 'guard-id',
+    user_id: null,
+    email: 'guard@example.invalid',
+    verification_status: status,
+    verified_by: status === 'suspended' ? guardReviewAdminId : null,
+  };
+  const db = {
+    auth: {
+      getUser: async token => {
+        assert.equal(token, guardReviewAdminToken);
+        return { data: { user: { id: guardReviewAdminId } }, error: null };
+      },
+    },
+    from: table => {
+      if (table === 'admin_users') {
+        return {
+          select: () => ({
+            eq: (column, value) => {
+              assert.equal(column, 'user_id');
+              assert.equal(value, guardReviewAdminId);
+              return { maybeSingle: async () => ({ data: { is_active: true }, error: null }) };
+            },
+          }),
+        };
+      }
+      if (table === 'notifications') return { insert: async () => ({ error: null }) };
+      assert.equal(table, 'guards');
+      let mutation = false;
+      const query = {
+        select: () => query,
+        eq: () => query,
+        update: changes => {
+          mutation = true;
+          writes.push(changes);
+          return query;
+        },
+        maybeSingle: async () => mutation
+          ? { data: updated ? { id: guard.id } : null, error: updateError }
+          : { data: guard, error: null },
+      };
+      return query;
+    },
+  };
+  const mod = { exports: {} };
+  const deno = {
+    env: { get: key => ({ SUPABASE_URL: 'https://test.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'service-secret' })[key] },
+    serve: fn => { handler = fn; },
+  };
+  new Function('module', 'exports', 'require', 'Deno', 'fetch', compile('supabase/functions/admin-verify-guard/index.ts'))(
+    mod, mod.exports, () => ({ createClient: () => db }), deno, async () => new Response(null, { status: 200 }),
+  );
+  return {
+    writes,
+    call: (action, token = 'service-secret') => handler(new Request('https://worker.test', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guardId: guard.id, action }),
+    })),
+  };
 }
-test('guard administration never reports success after rejected or unconfirmed database writes',async()=>{
- for(const action of ['manual_sia_verify','approve','reject','suspend','restore']) {
-  for(const opts of [{updateError:{message:'write failed'}},{updated:false}]) {
-   const h=guardAdminHarness({...opts,status:action==='restore'?'suspended':'pending'});const response=await h.call(action);
-   assert.equal(response.status,500,action);assert.equal((await response.json()).error,'Internal server error');
+
+test('guard administration never reports success after rejected or unconfirmed database writes', async () => {
+  for (const action of ['manual_sia_verify', 'approve', 'reject', 'suspend', 'restore']) {
+    for (const opts of [{ updateError: { message: 'write failed' } }, { updated: false }]) {
+      const h = guardAdminHarness({ ...opts, status: action === 'restore' ? 'suspended' : 'pending' });
+      const response = await h.call(action, action === 'approve' ? guardReviewAdminToken : undefined);
+      assert.equal(h.writes.length, 1, action);
+      assert.equal(response.status, 500, action);
+      assert.equal((await response.json()).error, 'Internal server error');
+    }
   }
- }
- const success=guardAdminHarness();assert.equal((await success.call('manual_sia_verify')).status,200);
+  const success = guardAdminHarness();
+  assert.equal((await success.call('manual_sia_verify')).status, 200);
+});
+
+test('guard approval requires and records a human admin reviewer', async () => {
+  const h = guardAdminHarness();
+  assert.equal((await h.call('approve')).status, 403);
+  assert.equal(h.writes.length, 0);
+
+  const response = await h.call('approve', guardReviewAdminToken);
+  assert.equal(response.status, 200);
+  assert.equal(h.writes.length, 1);
+  assert.equal(h.writes[0].verification_status, 'approved');
+  assert.equal(h.writes[0].verified_by, guardReviewAdminId);
 });
