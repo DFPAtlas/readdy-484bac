@@ -60,3 +60,7 @@ verify_jwt = false
 [functions.process-account-retention]
 # Authenticated by a generated Vault scheduler token, never a browser flag.
 verify_jwt = false
+
+[functions.complete-guard-profile]
+# The function validates the bearer token with auth.getUser().
+verify_jwt = false
