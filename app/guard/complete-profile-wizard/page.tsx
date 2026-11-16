@@ -463,10 +463,6 @@ function GuardCompleteProfileWizardContent() {
 
       const updatePayload: Record<string, any> = {
         full_name: fullName || null,
-        profile_completed: true,
-        onboarding_status: 'completed',
-        subscription_plan: 'guard_starter',
-        subscription_status: 'active',
         availability_status: 'available',
         updated_at: new Date().toISOString()
       };
@@ -493,9 +489,6 @@ function GuardCompleteProfileWizardContent() {
           updatePayload.rejection_reason = null;
           updatePayload.rejected_at = null;
         }
-      } else {
-        updatePayload.is_active = false;
-        updatePayload.dashboard_access = false;
       }
 
       if (photoUrl) updatePayload.profile_image_url = photoUrl;
@@ -599,18 +592,20 @@ function GuardCompleteProfileWizardContent() {
       if (formData.available_hours_to) updatePayload.available_hours_to = formData.available_hours_to;
       if (formData.bio) updatePayload.bio = formData.bio;
 
-      const { error: updateError } = await supabase.from('guards').update(updatePayload).eq('user_id', userId);
-      if (updateError) {
-        throw new Error(updateError.message || 'Failed to update profile');
+      const { data: saved, error: updateError } = await supabase
+        .from('guards').update(updatePayload).eq('user_id', userId)
+        .select('id, sia_licence_number, updated_at').maybeSingle();
+      if (updateError || !saved) {
+        throw new Error(updateError?.message || 'Failed to update profile');
       }
 
-      await ensureEntitlement(userId, 'guard');
-      const { error: entActivateError } = await supabase
-        .from('user_entitlements_data')
-        .update({ subscription_status: 'active', updated_at: new Date().toISOString() })
-        .eq('user_id', userId);
-      if (entActivateError) {
-        console.error('[GuardProfileWizard] Entitlement activation failed:', entActivateError.message);
+      const { data: completion, error: completionError } = await supabase.functions.invoke(
+        'complete-guard-profile',
+        { body: { updatedAt: saved.updated_at } },
+      );
+      if (completionError || !completion?.success) {
+        const body = await completionError?.context?.json?.().catch(() => null);
+        throw new Error(body?.error || 'Unable to complete your profile. Please try again.');
       }
 
       if (password) {
@@ -622,8 +617,7 @@ function GuardCompleteProfileWizardContent() {
         }
       }
 
-      const { data: guardAfterUpdate } = await supabase.from('guards').select('id, sia_licence_number').eq('user_id', userId).maybeSingle();
-      if (guardAfterUpdate?.sia_licence_number) {
+      if (saved.sia_licence_number) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.access_token) {
           fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/sia-check`, {
@@ -633,8 +627,8 @@ function GuardCompleteProfileWizardContent() {
               'Authorization': `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({
-              guard_id: guardAfterUpdate.id,
-              sia_licence_number: guardAfterUpdate.sia_licence_number,
+              guard_id: saved.id,
+              sia_licence_number: saved.sia_licence_number,
             }),
           }).catch((err) => console.error('[ProfileWizard] SIA check call failed:', err));
         }
