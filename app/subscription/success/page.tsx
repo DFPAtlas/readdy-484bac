@@ -289,7 +289,7 @@ function SuccessContent() {
   }, [searchParams, runConfirmation]);
 
   const trialEndFormatted = trialEnd
-    ? new Date(trialEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+    ? new Date(trialEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/London' })
     : null;
 
   const steps = [
@@ -428,7 +428,7 @@ function SuccessContent() {
               <div className="min-w-0">
                 <p className="text-xs text-slate-500 uppercase tracking-wider mb-0.5">Trial Period</p>
                 <p className="text-violet-400 text-sm font-medium">
-                  90 days free · Ends {trialEndFormatted}
+                  Free access until {trialEndFormatted}
                 </p>
               </div>
             </div>

@@ -1200,7 +1200,16 @@ export default function GuardDashboardClient() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-blue-300">
-                    You&apos;re on the Guard Free plan — apply to up to 2 jobs per month. Upgrade for more applications and features.
+                    {userEntitlement.is_free_tier ? (
+                      <>You&apos;re on the Guard Free plan — apply to up to 2 jobs per month. Upgrade for more applications and features.</>
+                    ) : (
+                      <>
+                        Your {userEntitlement.plan_name} trial is active.
+                        {userEntitlement.current_period_end && (
+                          <> Billing starts {new Date(userEntitlement.current_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/London' })} unless you cancel beforehand.</>
+                        )}
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
