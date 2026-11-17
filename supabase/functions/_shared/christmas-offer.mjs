@@ -1,4 +1,4 @@
-const opensAt = Date.parse('2026-11-24T00:00:00Z');
+const opensAt = Date.parse('2026-12-01T00:00:00Z');
 const closesAt = Date.parse('2026-12-30T00:00:00Z');
 const firstChargeAt = 1798761600;
 const stripeMinimumLeadMs = 48 * 60 * 60 * 1000;

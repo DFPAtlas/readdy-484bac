@@ -23,10 +23,11 @@ test('only the selected monthly Pro plans qualify while enabled', () => {
   }
 });
 
-test('campaign starts on 24 November and closes at midnight starting 30 December', () => {
+test('campaign starts on 1 December and closes at midnight starting 30 December', () => {
   const times = [
-    ['2026-11-23T23:59:59.999Z', null],
-    ['2026-11-24T00:00:00.000Z', 1900],
+    ['2026-11-24T00:00:00.000Z', null],
+    ['2026-11-30T23:59:59.999Z', null],
+    ['2026-12-01T00:00:00.000Z', 1900],
     ['2026-12-29T23:59:59.999Z', 1900],
     ['2026-12-30T00:00:00.000Z', null],
     ['2026-12-31T00:00:00.000Z', null],
