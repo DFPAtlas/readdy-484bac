@@ -1,0 +1,311 @@
+import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
+import { matchesSubscriptionPrice } from '../_shared/subscription-price.ts';
+import { profileTable, requireWrite, type AccountType } from '../_shared/subscription-profile.ts';
+import {
+  CHRISTMAS_OFFER,
+  CHRISTMAS_SANDBOX_ENV,
+  TEST_ONLY_NOTICE,
+  buildOfferCheckoutMetadata,
+  deriveProjectRef,
+  evaluateChristmasOffer,
+  evaluateSandboxConfig,
+  offerPlan,
+  offerPlanList,
+  trialEndOutsideStripeMinimum,
+} from '../_shared/christmas-offer-policy.mjs';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3?target=deno';
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', { apiVersion: '2023-10-16' });
+
+const ALLOWED_SITE_ORIGINS = ['https://quickguard.uk', 'https://www.quickguard.uk', 'http://localhost:3000'];
+
+function isPreviewOrigin(hostname: string): boolean {
+  return hostname === 'readdy.ai' || hostname === 'www.readdy.ai' || hostname.endsWith('.readdy.ai') || hostname.endsWith('.vercel.app');
+}
+
+function validatedSiteUrl(rawUrl: string | undefined, origin: string): string {
+  if (!rawUrl) return origin;
+  try {
+    const url = new URL(rawUrl);
+    if (ALLOWED_SITE_ORIGINS.includes(url.origin)) return url.origin;
+    if (url.origin === origin) return url.origin;
+    if (url.hostname === 'quickguard.uk' || url.hostname.endsWith('.quickguard.uk')) return url.origin;
+    if (isPreviewOrigin(url.hostname)) return url.origin + url.pathname.replace(/\/$/, '');
+    return origin;
+  } catch {
+    return origin;
+  }
+}
+
+function json(body: unknown, status: number, corsHeaders: Record<string, string>) {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+
+async function readSandboxGate() {
+  let stripeAccountId: string | null = null;
+  let stripeLivemode: boolean | null = null;
+  let stripeError: string | null = null;
+  try {
+    const [account, balance] = await Promise.all([stripe.accounts.retrieve(), stripe.balance.retrieve()]);
+    stripeAccountId = (account as any)?.id ?? null;
+    stripeLivemode = typeof (balance as any)?.livemode === 'boolean' ? (balance as any).livemode : null;
+  } catch (err: any) {
+    stripeError = err?.message || 'Stripe verification failed';
+  }
+  const gate = evaluateSandboxConfig({
+    enabledFlag: Deno.env.get(CHRISTMAS_SANDBOX_ENV.enabled) || '',
+    configuredProjectRef: Deno.env.get(CHRISTMAS_SANDBOX_ENV.projectRef) || '',
+    runningProjectRef: deriveProjectRef(Deno.env.get('SUPABASE_URL') || ''),
+    stripeAccountId,
+    stripeLivemode,
+  });
+  return { ...gate, stripeError, configuredProjectRef: Deno.env.get(CHRISTMAS_SANDBOX_ENV.projectRef) || '' };
+}
+
+async function loadCataloguePlan(db: any, planId: string, accountType: AccountType) {
+  const { data: plan, error } = await db
+    .from('plans')
+    .select('slug, name, audience, monthly_price_pence, features, stripe_price_id, stripe_annual_price_id, stripe_product_id')
+    .eq('slug', planId)
+    .eq('active', true)
+    .maybeSingle();
+  if (error) throw new Error(`Plan lookup failed: ${error.message}`);
+  if (!plan) return { error: 'The selected plan is not in the active catalogue.' as string };
+  if (plan.audience && plan.audience !== accountType) return { error: 'The selected plan does not belong to this account type.' as string };
+  const expected = offerPlan(planId);
+  if (!expected || plan.monthly_price_pence !== expected.monthlyPricePence) {
+    return { error: 'The catalogue price no longer matches the agreed Christmas offer price.' as string };
+  }
+  if (!plan.stripe_price_id) return { error: 'The selected plan has no monthly Stripe price in this environment.' as string };
+  return { plan };
+}
+
+async function verifySandboxPrice(plan: any) {
+  let price: any;
+  try {
+    price = await stripe.prices.retrieve(plan.stripe_price_id, { expand: ['product'] });
+  } catch (err: any) {
+    return { error: `Stripe could not load the catalogue price: ${err?.message || 'unknown error'}` };
+  }
+  if (!matchesSubscriptionPrice(price, plan, 'monthly')) {
+    return { error: 'The Stripe price does not match the catalogue plan, amount and monthly interval.' };
+  }
+  if (price.livemode !== false) return { error: 'The catalogue price exists in live mode. This sandbox path requires test-mode prices.' };
+  const product = typeof price.product === 'string' ? null : price.product;
+  if (product && product.livemode !== false) return { error: 'The catalogue product exists in live mode. This sandbox path requires test-mode products.' };
+  return { priceId: price.id };
+}
+
+serve(async (req) => {
+  const origin = req.headers.get('origin') || 'https://quickguard.uk';
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders, status: 204 });
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, corsHeaders);
+
+  const gate = await readSandboxGate();
+  if (!gate.enabled) {
+    return json({
+      testOnly: true,
+      promoAvailable: false,
+      code: gate.code,
+      message: gate.message,
+      notice: TEST_ONLY_NOTICE,
+      stripeVerificationError: gate.stripeError || undefined,
+    }, 503, corsHeaders);
+  }
+
+  const paymentFreeze = await paymentFreezeResponse(req.method, corsHeaders);
+  if (paymentFreeze) return paymentFreeze;
+
+  try {
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      body = {};
+    }
+    const action = body?.action === 'status' ? 'status' : 'checkout';
+    const planId = typeof body?.planId === 'string' ? body.planId : '';
+
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.match(/^Bearer\s+\S+$/i)) return json({ error: 'Authentication required.', testOnly: true }, 401, corsHeaders);
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) return json({ error: 'Server configuration error.', testOnly: true }, 500, corsHeaders);
+
+    const authClient = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const { data: { user }, error: authError } = await authClient.auth.getUser(token);
+    if (authError || !user) return json({ error: 'Invalid or expired session.', testOnly: true }, 401, corsHeaders);
+
+    const db = createClient(supabaseUrl, serviceRoleKey, { db: { schema: 'app' }, auth: { persistSession: false, autoRefreshToken: false } });
+
+    const [{ data: guardProfile }, { data: clientProfile }] = await Promise.all([
+      db.from('guards').select('id, email, stripe_customer_id').eq('user_id', user.id).maybeSingle(),
+      db.from('clients').select('id, email, stripe_customer_id').eq('user_id', user.id).maybeSingle(),
+    ]);
+    const accountType: AccountType | null = guardProfile ? 'guard' : clientProfile ? 'client' : null;
+    if (!accountType) return json({ error: 'QuickGuard profile not found.', testOnly: true }, 404, corsHeaders);
+    const profile = accountType === 'guard' ? guardProfile : clientProfile;
+
+    const { data: existingSub } = await db
+      .from('subscriptions')
+      .select('status, plan_slug, plan_name, stripe_subscription_id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    const eligibility = evaluateChristmasOffer({
+      now: new Date(),
+      planId,
+      accountType,
+      billingCycle: 'monthly',
+      subscription: existingSub ? {
+        status: existingSub.status,
+        planSlug: existingSub.plan_slug,
+        stripeSubscriptionId: existingSub.stripe_subscription_id,
+      } : null,
+      sandbox: gate,
+    });
+
+    if (action === 'status') {
+      return json({
+        testOnly: true,
+        promoAvailable: true,
+        notice: TEST_ONLY_NOTICE,
+        accountType,
+        plans: offerPlanList(),
+        eligibility,
+        trialBoundary: {
+          offerStartIso: CHRISTMAS_OFFER.offerStartIso,
+          offerEndIso: CHRISTMAS_OFFER.offerEndIso,
+          offerEndExclusive: CHRISTMAS_OFFER.offerEndExclusive,
+          firstChargeIso: CHRISTMAS_OFFER.firstChargeIso,
+          lastSupportedCheckoutIso: CHRISTMAS_OFFER.lastSupportedCheckoutIso,
+          stripeMinimumBoundaryIso: CHRISTMAS_OFFER.stripeMinimumBoundaryIso,
+          stripeMinimumLeadHours: CHRISTMAS_OFFER.stripeMinTrialLeadSeconds / 3600,
+          stripeMinimumAlreadyExceeded: trialEndOutsideStripeMinimum(new Date()),
+        },
+      }, 200, corsHeaders);
+    }
+
+    if (!eligibility.eligible) return json({ testOnly: true, promoAvailable: true, notice: TEST_ONLY_NOTICE, ...eligibility }, 409, corsHeaders);
+
+    const catalogue = await loadCataloguePlan(db, planId, accountType);
+    if (catalogue.error) return json({ testOnly: true, code: 'catalogue_invalid', message: catalogue.error, notice: TEST_ONLY_NOTICE }, 409, corsHeaders);
+    const plan = catalogue.plan;
+
+    const priceCheck = await verifySandboxPrice(plan);
+    if (priceCheck.error) return json({ testOnly: true, code: 'sandbox_price_required', message: priceCheck.error, notice: TEST_ONLY_NOTICE }, 409, corsHeaders);
+
+    if (trialEndOutsideStripeMinimum(new Date())) {
+      return json({
+        testOnly: true,
+        code: 'fixed_date_trial_unsupported',
+        message: 'Stripe requires at least 48 hours between checkout and the agreed first charge, so this sign-up cannot use the 1 January 2027 date. No subscription was started and the charge date was not moved.',
+        notice: TEST_ONLY_NOTICE,
+      }, 409, corsHeaders);
+    }
+
+    const email = profile?.email || user.email;
+    if (!email) return json({ error: 'No verified account email is available for checkout.', testOnly: true }, 400, corsHeaders);
+
+    let customerId: string | undefined = profile?.stripe_customer_id || undefined;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email,
+        metadata: { user_id: user.id, account_type: accountType, plan_id: planId, offer_id: CHRISTMAS_OFFER.id, sandbox_only: 'true' },
+      });
+      customerId = customer.id;
+      await requireWrite(
+        db.from(profileTable(accountType)).update({ stripe_customer_id: customerId }).eq('user_id', user.id).select('id'),
+        'Sandbox Stripe customer save',
+        { minRows: 1 },
+      );
+    }
+
+    const referer = req.headers.get('referer') || '';
+    let refererOrigin = '';
+    try { if (referer) refererOrigin = new URL(referer).origin; } catch { refererOrigin = ''; }
+    const siteUrl = validatedSiteUrl(body?.siteUrl || refererOrigin || origin, 'https://quickguard.uk');
+    const successUrl = `${siteUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}&offer=${CHRISTMAS_OFFER.id}`;
+    const cancelUrl = `${siteUrl}/subscription/christmas-sandbox?cancelled=true`;
+
+    const metadata = buildOfferCheckoutMetadata({ projectRef: gate.configuredProjectRef, userId: user.id, accountType, planId, planName: plan.name });
+
+    let session: any;
+    try {
+      session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        customer: customerId,
+        client_reference_id: user.id,
+        line_items: [{ price: priceCheck.priceId, quantity: 1 }],
+        payment_method_collection: 'always',
+        allow_promotion_codes: false,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        metadata,
+        subscription_data: {
+          trial_end: CHRISTMAS_OFFER.firstChargeAt,
+          metadata: {
+            offer_id: CHRISTMAS_OFFER.id,
+            offer_version: String(CHRISTMAS_OFFER.version),
+            sandbox_only: 'true',
+            sandbox_project_ref: gate.configuredProjectRef,
+            first_charge_at: CHRISTMAS_OFFER.firstChargeIso,
+            plan_slug: planId,
+            account_type: accountType,
+          },
+        },
+      }, { idempotencyKey: `christmas-${user.id}-${planId}-${Math.floor(Date.now() / 600000)}` });
+    } catch (err: any) {
+      const message = String(err?.message || 'Stripe rejected the checkout session');
+      const trialIssue = /trial_end|trial end|at least 48 hours/i.test(message);
+      return json({
+        testOnly: true,
+        code: trialIssue ? 'fixed_date_trial_unsupported' : 'stripe_checkout_rejected',
+        message: trialIssue
+          ? 'Stripe refused the 1 January 2027 first charge date for this sign-up. No subscription was started and the charge date was not moved.'
+          : message,
+        notice: TEST_ONLY_NOTICE,
+      }, 409, corsHeaders);
+    }
+
+    if (session.livemode !== false) {
+      try { await stripe.checkout.sessions.expire(session.id); } catch { /* session already unusable */ }
+      return json({
+        testOnly: true,
+        code: 'mixed_mode_rejected',
+        message: 'Stripe created a live-mode session, which is not allowed here. The session was expired immediately.',
+        notice: TEST_ONLY_NOTICE,
+      }, 409, corsHeaders);
+    }
+
+    return json({
+      testOnly: true,
+      promoAvailable: true,
+      notice: TEST_ONLY_NOTICE,
+      url: session.url,
+      sessionId: session.id,
+      offer: {
+        id: CHRISTMAS_OFFER.id,
+        firstChargeIso: CHRISTMAS_OFFER.firstChargeIso,
+        planId,
+        planName: plan.name,
+        amountPence: plan.monthly_price_pence,
+        billingCycle: 'monthly',
+        paymentMethodRequired: true,
+      },
+    }, 200, corsHeaders);
+  } catch (err: any) {
+    return json({ testOnly: true, code: 'server_error', message: err?.message || 'Internal server error', notice: TEST_ONLY_NOTICE }, 500, corsHeaders);
+  }
+});
