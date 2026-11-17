@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import LeadDrawer from './LeadDrawer';
+import LeadCsvImport from './LeadCsvImport';
 
 interface Lead {
   id: string;
@@ -177,7 +178,7 @@ export default function LeadsClient() {
     <div className="min-h-screen bg-[#0B1933]">
       <header className="sticky top-0 z-30 bg-[#0B1933]/90 backdrop-blur-md border-b border-[#1a2b4a]">
         <div className="px-5 sm:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 py-2">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center ring-1 ring-teal-500/20">
                 <i className="ri-user-search-line text-xl"></i>
@@ -187,15 +188,18 @@ export default function LeadsClient() {
                 <p className="text-xs text-slate-400">Manage leads collected by the internet lead finder</p>
               </div>
             </div>
-            <button
-              onClick={load}
-              className="flex items-center gap-2 px-4 py-2 border border-[#1a2b4a] rounded-xl text-sm font-medium text-slate-400 hover:bg-[#111d35] hover:text-white transition cursor-pointer whitespace-nowrap"
-            >
-              <div className="w-4 h-4 flex items-center justify-center">
-                <i className="ri-refresh-line"></i>
-              </div>
-              Refresh
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <LeadCsvImport onImported={load} />
+              <button
+                onClick={load}
+                className="flex items-center gap-2 px-4 py-2 border border-[#1a2b4a] rounded-xl text-sm font-medium text-slate-400 hover:bg-[#111d35] hover:text-white transition cursor-pointer whitespace-nowrap"
+              >
+                <div className="w-4 h-4 flex items-center justify-center">
+                  <i className="ri-refresh-line"></i>
+                </div>
+                Refresh
+              </button>
+            </div>
           </div>
         </div>
       </header>
