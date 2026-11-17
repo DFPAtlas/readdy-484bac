@@ -1,3 +1,4 @@
+import { canUseChristmasOffer, christmasOfferAmount, christmasOfferCheckoutParams, isChristmasOfferPrice } from '../_shared/christmas-offer.mjs';
 import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
 import { matchesSubscriptionPrice } from '../_shared/subscription-price.ts';
 import { subscriptionProfileUpdate, profileTable, requireWrite, type AccountType } from '../_shared/subscription-profile.ts';
@@ -329,7 +330,7 @@ serve(async (req) => {
     const planAmount = planData?.monthly_price_pence || 0;
     const planFeatures = planData?.features || '[]';
 
-    const { data: existingSub } = await publicSupabase
+    const { data: existingSub, error: subscriptionError } = await publicSupabase
       .from('subscriptions')
       .select('stripe_subscription_id, status, plan_slug')
       .eq('user_id', userId)
@@ -459,6 +460,23 @@ serve(async (req) => {
       }
     }
 
+    const offerRequest = {
+      enabled: Deno.env.get('QUICKGUARD_CHRISTMAS_OFFER_ENABLED') === 'true',
+      accountType, planId, billingCycle,
+    };
+    const offerAmount = christmasOfferAmount(offerRequest);
+    if (offerAmount !== null && subscriptionError) {
+      throw new Error('Unable to verify Christmas offer eligibility.');
+    }
+    const useChristmasOffer = offerAmount !== null && canUseChristmasOffer(existingSub);
+
+    if (useChristmasOffer && offerAmount !== null) {
+      const price = await stripe.prices.retrieve(priceId);
+      if (!isChristmasOfferPrice(price, offerAmount)) {
+        throw new Error('Christmas offer checkout could not verify the monthly Pro price.');
+      }
+    }
+
     const email = userEmail;
 
     let customerId: string | undefined;
@@ -504,7 +522,15 @@ serve(async (req) => {
 
     console.log('[create-subscription-checkout] Creating checkout session with price:', priceId, 'siteUrl:', siteUrl);
 
+    if (useChristmasOffer && christmasOfferAmount(offerRequest) === null) {
+      return new Response(
+        JSON.stringify({ error: 'The Christmas offer has closed. Please start checkout again to see the current price.' }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const session = await stripe.checkout.sessions.create({
+      ...(useChristmasOffer && offerAmount !== null ? christmasOfferCheckoutParams(offerAmount) : {}),
       customer: customerId,
       client_reference_id: userId,
       line_items: [{ price: priceId, quantity: 1 }],
