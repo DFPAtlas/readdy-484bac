@@ -678,7 +678,16 @@ export default function ClientDashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-blue-300">
-                    You&apos;re on the QuickGuard Free plan — publish up to 1 job per month and pay per job. Upgrade for more posts and lower fees.
+                    {userEntitlement.is_free_tier ? (
+                      <>You&apos;re on the QuickGuard Free plan — publish up to 1 job per month and pay per job. Upgrade for more posts and lower fees.</>
+                    ) : (
+                      <>
+                        Your {userEntitlement.plan_name} trial is active.
+                        {userEntitlement.current_period_end && (
+                          <> Billing starts {new Date(userEntitlement.current_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/London' })} unless you cancel beforehand.</>
+                        )}
+                      </>
+                    )}
                   </p>
                 </div>
               </div>

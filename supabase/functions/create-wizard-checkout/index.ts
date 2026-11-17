@@ -1,3 +1,4 @@
+import { canUseChristmasOffer, christmasOfferAmount, christmasOfferCheckoutParams, isChristmasOfferPrice } from '../_shared/christmas-offer.mjs';
 import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
@@ -236,6 +237,29 @@ serve(async (req) => {
       );
     }
 
+    const offerRequest = {
+      enabled: Deno.env.get('QUICKGUARD_CHRISTMAS_OFFER_ENABLED') === 'true',
+      accountType, planId, billingCycle,
+    };
+    const offerAmount = christmasOfferAmount(offerRequest);
+    let useChristmasOffer = false;
+    if (offerAmount !== null) {
+      const { data: subscription, error: subscriptionError } = await supabase
+        .from('subscriptions')
+        .select('stripe_subscription_id, status, plan_slug')
+        .eq('user_id', authenticatedUser.id)
+        .maybeSingle();
+      if (subscriptionError) throw new Error('Unable to verify Christmas offer eligibility.');
+      useChristmasOffer = canUseChristmasOffer(subscription);
+    }
+
+    if (useChristmasOffer && offerAmount !== null) {
+      const price = await stripe.prices.retrieve(priceId);
+      if (!isChristmasOfferPrice(price, offerAmount)) {
+        throw new Error('Christmas offer checkout could not verify the monthly Pro price.');
+      }
+    }
+
     const email = profile.email || authenticatedUser.email;
     if (!email) {
       return new Response(
@@ -276,7 +300,15 @@ serve(async (req) => {
     console.log('[create-wizard-checkout] successUrl:', successUrl);
     console.log('[create-wizard-checkout] cancelUrl:', cancelUrl);
 
+    if (useChristmasOffer && christmasOfferAmount(offerRequest) === null) {
+      return new Response(
+        JSON.stringify({ error: 'The Christmas offer has closed. Please start checkout again to see the current price.' }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const session = await stripe.checkout.sessions.create({
+      ...(useChristmasOffer && offerAmount !== null ? christmasOfferCheckoutParams(offerAmount) : {}),
       customer: customerId,
       client_reference_id: userId,
       line_items: [{ price: priceId, quantity: 1 }],
