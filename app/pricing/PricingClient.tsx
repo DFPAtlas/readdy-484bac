@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import NavSidebar from '@/components/NavSidebar';
+import PricingBreadcrumb from './PricingBreadcrumb';
 import { supabase } from '@/lib/supabase';
 import { calculatePaygFees, formatCurrency } from '@/lib/payg-fees';
 
@@ -417,19 +418,9 @@ export default function PricingClient() {
           </div>
         )}
 
-        {user && (
-          <div className="max-w-7xl mx-auto px-6 pt-6">
-            <Link
-              href={user.role === 'guard' ? '/guard/dashboard' : '/client/dashboard'}
-              className="inline-flex items-center gap-2 text-slate-400 hover:text-white text-sm font-medium transition-colors"
-            >
-              <i className="ri-arrow-left-line" />
-              Back to Dashboard
-            </Link>
-          </div>
-        )}
+        <PricingBreadcrumb />
         {/* HERO */}
-        <div className="relative bg-gradient-to-br from-[#0e1628] via-[#0B1933] to-[#111d35] pt-24 pb-20 border-b border-slate-800/60">
+        <div className="relative bg-gradient-to-br from-[#0e1628] via-[#0B1933] to-[#111d35] pt-10 pb-20 border-b border-slate-800/60">
           <div className="absolute inset-0 opacity-20 pointer-events-none">
             <div className="absolute top-0 right-0 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl" />
             <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" />

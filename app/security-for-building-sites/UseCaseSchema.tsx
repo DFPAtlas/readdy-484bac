@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { SITE_URL } from '@/lib/seo-helpers';
 
 interface UseCaseSchemaProps {
@@ -44,6 +45,17 @@ export default function UseCaseSchema({ title, slug, description }: UseCaseSchem
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
+      <nav aria-label="Breadcrumb trail" className="sr-only">
+        <ol>
+          <li>
+            <Link href="/">Home</Link>
+            <span> / </span>
+          </li>
+          <li>
+            <Link href={`/${slug}`}>{title}</Link>
+          </li>
+        </ol>
+      </nav>
     </>
   );
 }

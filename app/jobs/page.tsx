@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import JobsPageContent from "./JobsPageContent";
+import JobsSchema from "./JobsSchema";
 
 export const metadata: Metadata = {
   title: "Security Guard Jobs UK | Hire SIA Licensed Guards",
@@ -21,5 +22,10 @@ export const metadata: Metadata = {
 };
 
 export default function JobsPage() {
-  return <JobsPageContent />;
+  return (
+    <>
+      <JobsSchema />
+      <JobsPageContent />
+    </>
+  );
 }
