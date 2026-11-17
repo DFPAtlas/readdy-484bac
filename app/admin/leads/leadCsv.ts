@@ -3,8 +3,7 @@ export const leadCsvFields = [
   'location', 'postcode', 'decision_maker_name', 'contact_page_url',
 ] as const;
 
-const maxRows = 500;
-export const maxLeadCsvBytes = 1024 * 1024;
+export const maxLeadCsvBytes = 10 * 1024 * 1024;
 
 export interface CsvLead {
   row: number;
@@ -62,6 +61,26 @@ export function parseLeadCsv(source: string): CsvLead[] {
     leads.push({ row: index + 2, fields });
   }
   if (leads.length === 0) throw new Error('The file has no lead rows.');
-  if (leads.length > maxRows) throw new Error(`Upload up to ${maxRows} leads at a time.`);
   return leads;
+}
+
+export function batchLeadRows(rows: CsvLead[]): CsvLead[][] {
+  const batches: CsvLead[][] = [];
+  const encoder = new TextEncoder();
+  let batch: CsvLead[] = [];
+  let bytes = 0;
+  for (const row of rows) {
+    // Leave room under the RPC's 2 MiB limit for PostgreSQL's JSON formatting.
+    const size = encoder.encode(JSON.stringify(row)).length + 64;
+    if (size > 1024 * 1024) throw new Error(`CSV row ${row.row} is too large.`);
+    if (batch.length === 500 || bytes + size > 1024 * 1024) {
+      batches.push(batch);
+      batch = [];
+      bytes = 0;
+    }
+    batch.push(row);
+    bytes += size;
+  }
+  if (batch.length) batches.push(batch);
+  return batches;
 }
