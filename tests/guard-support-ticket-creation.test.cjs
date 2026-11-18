@@ -104,23 +104,22 @@ const tickets = [
 ];
 
 test('admin enrichment identifies guard requesters without relabelling client complaints', async () => {
-  const start = adminSource.indexOf('  const fetchTickets = useCallback');
-  const end = adminSource.indexOf('\n  useEffect(', start);
-  const calls = []; let rows;
+  const calls = [];
   const values = { support_tickets: tickets, clients: [{ id: id(13), contact_name: 'Client contact', email: 'client@example.test' }], guards: [{ id: id(11), full_name: 'Guard contact', email: 'guard@example.test' }] };
   const supabase = { from(table) { const q = { select(fields) { calls.push({ table, fields }); return q; }, eq() { return q; }, order() { return q; }, in() { return q; }, then(resolve, reject) { return Promise.resolve({ data: values[table] || [], error: null }).then(resolve, reject); } }; return q; } };
-  const fetchTickets = new Function('supabase', 'useCallback', 'setLoading', 'setTickets', compile(adminSource.slice(start, end) + '\nreturn fetchTickets;'))(supabase, fn => fn, () => {}, data => { rows = data; });
-  await fetchTickets();
+  const helpers = { exports: {} }; new Function('exports', compile(fs.readFileSync('lib/support-inbox-reads.ts','utf8')))(helpers.exports);
+  const rows = await helpers.exports.loadAdminSupportInbox(supabase);
   assert.equal(rows[0].requester_name, 'Guard contact'); assert.equal(rows[0].requester_email, 'guard@example.test');
   assert.equal(rows[1].requester_name, 'Client contact'); assert.equal(rows[1].requester_email, 'client@example.test');
   assert.ok(calls.find(c => c.table === 'guards').fields.includes('email'));
   for (const selected of rows) {
     let hook = 0;
-    const hooks = { ...React, useState(initial) { const state = React.useState(initial); const values = [rows, rows, false, selected]; return hook < values.length ? [values[hook++], () => {}] : (hook++, state); } };
+    const hooks = { ...React, useState(initial) { const state = React.useState(initial); const values = [rows, rows, false, false, selected]; return hook < values.length ? [values[hook++], () => {}] : (hook++, state); } };
     const mod = { exports: {} };
     new Function('require', 'exports', compile(adminSource))(name => {
       if (name === 'react') return hooks;
       if (name === '@/lib/supabase') return { supabase: {} };
+      if (name === '@/lib/support-inbox-reads') return helpers.exports;
       if (name === 'next/link') return { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) };
       return require(name);
     }, mod.exports);

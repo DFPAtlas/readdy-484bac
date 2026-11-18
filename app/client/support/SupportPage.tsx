@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { loadOwnedSupportInbox } from '@/lib/support-inbox-reads';
+import SupportInboxError from '@/components/SupportInboxError';
 import Link from 'next/link';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
@@ -143,63 +145,47 @@ export default function SupportPage() {
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [bulkActionKey, setBulkActionKey] = useState('');
 
+  const mountedRef = useRef(false);
+  const requestRef = useRef(0);
   const loadTickets = useCallback(async (silent = false) => {
+    if (!mountedRef.current) return;
+    const request = ++requestRef.current;
+    const current = () => mountedRef.current && request === requestRef.current;
     if (!silent) setLoading(true);
-    else setRefreshing(true);
-    if (!silent) setLoadError(false);
+    setRefreshing(silent);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/client/login'); return; }
-
-      const { data: client } = await supabase
-        .from('clients')
-        .select('id, company_name, subscription_tier')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!client) { router.push('/client/login'); return; }
-
-      setClientId(client.id);
-      setCompanyName(client.company_name || 'Client');
-      setSubscriptionTier(client.subscription_tier || 'Basic');
-      setInitials(getInitials(client.company_name || 'Client'));
-
-      const { data: ticketsData } = await supabase
-        .from('support_tickets')
-        .select('*')
-        .eq('client_id', client.id)
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false });
-
-      const { data: jobsData } = await supabase
-        .from('jobs')
-        .select('id, job_title, venue_city, start_date, status')
-        .eq('client_id', client.id)
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false });
-
-      const jobsList = jobsData || [];
-      setJobs(jobsList);
-
-      const jobMap = new Map(jobsList.map((j: any) => [j.id, j]));
-
-      const formatted = (ticketsData || []).map((t: any) => ({
-        ...t,
-        job_title: jobMap.get(t.related_job_id)?.job_title || null,
-      }));
-
-      setTickets(formatted);
+      const snapshot = await loadOwnedSupportInbox(supabase, 'client');
+      if (!current()) return;
+      if (!snapshot) { router.replace('/client/login'); return; }
+      const profile = snapshot.profile;
+      setClientId(profile.id);
+      setCompanyName(profile.company_name || 'Client');
+      setSubscriptionTier(profile.subscription_tier || 'Basic');
+      setInitials(getInitials(profile.company_name || 'Client'));
+      setJobs(snapshot.jobs);
+      setTickets(snapshot.tickets);
       setLastUpdated(new Date());
+      setLoadError(false);
     } catch {
-      if (!silent) setLoadError(true);
+      if (current()) {
+        setLoadError(true);
+        setSelectedTicket(null);
+        setSelectedTicketIds(new Set());
+        setBulkMode(false);
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (current()) { setLoading(false); setRefreshing(false); }
     }
   }, [router]);
 
   useEffect(() => {
-    loadTickets();
+    mountedRef.current = true;
+    void loadTickets();
+    return () => { mountedRef.current = false; requestRef.current += 1; };
+  }, [loadTickets]);
+
+  useEffect(() => {
+    if (!clientId) return;
     const channel = supabase
       .channel(`client-support-tickets-${clientId}`)
       .on('postgres_changes', {
@@ -353,7 +339,7 @@ export default function SupportPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setToast(`${filteredTickets.length} ticket${filteredTickets.length !== 1 ? 's' : ''} exported`);
+    setToast(`${loadError ? '—' : filteredTickets.length} ticket${filteredTickets.length !== 1 ? 's' : ''} exported`);
   };
 
   const handleClearFilters = () => {
@@ -439,6 +425,8 @@ export default function SupportPage() {
     else if (actionKey === 'resolve') handleBulkMarkResolved();
   };
   // --- End bulk action handlers ---
+
+  if (loadError && !loading && (authLoading || !allowed)) return <SupportInboxError onRetry={() => window.location.reload()} />;
 
   if (loading || authLoading || !allowed) {
     return (
@@ -551,7 +539,7 @@ export default function SupportPage() {
             <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Client Portal</p>
             <h1 className="text-xl font-bold text-white flex items-center gap-2">
               Support Centre
-              {stats.open > 0 && (
+              {!loadError && stats.open > 0 && (
                 <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
                   {stats.open} open
                 </span>
@@ -561,10 +549,10 @@ export default function SupportPage() {
           <div className="flex items-center gap-3">
             <LiveIndicator />
             <div className="hidden md:flex items-center gap-2 text-xs text-slate-500">
-              <div className={`w-2 h-2 rounded-full ${refreshing ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${loadError ? 'bg-red-400' : refreshing ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></div>
               {lastUpdated && (
                 <span suppressHydrationWarning>
-                  Updated {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                  {loadError ? 'Last loaded' : 'Updated'} {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               )}
             </div>
@@ -578,6 +566,7 @@ export default function SupportPage() {
             </button>
             <button
               onClick={() => handleOpenCreate()}
+              disabled={loadError || !clientId}
               className="flex items-center gap-2 bg-teal-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap"
             >
               <i className="ri-add-line"></i>
@@ -604,7 +593,7 @@ export default function SupportPage() {
                   <i className={`${s.icon} text-lg ${s.color}`}></i>
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-slate-200">{s.value}</p>
+                  <p className="text-xl font-bold text-slate-200">{loadError ? '—' : s.value}</p>
                   <p className="text-[10px] text-slate-500 font-medium">{s.label}</p>
                 </div>
               </div>
@@ -699,7 +688,7 @@ export default function SupportPage() {
               sortBy={sortBy}
               onSortChange={setSortBy}
               sortOptions={TICKET_SORT_OPTIONS}
-              resultCount={filteredTickets.length}
+              resultCount={loadError ? '—' : filteredTickets.length}
               loading={loading}
               onClear={handleClearFilters}
               showMobilePanel={showFilters}
@@ -731,7 +720,7 @@ export default function SupportPage() {
 
           {/* Content */}
           {loadError ? (
-            <div className="bg-[#111d35] rounded-2xl border border-red-500/20 shadow-sm p-10 md:p-16 text-center">
+            <div role="alert" className="bg-[#111d35] rounded-2xl border border-red-500/20 shadow-sm p-10 md:p-16 text-center">
               <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-500/20">
                 <i className="ri-error-warning-line text-4xl text-red-400"></i>
               </div>
@@ -777,7 +766,7 @@ export default function SupportPage() {
             <div className="space-y-4">
               <BulkActionBar
                 selectedCount={selectedTicketIds.size}
-                totalCount={filteredTickets.length}
+                totalCount={loadError ? '—' : filteredTickets.length}
                 allSelected={selectedTicketIds.size === filteredTickets.length && filteredTickets.length > 0}
                 onSelectAll={() => setSelectedTicketIds(new Set(filteredTickets.map(t => t.id)))}
                 onClearSelection={() => setSelectedTicketIds(new Set())}

@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { loadOwnedSupportInbox } from '@/lib/support-inbox-reads';
+import SupportInboxError from '@/components/SupportInboxError';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
@@ -126,46 +128,42 @@ export default function SupportPage() {
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [bulkActionKey, setBulkActionKey] = useState('');
 
+  const mountedRef = useRef(false);
+  const requestRef = useRef(0);
   const loadTickets = useCallback(async (silent = false) => {
+    if (!mountedRef.current) return;
+    const request = ++requestRef.current;
+    const current = () => mountedRef.current && request === requestRef.current;
     if (!silent) setLoading(true);
-    else setRefreshing(true);
-    if (!silent) setLoadError(false);
+    setRefreshing(silent);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/guard/login'); return; }
-
-      const { data: guard } = await supabase
-        .from('guards')
-        .select('id, full_name, verification_status')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!guard) { router.push('/guard/login'); return; }
-
-      setGuardId(guard.id);
-      setGuardName(guard.full_name || 'Guard');
-      setVerificationStatus(guard.verification_status ? capitalize(guard.verification_status) : 'Guard');
-      setInitials(getInitials(guard.full_name || 'Guard'));
-
-      const { data: ticketsData } = await supabase
-        .from('support_tickets')
-        .select('*')
-        .eq('guard_id', guard.id)
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false });
-
-      setTickets(ticketsData || []);
+      const snapshot = await loadOwnedSupportInbox(supabase, 'guard');
+      if (!current()) return;
+      if (!snapshot) { router.replace('/guard/login'); return; }
+      const profile = snapshot.profile;
+      setGuardId(profile.id);
+      setGuardName(profile.full_name || 'Guard');
+      setVerificationStatus(profile.verification_status ? capitalize(profile.verification_status) : 'Guard');
+      setInitials(getInitials(profile.full_name || 'Guard'));
+      setTickets(snapshot.tickets);
       setLastUpdated(new Date());
+      setLoadError(false);
     } catch {
-      if (!silent) setLoadError(true);
+      if (current()) {
+        setLoadError(true);
+        setSelectedTicket(null);
+        setSelectedTicketIds(new Set());
+        setBulkMode(false);
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (current()) { setLoading(false); setRefreshing(false); }
     }
   }, [router]);
 
   useEffect(() => {
-    loadTickets();
+    mountedRef.current = true;
+    void loadTickets();
+    return () => { mountedRef.current = false; requestRef.current += 1; };
   }, [loadTickets]);
 
   useEffect(() => {
@@ -303,7 +301,7 @@ export default function SupportPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setToast(`${filteredTickets.length} ticket${filteredTickets.length !== 1 ? 's' : ''} exported`);
+    setToast(`${loadError ? '—' : filteredTickets.length} ticket${filteredTickets.length !== 1 ? 's' : ''} exported`);
   };
 
   const handleClearFilters = () => {
@@ -382,6 +380,8 @@ export default function SupportPage() {
     else if (actionKey === 'resolve') handleBulkMarkResolved();
   };
 
+  if (loadError && !loading && (authLoading || !allowed)) return <SupportInboxError onRetry={() => window.location.reload()} />;
+
   if (loading || authLoading || !allowed) {
     return (
       <div className="min-h-screen bg-[#0B1933] flex flex-col lg:flex-row">
@@ -451,7 +451,7 @@ export default function SupportPage() {
             <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Guard Portal</p>
             <h1 className="text-xl font-bold text-white flex items-center gap-2">
               Support Centre
-              {stats.open > 0 && (
+              {!loadError && stats.open > 0 && (
                 <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
                   {stats.open} open
                 </span>
@@ -461,10 +461,10 @@ export default function SupportPage() {
           <div className="flex items-center gap-3">
             <LiveIndicator />
             <div className="hidden md:flex items-center gap-2 text-xs text-slate-500">
-              <div className={`w-2 h-2 rounded-full ${refreshing ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${loadError ? 'bg-red-400' : refreshing ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></div>
               {lastUpdated && (
                 <span suppressHydrationWarning>
-                  Updated {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                  {loadError ? 'Last loaded' : 'Updated'} {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               )}
             </div>
@@ -478,6 +478,7 @@ export default function SupportPage() {
             </button>
             <button
               onClick={() => handleOpenCreate()}
+              disabled={loadError || !guardId}
               className="flex items-center gap-2 bg-teal-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap"
             >
               <i className="ri-add-line"></i>
@@ -504,7 +505,7 @@ export default function SupportPage() {
                   <i className={`${s.icon} text-lg ${s.color}`}></i>
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-slate-200">{s.value}</p>
+                  <p className="text-xl font-bold text-slate-200">{loadError ? '—' : s.value}</p>
                   <p className="text-[10px] text-slate-500 font-medium">{s.label}</p>
                 </div>
               </div>
@@ -598,7 +599,7 @@ export default function SupportPage() {
               sortBy={sortBy}
               onSortChange={setSortBy}
               sortOptions={TICKET_SORT_OPTIONS}
-              resultCount={filteredTickets.length}
+              resultCount={loadError ? '—' : filteredTickets.length}
               loading={loading}
               onClear={handleClearFilters}
               showMobilePanel={showFilters}
@@ -630,7 +631,7 @@ export default function SupportPage() {
 
           {/* Content */}
           {loadError ? (
-            <div className="bg-[#111d35] rounded-2xl border border-red-500/20 shadow-sm p-10 md:p-16 text-center">
+            <div role="alert" className="bg-[#111d35] rounded-2xl border border-red-500/20 shadow-sm p-10 md:p-16 text-center">
               <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-500/20">
                 <i className="ri-error-warning-line text-4xl text-red-400"></i>
               </div>
@@ -671,7 +672,7 @@ export default function SupportPage() {
             <div className="space-y-4">
               <BulkActionBar
                 selectedCount={selectedTicketIds.size}
-                totalCount={filteredTickets.length}
+                totalCount={loadError ? '—' : filteredTickets.length}
                 allSelected={selectedTicketIds.size === filteredTickets.length && filteredTickets.length > 0}
                 onSelectAll={() => setSelectedTicketIds(new Set(filteredTickets.map(t => t.id)))}
                 onClearSelection={() => setSelectedTicketIds(new Set())}
