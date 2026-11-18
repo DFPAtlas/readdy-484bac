@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { loadAdminSupportInbox } from '@/lib/support-inbox-reads';
 import Link from 'next/link';
 
 interface SupportTicket {
@@ -47,6 +48,7 @@ export default function AdminSupportTicketsPage() {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [filtered, setFiltered] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selected, setSelected] = useState<SupportTicket | null>(null);
   const [adminNote, setAdminNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -57,56 +59,30 @@ export default function AdminSupportTicketsPage() {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
+  const mountedRef = useRef(false);
+  const requestRef = useRef(0);
   const fetchTickets = useCallback(async () => {
+    if (!mountedRef.current) return;
+    const request = ++requestRef.current;
+    const current = () => mountedRef.current && request === requestRef.current;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('support_tickets')
-        .select('*')
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      if (!data) { setTickets([]); setLoading(false); return; }
-
-      const clientIds = [...new Set(data.map((t: any) => t.client_id).filter(Boolean))];
-      const guardIds = [...new Set(data.map((t: any) => t.guard_id).filter(Boolean))];
-      const jobIds = [...new Set(data.map((t: any) => t.related_job_id).filter(Boolean))];
-
-      const [clientsRes, guardsRes, jobsRes] = await Promise.all([
-        clientIds.length > 0 ? supabase.from('clients').select('id, company_name, contact_name, email').in('id', clientIds) : Promise.resolve({ data: [] }),
-        guardIds.length > 0 ? supabase.from('guards').select('id, full_name, email').in('id', guardIds) : Promise.resolve({ data: [] }),
-        jobIds.length > 0 ? supabase.from('jobs').select('id, job_title').in('id', jobIds) : Promise.resolve({ data: [] }),
-      ]);
-
-      const clientMap = new Map((clientsRes.data || []).map((c: any) => [c.id, c]));
-      const guardMap = new Map((guardsRes.data || []).map((g: any) => [g.id, g]));
-      const jobMap = new Map((jobsRes.data || []).map((j: any) => [j.id, j]));
-
-      const enriched: SupportTicket[] = (data || []).map((t: any) => {
-        const client = clientMap.get(t.client_id);
-        const guard = guardMap.get(t.guard_id);
-        const job = jobMap.get(t.related_job_id);
-        return {
-          ...t,
-          client_name: client?.company_name || client?.contact_name || 'Unknown client',
-          client_email: client?.email || '',
-          guard_name: guard?.full_name || null,
-          requester_name: t.client_id ? client?.company_name || client?.contact_name || 'Unknown client' : guard?.full_name || 'Guard',
-          requester_email: t.client_id ? client?.email || '' : guard?.email || '',
-          job_title: job?.job_title || null,
-        };
-      });
-
+      const enriched = await loadAdminSupportInbox(supabase);
+      if (!current()) return;
       setTickets(enriched);
-    } catch (err) {
-      console.error('Error fetching support tickets:', err);
+      setLoadError(false);
+    } catch {
+      if (current()) { setLoadError(true); setSelected(null); setAdminNote(''); }
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchTickets(); }, [fetchTickets]);
+  useEffect(() => {
+    mountedRef.current = true;
+    void fetchTickets();
+    return () => { mountedRef.current = false; requestRef.current += 1; };
+  }, [fetchTickets]);
 
   useEffect(() => {
     let result = [...tickets];
@@ -235,7 +211,7 @@ export default function AdminSupportTicketsPage() {
                 </div>
                 <span className="text-xs font-medium text-slate-400">{s.label}</span>
               </div>
-              <p className="text-2xl font-bold text-white">{s.value}</p>
+              <p className="text-2xl font-bold text-white">{loadError ? '—' : s.value}</p>
             </div>
           ))}
         </div>
@@ -278,7 +254,13 @@ export default function AdminSupportTicketsPage() {
           </div>
         </div>
 
-        {loading ? (
+        {loadError ? (
+          <div role="alert" className="rounded-2xl border border-red-500/30 bg-[#111d35] p-8 text-center">
+            <h2 className="text-xl font-semibold text-white mb-3">Support inbox unavailable</h2>
+            <p className="text-slate-300 mb-5">Tickets or their requester details could not be loaded. Please retry.</p>
+            <button type="button" disabled={loading} onClick={() => void fetchTickets()} className="rounded-xl bg-teal-500 px-5 py-3 font-semibold text-slate-950 disabled:opacity-50">{loading ? 'Retrying…' : 'Retry support inbox'}</button>
+          </div>
+        ) : loading ? (
           <div className="flex items-center justify-center py-24">
             <div className="w-10 h-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
           </div>
