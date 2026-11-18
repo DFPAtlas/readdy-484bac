@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
@@ -78,46 +78,65 @@ export default function ReplacementNotificationsSection({ clientId }: Replacemen
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState(false);
+  const retryRef = useRef<{ clientId: string; jobId?: string; load: () => Promise<void> } | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     let latestRequest = 0;
     setLoading(true);
     setRequests([]);
+    setLoadError(false);
     setExpandedId(null);
     const loadRequests = async () => {
       if (cancelled) return;
       const request = ++latestRequest;
+      setLoading(true);
+      setLoadError(false);
       try {
-        const { data } = await supabase
+        if (!clientId) throw new Error('Replacement request context is unavailable.');
+        const { data, error } = await supabase
           .from('replacement_requests')
           .select('*, jobs:job_id(title, location)')
           .eq('client_id', clientId)
           .order('created_at', { ascending: false });
 
-        if (!cancelled && request === latestRequest) setRequests((data || []) as ReplacementRequest[]);
+        if (cancelled || request !== latestRequest) return;
+        if (error || !Array.isArray(data)) throw new Error('Unable to load replacement requests.');
+        setRequests(data as ReplacementRequest[]);
       } catch {
-        if (!cancelled && request === latestRequest) setRequests([]);
+        if (!cancelled && request === latestRequest) setLoadError(true);
       } finally {
         if (!cancelled && request === latestRequest) setLoading(false);
       }
     };
 
 
-    loadRequests();
+    retryRef.current = { clientId, load: loadRequests };
+    void loadRequests();
 
-    const channel = supabase
+    const channel = clientId ? supabase
       .channel(`replacement-notifications-${clientId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'app', table: 'replacement_requests', filter: `client_id=eq.${clientId}` },
         () => {
-          loadRequests();
+          void loadRequests();
         }
       )
-      .subscribe();
+      .subscribe() : null;
 
-    return () => { cancelled = true; supabase.removeChannel(channel); };
+    return () => {
+      cancelled = true;
+      if (retryRef.current?.load === loadRequests) retryRef.current = null;
+      if (channel) void supabase.removeChannel(channel);
+    };
   }, [clientId]);
+
+  const retryLoad = () => {
+    const current = retryRef.current;
+    if (current?.clientId === clientId) void current.load();
+  };
 
   if (loading) {
     return (
@@ -128,6 +147,17 @@ export default function ReplacementNotificationsSection({ clientId }: Replacemen
           <div className="h-28 bg-slate-100 dark:bg-[#162036] rounded-xl animate-pulse" />
           <div className="h-28 bg-slate-100 dark:bg-[#162036] rounded-xl animate-pulse" />
         </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div role="alert" className="rounded-2xl border border-red-500/25 bg-red-500/10 p-6 mb-6">
+        <h2 className="text-base font-bold text-slate-900 dark:text-white">Replacement Requests</h2>
+        <p className="mt-2 text-sm text-red-600 dark:text-red-400">Unable to load replacement requests.</p>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Please retry to check the latest replacement status.</p>
+        <button onClick={retryLoad} className="mt-3 text-sm font-semibold text-teal-600 dark:text-teal-400 underline">Retry loading replacement requests</button>
       </div>
     );
   }
