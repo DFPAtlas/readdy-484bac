@@ -1,15 +1,4 @@
-export type ClientPlan = {
-  slug: string;
-  name: string;
-  serviceFeePct: number;
-  postingAllowance: string;
-};
-
-export type GuardMembership = {
-  name: string;
-  monthlyPrice: number;
-};
-
+import { CANCELLATION_GUIDANCE, GUARD_CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
 export type CancellationWindow = {
   label: string;
   outcome: string;
@@ -34,29 +23,13 @@ export type HelpTopic = {
   href: string;
 };
 
-export const CLIENT_PLANS: ClientPlan[] = [
-  { slug: "free", name: "Free", serviceFeePct: 15, postingAllowance: "1 job posting per month" },
-  { slug: "starter", name: "Starter", serviceFeePct: 10, postingAllowance: "10 job postings per month" },
-  { slug: "pro", name: "Pro", serviceFeePct: 7.5, postingAllowance: "30 job postings per month" },
-  { slug: "enterprise", name: "Enterprise", serviceFeePct: 5, postingAllowance: "Unlimited job postings" },
-];
-
-export const GUARD_MEMBERSHIPS: GuardMembership[] = [
-  { name: "Basic", monthlyPrice: 10 },
-  { name: "Pro", monthlyPrice: 19 },
-  { name: "Elite", monthlyPrice: 29 },
-];
-
 export const CANCELLATION_WINDOWS: CancellationWindow[] = [
-  { label: "More than 24 hours before", outcome: "Full refund", detail: "Including the service fee.", tone: "good" },
-  { label: "12 to 24 hours before", outcome: "50% of guard fee", detail: "The service fee is retained.", tone: "warn" },
-  { label: "Less than 12 hours before", outcome: "No refund", detail: "The guard has kept the shift free for you.", tone: "bad" },
+  { label: "Before payment", outcome: "No booking payment to refund", detail: "Posting a job does not capture the booking payment.", tone: "good" },
+  { label: "After payment", outcome: "Refund review", detail: "The team reviews the original payment, timing, booking circumstances and any service fee.", tone: "warn" },
+  { label: "After payout starts", outcome: "Contact support", detail: "A payment or payout already started can block cancellation. Contact support for review.", tone: "warn" },
 ];
 
-export const CANCELLATION_NOTES: string[] = [
-  "If a guard cancels, you get a full refund including the service fee.",
-  "Cancel from My Jobs until the guard's payout has started. Our team reviews every refund request.",
-];
+export const CANCELLATION_NOTES = [CANCELLATION_GUIDANCE, `${GUARD_CANCELLATION_GUIDANCE} ${REFUND_TIMING_GUIDANCE}`];
 
 export const LICENCE_CHECKS: LicenceCheck[] = [
   {
