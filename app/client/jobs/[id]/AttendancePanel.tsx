@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getAttendanceStatus, getShiftPhase } from '@/lib/attendance-display.cjs';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -11,6 +11,7 @@ import ReplacementRequestModal from './ReplacementRequestModal';
 import ReplacementGuardSuggestions from './ReplacementGuardSuggestions';
 import ReplacementStatusTracker from './ReplacementStatusTracker';
 import { formatDateOnly } from '@/lib/date-only';
+import { saveClientAttendanceIssue, type AttendanceIssueType, type SavedAttendanceIssue } from '@/lib/client-attendance-issues';
 
 interface Guard {
   id: string;
@@ -40,9 +41,10 @@ interface AttendancePanelProps {
   assignments: Assignment[];
   clientId?: string;
   onMessageGuard?: (guardId: string, guardName: string, guardUserId: string) => void;
+  onIssueSaved?: (assignment: SavedAttendanceIssue) => void;
 }
 
-export default function AttendancePanel({ job, assignments: rawAssignments, clientId, onMessageGuard }: AttendancePanelProps) {
+export default function AttendancePanel({ job, assignments: rawAssignments, clientId, onMessageGuard, onIssueSaved }: AttendancePanelProps) {
   const router = useRouter();
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function AttendancePanel({ job, assignments: rawAssignments, clie
     ...assignment, attendance_status: getAttendanceStatus(assignment),
   }));
   const [reportingAssignment, setReportingAssignment] = useState<string | null>(null);
-  const [reportType, setReportType] = useState('no_show');
+  const [reportType, setReportType] = useState<AttendanceIssueType>('no_show');
   const [reportNotes, setReportNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -63,32 +65,64 @@ export default function AttendancePanel({ job, assignments: rawAssignments, clie
     guardId?: string;
     preferredGuard?: { id: string; fullName: string };
   } | null>(null);
+  const [saveError, setSaveError] = useState('');
+  const active = useRef(true);
+  const actionPending = useRef(false);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasContext = !!clientId && !!job?.id && job.client_id === clientId;
+
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
+
+  const showSuccess = (message: string) => {
+    if (!active.current) return;
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setSuccessMsg(message);
+    toastTimer.current = setTimeout(() => {
+      if (active.current) setSuccessMsg('');
+    }, 3000);
+  };
+
+  const saveIssue = async (assignmentId: string, issue: {type: AttendanceIssueType; notes: string} | null) => {
+    if (!active.current || actionPending.current) return false;
+    if (!hasContext || !assignments.some(a => a.id === assignmentId)) {
+      setSaveError('Unable to verify this assignment. Reload the job before retrying.');
+      return false;
+    }
+    actionPending.current = true;
+    setSubmitting(true);
+    setSaveError('');
+    setSuccessMsg('');
+    try {
+      const saved = await saveClientAttendanceIssue(supabase, {clientId: clientId!, jobId: job.id, assignmentId}, issue, () => active.current);
+      if (!active.current) return false;
+      onIssueSaved?.(saved);
+      showSuccess(issue ? 'Issue reported successfully' : 'Issue marked as resolved');
+      return true;
+    } catch {
+      if (active.current) setSaveError('The attendance change could not be confirmed. Reload the job to check its status before retrying.');
+      return false;
+    } finally {
+      actionPending.current = false;
+      if (active.current) setSubmitting(false);
+    }
+  };
 
   const handleReport = async () => {
     if (!reportingAssignment) return;
-    setSubmitting(true);
-    try {
-      await supabase
-        .from('job_assignments')
-        .update({
-          issue_reported: true,
-          issue_type: reportType,
-          issue_notes: reportNotes,
-          attendance_status: reportType === 'no_show' ? 'no_show' : 'late',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', reportingAssignment);
-      setSuccessMsg('Issue reported successfully');
-      setTimeout(() => setSuccessMsg(''), 3000);
+    if (await saveIssue(reportingAssignment, {type: reportType, notes: reportNotes}) && active.current) {
       setReportingAssignment(null);
       setReportNotes('');
-    } catch {
-    } finally {
-      setSubmitting(false);
     }
   };
 
   const handleRequestReplacement = async (assignmentId: string, guardName: string) => {
+    if (!active.current || actionPending.current) return;
     const assignment = assignments.find(a => a.id === assignmentId);
     setReplacementModal({
       assignmentId,
@@ -98,25 +132,12 @@ export default function AttendancePanel({ job, assignments: rawAssignments, clie
   };
 
   const handleMarkResolved = async (assignmentId: string) => {
-    try {
-      await supabase
-        .from('job_assignments')
-        .update({
-          issue_reported: false,
-          issue_type: null,
-          issue_notes: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', assignmentId);
-      setSuccessMsg('Issue marked as resolved');
-      setTimeout(() => setSuccessMsg(''), 3000);
-    } catch {
-    }
+    return saveIssue(assignmentId, null);
   };
 
   const handleReplacementSuccess = () => {
-    setSuccessMsg('Replacement request submitted successfully');
-    setTimeout(() => setSuccessMsg(''), 3000);
+    if (!active.current) return;
+    showSuccess('Replacement request submitted successfully');
     setReplacementModal(null);
   };
 
@@ -141,6 +162,7 @@ export default function AttendancePanel({ job, assignments: rawAssignments, clie
           <p className="text-sm font-medium text-emerald-400">{successMsg}</p>
         </div>
       )}
+      {saveError && !reportingAssignment && <p role="alert" className="text-sm text-red-400">{saveError}</p>}
 
       {/* Shift Header */}
       <div className="bg-[#111d35] rounded-2xl border border-[#1e2d4d] shadow-sm p-6">
@@ -281,7 +303,10 @@ export default function AttendancePanel({ job, assignments: rawAssignments, clie
                 jobEndTime={job.end_time}
                 jobStartDate={job.start_date}
                 onMessageGuard={onMessageGuard}
+                actionsDisabled={submitting || !hasContext}
                 onReportIssue={(id, name) => {
+                  if (!active.current || actionPending.current || !hasContext) return;
+                  setSaveError('');
                   setReportingAssignment(id);
                   setReportType('no_show');
                   setReportNotes(`${name} did not show up for the shift.`);
@@ -305,6 +330,7 @@ export default function AttendancePanel({ job, assignments: rawAssignments, clie
               <h2 className="text-lg font-bold text-white">Report Issue</h2>
             </div>
             <div className="space-y-4 mb-6">
+              {saveError && <p role="alert" className="text-sm text-red-400">{saveError}</p>}
               <div>
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Issue Type</label>
                 <div className="flex flex-wrap gap-2">
@@ -316,7 +342,8 @@ export default function AttendancePanel({ job, assignments: rawAssignments, clie
                   ].map(type => (
                     <button
                       key={type.key}
-                      onClick={() => setReportType(type.key)}
+                      onClick={() => setReportType(type.key as AttendanceIssueType)}
+                      disabled={submitting}
                       className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                         reportType === type.key
                           ? 'bg-red-500/15 text-red-400 border border-red-500/25'
@@ -333,6 +360,7 @@ export default function AttendancePanel({ job, assignments: rawAssignments, clie
                 <label className="block text-sm font-semibold text-slate-300 mb-2">Notes</label>
                 <textarea
                   value={reportNotes}
+                  disabled={submitting}
                   onChange={e => setReportNotes(e.target.value)}
                   placeholder="Describe the issue..."
                   maxLength={500}
@@ -351,7 +379,7 @@ export default function AttendancePanel({ job, assignments: rawAssignments, clie
               </button>
               <button
                 onClick={handleReport}
-                disabled={submitting}
+                disabled={submitting || !hasContext}
                 className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {submitting ? (

@@ -805,10 +805,12 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
           )}
           {activeTab === 'attendance' && (
             <AttendancePanel
+              key={`${clientId}:${job.id}`}
               job={job}
               assignments={assignedGuards}
               clientId={clientId}
               onMessageGuard={handleMessageGuard}
+              onIssueSaved={saved => setAssignedGuards(current => current.map(assignment => assignment.id === saved.id ? {...assignment, ...saved} : assignment))}
             />
           )}
           {activeTab === 'timeline' && <JobTimeline events={timeline} />}

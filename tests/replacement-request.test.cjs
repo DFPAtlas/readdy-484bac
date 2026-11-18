@@ -6,7 +6,7 @@ const React = require('react');
 
 function harness(file, initial, mocks = {}) {
   const states = [...initial]; let index = 0;
-  const hooks = {...React, useEffect() {}, useState(value) { const i = index++; if (!(i in states)) states[i] = typeof value === 'function' ? value() : value; return [states[i], next => states[i] = typeof next === 'function' ? next(states[i]) : next]; }};
+  const hooks = {...React, useEffect() {}, useRef(value) { const i = index++; if (!(i in states)) states[i] = {current:value}; return states[i]; }, useState(value) { const i = index++; if (!(i in states)) states[i] = typeof value === 'function' ? value() : value; return [states[i], next => states[i] = typeof next === 'function' ? next(states[i]) : next]; }};
   const module = {exports:{}};
   const code = ts.transpileModule(fs.readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText;
   new Function('module','exports','require','setTimeout',code)(module,module.exports,name => name === 'react' ? hooks : name in mocks ? mocks[name] : require(name),()=>{});
@@ -73,7 +73,7 @@ test('failed request insert does not report success or create follow-up writes',
 
 test('attendance panel opens the request modal with the candidate and affected assignment choices',()=>{
   const Suggestions=()=>null, Modal=()=>null;
-  const mocks={...common,'@/lib/supabase':{supabase:{}},'./ReplacementGuardSuggestions':{default:Suggestions},'./ReplacementRequestModal':{default:Modal}};
+  const mocks={...common,'@/lib/supabase':{supabase:{}},'@/lib/client-attendance-issues':{saveClientAttendanceIssue:async()=>{}},'./ReplacementGuardSuggestions':{default:Suggestions},'./ReplacementRequestModal':{default:Modal}};
   for(const name of ['GuardAttendanceCard','AttendanceSummary','AttendanceWarnings','ReplacementStatusTracker'])mocks['./'+name]={default:()=>null};
   const h=harness(dir+'AttendancePanel.tsx',[],mocks);
   const affected={id:'original',guard_id:'absent',attendance_status:'no_show',guards:{id:'absent',full_name:'Absent Guard'}};
