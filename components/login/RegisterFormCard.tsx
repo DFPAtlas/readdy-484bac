@@ -10,7 +10,7 @@ interface RegisterFormCardProps {
   subtitle?: string;
 }
 
-export default function RegisterFormCard({ children, userTypeLabel, formId, heading = "Create your account", subtitle = "Create your QuickGuard account." }: RegisterFormCardProps) {
+export default function RegisterFormCard({ children, userTypeLabel, formId, heading = "Create your account", subtitle = "Join thousands of professionals on the QuickGuard platform." }: RegisterFormCardProps) {
   return (
     <div className="relative z-10 w-full max-w-[440px]">
       <div

@@ -49,7 +49,7 @@ const data: IndustryData = {
   heroImage:
     'https://readdy.ai/api/search-image?query=Professional%20team%20of%20SIA-licensed%20security%20officers%20in%20smart%20black%20uniforms%20standing%20confidently%20outside%20a%20modern%20UK%20corporate%20office%20building%20at%20dusk%2C%20visible%20SIA%20badges%2C%20moody%20deep%20navy%20blue%20and%20teal%20colour%20palette%20with%20soft%20city%20bokeh%2C%20cinematic%20wide%20angle%20with%20a%20clean%20dark%20gradient%20across%20the%20left%20side%20ideal%20for%20white%20text%20overlay%2C%20high-end%20editorial%20corporate%20photography%20style%2C%20realistic%20sharp%20details%2C%20uncluttered%20premium%20composition&width=1600&height=900&seq=ind_seccomp_hero_20261001&orientation=landscape',
   primaryCta: { label: 'Find Security Staff', href: '/client/register?redirect=/post-job' },
-  secondaryCta: { label: 'Create Client Account', href: '/client/register' },
+  secondaryCta: { label: 'Create Company Account', href: '/client/register' },
   problemsTitle: 'When your workforce cannot cover the requirement',
   problemsIntro:
     'Security companies lose contracts when cover falls through. These are the gaps QuickGuard is built to help you fill.',
@@ -105,12 +105,12 @@ const data: IndustryData = {
     'Not every security role is licensable in the same way. Where a role involves licensable security activity, QuickGuard helps you identify professionals holding the appropriate SIA licence.',
   faqs: [
     { q: 'Can I source more than one officer at a time?', a: 'Yes. Post a requirement for as many operatives as you need and suitable candidates will be able to respond. You review and select before confirming.' },
-    { q: 'How quickly can cover be arranged?', a: 'Response times depend on eligible guard availability and your job requirements. For urgent cover, choose the immediate option when posting. A response or booking is not guaranteed.' },
-    { q: 'Do I need to be a security company to use QuickGuard?', a: 'Security companies, venues and end clients use the same client registration and job-posting journey. Create a client account to book cover. The separate company management portal is for administrator-issued accounts; it is not activated by client registration.' },
+    { q: 'How quickly can cover be arranged?', a: 'Many requirements receive responses within minutes. For urgent same-day cover, mark the requirement as immediate when posting so available operatives are prompted.' },
+    { q: 'Do I need to be a security company to use QuickGuard?', a: 'QuickGuard is used by security companies, venues and end clients alike. You create a company account and post your requirement through the standard job-posting flow.' },
     { q: 'Will I know if an operative holds the right licence?', a: 'Where licensable activity is involved, licence information is displayed on operatives’ profiles so you can review it against the role before confirming.' },
   ],
   relatedLinks: [
-    { label: 'Create a client account', href: '/client/register' },
+    { label: 'Create a company account', href: '/client/register' },
     { label: 'Post a requirement', href: '/post-job' },
     { label: 'Browse available guards', href: '/find-a-guard' },
     { label: 'How QuickGuard works', href: '/how-it-works' },

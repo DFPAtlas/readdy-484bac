@@ -24,3 +24,11 @@ Full-suite, TypeScript, ESLint, admin/financial type gate and production-build r
 ## Scope
 
 This does not implement rewards redemption or company management CRUD. Those remain separate development/UAT work. Frontend changes require merge, Readdy import and publication before appearing live. No real checkout payment or refund was performed.
+
+## Readdy v2363 merge reconciliation
+
+Resolved conflicts with `ef23f93` in printable pricing, upgrade and help content. The reviewed catalogue/annual-price implementation and shared cancellation guidance are retained. The shared guidance and plan-catalogue helpers removed by the sync are restored because pricing imports them.
+
+The new blog/admin-blog, launch pages, navigation and sitemap work are preserved unchanged from main. Next.js remains at the previously used 15.5.27; the new Markdown dependencies are retained and the npm lockfile is reconciled. A clean `npm ci` validates the combined dependency set.
+
+The same Readdy sync reverted other earlier consistency repairs outside the pricing files. Restoring those unrelated changes is outside this conflict resolution and needs separate review; this merge does not certify that all earlier audit fixes remain present on main.

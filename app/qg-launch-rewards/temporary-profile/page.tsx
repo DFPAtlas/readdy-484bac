@@ -98,11 +98,11 @@ export default function TemporaryProfilePage() {
           </div>
           <h2 className="text-2xl font-bold text-white mb-3">Your QG Launch Rewards profile has been created!</h2>
           <p className="text-slate-400 text-sm leading-relaxed mb-6">
-            Your QG Tokens will be linked to <strong className="text-teal-400">{submittedEmail}</strong>. Create a full QuickGuard account later with the same email to view eligible recorded tokens after verification. Checkout redemption is not available yet.
+            Your QG Tokens will be linked to <strong className="text-teal-400">{submittedEmail}</strong>. Create a full QuickGuard account later with the same email to view and use eligible tokens after verification.
           </p>
           <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl p-4 mb-6">
             <p className="text-teal-400 text-sm font-semibold mb-1">100 QG Tokens = £10 QuickGuard credit</p>
-            <p className="text-slate-400 text-xs">Tokens are discount credits only. Eligible tokens can be linked after account verification; checkout redemption is planned and is not available yet.</p>
+            <p className="text-slate-400 text-xs">Tokens are discount credits only. They become usable after your full account is verified.</p>
           </div>
           <div className="flex flex-col gap-3">
             <Link
@@ -316,7 +316,7 @@ export default function TemporaryProfilePage() {
           </form>
 
           <p className="text-center text-slate-600 text-[11px] mt-6 leading-relaxed">
-            By creating a temporary launch profile, you agree that QG Tokens are discount credits only, have no cash value, and can be linked after account verification; checkout redemption is planned and is not available yet. Single-level referrals only.
+            By creating a temporary launch profile, you agree that QG Tokens are discount credits only, have no cash value, and become usable only after your full QuickGuard account is verified. Single-level referrals only.
           </p>
         </div>
       </section>

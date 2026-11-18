@@ -206,7 +206,7 @@ export default function QGExitIntentPopup() {
               </div>
               <div>
                 <p className="text-white font-bold">100 QG Tokens = £10 QuickGuard Credit</p>
-                <p className="text-slate-400 text-xs mt-0.5">QG Tokens are discount credits only. Eligible tokens can be linked after account verification. Checkout redemption is planned and is not available yet. Tokens have no cash value.</p>
+                <p className="text-slate-400 text-xs mt-0.5">QG Tokens are discount credits only. They activate after verified account creation and have no cash value.</p>
               </div>
             </div>
           </div>
@@ -249,7 +249,7 @@ export default function QGExitIntentPopup() {
 
         <div className="px-8 pb-4 text-center">
           <p className="text-[10px] text-slate-600 leading-relaxed">
-            QG Tokens are discount credits only. They have no cash value, cannot be withdrawn or transferred, and can be linked after account verification. Checkout redemption is planned and is not available yet. Single-level referrals only.
+            QG Tokens are discount credits only. They have no cash value, cannot be withdrawn or transferred, and activate after verified account creation. Single-level referrals only.
           </p>
         </div>
       </div>

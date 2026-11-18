@@ -27,6 +27,7 @@ const STATIC_PAGES: Array<{ path: string; changeFrequency: ChangeFrequency; prio
   { path: '/pricing', changeFrequency: 'monthly', priority: 0.8 },
   { path: '/contact', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/help', changeFrequency: 'monthly', priority: 0.7 },
+  { path: '/blog', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/guide/client', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/guide/guard', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/security-guards', changeFrequency: 'weekly', priority: 0.8 },
@@ -83,6 +84,35 @@ async function fetchPublishedJobs(now: Date): Promise<MetadataRoute.Sitemap> {
   }
 }
 
+async function fetchPublishedBlogPosts(now: Date): Promise<MetadataRoute.Sitemap> {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { db: { schema: 'app' } }
+    );
+
+    const { data } = await supabase
+      .from('blog_posts')
+      .select('slug, updated_at, published_at')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .limit(500);
+
+    const posts = Array.isArray(data) ? data : [];
+    if (posts.length === 0) return [];
+
+    return posts.map((post) => ({
+      url: `${BASE_URL}/blog/${post.slug}`,
+      lastModified: post.updated_at ? new Date(post.updated_at) : post.published_at ? new Date(post.published_at) : now,
+      changeFrequency: 'monthly' as ChangeFrequency,
+      priority: 0.6,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
@@ -101,6 +131,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   const jobEntries = await fetchPublishedJobs(now);
+  const blogEntries = await fetchPublishedBlogPosts(now);
 
-  return [...staticEntries, ...cityEntries, ...jobEntries];
+  return [...staticEntries, ...cityEntries, ...jobEntries, ...blogEntries];
 }

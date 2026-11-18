@@ -1,7 +1,5 @@
 'use client';
 
-import { companyTabHref, type CompanyTab } from '@/lib/company-navigation';
-
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
@@ -15,7 +13,6 @@ import BrandLogo from '@/components/BrandLogo';
 import { planLabel } from '@/lib/client-journey';
 
 interface PortalSidebarProps {
-  companyTab?: CompanyTab;
   role: 'client' | 'guard' | 'company';
   displayName: string;
   subtitle: string;
@@ -73,22 +70,21 @@ const GUARD_NAV = [
 ];
 
 const COMPANY_NAV = [
-  { href: companyTabHref('overview'), icon: 'ri-dashboard-line', label: 'Dashboard' },
-  { href: companyTabHref('sites'), icon: 'ri-building-4-line', label: 'Sites' },
-  { href: companyTabHref('staff'), icon: 'ri-team-line', label: 'Staff' },
-  { href: companyTabHref('rotas'), icon: 'ri-calendar-check-line', label: 'Rotas' },
-  { href: companyTabHref('incidents'), icon: 'ri-alert-line', label: 'Incidents' },
-  { href: companyTabHref('compliance'), icon: 'ri-shield-check-line', label: 'Compliance' },
-  { href: companyTabHref('training'), icon: 'ri-book-open-line', label: 'Training' },
-  { href: companyTabHref('reports'), icon: 'ri-file-chart-line', label: 'Reports' },
-  { href: companyTabHref('billing'), icon: 'ri-bank-card-line', label: 'Billing' },
-  { href: companyTabHref('messages'), icon: 'ri-message-3-line', label: 'Messages' },
-  { href: companyTabHref('settings'), icon: 'ri-settings-3-line', label: 'Settings' },
+  { href: '/company/dashboard', icon: 'ri-dashboard-line', label: 'Dashboard' },
+  { href: '/company/sites', icon: 'ri-building-4-line', label: 'Sites' },
+  { href: '/company/staff', icon: 'ri-team-line', label: 'Staff' },
+  { href: '/company/rotas', icon: 'ri-calendar-check-line', label: 'Rotas' },
+  { href: '/company/incidents', icon: 'ri-alert-line', label: 'Incidents' },
+  { href: '/company/compliance', icon: 'ri-shield-check-line', label: 'Compliance' },
+  { href: '/company/training', icon: 'ri-book-open-line', label: 'Training' },
+  { href: '/company/reports', icon: 'ri-file-chart-line', label: 'Reports' },
+  { href: '/company/billing', icon: 'ri-bank-card-line', label: 'Billing' },
+  { href: '/company/messages', icon: 'ri-message-3-line', label: 'Messages' },
+  { href: '/company/settings', icon: 'ri-settings-3-line', label: 'Settings' },
 ];
 
 export default function PortalSidebar({
   role,
-  companyTab = 'overview',
   displayName,
   subtitle,
   initials,
@@ -107,7 +103,7 @@ export default function PortalSidebar({
   const router = useSafeRouter();
 
   const navItems = role === 'client' ? CLIENT_NAV : role === 'company' ? COMPANY_NAV : GUARD_NAV;
-  const isActive = (href: string) => role === 'company' ? href === companyTabHref(companyTab) : pathname === href;
+  const isActive = (href: string) => pathname === href;
 
   const mergedFlags: Record<string, boolean> = { ...internalFlags, ...explicitFlags };
 

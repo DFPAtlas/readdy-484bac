@@ -69,7 +69,7 @@ export default function HomepageSchema() {
         name: 'How much does it cost for guards to use the platform?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Guards can create a free account with two applications per month. Paid memberships start at £10/month, with Pro at £19 and Elite at £29. Membership is separate from guard pay; compare current plans on the Pricing page.',
+          text: 'Guards pay a monthly subscription starting from £10/month. There are multiple tiers available depending on the level of visibility and features you need. You can view all plans on our Pricing page.',
         },
       },
       {
@@ -77,7 +77,7 @@ export default function HomepageSchema() {
         name: 'When and how do guards get paid?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Once a client confirms job completion, payment is released to your account in full, with no guard commission. Funds are transferred directly to your registered UK bank account. Payment records are available in your account. You remain responsible for your own tax reporting and should seek independent advice when needed.',
+          text: 'Once a client confirms job completion, payment is released to your account in full, with no guard commission. Funds are transferred directly to your registered UK bank account. You also receive automatic UTR and tax documentation to stay HMRC compliant.',
         },
       },
       {
@@ -114,10 +114,10 @@ export default function HomepageSchema() {
       },
       {
         '@type': 'Question',
-        name: 'Who is responsible for tax reporting?',
+        name: 'Is the platform HMRC compliant?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'QuickGuard is a marketplace, not the guard’s employer. Guards and clients are responsible for their own tax, National Insurance, VAT and reporting obligations. Payment records support record-keeping but do not replace independent tax advice.',
+          text: 'Yes. QuickGuard.uk is fully HMRC compliant. Guards receive automatic tax documentation and UTR support. All transactions are processed through our secure, regulated payment system.',
         },
       },
       {

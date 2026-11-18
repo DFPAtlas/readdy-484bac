@@ -312,6 +312,13 @@ export default function AdminPaymentManagementPage() {
     } finally { setActionLoading(''); }
   };
 
+  const amount = parseFloat(testAmount) || 0;
+  const guardGross = amount;
+  const platformFee = amount * 0.10;
+  const stripeFee = amount * 0.015 + 0.20;
+  const clientTotal = amount + platformFee + stripeFee;
+  const guardNet = amount;
+
   const statusBadge = (status: string | null | undefined) => {
     const s = (status || 'unknown').toLowerCase();
     let cls = 'bg-slate-500/10 text-slate-400 ring-slate-500/20';
@@ -577,8 +584,19 @@ export default function AdminPaymentManagementPage() {
                 </div>
               </div>
 
-              <div className="mt-5 bg-[#0a1628] rounded-xl border border-[#1a2b4a] p-4 text-sm text-slate-300">
-                The amount entered is test guard pay, not a client-total quote. The server determines the booking service fee from the client plan and any eligible promotion when checkout is created. Payment processing is included in that service fee; there is no separate client card surcharge. Review the returned checkout and recorded payment details for the actual amounts.
+              <div className="mt-5 bg-[#0a1628] rounded-xl border border-[#1a2b4a] p-4 grid grid-cols-2 sm:grid-cols-5 gap-4">
+                {[
+                  { label: 'Guard Gross', value: guardGross, cls: 'text-white' },
+                  { label: 'Platform Fee (10%)', value: platformFee, cls: 'text-amber-400' },
+                  { label: 'Stripe Fee (est.)', value: stripeFee, cls: 'text-sky-400' },
+                  { label: 'Client Total', value: clientTotal, cls: 'text-emerald-400' },
+                  { label: 'Guard Net', value: guardNet, cls: 'text-teal-400' },
+                ].map((row, i) => (
+                  <div key={i} className="text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">{row.label}</p>
+                    <p className={`text-base font-extrabold ${row.cls}`}>£{row.value.toFixed(2)}</p>
+                  </div>
+                ))}
               </div>
 
               <div className="mt-5 flex items-center gap-2 text-[11px] text-slate-500">
