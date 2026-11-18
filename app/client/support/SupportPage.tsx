@@ -303,12 +303,14 @@ export default function SupportPage() {
   };
 
   const handleOpenCreate = (jobId?: string, category?: string) => {
+    if (loadError) return;
     setPrefillJobId(jobId || '');
     setPrefillCategory(category || '');
     setShowCreateModal(true);
   };
 
   const handleExport = () => {
+    if (loadError) return;
     if (filteredTickets.length === 0) {
       setToast('No tickets to export');
       return;
@@ -339,7 +341,7 @@ export default function SupportPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setToast(`${loadError ? '—' : filteredTickets.length} ticket${filteredTickets.length !== 1 ? 's' : ''} exported`);
+    setToast(`${filteredTickets.length} ticket${filteredTickets.length !== 1 ? 's' : ''} exported`);
   };
 
   const handleClearFilters = () => {
@@ -374,6 +376,7 @@ export default function SupportPage() {
   };
 
   const handleBulkExportTickets = () => {
+    if (loadError) return;
     const selected = filteredTickets.filter(t => selectedTicketIds.has(t.id));
     if (selected.length === 0) { setToast('No tickets selected'); return; }
     setBulkProcessing(true);
@@ -401,6 +404,7 @@ export default function SupportPage() {
   };
 
   const handleBulkMarkResolved = async () => {
+    if (loadError) return;
     const resolvable = filteredTickets.filter(t => selectedTicketIds.has(t.id) && !['resolved', 'closed'].includes(t.status)).map(t => t.id);
     if (resolvable.length === 0) { setToast('No tickets that can be resolved'); return; }
     setBulkProcessing(true);
@@ -421,6 +425,7 @@ export default function SupportPage() {
   };
 
   const handleTicketBulkAction = (actionKey: string) => {
+    if (loadError) return;
     if (actionKey === 'export') handleBulkExportTickets();
     else if (actionKey === 'resolve') handleBulkMarkResolved();
   };
@@ -659,7 +664,7 @@ export default function SupportPage() {
                 >
                   <i className={tab.icon}></i>
                   {tab.label}
-                  {count > 0 && (
+                  {!loadError && count > 0 && (
                     <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-[#162036] text-slate-400'}`}>
                       {count}
                     </span>
@@ -688,7 +693,7 @@ export default function SupportPage() {
               sortBy={sortBy}
               onSortChange={setSortBy}
               sortOptions={TICKET_SORT_OPTIONS}
-              resultCount={loadError ? '—' : filteredTickets.length}
+              resultCount={loadError ? undefined : filteredTickets.length}
               loading={loading}
               onClear={handleClearFilters}
               showMobilePanel={showFilters}
@@ -766,7 +771,7 @@ export default function SupportPage() {
             <div className="space-y-4">
               <BulkActionBar
                 selectedCount={selectedTicketIds.size}
-                totalCount={loadError ? '—' : filteredTickets.length}
+                totalCount={filteredTickets.length}
                 allSelected={selectedTicketIds.size === filteredTickets.length && filteredTickets.length > 0}
                 onSelectAll={() => setSelectedTicketIds(new Set(filteredTickets.map(t => t.id)))}
                 onClearSelection={() => setSelectedTicketIds(new Set())}
