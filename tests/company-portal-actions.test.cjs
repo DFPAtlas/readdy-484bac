@@ -74,16 +74,22 @@ test('every company support destination resolves to an editable contact form wit
     '@/lib/customer-guidance': { HUMAN_SUPPORT_HOURS: 'Mon–Fri 9AM–6PM' },
     '@/lib/supabase': { supabase: new Proxy({}, { get() { assert.fail('Rendering must not submit a request'); } }) },
   }).default;
-  const page = load('app/contact/page.tsx', {
+  let searchParams = new URLSearchParams();
+  const ContactEnquiryWrapper = load('app/contact/ContactEnquiryWrapper.tsx', {
+    'next/navigation': { useSearchParams: () => searchParams },
     './ContactClient': { __esModule: true, default: ContactClient },
-    './ContactSchema': { __esModule: true, default: () => null },
     '@/lib/contact-enquiry': contact,
+  }).default;
+  const page = load('app/contact/page.tsx', {
+    './ContactEnquiryWrapper': { __esModule: true, default: ContactEnquiryWrapper },
+    './ContactSchema': { __esModule: true, default: () => null },
   }).default;
   assert.equal(topics.length, 10);
   for (const topic of topics) {
     const enquiry = contact.getContactEnquiry(topic);
     assert.ok(enquiry.subject); assert.ok(enquiry.category);
-    const html = renderToStaticMarkup(await page({ searchParams: Promise.resolve({ subject: topic }) }));
+    searchParams = new URLSearchParams({ subject: topic });
+    const html = renderToStaticMarkup(React.createElement(page));
     assert.ok(html.includes(`value="${enquiry.subject}"`));
     assert.ok(html.includes(`name="category" value="${enquiry.category}"`));
     assert.doesNotMatch(html, /readOnly|readonly/);

@@ -14,7 +14,7 @@ An account-scoped synchronous lock prevents overlapping writes. Request sequenci
 
 Eleven new guard-bell tests cover returned/thrown/malformed loads and retries; confirmed empty results and guard query scopes; failed single/mark-all writes; duplicate clicks; partial/zero-row acknowledgements; notifications arriving during writes; confirmed and failed View actions; cancellation after closing; changed accounts; unmounts; and rendered accessible alerts/disabled actions.
 
-The 26-test targeted set includes those tests, twelve existing notification-owner/inbox tests and three existing notification/template dependency tests. Full-suite, TypeScript, repository lint, admin/financial gate and production build results are recorded in the PR description. Failure tests use mocks. Build validation overrides the tracked public Supabase settings with the loopback endpoint and placeholder key established in PR #164.
+The notification-focused 26-test set includes those tests, twelve existing notification-owner/inbox tests and three existing notification/template dependency tests. The full suite also exposed an outdated contact-page test harness after the Readdy update on main introduced ContactEnquiryWrapper. The harness now renders that real wrapper with mocked URL parameters and retains all existing contact-form assertions; all five company portal tests pass (31 targeted and related tests in total). No contact-page application code is changed. Full-suite, TypeScript, repository lint, admin/financial gate and production build results are recorded in the PR description. Failure tests use mocks. Build validation overrides the tracked public Supabase settings with the loopback endpoint and placeholder key established in PR #164.
 
 ## Deployment and signed-in checks
 
