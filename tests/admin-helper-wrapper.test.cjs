@@ -91,5 +91,10 @@ test('migration aborts if the canonical helper differs or cannot be called, with
     await db.exec("GRANT EXECUTE ON FUNCTION app.is_active_admin() TO authenticated,service_role; CREATE OR REPLACE FUNCTION public.is_active_admin() RETURNS boolean LANGUAGE sql SECURITY DEFINER AS 'SELECT true;'; BEGIN");
     await assert.rejects(db.exec(migration),/bodies differ/); await db.exec('ROLLBACK');
     assert.equal((await state(db)).prosecdef,true);
+    const canonical = (await db.query("SELECT prosrc FROM pg_proc WHERE oid='app.is_active_admin()'::regprocedure")).rows[0].prosrc;
+    const alteredMfa = canonical.replace("'aal2'", "'aal 2'");
+    await db.exec(`CREATE OR REPLACE FUNCTION public.is_active_admin() RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path=app,pg_catalog AS $body$${alteredMfa}$body$; BEGIN`);
+    await assert.rejects(db.exec(migration),/bodies differ/); await db.exec('ROLLBACK');
+    assert.equal((await state(db)).prosecdef,true,'whitespace inside an MFA string must never be normalised away');
   } finally { await db.close(); }
 });

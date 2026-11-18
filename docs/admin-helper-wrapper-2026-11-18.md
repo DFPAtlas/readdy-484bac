@@ -27,6 +27,8 @@ No frontend or Edge Function changes are included. PR 146 was separately closed 
 ## Hosted rehearsal result — 18 November
 
 - Test Batabase (PostgreSQL 17.11): baseline, delegate and rollback all passed eight actor/MFA combinations, 27 policy-backed admin read paths, owner billing reads, admin writes, legacy routine calls, absent-claims denial, anonymous denial and backend access.
-- The legacy function retained its OID, owner, ACL and 51 policy dependency edges. The sole intended catalog change was its security-definer flag becoming false; rollback restored the original implementation and the same decision results.
+- The legacy function retained its OID, owner, ACL and 51 policy dependency edges. The function became a schema-qualified invoker delegate with an empty search path; rollback restored its original implementation and the same decision results.
 - Security Advisor reported the public security-definer warning in the prepared baseline and omitted it after delegation. Fixture cleanup removed the isolated schema and the two helpers, which had not existed in the partial test database before rehearsal. Test migration history remains as evidence.
 - This fixture copies the dependent policies and exercises representative paths. It is not a complete staging clone or browser/payment UAT. No real user account, checkout fixture, payment or email was modified.
+
+Review follow-up: the preflight compares trimmed source bodies exactly, preserving whitespace inside SQL literals. An additional regression rejects a changed MFA string. The live source bodies match exactly. Hosted rehearsal covered the unchanged delegate behavior; this stricter preflight was verified by the isolated regression suite.

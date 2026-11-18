@@ -18,11 +18,10 @@ BEGIN
     RAISE EXCEPTION 'Admin helper contract differs from the reviewed configuration';
   END IF;
   IF legacy.prosecdef THEN
-    IF regexp_replace(legacy.prosrc, '[[:space:]]+', '', 'g')
-       <> regexp_replace(canonical.prosrc, '[[:space:]]+', '', 'g') THEN
+    IF btrim(legacy.prosrc) IS DISTINCT FROM btrim(canonical.prosrc) THEN
       RAISE EXCEPTION 'Admin helper bodies differ; delegation needs a fresh review';
     END IF;
-  ELSIF regexp_replace(legacy.prosrc, '[[:space:]]+', '', 'g') <> 'SELECTapp.is_active_admin();' THEN
+  ELSIF btrim(legacy.prosrc) IS DISTINCT FROM 'SELECT app.is_active_admin();' THEN
     RAISE EXCEPTION 'Legacy invoker helper is not the reviewed delegate';
   END IF;
   IF NOT has_schema_privilege('authenticated', 'app', 'USAGE')
