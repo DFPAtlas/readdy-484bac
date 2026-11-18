@@ -43,21 +43,19 @@ test('suggestion query errors are visible and Refresh performs a new search',asy
 });
 
 function modal(assignmentId='original',failed=false) {
-  const writes=[];const routed=[];
-  const db={auth:{getUser:async()=>({data:{user:{id:'client-user'}}})},from(table){return {insert(payload){writes.push({table,payload});return {select(){return {single:async()=>({data:failed?null:{id:'request'},error:failed?{message:'Could not save'}:null})}}};},update(){return {eq:async()=>({error:null})};}};}};
-  const h=harness(dir+'ReplacementRequestModal.tsx',[assignmentId,'urgent','no_show','18:00','Extra instructions','',false,'',false,2,true],{...common,'@/lib/supabase':{supabase:db},'@/lib/support-routing':{routeTicketToCommandCentre:async(id)=>{routed.push(id);return {ok:true};}}});
+  const writes=[];
+  const db={from(){assert.fail('browser must not write replacement follow-ups directly');}};
+  const h=harness(dir+'ReplacementRequestModal.tsx',[assignmentId,'urgent','no_show','2099-01-01T18:00','Extra instructions','',false,'',false,2,true],{...common,'@/lib/supabase':{supabase:db},'@/lib/replacement-submission':{submitReplacementRequest:async(_db,payload)=>{writes.push(payload);if(failed)throw Error('Could not save');return {requestId:payload.requestId,ticketId:'ticket',supportSyncPending:false};}}});
   const props={jobId:'job',jobTitle:'Test shift',clientId:'client',preferredGuard:{id:'candidate',fullName:'Preferred Guard'},assignmentOptions:[{id:'original',guardId:'absent',guardName:'Absent Guard'},{id:'other',guardId:'late',guardName:'Late Guard'}],onClose(){},onSuccess(){}};
-  return {h,props,writes,routed};
+  return {h,props,writes};
 }
-test('request persists the preferred guard while retaining the original assignment and guard',async()=>{
-  const {h,props,writes,routed}=modal();
+test('request sends the preferred guard and affected assignment through the server submission path',async()=>{
+  const {h,props,writes}=modal();
   await button(h.render(props),'Request Replacement').props.onClick();
-  assert.deepEqual(routed,['request'],'replacement ticket is handed to the Command Centre');
-  const request=writes.find(w=>w.table==='replacement_requests').payload;
-  assert.equal(request.assignment_id,'original');assert.equal(request.guard_id,'absent');assert.equal(request.status,'requested');
+  assert.equal(writes.length,1);const request=writes[0];
+  assert.equal(request.assignmentId,'original');assert.equal(request.guardId,undefined,'server derives the affected guard');
   assert.match(request.notes,/Preferred Guard.*candidate/);assert.match(request.notes,/Extra instructions/);
-  assert.match(writes.find(w=>w.table==='support_tickets').payload.description,/Preferred Guard.*candidate/);
-  assert.equal(h.states[8],true);
+  assert.equal(request.createTicket,true);assert.equal(h.states[8],true);
 });
 test('multiple affected guards require an explicit assignment choice',async()=>{
   const {h,props,writes}=modal('');
@@ -67,7 +65,7 @@ test('multiple affected guards require an explicit assignment choice',async()=>{
 test('failed request insert does not report success or create follow-up writes',async()=>{
   const {h,props,writes}=modal('original',true);
   await button(h.render(props),'Request Replacement').props.onClick();
-  assert.equal(writes.length,1);assert.equal(h.states[8],false);assert.equal(h.states[7],'Could not save');
+  assert.equal(writes.length,1);assert.equal(h.states[8],false);assert.match(h.states[7],/could not confirm/);
 });
 
 test('attendance panel opens the request modal with the candidate and affected assignment choices',()=>{

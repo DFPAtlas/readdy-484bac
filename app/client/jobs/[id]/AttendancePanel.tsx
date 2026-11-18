@@ -397,6 +397,7 @@ export default function AttendancePanel({ job, assignments: rawAssignments, clie
       {/* Replacement Request Modal */}
       {replacementModal && clientId && (
         <ReplacementRequestModal
+          key={`${clientId}:${job.id}:${replacementModal.assignmentId || replacementModal.preferredGuard?.id}`}
           jobId={job.id}
           jobTitle={job.job_title}
           assignmentId={replacementModal.assignmentId}
