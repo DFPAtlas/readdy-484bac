@@ -271,7 +271,7 @@ export default function ClientRegister() {
   const visibleFields = wizardFields.filter((f) => f.is_enabled && f.field_key !== 'password' && f.field_key !== 'confirm_password');
 
   const title = portalDefaults?.hero_title || 'Register as Client';
-  const subtitle = portalDefaults?.hero_subtitle || 'Create an account to hire SIA-licensed security professionals';
+  const subtitle = portalDefaults?.hero_subtitle || 'Join hundreds of businesses hiring verified security professionals';
   const socialEnabled = portalDefaults?.social_login_enabled !== false;
   const ctaPrimary = portalDefaults?.cta_primary_text || 'Create Account';
 

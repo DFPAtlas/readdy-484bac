@@ -1,4 +1,3 @@
-import { HUMAN_SUPPORT_HOURS } from '@/lib/customer-guidance';
 import Link from 'next/link';
 import CookieSettingsButton from '@/components/CookieSettingsButton';
 import FooterExitPopupTestIcon from '@/components/qg-rewards/FooterExitPopupTestIcon';
@@ -6,7 +5,7 @@ import BrandLogo from '@/components/BrandLogo';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
-
+  
   return (
     <footer className="bg-[#0B1933] text-white pt-16 pb-8" role="contentinfo">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -219,6 +218,15 @@ export default function Footer() {
               </li>
               <li>
                 <Link
+                  href="/blog"
+                  prefetch={false}
+                  className="text-gray-300 hover:text-white transition-colors focus:outline-none focus:underline text-sm"
+                >
+                  Blog
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/guide/guard"
                   prefetch={false}
                   className="text-gray-300 hover:text-white transition-colors focus:outline-none focus:underline text-sm"
@@ -322,8 +330,8 @@ export default function Footer() {
               <li className="text-slate-400 text-sm flex items-start gap-2">
                 <i className="ri-time-line text-lg mt-0.5 text-teal-400" aria-hidden="true"></i>
                 <div>
-                  <p>{HUMAN_SUPPORT_HOURS}</p>
-                  <p>AI support available 24/7</p>
+                  <p>Mon-Fri: 9:00 AM - 6:00 PM</p>
+                  <p>Sat-Sun: 10:00 AM - 4:00 PM</p>
                 </div>
               </li>
             </ul>

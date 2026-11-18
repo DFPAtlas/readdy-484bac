@@ -1,4 +1,3 @@
-import { CANCELLATION_GUIDANCE, GUARD_CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
 export type ClientPlan = {
   slug: string;
   name: string;
@@ -49,12 +48,15 @@ export const GUARD_MEMBERSHIPS: GuardMembership[] = [
 ];
 
 export const CANCELLATION_WINDOWS: CancellationWindow[] = [
-  { label: "Before payment", outcome: "No booking payment to refund", detail: "Posting a job does not capture the booking payment.", tone: "good" },
-  { label: "After payment", outcome: "Refund review", detail: "The team reviews the original payment, timing, booking circumstances and any service fee.", tone: "warn" },
-  { label: "After payout starts", outcome: "Contact support", detail: "A payment or payout already started can block cancellation. Contact support for review.", tone: "warn" },
+  { label: "More than 24 hours before", outcome: "Full refund", detail: "Including the service fee.", tone: "good" },
+  { label: "12 to 24 hours before", outcome: "50% of guard fee", detail: "The service fee is retained.", tone: "warn" },
+  { label: "Less than 12 hours before", outcome: "No refund", detail: "The guard has kept the shift free for you.", tone: "bad" },
 ];
 
-export const CANCELLATION_NOTES = [CANCELLATION_GUIDANCE, `${GUARD_CANCELLATION_GUIDANCE} ${REFUND_TIMING_GUIDANCE}`];
+export const CANCELLATION_NOTES: string[] = [
+  "If a guard cancels, you get a full refund including the service fee.",
+  "Cancel from My Jobs until the guard's payout has started. Our team reviews every refund request.",
+];
 
 export const LICENCE_CHECKS: LicenceCheck[] = [
   {

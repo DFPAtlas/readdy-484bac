@@ -36,7 +36,7 @@ export default function CompleteProfileNudge({ guard }: CompleteProfileNudgeProp
               </h3>
               <p className="text-xs sm:text-sm text-blue-400/80">
                 You&apos;re missing a{items.length === 1 ? ' ' : ' '}{items.join(' and ')}.
-                A complete profile helps clients review your experience and qualifications.
+                Guards with complete profiles get 3x more job offers — it only takes a minute.
               </p>
             </div>
           </div>

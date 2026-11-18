@@ -1,7 +1,5 @@
 'use client';
 
-import { CANCELLATION_GUIDANCE, GUARD_CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE, OVERRUN_GUIDANCE } from '@/lib/customer-guidance';
-
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import NavSidebar from '@/components/NavSidebar';
@@ -273,13 +271,13 @@ export default function PricingClient() {
 
   const faqs = [
     { question: 'When am I charged?', answer: 'Posting a job does not charge the booking payment. Once you have reviewed applicants and selected your guards, you review the agreed guard pay, your plan’s service fee and any eligible promotion, then pay securely through Stripe before the booking is confirmed. Funds are held with Stripe and released to the guard after completion and the applicable release checks.' },
-    { question: 'What if a guard cancels?', answer: `${GUARD_CANCELLATION_GUIDANCE} ${REFUND_TIMING_GUIDANCE}` },
-    { question: 'What if I cancel the job?', answer: `${CANCELLATION_GUIDANCE} ${REFUND_TIMING_GUIDANCE}` },
+    { question: 'What if a guard cancels?', answer: 'Contact QuickGuard support from your booking so our team can review the cancellation and help with the next steps. If you have already paid, any refund, including the service fee, is reviewed against the booking circumstances. Approved refunds are processed through Stripe and may take 5–10 business days to appear on your statement.' },
+    { question: 'What if I cancel the job?', answer: 'Cancel through your job dashboard and provide a reason. If you have already paid, a refund request is recorded for review; cancellation does not mean a refund has been approved or paid. Our team reviews eligibility, the amount and any service fee against the cancellation timing and booking circumstances. Approved refunds are processed through Stripe and may take 5–10 business days to appear on your statement.' },
     { question: 'Is there a contract or minimum commitment?', answer: 'A free account has no subscription charge; booking payments and service fees still apply. Paid subscriptions renew monthly or annually. You can cancel renewal at any time, with cancellation taking effect at the end of your current billing period. Annual plans are paid upfront for 12 months. Access continues until the period ends; unused time is not refunded unless required by law.' },
     { question: 'Can I change my subscription plan?', answer: 'You can switch between paid plans. Successful changes take effect immediately, and Stripe calculates a prorated charge or account credit for the remaining billing period. A credit is not an automatic cash refund. To stop renewal, use your billing settings or contact support.' },
     { question: 'What happens if no guard accepts my job?', answer: 'Posting a job does not charge the booking payment. You pay only after selecting guards and reviewing the booking total, so an unfilled, unpaid job has no booking payment to refund. If you have already paid and a selected guard can no longer attend, contact support for a cancellation and refund review.' },
     { question: 'Do guards get paid differently depending on my plan?', answer: 'No. Guards always receive their posted hourly rate multiplied by the hours worked. The service fee is separate and does not reduce guard pay.' },
-    { question: 'How do you handle overruns?', answer: OVERRUN_GUIDANCE },
+    { question: 'How do you handle overruns?', answer: 'Guards log actual hours via time-tracking. If the actual shift runs longer than booked, a top-up payment request is sent before payout. The service fee applies to the top-up amount too.' },
   ];
 
   const renderPlanCard = (plan: Plan, index: number, accentColor: string) => {

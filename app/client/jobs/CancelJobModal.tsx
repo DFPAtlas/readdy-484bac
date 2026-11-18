@@ -1,7 +1,5 @@
 'use client';
 
-import { CLIENT_CANCELLABLE_STATUSES } from '@/lib/customer-guidance';
-
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { ClientJob } from '@/lib/client-types';
@@ -38,7 +36,7 @@ const CONTACT_PREFS = [
   { value: 'phone', label: 'Phone', icon: 'ri-phone-line' },
 ];
 
-const ALLOWED_CANCEL_STATUSES: readonly string[] = CLIENT_CANCELLABLE_STATUSES;
+const ALLOWED_CANCEL_STATUSES = ['draft', 'open', 'pending', 'awaiting_guard_selection', 'awaiting_payment', 'in_progress'];
 
 export default function CancelJobModal({ job, onClose, onSuccess }: CancelJobModalProps) {
   const router = useRouter();

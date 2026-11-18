@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
 
 export default function PricingPDFClient() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
@@ -144,10 +143,10 @@ export default function PricingPDFClient() {
         {/* Header */}
         <div className="text-center mb-12 print:mb-10">
           <div className="flex items-center justify-center gap-3 mb-4 print:mb-2">
-            <span className="font-[family-name:var(--font-pacifico)] text-3xl text-teal-600">QuickGuard</span>
+            <span className="font-[family-name:var(--font-pacifico)] text-3xl text-teal-600">logo</span>
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">QuickGuard Pricing Guide</h1>
-          <p className="text-slate-500 text-sm">Complete pricing for clients and security guards — updated November 2026</p>
+          <p className="text-slate-500 text-sm">Complete pricing for clients and security guards — updated October 2026</p>
           <div className="w-24 h-0.5 bg-teal-500 mx-auto mt-4" />
         </div>
 
@@ -433,7 +432,7 @@ export default function PricingPDFClient() {
               <i className="ri-gift-line text-xl text-rose-600" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Membership and Payment Notes</h2>
+              <h2 className="text-xl font-bold text-slate-900">Current Promotions</h2>
             </div>
           </div>
 
@@ -450,19 +449,19 @@ export default function PricingPDFClient() {
             <div className="rounded-xl border border-blue-200 bg-blue-50/30 p-5">
               <div className="flex items-center gap-2 mb-2">
                 <i className="ri-refresh-line text-blue-600" />
-                <span className="font-bold text-blue-800 text-sm">Cancellation and Refund Review</span>
+                <span className="font-bold text-blue-800 text-sm">30-Day Money-Back Guarantee</span>
               </div>
               <p className="text-sm text-slate-600">
-                {CANCELLATION_GUIDANCE} {REFUND_TIMING_GUIDANCE}
+                Not satisfied? Get a full refund within 30 days — no questions asked.
               </p>
             </div>
             <div className="rounded-xl border border-amber-200 bg-amber-50/30 p-5">
               <div className="flex items-center gap-2 mb-2">
                 <i className="ri-percent-line text-amber-600" />
-                <span className="font-bold text-amber-800 text-sm">Compare Annual Billing</span>
+                <span className="font-bold text-amber-800 text-sm">20% Off Annual Billing</span>
               </div>
               <p className="text-sm text-slate-600">
-                Annual and monthly prices are shown above. Compare the configured annual price with 12 monthly payments for your chosen plan; checkout confirms any eligible offer.
+                Pay yearly and save 20% — equivalent to getting over 2 months free.
               </p>
             </div>
             <div className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-5">
@@ -481,7 +480,7 @@ export default function PricingPDFClient() {
         <div className="border-t border-slate-200 pt-8 mt-8 print:mt-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <span className="font-[family-name:var(--font-pacifico)] text-xl text-teal-600">QuickGuard</span>
+              <span className="font-[family-name:var(--font-pacifico)] text-xl text-teal-600">logo</span>
               <span className="text-sm text-slate-400">|</span>
               <span className="text-sm text-slate-500">quickguard.uk</span>
             </div>
@@ -490,7 +489,7 @@ export default function PricingPDFClient() {
             </div>
           </div>
           <p className="text-xs text-slate-400 text-center mt-4 print:mt-2">
-            All prices shown in GBP. VAT applies where applicable. Prices subject to change. 24/7 support is provided by our AI assistant; issues needing human review can be escalated during business hours. Last updated November 2026.
+            All prices shown in GBP. VAT applies where applicable. Prices subject to change. 24/7 support is provided by our AI assistant; issues needing human review can be escalated during business hours. Last updated October 2026.
           </p>
         </div>
       </div>

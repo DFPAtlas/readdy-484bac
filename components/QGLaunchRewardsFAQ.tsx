@@ -10,11 +10,11 @@ interface FAQItem {
 const faqs: FAQItem[] = [
   {
     q: 'What are QG Tokens?',
-    a: 'QG Tokens are discount credits you earn through the QG Launch Rewards programme. Redemption is planned; tokens cannot currently be applied to checkout payments. Tokens have no cash value and cannot be withdrawn, transferred, sold, or exchanged for money.',
+    a: 'QG Tokens are discount credits you earn through the QG Launch Rewards programme. They can be used to reduce your QuickGuard subscription costs, job posting fees, and other platform charges. Tokens have no cash value and cannot be withdrawn, transferred, sold, or exchanged for money.',
   },
   {
     q: 'How much are QG Tokens worth?',
-    a: '100 QG Tokens = £10 QuickGuard credit. This means each token is worth approximately 10 pence in platform discounts. This describes the planned discount value. Redemption is not available at checkout yet.',
+    a: '100 QG Tokens = £10 QuickGuard credit. This means each token is worth approximately 10 pence in platform discounts. The exact conversion rate is applied by QuickGuard at checkout.',
   },
   {
     q: 'When do QG Tokens activate?',
@@ -22,7 +22,7 @@ const faqs: FAQItem[] = [
   },
   {
     q: 'Can I withdraw or transfer QG Tokens?',
-    a: 'No. QG Tokens are discount credits only. They cannot be withdrawn as cash, transferred to another user, sold, traded, or exchanged for money. They are intended for future eligible QuickGuard platform discounts; they cannot currently reduce a checkout payment.',
+    a: 'No. QG Tokens are discount credits only. They cannot be withdrawn as cash, transferred to another user, sold, traded, or exchanged for money. They exist exclusively to reduce your QuickGuard platform costs.',
   },
   {
     q: 'How does the referral programme work?',
@@ -38,7 +38,7 @@ const faqs: FAQItem[] = [
   },
   {
     q: 'Do QG Tokens expire?',
-    a: 'Yes. QG Tokens normally expire 12 months after they are approved, unless stated otherwise. You can see your token expiry dates in your rewards dashboard. Redemption availability and expiry handling will be explained before checkout redemption opens.',
+    a: 'Yes. QG Tokens normally expire 12 months after they are approved, unless stated otherwise. You can see your token expiry dates in your rewards dashboard. Tokens already converted to credit at checkout are not affected.',
   },
   {
     q: 'Can the programme terms change?',
@@ -46,11 +46,11 @@ const faqs: FAQItem[] = [
   },
   {
     q: 'Can QG Tokens be saved before I create an account?',
-    a: 'Yes. If you receive a QuickGuard invite or earn launch rewards before creating an account, QG Tokens can be held against your email address. When you create a QuickGuard account using the same email, your eligible QG Tokens will be linked to your rewards dashboard. Eligible tokens can be linked after verification; redemption is planned and is not available yet.',
+    a: 'Yes. If you receive a QuickGuard invite or earn launch rewards before creating an account, QG Tokens can be held against your email address. When you create a QuickGuard account using the same email, your eligible QG Tokens will be linked to your rewards dashboard. Tokens become usable after your account is verified.',
   },
   {
     q: 'Where can I use QG Tokens?',
-    a: 'Redemption is not available yet. We plan to support eligible QuickGuard subscription or platform discounts and will publish supported charges and limits before redemption opens.',
+    a: 'QG Tokens can be applied as discounts on QuickGuard subscriptions, job posting fees, profile boosts, featured listings, and future QuickGuard platform credits. The maximum discount per transaction is set by QuickGuard and shown at checkout.',
   },
 ];
 

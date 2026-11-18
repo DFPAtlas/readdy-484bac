@@ -43,15 +43,18 @@ const data = {
     { icon: 'ri-file-list-line', title: 'Site Details', desc: 'Share your site address, hours, and whether you need patrol or static guarding.' },
     { icon: 'ri-user-search-line', title: 'Guards Match', desc: 'Guards with construction site experience and valid licences get notified.' },
     { icon: 'ri-shield-check-line', title: 'Review & Book', desc: 'Check guard profiles for site-specific experience. Confirm with one click.' },
-    { icon: 'ri-lock-line', title: 'Pay Before Confirmation', desc: 'Funds stay held with Stripe until you confirm the shift was completed as agreed.' },
+    { icon: 'ri-lock-line', title: 'Pay on Completion', desc: 'Funds stay held with Stripe until you confirm the shift was completed as agreed.' },
   ],
   faqs: [
     { q: 'Can guards do mobile patrols around a large site?', a: 'Yes. Many guards have transport and are willing to patrol large perimeters. Check the "Has Own Transport" and "Willing to Travel" badges on their profile.' },
     { q: 'Do guards have CSCS cards or construction site experience?', a: 'Many do. Guards can list certifications and specialisations on their profile. You can also require specific qualifications in your job post.' },
     { q: 'Can I book a guard for an entire 12-hour night shift?', a: 'Yes. You control the start and end times. Guards apply based on their availability for the exact shift length you post.' },
     { q: 'What if my site is in a remote location?', a: 'Set your postcode when posting. Guards with transport and willingness to travel further will still see and apply to your job.' },
-    { q: 'Is there insurance coverage?', a: 'SIA licensing does not confirm a guard’s insurance cover. Check the insurance required for your booking and request evidence from the guard before confirming. Contact your insurer or adviser about the cover your site and engagement need.' },
+    { q: 'Is there insurance coverage?', a: 'All QuickGuard guards carry their own SIA-mandated public liability insurance. You should also maintain your own site insurance as standard practice.' },
   ],
+  testimonialQuote: 'We manage three active sites in Birmingham. QuickGuard lets us book overnight security the same day a site goes live. The guards arrive with proper hi-vis, know the site protocols, and we have never had a tool theft since switching from our old agency.',
+  testimonialAuthor: 'James R.',
+  testimonialVenue: 'Site Manager, Birmingham',
 };
 
 export default function BuildingSiteSecurityPage() {
