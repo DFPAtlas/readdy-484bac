@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { loadGuardNotificationSettings, saveGuardNotificationSettings, type NotificationPreferences, type GuardMatchPreferences } from '@/lib/guard-notification-settings';
 import Link from 'next/link';
 import PortalSidebar from '@/components/PortalSidebar';
 import PreferenceToggle from './PreferenceToggle';
@@ -11,23 +12,10 @@ import { useGuardGuard } from '@/hooks/useGuardGuard';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useRouter } from 'next/navigation';
 
-interface Preferences {
-  job_matches: boolean;
-  application_updates: boolean;
-  payment_notifications: boolean;
-  messages: boolean;
-  sia_reminders: boolean;
-  email_frequency: string;
-}
-
-interface GuardPreferences {
-  max_distance_miles: number;
-  min_hourly_rate: number;
-}
-
 export default function NotificationSettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [toast, setToast] = useState({ show: false, success: true, message: '' });
@@ -36,7 +24,7 @@ export default function NotificationSettingsPage() {
   const { checking, blocked } = useRouteGuard();
   const { loading: authLoading, allowed } = useGuardGuard();
 
-  const [preferences, setPreferences] = useState<Preferences>({
+  const [preferences, setPreferences] = useState<NotificationPreferences>({
     job_matches: true,
     application_updates: true,
     payment_notifications: true,
@@ -45,7 +33,7 @@ export default function NotificationSettingsPage() {
     email_frequency: 'instant',
   });
 
-  const [guardPreferences, setGuardPreferences] = useState<GuardPreferences>({
+  const [guardPreferences, setGuardPreferences] = useState<GuardMatchPreferences>({
     max_distance_miles: 25,
     min_hourly_rate: 10.0,
   });
@@ -54,58 +42,43 @@ export default function NotificationSettingsPage() {
   const [lastWeeklyDigestSent, setLastWeeklyDigestSent] = useState<string | null>(null);
   const [digestInfo, setDigestInfo] = useState<{ show: boolean; type: 'daily' | 'weekly' | null }>({ show: false, type: null });
 
-  const showToast = (success: boolean, message: string) => {
-    setToast({ show: true, success, message });
-  };
+  const mountedRef = useRef(false);
+  const requestRef = useRef(0);
+  const savingRef = useRef(false);
+  const lifetimeRef = useRef<symbol | null>(null);
+  const loadedUserRef = useRef<string | null>(null);
 
-  const loadPreferences = useCallback(async (uid: string) => {
+  const loadPreferences = useCallback(async () => {
+    if (!mountedRef.current || savingRef.current) return;
+    const request = ++requestRef.current;
+    const current = () => mountedRef.current && requestRef.current === request;
+    loadedUserRef.current = null;
+    setUserId(null);
     setLoading(true);
+    setToast({ show: false, success: true, message: '' });
     try {
-      const { data: notifPrefs } = await supabase
-        .from('notification_preferences')
-        .select('*, last_digest_sent_at, last_weekly_digest_sent_at')
-        .eq('user_id', uid)
-        .maybeSingle();
-
-      if (notifPrefs) {
-        setPreferences({
-          job_matches: notifPrefs.job_matches ?? true,
-          application_updates: notifPrefs.application_updates ?? true,
-          payment_notifications: notifPrefs.payment_notifications ?? true,
-          messages: notifPrefs.messages ?? true,
-          sia_reminders: notifPrefs.sia_reminders ?? true,
-          email_frequency: notifPrefs.email_frequency || 'instant',
-        });
-        setLastDigestSent(notifPrefs.last_digest_sent_at || null);
-        setLastWeeklyDigestSent(notifPrefs.last_weekly_digest_sent_at || null);
+      const snapshot = await loadGuardNotificationSettings(supabase);
+      if (!current()) return;
+      if (!snapshot) {
+        setLoadError(true);
+        router.replace('/guard/login');
+        return;
       }
-
-      const { data: guardData } = await supabase
-        .from('guards')
-        .select('full_name, max_distance_miles, min_hourly_rate')
-        .eq('user_id', uid)
-        .maybeSingle();
-
-      if (guardData) {
-        setGuardPreferences({
-          max_distance_miles: guardData.max_distance_miles || 25,
-          min_hourly_rate: guardData.min_hourly_rate || 10.0,
-        });
-        setDisplayName(guardData.full_name || 'Guard');
-        setInitials(
-          (guardData.full_name || 'Guard')
-            .split(' ')
-            .map((n: string) => n[0])
-            .join('')
-            .toUpperCase()
-        );
-      }
-    } catch (error) {
-      console.error('Error loading preferences:', error);
+      setPreferences(snapshot.preferences);
+      setGuardPreferences(snapshot.guardPreferences);
+      setDisplayName(snapshot.displayName);
+      setInitials(snapshot.displayName.split(' ').map((name: string) => name[0]).join('').toUpperCase());
+      setLastDigestSent(snapshot.lastDigestSent);
+      setLastWeeklyDigestSent(snapshot.lastWeeklyDigestSent);
+      loadedUserRef.current = snapshot.userId;
+      setUserId(snapshot.userId);
+      setLoadError(false);
+    } catch {
+      if (current()) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     const freq = preferences.email_frequency;
@@ -119,44 +92,32 @@ export default function NotificationSettingsPage() {
   }, [preferences.email_frequency]);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/guard/login');
-        return;
-      }
-      setUserId(user.id);
-      await loadPreferences(user.id);
-    };
-    checkAuth();
-  }, [router, loadPreferences]);
+    mountedRef.current = true;
+    lifetimeRef.current = Symbol('guard-settings');
+    savingRef.current = false;
+    setSaving(false);
+    void loadPreferences();
+    return () => { mountedRef.current = false; lifetimeRef.current = null; requestRef.current += 1; };
+  }, [loadPreferences]);
 
   const handleSave = async () => {
-    if (!userId) return;
+    if (!mountedRef.current || loading || loadError || !userId || loadedUserRef.current !== userId || savingRef.current) return;
+    const lifetime = lifetimeRef.current;
+    const request = requestRef.current;
+    const current = () => mountedRef.current && lifetimeRef.current === lifetime && requestRef.current === request;
+    savingRef.current = true;
     setSaving(true);
     try {
-      const { error: notifError } = await supabase
-        .from('notification_preferences')
-        .upsert({ user_id: userId, ...preferences, updated_at: new Date().toISOString() });
-
-      if (notifError) throw notifError;
-
-      const { error: guardError } = await supabase
-        .from('guards')
-        .update(guardPreferences)
-        .eq('user_id', userId);
-
-      if (guardError) throw guardError;
-
-      showToast(true, 'Notification settings saved successfully!');
-    } catch (error: any) {
-      showToast(false, `Failed to save: ${error.message}`);
+      const result = await saveGuardNotificationSettings(supabase, userId, { ...preferences }, { ...guardPreferences });
+      if (current()) setToast({ show: true, ...result });
+    } catch {
+      if (current()) setToast({ show: true, success: false, message: 'Your settings could not be confirmed as saved. Please reload preferences.' });
     } finally {
-      setSaving(false);
+      if (current()) { savingRef.current = false; setSaving(false); }
     }
   };
 
-  const setPref = (key: keyof Preferences, value: boolean | string) => {
+  const setPref = (key: keyof NotificationPreferences, value: boolean | string) => {
     setPreferences(prev => ({ ...prev, [key]: value }));
   };
 
@@ -196,6 +157,21 @@ export default function NotificationSettingsPage() {
     );
   }
 
+  if (loadError || !userId) {
+    return (
+      <div className="min-h-screen bg-[#0B1933] flex">
+        <PortalSidebar role="guard" displayName={displayName} subtitle="Guard" initials={initials} />
+        <main className="flex-1 ml-72 p-8">
+          <div role="alert" className="max-w-xl mx-auto rounded-2xl border border-red-500/25 bg-[#111d35] p-6 text-slate-300">
+            <h1 className="text-xl font-bold text-white mb-3">Notification settings unavailable</h1>
+            <p>We could not load your notification preferences and job-match filters. Retry before making changes.</p>
+            <button onClick={() => void loadPreferences()} className="mt-5 rounded-xl bg-teal-500 px-5 py-3 font-semibold text-slate-950">Retry loading preferences</button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0B1933] flex">
       <PortalSidebar
@@ -220,7 +196,7 @@ export default function NotificationSettingsPage() {
             </div>
           </div>
 
-          <div className="space-y-6">
+          <fieldset disabled={saving || loadError || !userId} className="space-y-6 disabled:opacity-70">
 
             <div className="bg-white dark:bg-[#111d35] rounded-2xl border border-slate-200 dark:border-[#1e2d4d] shadow-sm overflow-hidden">
               <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-200 dark:border-[#1e2d4d]">
@@ -425,7 +401,7 @@ export default function NotificationSettingsPage() {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || loadError || !userId}
                 className="flex-1 bg-teal-500 text-white px-6 py-4 rounded-xl font-semibold hover:bg-teal-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap flex items-center justify-center gap-2 cursor-pointer"
               >
                 {saving ? (
@@ -448,7 +424,7 @@ export default function NotificationSettingsPage() {
                 Back
               </Link>
             </div>
-          </div>
+          </fieldset>
         </div>
       </main>
 
