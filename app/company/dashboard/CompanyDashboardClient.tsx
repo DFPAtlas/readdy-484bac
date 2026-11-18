@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { loadCompanyDashboardData } from '@/lib/company-dashboard-data';
+import { resolveCompanyTab, type CompanyTab } from '@/lib/company-navigation';
 import Link from 'next/link';
 import PortalSidebar from '@/components/PortalSidebar';
 
@@ -87,6 +89,7 @@ interface TrainingRecord {
 
 export default function CompanyDashboardClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [company, setCompany] = useState<Company | null>(null);
   const [sites, setSites] = useState<CompanySite[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
@@ -95,63 +98,44 @@ export default function CompanyDashboardClient() {
   const [compliance, setCompliance] = useState<ComplianceRecord[]>([]);
   const [training, setTraining] = useState<TrainingRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [loadError, setLoadError] = useState('');
+  const mountedRef = useRef(false);
+  const requestRef = useRef(0);
+  const [activeTab, setActiveTab] = useState<CompanyTab>('overview');
+  useEffect(() => { setActiveTab(resolveCompanyTab(searchParams.get('tab'))); }, [searchParams]);
   const [unreadMessages, setUnreadMessages] = useState(0);
 
   const loadDashboard = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.replace('/company/login'); return; }
-
-    const { data: companyData } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!companyData) {
-      await supabase.auth.signOut({ scope: 'local' });
-      router.replace('/company/login?error=company-profile-not-found');
-      return;
+    if (!mountedRef.current) return;
+    const request = ++requestRef.current;
+    const current = () => mountedRef.current && request === requestRef.current;
+    setLoading(true); setLoadError('');
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (!current()) return;
+      if (authError) throw new Error('Your company account could not be confirmed. Please retry.');
+      if (!user) { router.replace('/company/login'); return; }
+      const { data: companyData, error: companyError } = await supabase.from('companies').select('*').eq('user_id', user.id).maybeSingle();
+      if (!current()) return;
+      if (companyError) throw new Error('Your company profile could not be loaded. Please retry.');
+      if (!companyData) { router.replace('/company/login?error=company-profile-not-found'); return; }
+      const data = await loadCompanyDashboardData(supabase, companyData.id, user.id);
+      if (!current()) return;
+      setCompany(companyData as Company);
+      setSites(data.sites); setStaff(data.staff); setRotas(data.rotas); setIncidents(data.incidents);
+      setCompliance(data.compliance); setTraining(data.training); setUnreadMessages(data.unreadMessages);
+    } catch (cause) {
+      if (current()) setLoadError(cause instanceof Error ? cause.message : 'Company dashboard data could not be loaded.');
+    } finally {
+      if (current()) setLoading(false);
     }
-    setCompany(companyData as Company);
-
-    const [
-      sitesRes, staffRes, rotasRes, incidentsRes, complianceRes, trainingRes, msgsRes
-    ] = await Promise.all([
-      supabase.from('company_sites').select('*').eq('company_id', companyData.id).order('created_at', { ascending: false }),
-      supabase.from('company_staff').select('*, company_sites(site_name)').eq('company_id', companyData.id).order('created_at', { ascending: false }),
-      supabase.from('rotas').select('*, company_sites(site_name), guards(full_name)').eq('company_id', companyData.id).gte('shift_date', new Date().toISOString().split('T')[0]).order('shift_date', { ascending: true }).limit(20),
-      supabase.from('incidents').select('*, company_sites(site_name)').eq('company_id', companyData.id).order('reported_at', { ascending: false }).limit(10),
-      supabase.from('compliance_records').select('*').eq('company_id', companyData.id).order('created_at', { ascending: false }),
-      supabase.from('training_records').select('*, guards(full_name)').eq('company_id', companyData.id).order('completion_date', { ascending: false }).limit(10),
-      supabase.from('messages').select('id').eq('receiver_id', user.id).eq('is_read', false),
-    ]);
-
-    setSites(sitesRes.data || []);
-    setStaff((staffRes.data || []).map((s: any) => ({
-      ...s,
-      site_name: s.company_sites?.site_name || 'Unassigned',
-    })));
-    setRotas((rotasRes.data || []).map((r: any) => ({
-      ...r,
-      site_name: r.company_sites?.site_name || '',
-      guard_name: r.guards?.full_name || 'Unassigned',
-    })));
-    setIncidents((incidentsRes.data || []).map((i: any) => ({
-      ...i,
-      site_name: i.company_sites?.site_name || '',
-    })));
-    setCompliance(complianceRes.data || []);
-    setTraining((trainingRes.data || []).map((t: any) => ({
-      ...t,
-      guard_name: t.guards?.full_name || '',
-    })));
-    setUnreadMessages(msgsRes.data?.length || 0); 
-
-    setLoading(false);
   }, [router]);
 
-  useEffect(() => { loadDashboard(); }, [loadDashboard]);
+  useEffect(() => {
+    mountedRef.current = true;
+    void loadDashboard();
+    return () => { mountedRef.current = false; };
+  }, [loadDashboard]);
 
   useEffect(() => {
     if (!company?.id) return;
@@ -191,6 +175,14 @@ export default function CompanyDashboardClient() {
     );
   }
 
+  if (loadError) return <main className="min-h-screen bg-[#0B1933] text-white flex items-center justify-center px-6">
+    <div role="alert" className="max-w-xl rounded-xl border border-amber-500/30 bg-amber-500/10 p-6">
+      <h1 className="text-xl font-bold mb-3">Company dashboard unavailable</h1><p>{loadError}</p>
+      <button type="button" onClick={() => void loadDashboard()} className="mt-4 text-teal-300 underline">Retry dashboard</button>
+      <Link href="/contact?subject=company-dashboard" className="ml-6 text-teal-300 underline">Contact support</Link>
+    </div>
+  </main>;
+
   if (!company) return null;
 
   const initials = company.company_name
@@ -217,6 +209,7 @@ export default function CompanyDashboardClient() {
     <div className="min-h-screen bg-slate-50 dark:bg-[#0B1933] flex">
       <PortalSidebar
         role="company"
+        companyTab={activeTab}
         displayName={company.company_name || 'Company'}
         subtitle={company.verification_status === 'approved' ? 'Verified Company' : 'Company'}
         initials={initials}
@@ -232,13 +225,13 @@ export default function CompanyDashboardClient() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <Link href="/company/sites/new" className="flex items-center gap-2 bg-violet-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-violet-600 transition-colors whitespace-nowrap cursor-pointer">
+              <Link href="/contact?subject=company-site-setup" className="flex items-center gap-2 bg-violet-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-violet-600 transition-colors whitespace-nowrap cursor-pointer">
                 <i className="ri-add-circle-line"></i>
-                Add Site
+                Request Site Setup
               </Link>
-              <Link href="/company/staff/add" className="flex items-center gap-2 bg-teal-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-teal-600 transition-colors whitespace-nowrap cursor-pointer">
+              <Link href="/contact?subject=company-staff-setup" className="flex items-center gap-2 bg-teal-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-teal-600 transition-colors whitespace-nowrap cursor-pointer">
                 <i className="ri-user-add-line"></i>
-                Add Staff
+                Request Staff Setup
               </Link>
             </div>
           </div>
@@ -293,7 +286,7 @@ export default function CompanyDashboardClient() {
               {tabs.map(tab => (
                 <button
                   key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
+                  onClick={() => setActiveTab(resolveCompanyTab(tab.key))}
                   className={`flex items-center gap-2 px-4 py-3.5 font-medium transition-colors whitespace-nowrap text-sm border-b-2 -mb-px ${
                     activeTab === tab.key
                       ? 'text-violet-500 dark:text-violet-400 border-violet-500 dark:border-violet-400'
@@ -422,7 +415,7 @@ export default function CompanyDashboardClient() {
                     <div className="text-center py-12">
                       <i className="ri-building-4-line text-6xl text-slate-300 dark:text-slate-600"></i>
                       <p className="text-slate-500 mt-4">No sites added yet</p>
-                      <Link href="/company/sites/new" className="mt-4 inline-block px-6 py-3 bg-violet-500 text-white rounded-xl font-semibold hover:bg-violet-600 transition-colors whitespace-nowrap cursor-pointer">Add Your First Site</Link>
+                      <Link href="/contact?subject=company-site-setup" className="mt-4 inline-block px-6 py-3 bg-violet-500 text-white rounded-xl font-semibold hover:bg-violet-600 transition-colors whitespace-nowrap cursor-pointer">Request Site Setup</Link>
                     </div>
                   ) : (
                     sites.map(site => (
@@ -669,7 +662,7 @@ export default function CompanyDashboardClient() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">Messages</h3>
-                    <Link href="/company/messages" className="text-sm text-violet-500 dark:text-violet-400 font-medium hover:underline whitespace-nowrap">Open Messages</Link>
+                    <Link href="/contact?subject=company-messages" className="text-sm text-violet-500 dark:text-violet-400 font-medium hover:underline whitespace-nowrap">Contact Support</Link>
                   </div>
                   {unreadMessages > 0 ? (
                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-5">
@@ -697,12 +690,12 @@ export default function CompanyDashboardClient() {
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Company Settings</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { title: 'Company Profile', desc: 'Update company name, address, and contact details', icon: 'ri-building-line', href: '/company/profile' },
-                      { title: 'Staff Management', desc: 'Add or remove staff, update roles and assignments', icon: 'ri-team-line', href: '/company/staff' },
-                      { title: 'Notification Preferences', desc: 'Configure how you receive alerts and updates', icon: 'ri-notification-3-line', href: '/company/notifications' },
-                      { title: 'Security Settings', desc: 'Password, two-factor authentication, and access control', icon: 'ri-shield-keyhole-line', href: '/company/security' },
-                      { title: 'Billing & Invoices', desc: 'Update payment methods, view invoices, manage plan', icon: 'ri-bank-card-line', href: '/company/billing' },
-                      { title: 'API & Integrations', desc: 'Connect with third-party tools and services', icon: 'ri-plug-line', href: '/company/integrations' },
+                      { title: 'Company Profile', desc: 'Contact support to request changes to your company profile', icon: 'ri-building-line', href: '/contact?subject=company-profile' },
+                      { title: 'Staff Management', desc: 'Review staff records; contact support to request changes', icon: 'ri-team-line', href: '/company/dashboard?tab=staff' },
+                      { title: 'Notification Preferences', desc: 'Ask support about available notification settings', icon: 'ri-notification-3-line', href: '/contact?subject=company-notifications' },
+                      { title: 'Security Settings', desc: 'Contact support for account security assistance', icon: 'ri-shield-keyhole-line', href: '/contact?subject=company-security' },
+                      { title: 'Billing & Invoices', desc: 'Review the billing information available for this company', icon: 'ri-bank-card-line', href: '/company/dashboard?tab=billing' },
+                      { title: 'API & Integrations', desc: 'Discuss integration availability and scope with support', icon: 'ri-plug-line', href: '/contact?subject=company-integrations' },
                     ].map(item => (
                       <Link key={item.title} href={item.href} className="bg-slate-50 dark:bg-[#0B1933] rounded-xl p-5 border border-slate-200 dark:border-[#1e2d4d] hover:border-violet-500/30 transition-all group">
                         <div className="flex items-start gap-4">
