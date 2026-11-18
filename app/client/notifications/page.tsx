@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { loadClientNotificationInbox, changeClientNotifications, type ClientNotification, type InboxAction } from '@/lib/client-notification-inbox';
 import PortalSidebar from '@/components/PortalSidebar';
 import NotificationCard from './NotificationCard';
 import ReplacementNotificationsSection from './ReplacementNotificationsSection';
@@ -10,20 +11,6 @@ import { useClientGuard } from '@/hooks/useClientGuard';
 import SearchFilterBar from '../components/SearchFilterBar';
 import BulkActionBar from '../components/BulkActionBar';
 import Link from 'next/link';
-
-interface NotificationItem {
-  id: string;
-  title: string;
-  message: string;
-  category: string;
-  type: string;
-  priority: number;
-  is_read: boolean;
-  created_at: string;
-  link: string | null;
-  data: { job_title?: string } | null;
-  read: boolean;
-}
 
 const CATEGORIES = [
   { id: 'all', label: 'All' },
@@ -84,7 +71,7 @@ const NOTIFICATION_FILTER_CONFIGS = [
 export default function ClientNotificationsPage() {
   const router = useRouter();
   const { loading: authLoading, allowed } = useClientGuard();
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notifications, setNotifications] = useState<ClientNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -106,166 +93,152 @@ export default function ClientNotificationsPage() {
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [bulkAction, setBulkAction] = useState('');
 
+  const [actionError, setActionError] = useState('');
+  const [actionPending, setActionPending] = useState(false);
+  const mountedRef = useRef(false);
+  const lifetimeRef = useRef<symbol | null>(null);
+  const requestRef = useRef(0);
+  const mutationRef = useRef(false);
+  const loadedUserRef = useRef<string | null>(null);
+  const latestLoadRef = useRef<() => Promise<void>>(async () => {});
+
   const loadNotifications = useCallback(async () => {
+    if (!mountedRef.current || mutationRef.current || authLoading || !allowed) return;
+    const request = ++requestRef.current;
+    const current = () => mountedRef.current && requestRef.current === request;
+    loadedUserRef.current = null;
+    setLoading(true);
     setLoadError(false);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        router.push('/client/login');
+      const snapshot = await loadClientNotificationInbox(supabase, {
+        category: activeCategory, priority: activePriority, status: activeStatus, search, dateFrom, dateTo,
+      });
+      if (!current()) return;
+      if ('redirect' in snapshot) {
+        setLoadError(true);
+        setUserId(null);
+        setClientId(null);
+        setNotifications([]);
+        router.replace(snapshot.redirect);
         return;
       }
-      const uid = session.user.id;
-      setUserId(uid);
-
-      const { data: client } = await supabase
-        .from('clients')
-        .select('id, company_name')
-        .eq('user_id', uid)
-        .maybeSingle();
-
-      if (!client) {
-        router.push('/client/complete-profile-wizard');
-        return;
-      }
-      setClientId(client.id);
-      setCompanyName(client.company_name || 'Client');
-
-      let query = supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', uid)
-        .order('created_at', { ascending: false });
-
-      if (activeCategory !== 'all') {
-        query = query.eq('category', activeCategory);
-      }
-      if (activePriority !== 'all') {
-        query = query.eq('priority', parseInt(activePriority));
-      }
-      if (activeStatus === 'unread') {
-        query = query.eq('is_read', false);
-      } else if (activeStatus === 'read') {
-        query = query.eq('is_read', true);
-      }
-      if (search.trim()) {
-        query = query.or(`title.ilike.%${search.trim()}%,message.ilike.%${search.trim()}%`);
-      }
-      if (dateFrom) {
-        query = query.gte('created_at', dateFrom);
-      }
-      if (dateTo) {
-        query = query.lte('created_at', dateTo + 'T23:59:59');
-      }
-
-      const { data } = await query.limit(100);
-      setNotifications((data || []) as NotificationItem[]);
-      setLoading(false);
+      loadedUserRef.current = snapshot.userId;
+      setUserId(snapshot.userId);
+      setClientId(snapshot.clientId);
+      setCompanyName(snapshot.companyName);
+      setNotifications(snapshot.notifications);
+      setSelectedNotifIds(previous => new Set([...previous].filter(id => snapshot.notifications.some(n => n.id === id))));
     } catch {
-      setLoadError(true);
-      setLoading(false);
+      if (current()) setLoadError(true);
+    } finally {
+      if (current()) setLoading(false);
     }
-  }, [router, activeCategory, activePriority, activeStatus, search, dateFrom, dateTo]);
+  }, [router, activeCategory, activePriority, activeStatus, search, dateFrom, dateTo, authLoading, allowed]);
 
   useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
+    mountedRef.current = true;
+    lifetimeRef.current = Symbol('client-inbox');
+    mutationRef.current = false;
+    return () => {
+      mountedRef.current = false;
+      lifetimeRef.current = null;
+      requestRef.current += 1;
+      loadedUserRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
-    if (!userId) return;
+    latestLoadRef.current = loadNotifications;
+    setSelectedNotifIds(new Set());
+    void loadNotifications();
+    return () => { requestRef.current += 1; loadedUserRef.current = null; };
+  }, [loadNotifications, authLoading, allowed]);
+
+  useEffect(() => {
+    if (!userId || authLoading || !allowed) return;
     const channel = supabase
       .channel(`client-notifications-page-${userId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-        () => { loadNotifications(); }
+        { event: 'INSERT', schema: 'app', table: 'notifications', filter: `user_id=eq.${userId}` },
+        () => { void latestLoadRef.current(); }
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-        () => { loadNotifications(); }
+        { event: 'UPDATE', schema: 'app', table: 'notifications', filter: `user_id=eq.${userId}` },
+        () => { void latestLoadRef.current(); }
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [userId, loadNotifications]);
+    return () => { void supabase.removeChannel(channel); };
+  }, [userId, authLoading, allowed]);
 
-  const markOneRead = async (id: string) => {
-    await supabase.from('notifications').update({ is_read: true, read: true }).eq('id', id);
-    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, is_read: true, read: true } : n));
+  const runNotificationAction = async (action: InboxAction, ids: string[], bulk = false, all = false) => {
+    if (!mountedRef.current || mutationRef.current || loading || loadError || authLoading || !allowed ||
+        !userId || loadedUserRef.current !== userId || ids.length === 0) return;
+    mutationRef.current = true;
+    requestRef.current += 1;
+    const lifetime = lifetimeRef.current;
+    const current = () => mountedRef.current && lifetimeRef.current === lifetime;
+    setActionPending(true);
+    setActionError('');
+    if (bulk) { setBulkProcessing(true); setBulkAction(action); }
+    if (all) setMarkingAll(true);
+    try {
+      const result = await changeClientNotifications(supabase, userId, ids, action);
+      if (!current()) return;
+      const confirmed = new Set(result.confirmedIds);
+      // Commit only rows acknowledged by the database, even on a partial result.
+      setNotifications(previous => previous.flatMap(notification => {
+        if (!confirmed.has(notification.id)) return [notification];
+        if (action === 'delete') return [];
+        const isRead = action === 'mark_read';
+        return [{ ...notification, is_read: isRead, read: isRead }];
+      }));
+      setSelectedNotifIds(previous => new Set([...previous].filter(id => !confirmed.has(id))));
+      if (!result.complete) {
+        setActionError('Some notification changes could not be confirmed. Reload the inbox to check before retrying.');
+      } else if (bulk) {
+        setBulkMode(false);
+      }
+    } catch {
+      if (current()) setActionError('Notification changes could not be confirmed. Reload the inbox to check before retrying.');
+    } finally {
+      if (current()) {
+        mutationRef.current = false;
+        setActionPending(false);
+        setMarkingAll(false);
+        setBulkProcessing(false);
+        setBulkAction('');
+        // A realtime refresh or a filter change may have arrived during the write.
+        void latestLoadRef.current();
+      }
+    }
   };
 
-  const markAllRead = async () => {
-    const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
-    if (unreadIds.length === 0) return;
-    setMarkingAll(true);
-    await supabase.from('notifications').update({ is_read: true, read: true }).in('id', unreadIds);
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true, read: true })));
-    setMarkingAll(false);
-  };
+  const markOneRead = (id: string) => runNotificationAction('mark_read', [id]);
+  const deleteOne = (id: string) => runNotificationAction('delete', [id]);
+  const markAllRead = () => runNotificationAction('mark_read', notifications.filter(n => !n.is_read).map(n => n.id), false, true);
 
-  const deleteOne = async (id: string) => {
-    await supabase.from('notifications').delete().eq('id', id);
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  };
-
-  // --- Bulk action handlers ---
   const toggleNotifSelection = (id: string) => {
-    setSelectedNotifIds(prev => {
-      const next = new Set(prev);
+    if (mutationRef.current || loading || loadError) return;
+    setSelectedNotifIds(previous => {
+      const next = new Set(previous);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
   };
-
   const selectAllNotifs = () => {
-    const ids = filtered.map(n => n.id);
-    setSelectedNotifIds(new Set(ids));
+    if (!mutationRef.current && !loading && !loadError) setSelectedNotifIds(new Set(filtered.map(n => n.id)));
   };
-
-  const clearNotifSelection = () => setSelectedNotifIds(new Set());
-
-  const handleBulkMarkRead = async () => {
-    setBulkProcessing(true);
-    setBulkAction('mark_read');
-    const ids = Array.from(selectedNotifIds);
-    await supabase.from('notifications').update({ is_read: true, read: true }).in('id', ids);
-    setNotifications(prev => prev.map(n => ids.includes(n.id) ? { ...n, is_read: true, read: true } : n));
-    setBulkProcessing(false);
-    setBulkAction('');
-    setSelectedNotifIds(new Set());
-    setBulkMode(false);
+  const clearNotifSelection = () => {
+    if (!mutationRef.current) setSelectedNotifIds(new Set());
   };
-
-  const handleBulkMarkUnread = async () => {
-    setBulkProcessing(true);
-    setBulkAction('mark_unread');
-    const ids = Array.from(selectedNotifIds);
-    await supabase.from('notifications').update({ is_read: false, read: false }).in('id', ids);
-    setNotifications(prev => prev.map(n => ids.includes(n.id) ? { ...n, is_read: false, read: false } : n));
-    setBulkProcessing(false);
-    setBulkAction('');
-    setSelectedNotifIds(new Set());
-    setBulkMode(false);
-  };
-
-  const handleBulkDeleteNotifs = async () => {
-    setBulkProcessing(true);
-    setBulkAction('delete');
-    const ids = Array.from(selectedNotifIds);
-    await supabase.from('notifications').delete().in('id', ids);
-    setNotifications(prev => prev.filter(n => !ids.includes(n.id)));
-    setBulkProcessing(false);
-    setBulkAction('');
-    setSelectedNotifIds(new Set());
-    setBulkMode(false);
-  };
-
   const handleNotifBulkAction = (actionKey: string) => {
-    if (actionKey === 'mark_read') handleBulkMarkRead();
-    else if (actionKey === 'mark_unread') handleBulkMarkUnread();
-    else if (actionKey === 'delete') handleBulkDeleteNotifs();
+    if (actionKey === 'mark_read' || actionKey === 'mark_unread' || actionKey === 'delete') {
+      void runNotificationAction(actionKey, Array.from(selectedNotifIds), true);
+    }
   };
-  // --- End bulk action handlers ---
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
   const urgentCount = notifications.filter((n) => n.priority === 3 && !n.is_read).length;
@@ -283,7 +256,7 @@ export default function ClientNotificationsPage() {
     return 0;
   });
 
-  const filtered = sortedNotifications;
+  const filtered = sortedNotifications.filter(n => activeStatus === 'all' || n.is_read === (activeStatus === 'read'));
 
   if (authLoading || !allowed) {
     return (
@@ -312,7 +285,7 @@ export default function ClientNotificationsPage() {
               {unreadCount > 0 && (
                 <button
                   onClick={markAllRead}
-                  disabled={markingAll}
+                  disabled={actionPending || loading || loadError}
                   className="flex items-center gap-1.5 bg-teal-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-60"
                 >
                   {markingAll ? (
@@ -324,7 +297,8 @@ export default function ClientNotificationsPage() {
                 </button>
               )}
               <button
-                onClick={() => setBulkMode(!bulkMode)}
+                onClick={() => { if (!mutationRef.current) setBulkMode(!bulkMode); }}
+                disabled={actionPending || loading || loadError}
                 className={`flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl border transition-colors cursor-pointer whitespace-nowrap ${
                   bulkMode
                     ? 'bg-teal-500 text-white border-teal-500'
@@ -347,25 +321,25 @@ export default function ClientNotificationsPage() {
           {/* Stats bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             <div className="bg-white dark:bg-[#111d35] rounded-xl border border-slate-200 dark:border-[#1e2d4d] p-4">
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{notifications.length}</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">{loading || loadError ? '—' : notifications.length}</p>
               <p className="text-xs text-slate-500">Total</p>
             </div>
             <div className="bg-white dark:bg-[#111d35] rounded-xl border border-slate-200 dark:border-[#1e2d4d] p-4">
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{unreadCount}</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">{loading || loadError ? '—' : unreadCount}</p>
               <p className="text-xs text-slate-500">Unread</p>
             </div>
             <div className="bg-white dark:bg-[#111d35] rounded-xl border border-red-500/20 p-4">
-              <p className="text-2xl font-bold text-red-500">{urgentCount}</p>
+              <p className="text-2xl font-bold text-red-500">{loading || loadError ? '—' : urgentCount}</p>
               <p className="text-xs text-red-400">Urgent</p>
             </div>
             <div className="bg-white dark:bg-[#111d35] rounded-xl border border-amber-500/20 p-4">
-              <p className="text-2xl font-bold text-amber-500">{importantCount}</p>
+              <p className="text-2xl font-bold text-amber-500">{loading || loadError ? '—' : importantCount}</p>
               <p className="text-xs text-amber-400">Important</p>
             </div>
           </div>
 
           {/* Alert banner */}
-          {urgentCount > 0 && (
+          {!loading && !loadError && urgentCount > 0 && (
             <div className="mb-6 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 flex items-center gap-3">
               <div className="w-8 h-8 bg-red-500/15 rounded-lg flex items-center justify-center flex-shrink-0">
                 <i className="ri-alarm-warning-line text-red-400 text-lg"></i>
@@ -421,6 +395,13 @@ export default function ClientNotificationsPage() {
             />
           </div>
 
+          {actionError && (
+            <div role="alert" className="mb-4 rounded-xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-600 dark:text-red-400">
+              <p>{actionError}</p>
+              <button onClick={() => { void loadNotifications(); }} disabled={actionPending || loading} className="mt-2 font-semibold underline disabled:opacity-50">Reload inbox</button>
+            </div>
+          )}
+
           {/* BulkActionBar */}
           <BulkActionBar
             selectedCount={selectedNotifIds.size}
@@ -454,7 +435,7 @@ export default function ClientNotificationsPage() {
               },
             ]}
             onAction={handleNotifBulkAction}
-            processing={bulkProcessing}
+            processing={bulkProcessing || actionPending || loading || loadError}
             processingAction={bulkAction}
           />
 
@@ -512,14 +493,14 @@ export default function ClientNotificationsPage() {
                 ))}
               </div>
             ) : loadError ? (
-              <div className="bg-white dark:bg-[#111d35] rounded-2xl border border-red-500/20 p-10 md:p-16 text-center">
+              <div role="alert" className="bg-white dark:bg-[#111d35] rounded-2xl border border-red-500/20 p-10 md:p-16 text-center">
                 <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-500/20">
                   <i className="ri-error-warning-line text-3xl text-red-400"></i>
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-2">Failed to load notifications</h3>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Failed to load notifications</h3>
                 <p className="text-slate-500 text-sm mb-6">We could not load your notifications. Please check your connection and try again.</p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                  <button onClick={loadNotifications} className="inline-flex items-center gap-2 bg-[#162036] text-teal-400 text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap border border-[#1e2d4d]">
+                  <button onClick={() => { void loadNotifications(); }} className="inline-flex items-center gap-2 bg-[#162036] text-teal-400 text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap border border-[#1e2d4d]">
                     <i className="ri-refresh-line"></i>Retry
                   </button>
                   <Link href="/client/support" className="inline-flex items-center gap-2 bg-red-500/10 text-red-400 text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-red-500/20 transition-colors cursor-pointer whitespace-nowrap border border-red-500/25">
@@ -552,11 +533,12 @@ export default function ClientNotificationsPage() {
                   title={n.title}
                   message={n.message}
                   category={n.category || n.type || 'general'}
-                  priority={n.priority || 1}
+                  priority={n.priority ?? 1}
                   is_read={n.is_read}
                   created_at={n.created_at}
                   link={n.link || undefined}
                   related_job_title={n.data?.job_title || undefined}
+                  disabled={actionPending || loading || loadError}
                   onMarkRead={markOneRead}
                   onDelete={deleteOne}
                   selectable={bulkMode}

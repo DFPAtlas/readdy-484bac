@@ -17,6 +17,7 @@ interface NotificationCardProps {
   related_job_title?: string;
   onMarkRead?: (id: string) => void;
   onDelete?: (id: string) => void;
+  disabled?: boolean;
   // Bulk selection
   selectable?: boolean;
   selected?: boolean;
@@ -47,6 +48,7 @@ export default function NotificationCard({
   selectable,
   selected,
   onToggleSelect,
+  disabled = false,
 }: NotificationCardProps) {
   const inner = (
     <div className="p-4 sm:p-5">
@@ -56,6 +58,7 @@ export default function NotificationCard({
             <input
               type="checkbox"
               checked={selected}
+              disabled={disabled}
               onChange={() => onToggleSelect?.(id)}
               className="w-4 h-4 rounded border-[#1e2d4d] bg-[#162036] text-teal-500 focus:ring-teal-500/20 cursor-pointer"
             />
@@ -96,7 +99,7 @@ export default function NotificationCard({
           {inner}
         </Link>
       ) : (
-        <div onClick={() => selectable && onToggleSelect?.(id)} className={selectable ? 'cursor-pointer' : ''}>
+        <div onClick={() => selectable && !disabled && onToggleSelect?.(id)} className={selectable ? 'cursor-pointer' : ''}>
           {inner}
         </div>
       )}
@@ -104,6 +107,7 @@ export default function NotificationCard({
       <div className={`flex items-center gap-2 px-4 pb-4 sm:px-5 sm:pb-5 ${selectable ? 'hidden' : ''}`}>
         {!is_read && (
           <button
+            disabled={disabled}
             onClick={(e) => {
               e.stopPropagation();
               onMarkRead?.(id);
@@ -125,6 +129,7 @@ export default function NotificationCard({
         )}
         {onDelete && (
           <button
+            disabled={disabled}
             onClick={(e) => {
               e.stopPropagation();
               onDelete?.(id);
