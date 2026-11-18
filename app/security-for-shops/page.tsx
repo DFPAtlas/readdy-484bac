@@ -52,9 +52,6 @@ const data = {
     { q: 'What if I only need cover for a few hours?', a: 'You set the shift length. Whether it is 4 hours or 12, you control the schedule and pay only for the time booked.' },
     { q: 'Is weekend and late-night cover available?', a: 'Yes. Guards set their own availability. When posting a job, you will only see guards who are free at the exact times you need.' },
   ],
-  testimonialQuote: 'Our small boutique in Manchester had repeated stock loss issues. Through QuickGuard we found a guard who worked retail for 8 years. He cut our shrinkage by 70% in the first month. And we pay less than half what the agency charged.',
-  testimonialAuthor: 'Priya K.',
-  testimonialVenue: 'Boutique Owner, Manchester',
 };
 
 export default function ShopSecurityPage() {

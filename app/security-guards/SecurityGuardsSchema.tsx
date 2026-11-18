@@ -7,7 +7,7 @@ export default function SecurityGuardsSchema() {
     name: 'Hire SIA Licensed Security Guards Across the UK | QuickGuard',
     url: `${SITE_URL}/security-guards`,
     description:
-      'Book verified SIA-licensed security guards in London, Manchester, Birmingham, Leeds, Liverpool, Glasgow, Edinburgh, Bristol, and Cardiff. Instant matching, same-day deployment.',
+      'Book verified SIA-licensed security guards in London, Manchester, Birmingham, Leeds, Liverpool, Glasgow, Edinburgh, Bristol, and Cardiff. Post a job and compare applicants, subject to guard availability.',
     isPartOf: {
       '@type': 'WebSite',
       name: 'QuickGuard',
@@ -16,7 +16,7 @@ export default function SecurityGuardsSchema() {
     about: {
       '@type': 'Thing',
       name: 'UK Security Guard Services',
-      description: ' Nationwide coverage of SIA-licensed security professionals for events, retail, corporate, construction, and residential security.',
+      description: 'UK job-posting guides for event, retail, corporate, construction and residential security requirements. Guard availability varies.',
     },
   };
 

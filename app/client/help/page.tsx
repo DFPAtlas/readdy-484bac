@@ -1,5 +1,7 @@
 'use client';
 
+import { CANCELLATION_GUIDANCE, CANCELLATION_AVAILABILITY, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
+
 import Link from 'next/link';
 import PortalSidebar from '@/components/PortalSidebar';
 import { useClientGuard } from '@/hooks/useClientGuard';
@@ -384,28 +386,9 @@ export default function ClientHelpPage() {
             <HelpSection id="cancellations-refunds" icon="ri-refund-line" title="Cancellations & Refunds">
               <div className="space-y-4 text-sm text-slate-400">
                 <p>Sometimes plans change. Here is how cancellations and refunds work:</p>
-                <div className="bg-[#162036] rounded-xl p-5 border border-[#1e2d4d]">
-                  <p className="text-white font-semibold text-sm mb-3">Cancellation Eligibility</p>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                      <span className="text-slate-300">Draft, Posted, Awaiting Applicants — Full refund</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-amber-400" />
-                      <span className="text-slate-300">Awaiting Payment — no booking payment has been captured yet</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-orange-400" />
-                      <span className="text-slate-300">Confirmed — more than 24h: full refund; 12–24h: 50% guard-fee refund; under 12h: no refund</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-red-400" />
-                      <span className="text-slate-300">Active / Completed — Not eligible for cancellation</span>
-                    </div>
-                  </div>
-                </div>
-                <p>To cancel a job, go to your job list, click the cancel button, and select your reason. If eligible, you can request a full refund, partial refund, or credit toward a future booking. Refund requests are processed within 3–5 business days.</p>
+                <p>{CANCELLATION_GUIDANCE}</p>
+                <p>{CANCELLATION_AVAILABILITY}</p>
+                <p>{REFUND_TIMING_GUIDANCE}</p>
                 <p>For disputed cancellations, our support team will review and determine the outcome. You will be notified at every step.</p>
               </div>
             </HelpSection>

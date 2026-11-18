@@ -23,6 +23,7 @@ export default function FoundingClientsPromoSection() {
     load();
   }, []);
 
+  const legacyWindowOpen = !!stats?.tier3WindowEnd && Date.now() < Date.parse(stats.tier3WindowEnd);
   const t1Taken = stats?.founding ?? 0;
   const t1Cap = stats?.caps?.tier1 ?? 50;
   const t1Left = Math.max(0, t1Cap - t1Taken);
@@ -89,10 +90,10 @@ export default function FoundingClientsPromoSection() {
               <span className="text-sm font-bold text-teal-400">Launch Client</span>
             </div>
             <p className="text-2xl font-bold text-white mb-1">{stats?.launch ?? 0}/{stats?.caps?.tier3 ?? 1000}</p>
-            <p className="text-sm text-slate-400 mb-4">Spots 251–1000 (90-day window)</p>
+            <p className="text-sm text-slate-400 mb-4">{legacyWindowOpen ? 'Legacy launch window open' : 'Legacy launch window closed'}</p>
             <ul className="space-y-2 text-sm text-slate-400">
-              <li className="flex items-start gap-2"><i className="ri-check-line text-emerald-400 mt-0.5" /> First 3 jobs completely free</li>
-              <li className="flex items-start gap-2"><i className="ri-check-line text-emerald-400 mt-0.5" /> Standard rates after that</li>
+              <li className="flex items-start gap-2"><i className="ri-check-line text-emerald-400 mt-0.5" /> Service fee waived on first 3 eligible bookings</li>
+              <li className="flex items-start gap-2"><i className="ri-check-line text-emerald-400 mt-0.5" /> Guard pay still applies; standard fees apply after eligibility ends</li>
             </ul>
           </div>
         </div>
