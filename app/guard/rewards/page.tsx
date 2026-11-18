@@ -1,5 +1,7 @@
 'use client';
 
+import { REWARDS_REDEMPTION_NOTICE } from '@/lib/customer-guidance';
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -96,7 +98,7 @@ export default function GuardRewardsPage() {
   const shareEmail = () => {
     const link = `${window.location.origin}/qg-launch-rewards?ref=${referralCode}`;
     const subject = encodeURIComponent('Join QuickGuard — QG Launch Rewards');
-    const body = encodeURIComponent(`Hey! QuickGuard is opening early access and I thought you'd be interested. Create a verified guard or client profile using my referral link and we both earn QG Tokens (discount credits).\n\n${link}\n\n100 QG Tokens = £10 QuickGuard credit.`);
+    const body = encodeURIComponent(`Hey! QuickGuard is opening early access and I thought you'd be interested. Create a verified guard or client profile using my referral link and we both earn QG Tokens (discount credits).\n\n${link}\n\n100 QG Tokens = £10 planned QuickGuard credit. Checkout redemption is not available yet.`);
     window.open(`mailto:?subject=${subject}&body=${body}`);
   };
 
@@ -170,6 +172,7 @@ export default function GuardRewardsPage() {
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-bold">QG Rewards</h1>
+              <p role="status" className="my-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-200">{REWARDS_REDEMPTION_NOTICE}</p>
             <p className="text-slate-400 text-sm mt-1">Your referral programme dashboard</p>
           </div>
           <Link href="/guard/dashboard" className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors text-sm whitespace-nowrap cursor-pointer">
@@ -253,7 +256,7 @@ export default function GuardRewardsPage() {
                       {preAccountData.pre_account_status === 'linked' && (
                         <p className="flex items-center gap-1 text-amber-400 text-xs self-end pb-2">
                           <div className="w-3.5 h-3.5 flex items-center justify-center"><i className="ri-information-line"></i></div>
-                          These tokens will become usable after your QuickGuard account is verified.
+                          Eligible tokens can be linked after account verification. Checkout redemption is planned and is not available yet.
                         </p>
                       )}
                     </div>
@@ -546,9 +549,9 @@ export default function GuardRewardsPage() {
             {redemptions.length === 0 ? (
               <div className="bg-[#111d35] border border-[#1a2b4a] rounded-2xl p-12 text-center">
                 <div className="w-12 h-12 flex items-center justify-center mx-auto rounded-full bg-teal-500/10 mb-4"><i className="ri-coupon-line text-teal-400 text-xl"></i></div>
-                <p className="text-slate-400">No redemptions yet. Use your tokens when subscribing or paying for QuickGuard services.</p>
-                <Link href="/guard/payment-centre" className="mt-4 inline-block px-6 py-3 bg-teal-500 text-slate-900 font-bold rounded-xl hover:bg-teal-400 transition-all text-sm whitespace-nowrap cursor-pointer">
-                  Use Tokens Now
+                <p className="text-slate-400">Checkout redemption is not available yet. Eligible recorded rewards will remain visible here.</p>
+                <Link href="/qg-launch-rewards/terms" className="mt-4 inline-block px-6 py-3 bg-teal-500 text-slate-900 font-bold rounded-xl hover:bg-teal-400 transition-all text-sm whitespace-nowrap cursor-pointer">
+                  View programme terms
                 </Link>
               </div>
             ) : (

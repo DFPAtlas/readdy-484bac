@@ -9,7 +9,6 @@ interface CityCard {
   slug: string;
   city: string;
   region: string;
-  guards: string;
   description: string;
 }
 
@@ -18,71 +17,62 @@ const cities: CityCard[] = [
     slug: 'london',
     city: 'London',
     region: 'Greater London & Home Counties',
-    guards: '850+',
-    description: 'Verified guards across all 32 boroughs including Westminster, Canary Wharf, and the City of London.',
+    description: 'Post security requirements for Westminster, Canary Wharf, the City of London and other boroughs.',
   },
   {
     slug: 'manchester',
     city: 'Manchester',
     region: 'Greater Manchester & North West',
-    guards: '420+',
-    description: 'Coverage across the city centre, Salford Quays, Trafford Park, and all ten boroughs.',
+    description: 'Post requirements for the city centre, Salford Quays, Trafford Park and surrounding boroughs.',
   },
   {
     slug: 'birmingham',
     city: 'Birmingham',
     region: 'West Midlands & Birmingham Area',
-    guards: '380+',
-    description: 'From the Bullring to the NEC, serving Birmingham, Solihull, Coventry, and Wolverhampton.',
+    description: 'Post requirements around the Bullring, NEC, Birmingham, Solihull, Coventry and Wolverhampton.',
   },
   {
     slug: 'leeds',
     city: 'Leeds',
     region: 'West Yorkshire & Leeds Area',
-    guards: '290+',
-    description: 'Security professionals across the city centre, Headingley, Chapel Allerton, and West Yorkshire.',
+    description: 'Post requirements for the city centre, Headingley, Chapel Allerton and West Yorkshire.',
   },
   {
     slug: 'liverpool',
     city: 'Liverpool',
     region: 'Merseyside & Liverpool Area',
-    guards: '260+',
-    description: 'Guards covering the city centre, Anfield, Albert Dock, and the full Wirral peninsula.',
+    description: 'Post requirements for the city centre, Anfield, Albert Dock and the Wirral.',
   },
   {
     slug: 'glasgow',
     city: 'Glasgow',
     region: 'Scotland & Glasgow Area',
-    guards: '240+',
-    description: 'From the SEC to Buchanan Galleries, covering the city centre, West End, and Greater Glasgow.',
+    description: 'Post requirements for the SEC, Buchanan Galleries, city centre, West End and Greater Glasgow.',
   },
   {
     slug: 'edinburgh',
     city: 'Edinburgh',
     region: 'Scotland & Edinburgh Area',
-    guards: '210+',
-    description: 'Festival security, retail guarding, and corporate coverage across the Lothians.',
+    description: 'Post festival, retail and corporate security requirements across the Lothians.',
   },
   {
     slug: 'bristol',
     city: 'Bristol',
     region: 'South West England & Bristol Area',
-    guards: '230+',
-    description: 'Serving Bristol, Bath, and the South West from Cabot Circus to Ashton Gate.',
+    description: 'Post requirements for Bristol, Bath and the South West, from Cabot Circus to Ashton Gate.',
   },
   {
     slug: 'cardiff',
     city: 'Cardiff',
     region: 'Wales & Cardiff Area',
-    guards: '180+',
-    description: 'Principality Stadium events, St David\'s retail security, and coverage across South Wales.',
+    description: 'Post event and retail security requirements around Cardiff and South Wales.',
   },
 ];
 
 export const metadata: Metadata = {
   title: 'Hire SIA Licensed Security Guards Across the UK | QuickGuard',
   description:
-    'Book verified SIA-licensed security guards in London, Manchester, Birmingham, Leeds, Liverpool, Glasgow, Edinburgh, Bristol, and Cardiff. Instant matching, same-day deployment, no upfront fees.',
+    'Book verified SIA-licensed security guards in London, Manchester, Birmingham, Leeds, Liverpool, Glasgow, Edinburgh, Bristol, and Cardiff. Post a job, compare applicants and pay before booking confirmation. Guard availability varies.',
   keywords:
     'security guards UK, SIA licensed guards, hire security London, security guards Manchester, security guards Birmingham, event security UK, door supervisors UK',
   alternates: {
@@ -91,7 +81,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Hire SIA Licensed Security Guards Across the UK | QuickGuard',
     description:
-      'Book verified SIA-licensed security guards in every major UK city. Instant matching, same-day deployment.',
+      'Post security requirements in UK cities and compare SIA-licensed guard profiles. Post a job and compare applicants, subject to guard availability.',
     url: 'https://quickguard.uk/security-guards',
     siteName: 'QuickGuard',
     type: 'website',
@@ -108,7 +98,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Hire SIA Licensed Security Guards Across the UK | QuickGuard',
-    description: 'Book verified SIA-licensed security guards in every major UK city.',
+    description: 'Post security requirements in UK cities and compare SIA-licensed guard profiles.',
     images: ['https://public.readdy.ai/ai/img_res/99cbad8f-297d-414a-946f-a43c56ace314.png'],
   },
 };
@@ -142,26 +132,26 @@ export default function SecurityGuardsIndex() {
               <span className="block text-teal-400 mt-1">Across the UK</span>
             </h1>
             <p className="text-lg md:text-xl mb-8 text-slate-300 max-w-xl leading-relaxed">
-              QuickGuard operates in every major UK city. Book verified, background-checked security professionals in minutes with same-day deployment available nationwide.
+              Post security requirements in UK cities and compare applicants for your role. Responses and booking times depend on eligible guard availability; cover is not guaranteed.
             </p>
             <div className="flex flex-wrap items-center gap-6 text-slate-300 text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">
                   <i className="ri-shield-check-line text-teal-400 text-base" aria-hidden="true"></i>
                 </div>
-                <span className="font-medium text-slate-200">SIA Approved</span>
+                <span className="font-medium text-slate-200">SIA licence information</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">
                   <i className="ri-time-line text-teal-400 text-base" aria-hidden="true"></i>
                 </div>
-                <span className="font-medium text-slate-200">Same-Day Deployment</span>
+                <span className="font-medium text-slate-200">Urgent jobs can be posted</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">
                   <i className="ri-star-fill text-teal-400 text-base" aria-hidden="true"></i>
                 </div>
-                <span className="font-medium text-slate-200">4.9/5 Rating</span>
+                <span className="font-medium text-slate-200">You choose your guard</span>
               </div>
             </div>
           </div>
@@ -210,7 +200,7 @@ export default function SecurityGuardsIndex() {
                     <div className="w-5 h-5 flex items-center justify-center">
                       <i className="ri-shield-user-line" aria-hidden="true"></i>
                     </div>
-                    {city.guards} Verified Guards
+                    View local job-posting guide
                   </div>
                   <span className="text-xs text-slate-500 group-hover:text-teal-400 transition-colors">
                     View City Page
@@ -296,7 +286,7 @@ export default function SecurityGuardsIndex() {
             Need Security Guards in Your City?
           </h2>
           <p className="text-xl mb-10 text-slate-400 max-w-2xl mx-auto">
-            Post a job in under two minutes and get matched with verified SIA-licensed guards near you.
+            Post a job and review applicants against your requirements. Availability varies by location, date and role.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link

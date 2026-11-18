@@ -1,135 +1,37 @@
 'use client';
 
+import { CANCELLATION_GUIDANCE, GUARD_CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE, OVERRUN_GUIDANCE } from '@/lib/customer-guidance';
+
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import NavSidebar from '@/components/NavSidebar';
+import PricingBreadcrumb from './PricingBreadcrumb';
 import { supabase } from '@/lib/supabase';
 import { calculatePaygFees, formatCurrency } from '@/lib/payg-fees';
+import { usePublicPricing } from '@/lib/use-public-pricing';
+import { subscriptionPrice, bookingFeeText, type PublicPricingPlan } from '@/lib/public-pricing';
+import { getFeatureLabel, presentPricingPlan } from '@/lib/pricing-presentation';
+import PlanPrice from '@/components/pricing/PlanPrice';
 
-interface Plan {
-  slug: string;
-  name: string;
-  description: string;
-  monthly_price_pence: number;
-  stripe_price_id: string | null;
-  stripe_annual_price_id: string | null;
-  features: string[];
-  limitations?: string[];
-  badge?: string;
-  audience: string;
-  bookingFee?: number;
-}
-
-const clientFeatureLabels: Record<string, string> = {
-  'client.post_job': 'Job postings',
-  'client.ai_matching': 'AI guard matching',
-  'client.email_support': 'Email support',
-  'client.standard_payments': 'Standard payments',
-  'client.escrow_payments': 'Standard payments',
-  'client.job_templates': 'Job templates',
-  'client.analytics': 'Advanced analytics',
-  'client.priority_support': 'Priority support',
-  'client.bulk_posting': 'Bulk posting',
-  'client.dedicated_manager': 'Dedicated account manager',
-  'client.unlimited_jobs': 'Unlimited jobs',
-  'client.performance_analytics': 'Performance analytics',
-  'client.priority_listing': 'Priority listing',
-};
-
-const guardFeatureLabels: Record<string, string> = {
-  'guard.job_applications': 'Job applications',
-  'guard.ai_matching': 'AI job matching',
-  'guard.email_support': 'Email support',
-  'guard.profile_visibility': 'Profile visibility',
-  'guard.secure_payments': 'Secure payments',
-  'guard.performance_analytics': 'Performance analytics',
-  'guard.priority_support': 'Priority support',
-  'guard.bulk_apply': 'Bulk applications',
-  'guard.dedicated_manager': 'Dedicated account manager',
-  'guard.unlimited_applications': 'Up to 40 applications per month',
-  'guard.enhanced_profile': 'Enhanced profile',
-  'guard.priority_listing': 'Priority listing',
-};
-
-const planDescriptions: Record<string, string> = {
-  'client-starter': 'For small businesses with regular security needs',
-  'client-pro': 'For growing companies with high-volume needs',
-  'client-enterprise': 'For multi-site and enterprise security needs',
-  'guard-basic': 'Perfect for getting started',
-  'guard-pro': 'For active security professionals',
-  'guard-elite': 'Full access to all features',
-};
-
-const planBadges: Record<string, string> = {
-  'client-pro': 'POPULAR',
-  'guard-elite': 'MOST POPULAR',
-};
-
-const planLimitations: Record<string, string[]> = {
-  'client_free': ['Limited to 1 job per month', 'Upgrade required for advanced matching', 'Upgrade required for job templates', 'Upgrade required for analytics dashboard', 'Upgrade required for direct contact', 'Upgrade required for multi-site features'],
-  'client-starter': ['Limited to 10 jobs per month', 'No priority matching', 'No dedicated support'],
-  'client-pro': ['Limited to 30 jobs per month', 'No dedicated account manager', 'No bulk posting'],
-  'guard_starter': ['Limited to 2 applications per month', 'No advanced job alerts', 'No performance analytics', 'No priority support'],
-  'guard-basic': ['Limited to 10 applications/month', 'No performance analytics', 'No 24/7 AI support'],
-  'guard-pro': ['Limited to 25 applications/month', 'No 24/7 AI support'],
-};
-
-const getFeatureLabel = (key: string, audience: string) => {
-  if (audience === 'client' && clientFeatureLabels[key]) return clientFeatureLabels[key];
-  if (audience === 'guard' && guardFeatureLabels[key]) return guardFeatureLabels[key];
-  return key.split('.').pop()?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || key;
-};
+interface Plan extends PublicPricingPlan { badge?: string; limitations?: string[]; }
 
 export default function PricingClient() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [paygServiceFeePct, setPaygServiceFeePct] = useState(15);
+  const catalogue = usePublicPricing();
+  const clientPlans = catalogue.plans.filter(plan => plan.audience === 'client').map(presentPricingPlan);
+  const guardPlans = catalogue.plans.filter(plan => plan.audience === 'guard').map(presentPricingPlan);
+  const freePlan = clientPlans.find(plan => plan.slug === 'client_free');
+  const paygServiceFeePct = freePlan?.bookingFee ?? null;
+  const paygFixedFeePence = freePlan?.bookingFeeFixedPence ?? 0;
+  const pricingError = !!catalogue.error || catalogue.feesError;
+  const plansLoading = catalogue.loading;
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [subscribingPlan, setSubscribingPlan] = useState<string | null>(null);
   const [user, setUser] = useState<{ id: string; email: string; role: 'guard' | 'client' | null } | null>(null);
-  const [clientPlans, setClientPlans] = useState<Plan[]>([]);
-  const [guardPlans, setGuardPlans] = useState<Plan[]>([]);
-  const [plansLoading, setPlansLoading] = useState(true);
   const [switchSuccess, setSwitchSuccess] = useState<{ oldPlanName: string; newPlanName: string } | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState<number>(0);
 
   useEffect(() => {
-    const loadPlans = async () => {
-      const { data } = await supabase
-        .from('plans')
-        .select('*')
-        .eq('active', true)
-        .order('monthly_price_pence', { ascending: true });
-
-      const { data: feeRules } = await supabase.from('plan_fee_rules').select('plan_slug, platform_fee_percent');
-      const bookingFees = new Map((feeRules || []).map(r => [r.plan_slug, Number(r.platform_fee_percent)]));
-      if (data) {
-        const enriched = data.map((p: any) => ({
-          ...p,
-          bookingFee: bookingFees.get(p.slug),
-          description: planDescriptions[p.slug] || '',
-          badge: planBadges[p.slug] || undefined,
-          limitations: planLimitations[p.slug] || undefined,
-        }));
-        setClientPlans(enriched.filter((p: Plan) => p.audience === 'client'));
-        setGuardPlans(enriched.filter((p: Plan) => p.audience === 'guard'));
-      }
-      setPlansLoading(false);
-    };
-    loadPlans();
-
-    const loadConfig = async () => {
-      const { data } = await supabase
-        .from('pricing_config')
-        .select('payg_service_fee_pct')
-        .order('id', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (data) {
-        setPaygServiceFeePct(Number(data.payg_service_fee_pct ?? 15));
-      }
-    };
-    loadConfig();
-
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setUser(null); return; }
@@ -232,37 +134,28 @@ export default function PricingClient() {
     }
   };
 
-  const example = calculatePaygFees({
+  const example = paygServiceFeePct == null ? null : calculatePaygFees({
     hourlyRate: 18,
     hours: 8,
     numberOfGuards: 1,
     numberOfDays: 1,
     serviceFeePct: paygServiceFeePct,
+    serviceFeeFixedPence: paygFixedFeePence,
   });
-
-  const calculateSavings = (monthlyPence: number, annualPence: number) => {
-    if (monthlyPence === 0) return 0;
-    const monthlyCost = monthlyPence * 12;
-    return Math.round(((monthlyCost - annualPence) / monthlyCost) * 100);
-  };
 
   const faqs = [
     { question: 'When am I charged?', answer: 'Posting a job does not charge the booking payment. Once you have reviewed applicants and selected your guards, you review the agreed guard pay, your plan’s service fee and any eligible promotion, then pay securely through Stripe before the booking is confirmed. Funds are held with Stripe and released to the guard after completion and the applicable release checks.' },
-    { question: 'What if a guard cancels?', answer: 'If the guard cancels before the shift starts, you get a full refund including the service fee. If a pattern of cancellations emerges, our admin team investigates.' },
-    { question: 'What if I cancel the job?', answer: 'Cancelling more than 24 hours before the shift: full refund including the service fee. 12–24 hours before: 50% refund of the guard fee; service fee is retained. Less than 12 hours: no refund.' },
-    { question: 'Is there a contract or minimum commitment?', answer: 'No. Pay-As-You-Go means zero commitment. Subscription plans can be cancelled anytime with no penalties.' },
-    { question: 'Can I change my subscription plan?', answer: 'Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we prorate the difference.' },
-    { question: 'What happens if no guard accepts my job?', answer: 'If the start time passes and no guard has accepted, a full refund (including the service fee) is automatically issued after 24 hours.' },
+    { question: 'What if a guard cancels?', answer: `${GUARD_CANCELLATION_GUIDANCE} ${REFUND_TIMING_GUIDANCE}` },
+    { question: 'What if I cancel the job?', answer: `${CANCELLATION_GUIDANCE} ${REFUND_TIMING_GUIDANCE}` },
+    { question: 'Is there a contract or minimum commitment?', answer: 'A free account has no subscription charge; booking payments and service fees still apply. Paid subscriptions renew monthly or annually. You can cancel renewal at any time, with cancellation taking effect at the end of your current billing period. Annual plans are paid upfront for 12 months. Access continues until the period ends; unused time is not refunded unless required by law.' },
+    { question: 'Can I change my subscription plan?', answer: 'You can switch between paid plans. Successful changes take effect immediately, and Stripe calculates a prorated charge or account credit for the remaining billing period. A credit is not an automatic cash refund. To stop renewal, use your billing settings or contact support.' },
+    { question: 'What happens if no guard accepts my job?', answer: 'Posting a job does not charge the booking payment. You pay only after selecting guards and reviewing the booking total, so an unfilled, unpaid job has no booking payment to refund. If you have already paid and a selected guard can no longer attend, contact support for a cancellation and refund review.' },
     { question: 'Do guards get paid differently depending on my plan?', answer: 'No. Guards always receive their posted hourly rate multiplied by the hours worked. The service fee is separate and does not reduce guard pay.' },
-    { question: 'How do you handle overruns?', answer: 'Guards log actual hours via time-tracking. If the actual shift runs longer than booked, a top-up payment request is sent before payout. The service fee applies to the top-up amount too.' },
+    { question: 'How do you handle overruns?', answer: OVERRUN_GUIDANCE },
   ];
 
   const renderPlanCard = (plan: Plan, index: number, accentColor: string) => {
-    const monthlyPrice = plan.monthly_price_pence / 100;
-    const annualTotal = Math.round((plan.monthly_price_pence * 10) / 100);
-    const annualMonthlyEquiv = Math.round(annualTotal / 12);
-    const price = billingCycle === 'monthly' ? monthlyPrice : annualMonthlyEquiv;
-    const savings = calculateSavings(plan.monthly_price_pence, plan.monthly_price_pence * 10);
+    const priceAvailable = subscriptionPrice(plan, billingCycle) !== null;
     const isPopular = !!plan.badge;
     const borderColor = accentColor === 'teal' ? 'border-teal-500' : 'border-blue-500';
     const textColor = accentColor === 'teal' ? 'text-teal-400' : 'text-blue-400';
@@ -296,31 +189,15 @@ export default function PricingClient() {
             </div>
           </div>
           <p className="text-slate-400 mb-6 text-sm">{plan.description}</p>
-          <p className="text-sm text-teal-400 mb-4">{plan.audience === "client" ? (plan.bookingFee != null ? `${plan.bookingFee}% service fee. Payment processing included.` : "Service fee shown before checkout.") : "Keep your full agreed pay. No guard commission. Standard payouts included."}</p>
+          <p className="text-sm text-teal-400 mb-4">{plan.audience === "client" ? (plan.bookingFee != null ? `${bookingFeeText(plan)} booking service fee, in addition to guard pay. Payment processing included.` : "Service fee shown before you confirm payment.") : "Keep your full agreed pay. No guard commission. Standard payouts included."}</p>
 
           <div className="mb-6">
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-bold text-white">£{price}</span>
-              <span className="text-slate-400">/month</span>
-            </div>
-            {billingCycle === 'annual' && plan.monthly_price_pence > 0 && (
-              <p className="text-sm text-emerald-400 font-semibold mt-1">
-                Save {savings}% with annual billing
-              </p>
-            )}
-            {billingCycle === 'annual' && plan.monthly_price_pence > 0 && (
-              <p className="text-sm text-slate-500 mt-0.5">
-                Billed £{annualTotal} annually
-              </p>
-            )}
-            {plan.monthly_price_pence === 0 && (
-              <p className="text-sm text-slate-500 mt-1">No credit card required</p>
-            )}
+            <PlanPrice plan={plan} billingCycle={billingCycle} />
             {plan.monthly_price_pence === 0 && plan.audience === 'client' && (
               <div className="mt-3 bg-amber-500/10 border border-amber-400/20 rounded-xl p-3 flex items-start gap-2.5">
                 <i className="ri-information-line text-amber-400 text-sm flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-300 leading-relaxed">
-                  A service charge applies to all jobs on free accounts. Upgrade to a paid plan for lower fees.
+                  No subscription charge. Booking service fees apply when you pay for a booking. Paid client plans have lower standard service fees; eligible promotions may reduce them.
                 </p>
               </div>
             )}
@@ -353,9 +230,9 @@ export default function PricingClient() {
           ) : (
             <button
               onClick={() => handleSubscribe(plan)}
-              disabled={subscribingPlan === plan.slug}
+              disabled={subscribingPlan === plan.slug || !priceAvailable}
               className={`w-full py-3.5 rounded-xl font-bold text-base transition-all whitespace-nowrap block text-center ${bgColor} text-white ${hoverBg} shadow-lg ${
-                subscribingPlan === plan.slug ? 'opacity-60 cursor-wait' : 'cursor-pointer'
+                subscribingPlan === plan.slug || !priceAvailable ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
               }`}
             >
               {subscribingPlan === plan.slug ? 'Processing...' : 'Subscribe'}
@@ -383,7 +260,7 @@ export default function PricingClient() {
                 <span className="text-emerald-400 font-semibold">{switchSuccess.newPlanName}</span>.
               </p>
               <p className="text-slate-500 text-xs mb-6">
-                Prorated billing applied. No double charges. Returning to dashboard in {redirectCountdown}...
+                Prorated billing applied. Check your Stripe invoice for any charge or account credit. Returning to dashboard in {redirectCountdown}...
               </p>
               <button
                 onClick={() => { window.location.href = user?.role === 'guard' ? '/guard/dashboard' : '/client/dashboard'; }}
@@ -395,19 +272,9 @@ export default function PricingClient() {
           </div>
         )}
 
-        {user && (
-          <div className="max-w-7xl mx-auto px-6 pt-6">
-            <Link
-              href={user.role === 'guard' ? '/guard/dashboard' : '/client/dashboard'}
-              className="inline-flex items-center gap-2 text-slate-400 hover:text-white text-sm font-medium transition-colors"
-            >
-              <i className="ri-arrow-left-line" />
-              Back to Dashboard
-            </Link>
-          </div>
-        )}
+        <PricingBreadcrumb />
         {/* HERO */}
-        <div className="relative bg-gradient-to-br from-[#0e1628] via-[#0B1933] to-[#111d35] pt-24 pb-20 border-b border-slate-800/60">
+        <div className="relative bg-gradient-to-br from-[#0e1628] via-[#0B1933] to-[#111d35] pt-10 pb-20 border-b border-slate-800/60">
           <div className="absolute inset-0 opacity-20 pointer-events-none">
             <div className="absolute top-0 right-0 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl" />
             <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" />
@@ -421,7 +288,7 @@ export default function PricingClient() {
               Simple plans. No surprises.
             </h1>
             <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-              Choose a subscription that fits your needs, or stick with Pay-As-You-Go. Subscriptions can be cancelled anytime. A free account can publish 1 job per month.
+              Choose a monthly or annual subscription, or start with a free account. Cancel renewal anytime. Current posting and application allowances are listed with each plan. Guard pay and booking service fees are separate from subscriptions.
             </p>
 
             <div className="inline-flex items-center bg-slate-800/80 backdrop-blur-sm rounded-full p-1 gap-1 border border-slate-700">
@@ -453,6 +320,12 @@ export default function PricingClient() {
         </div>
 
         <div className="max-w-7xl mx-auto px-6 py-20">
+          {pricingError && (
+            <div role="alert" className="mb-10 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-amber-200">
+              <p>Some pricing details could not be loaded. Please retry or contact support@quickguard.uk. Your final booking service fee is shown before you confirm payment.</p>
+              <button type="button" onClick={catalogue.retry} className="mt-3 underline">Retry pricing</button>
+            </div>
+          )}
           {/* CLIENT PLANS */}
           <div className="text-center mb-14">
             <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-400/20 text-teal-400 px-4 py-1.5 rounded-full text-sm font-medium mb-4">
@@ -487,7 +360,7 @@ export default function PricingClient() {
               Guard Membership Plans
             </h2>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-              Unlock job applications, priority matching, and full platform access to grow your security career.
+              Compare application limits, profile features and support to find the membership that fits your security career.
             </p>
           </div>
 
@@ -510,7 +383,7 @@ export default function PricingClient() {
               Not sure which plan fits you?
             </h2>
             <p className="text-slate-400 max-w-2xl mx-auto mb-8">
-              All plans include SIA-verified guards, secure held job payments with Stripe, and 24/7 AI dispute support. Upgrade, downgrade, or cancel anytime.
+              Every guard must pass an SIA licence check before taking work. Booking payments are processed through Stripe, and QuickGuard AI support is available 24/7 for platform and dispute questions. Human reviews are handled by our team; priority support depends on your plan.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
@@ -529,7 +402,7 @@ export default function PricingClient() {
               </Link>
             </div>
             <p className="text-sm text-slate-500 mt-6">
-              Free to create an account · Cancel subscriptions anytime · Upgrade or downgrade as needed
+              Free to create an account · Cancel renewal anytime · Paid access continues until your billing period ends
             </p>
           </div>
 
@@ -541,14 +414,14 @@ export default function PricingClient() {
               </div>
               <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">How the service fee works</h2>
               <p className="text-slate-400 max-w-2xl mx-auto">
-                The {paygServiceFeePct}% fee covers everything that keeps QuickGuard safe, fast, and reliable.
+                Clients pay a booking service fee in addition to the agreed guard pay. Your rate depends on your client plan and any eligible promotion. Each client plan above shows its standard rate. Guards keep their full agreed pay, and payment processing is included.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
                 { icon: 'ri-shield-check-line', title: 'SIA licence checked before work', desc: 'Every guard must pass an SIA licence check before they can take work through QuickGuard. We are developing automated weekly re-checks that will flag suspended, revoked or expired licences for review.' },
-                { icon: 'ri-safe-2-line', title: 'Held Job Payment Protection', desc: 'Your payment is held securely with Stripe and only released to the guard after the shift is marked complete.' },
+                { icon: 'ri-safe-2-line', title: 'Held job payments', desc: 'Booking payments are processed through Stripe. Guard payouts follow shift completion and the applicable release checks, including any open dispute.' },
                 { icon: 'ri-customer-service-2-line', title: '24/7 AI Dispute Support', desc: 'Our AI assistant is available 24/7 to help with dispute questions and common issues. Cases needing human review can be escalated to our team.' },
                 { icon: 'ri-bank-card-line', title: 'Payment Processing', desc: 'Stripe handles all card processing securely. The fee covers PCI-compliant infrastructure and fraud prevention.' },
               ].map((item, i) => (
@@ -568,10 +441,10 @@ export default function PricingClient() {
             <div className="max-w-3xl mx-auto">
               <div className="text-center mb-10">
                 <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">Worked example</h2>
-                <p className="text-slate-400">A typical one-off 8-hour event security shift.</p>
+                <p className="text-slate-400">One guard working an 8-hour shift at £18/hour, using the free client plan’s standard service fee before any promotion.</p>
               </div>
 
-              <div className="bg-[#0e1628] rounded-2xl border border-slate-700/50 p-6 md:p-8">
+              {example ? <div className="bg-[#0e1628] rounded-2xl border border-slate-700/50 p-6 md:p-8">
                 <div className="flex flex-col md:flex-row gap-8">
                   <div className="flex-1 space-y-4">
                     <div className="flex justify-between text-sm">
@@ -606,15 +479,15 @@ export default function PricingClient() {
                       <li>Stripe charges your card {formatCurrency(example.total)} before the booking is confirmed</li>
                       <li>Posting the job does not charge the booking payment</li>
                       <li>Money sits with Stripe until completion and the release checks</li>
-                      <li>Guard gets paid {formatCurrency(example.guardTotal)} after completion</li>
-                      <li>QuickGuard retains {formatCurrency(example.serviceFee)} for platform services</li>
+                      <li>Guard receives {formatCurrency(example.guardTotal)} after completion and the applicable release checks</li>
+                      <li>The {formatCurrency(example.serviceFee)} service fee covers QuickGuard platform services and payment processing</li>
                     </ul>
                     <p className="mt-4 text-xs text-slate-500">
-                      Promotional discounts (Founding, Early, Launch) are applied automatically at checkout and reduce the service fee shown above.
+                      This example excludes promotions. Any eligible booking service fee discount is shown in your booking payment summary before you confirm payment. Subscription offers have separate eligibility and billing terms.
                     </p>
                   </div>
                 </div>
-              </div>
+              </div> : <p className="text-center text-slate-400">{plansLoading ? 'Loading the current service fee…' : 'The current service fee could not be loaded. Please refresh or contact support@quickguard.uk.'}</p>}
             </div>
           </div>
 
@@ -671,7 +544,7 @@ export default function PricingClient() {
               Ready to get started?
             </h2>
             <p className="text-xl mb-10 text-slate-400 max-w-2xl mx-auto">
-              Join thousands of UK venues and security professionals on QuickGuard.
+              Connect with UK venues and security professionals on QuickGuard.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
@@ -688,7 +561,7 @@ export default function PricingClient() {
               </Link>
             </div>
             <p className="text-sm text-slate-500 mt-6">
-              Free to create an account · Cancel subscriptions anytime · Upgrade or downgrade as needed
+              Free to create an account · Cancel renewal anytime · Paid access continues until your billing period ends
             </p>
           </div>
         </section>

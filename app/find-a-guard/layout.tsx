@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Find SIA Security Guards UK',
@@ -35,6 +36,17 @@ export default function FindAGuardLayout({ children }: { children: React.ReactNo
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
+      <nav aria-label="Breadcrumb trail" className="sr-only">
+        <ol>
+          <li>
+            <Link href="/">Home</Link>
+            <span> / </span>
+          </li>
+          <li>
+            <Link href="/find-a-guard">Find a Guard</Link>
+          </li>
+        </ol>
+      </nav>
       {children}
     </>
   );

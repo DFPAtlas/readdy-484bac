@@ -23,6 +23,8 @@ interface SupportTicket {
   client_name?: string;
   client_email?: string;
   guard_name?: string;
+  requester_name?: string;
+  requester_email?: string;
   job_title?: string;
 }
 
@@ -72,8 +74,8 @@ export default function AdminSupportTicketsPage() {
       const jobIds = [...new Set(data.map((t: any) => t.related_job_id).filter(Boolean))];
 
       const [clientsRes, guardsRes, jobsRes] = await Promise.all([
-        clientIds.length > 0 ? supabase.from('clients').select('id, company_name, email').in('id', clientIds) : Promise.resolve({ data: [] }),
-        guardIds.length > 0 ? supabase.from('guards').select('id, full_name').in('id', guardIds) : Promise.resolve({ data: [] }),
+        clientIds.length > 0 ? supabase.from('clients').select('id, company_name, contact_name, email').in('id', clientIds) : Promise.resolve({ data: [] }),
+        guardIds.length > 0 ? supabase.from('guards').select('id, full_name, email').in('id', guardIds) : Promise.resolve({ data: [] }),
         jobIds.length > 0 ? supabase.from('jobs').select('id, job_title').in('id', jobIds) : Promise.resolve({ data: [] }),
       ]);
 
@@ -87,9 +89,11 @@ export default function AdminSupportTicketsPage() {
         const job = jobMap.get(t.related_job_id);
         return {
           ...t,
-          client_name: client?.company_name || 'Unknown',
+          client_name: client?.company_name || client?.contact_name || 'Unknown client',
           client_email: client?.email || '',
           guard_name: guard?.full_name || null,
+          requester_name: t.client_id ? client?.company_name || client?.contact_name || 'Unknown client' : guard?.full_name || 'Guard',
+          requester_email: t.client_id ? client?.email || '' : guard?.email || '',
           job_title: job?.job_title || null,
         };
       });
@@ -306,8 +310,8 @@ export default function AdminSupportTicketsPage() {
                           <p className="text-sm font-medium text-white truncate max-w-[200px]">{ticket.subject}</p>
                         </td>
                         <td className="px-4 py-3">
-                          <p className="text-sm text-slate-300">{ticket.client_id ? ticket.client_name : ticket.guard_name || 'Guard'}</p>
-                          {ticket.client_email && <p className="text-xs text-slate-500">{ticket.client_email}</p>}
+                          <p className="text-sm text-slate-300">{ticket.requester_name}</p>
+                          {ticket.requester_email && <p className="text-xs text-slate-500">{ticket.requester_email}</p>}
                         </td>
                         <td className="px-4 py-3">
                           <span className="text-xs font-medium text-slate-400 capitalize">{ticket.category}</span>
@@ -381,7 +385,8 @@ export default function AdminSupportTicketsPage() {
                 </div>
                 <div className="bg-[#0a1628] rounded-xl p-3">
                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Requester</p>
-                  <p className="text-sm font-semibold text-white">{selected.client_id ? selected.client_name : selected.guard_name || 'Guard'}</p>
+                  <p className="text-sm font-semibold text-white">{selected.requester_name}</p>
+                  {selected.requester_email && <p className="text-xs text-slate-400">{selected.requester_email}</p>}
                 </div>
               </div>
 

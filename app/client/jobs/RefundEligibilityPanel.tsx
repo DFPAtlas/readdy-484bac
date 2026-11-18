@@ -1,5 +1,7 @@
 'use client';
 
+import { CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
+
 interface RefundEligibilityPanelProps {
   job: any;
   transaction: any;
@@ -28,15 +30,7 @@ export default function RefundEligibilityPanel({ job, transaction, cancellation,
   const recordedPlatformFee = Number(breakdown.platformFee ?? transaction?.metadata?.platform_fee ?? 0);
   const hasRecordedPlatformFee = Number.isFinite(recordedPlatformFee) && recordedPlatformFee > 0;
 
-  const startDate = job.start_date ? new Date(job.start_date) : null;
-  const now = new Date();
-  const hoursUntilStart = startDate ? Math.max(0, (startDate.getTime() - now.getTime()) / (1000 * 60 * 60)) : 0;
-
-  let policyNote = 'Refund requests are reviewed against the original Stripe payment, cancellation timing, and any payout already released.';
-  if (hoursUntilStart >= 48) policyNote = 'Cancellations 48+ hours before start may be eligible for full refund minus platform fees.';
-  else if (hoursUntilStart >= 24) policyNote = 'Cancellations 24-48 hours before start may be eligible for partial refund.';
-  else if (hoursUntilStart > 0) policyNote = 'Cancellations within 24 hours of start may be subject to limited refund.';
-  else policyNote = 'This job has already started. Refund requests are handled on a case-by-case basis.';
+  const policyNote = `${CANCELLATION_GUIDANCE} ${REFUND_TIMING_GUIDANCE}`;
 
   return (
     <div className="bg-[#111d35] rounded-2xl border border-[#1e2d4d] p-5">

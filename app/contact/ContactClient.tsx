@@ -5,14 +5,16 @@ import NavSidebar from '../../components/NavSidebar';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import ContactSchema from './ContactSchema';
+import { HUMAN_SUPPORT_HOURS } from '@/lib/customer-guidance';
+import type { ContactEnquiry } from '@/lib/contact-enquiry';
 
-export default function ContactClient() {
+export default function ContactClient({ initialEnquiry = { subject: '', category: '' } }: { initialEnquiry?: ContactEnquiry }) {
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    subject: '',
-    category: '',
+    subject: initialEnquiry.subject,
+    category: initialEnquiry.category,
     message: '',
   });
 
@@ -101,7 +103,7 @@ export default function ContactClient() {
       color: 'bg-emerald-500/10 border-emerald-400/20 text-emerald-400',
       title: 'Call Us',
       value: '01992 217019',
-      sub: 'Mon–Fri 9AM–6PM',
+      sub: HUMAN_SUPPORT_HOURS,
       href: 'tel:01992217019',
     },
     {
@@ -109,7 +111,7 @@ export default function ContactClient() {
       color: 'bg-purple-500/10 border-purple-400/20 text-purple-400',
       title: 'Our Office',
       value: 'London, United Kingdom',
-      sub: 'Mon–Fri, 9AM – 6PM',
+      sub: HUMAN_SUPPORT_HOURS,
       href: '#',
     },
     {
@@ -117,7 +119,7 @@ export default function ContactClient() {
       color: 'bg-amber-500/10 border-amber-400/20 text-amber-400',
       title: 'Support Hours',
       value: '24/7 AI Support',
-      sub: 'Human team: Mon–Fri 9AM–6PM',
+      sub: `Human team: ${HUMAN_SUPPORT_HOURS}`,
       href: '#',
     },
   ];
@@ -207,7 +209,7 @@ export default function ContactClient() {
                 {[
                   { type: 'AI Support', time: '24/7', pct: 100, color: 'bg-teal-500' },
                   { type: 'Email (human)', time: 'Business hours', pct: 75, color: 'bg-emerald-500' },
-                  { type: 'Phone (human)', time: 'Mon–Fri 9AM–6PM', pct: 60, color: 'bg-purple-500' },
+                  { type: 'Phone (human)', time: HUMAN_SUPPORT_HOURS, pct: 60, color: 'bg-purple-500' },
                 ].map((r) => (
                   <div key={r.type}>
                     <div className="flex justify-between text-sm mb-1">

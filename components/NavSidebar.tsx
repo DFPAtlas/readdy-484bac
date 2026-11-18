@@ -281,6 +281,10 @@ export default function NavSidebar() {
             <div className={iconClass('/how-it-works')}><i className="ri-question-line text-lg"></i></div>
             How It Works
           </Link>
+          <Link href="/blog" prefetch={false} onClick={() => setSidebarOpen(false)} className={linkClass('/blog')}>
+            <div className={iconClass('/blog')}><i className="ri-article-line text-lg"></i></div>
+            Blog
+          </Link>
           <Link href="/jobs" prefetch={false} onClick={() => setSidebarOpen(false)} className={linkClass('/jobs')}>
             <div className={iconClass('/jobs')}><i className="ri-briefcase-line text-lg"></i></div>
             Find Jobs
@@ -297,6 +301,7 @@ export default function NavSidebar() {
             <div className={iconClass('/help')}><i className="ri-lifebuoy-line text-lg"></i></div>
             Help
           </Link>
+
           <Link href="/qg-launch-rewards" prefetch={false} onClick={() => setSidebarOpen(false)} className={linkClass('/qg-launch-rewards')}>
             <div className={iconClass('/qg-launch-rewards')}><i className="ri-rocket-2-line text-lg"></i></div>
             Launch Rewards

@@ -1,47 +1,18 @@
 'use client';
 
+import { featurePlanNames, planIncludesFeature, recommendedFeaturePlan } from '@/lib/plan-catalogue';
+import { clientFeatureLabels, guardFeatureLabels, getFeatureLabel, presentPricingPlan } from '@/lib/pricing-presentation';
+import { subscriptionPrice, planAllowanceText, bookingFeeText } from '@/lib/public-pricing';
+import PlanPrice from '@/components/pricing/PlanPrice';
+
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { getPlansForAudience, getActivePlan } from '@/lib/entitlements';
+import { getActivePlan } from '@/lib/entitlements';
+import { usePublicPricing } from '@/lib/use-public-pricing';
 import NavSidebar from '@/components/NavSidebar';
-
-const clientFeatureLabels: Record<string, string> = {
-  'client.post_job': 'Job Posting',
-  'client.view_guard_profiles': 'View Guard Profiles',
-  'client.escrow_payments': 'Held Job Payments with Stripe',
-  'client.advanced_matching': 'Advanced Guard Matching',
-  'client.priority_support': 'Priority Support',
-  'client.job_templates': 'Job Templates',
-  'client.analytics_dashboard': 'Analytics Dashboard',
-  'client.direct_contact': 'Direct Guard Contact',
-  'client.unlimited_jobs': 'Unlimited Jobs',
-  'client.bulk_posting': 'Bulk Job Posting',
-  'client.multi_site': 'Multi-Site Management',
-  'client.team_access': 'Team Access',
-  'client.custom_contracts': 'Custom Contracts',
-  'client.api_access': 'API Access',
-  'client.job_history': 'Job History',
-  'client.job_tracker': 'Live Job Tracker',
-};
-
-const guardFeatureLabels: Record<string, string> = {
-  'guard.apply_job': 'Job Applications',
-  'guard.view_jobs': 'View Jobs',
-  'guard.create_profile': 'Create Guard Profile',
-  'guard.advanced_alerts': 'Advanced Job Alerts',
-  'guard.priority_profile': 'Priority Profile',
-  'guard.profile_boost': 'Profile Boost',
-  'guard.performance_analytics': 'Performance Analytics',
-  'guard.priority_support': 'Priority Support',
-  'guard.direct_contact': 'Direct Contact',
-  'guard.unlimited_applications': 'Up to 40 Applications per Month',
-  'guard_application_limit_reached': 'Monthly Application Limit Reached',
-  'guard.plan_verification_failed': 'Plan Verification Failed',
-  'job_limit_reached': 'Monthly Job Posting Limit Reached',
-};
 
 const FEATURE_RECOMMENDED_PLAN: Record<string, string> = {
   'client.post_job': 'client_free',
@@ -58,14 +29,14 @@ const FEATURE_RECOMMENDED_PLAN: Record<string, string> = {
   'client.team_access': 'client-enterprise',
   'client.custom_contracts': 'client-enterprise',
   'client.api_access': 'client-enterprise',
-  'client.job_history': 'client-pro',
-  'client.job_tracker': 'client-pro',
+  'client.job_history': 'client-starter',
+  'client.job_tracker': 'client-starter',
   'guard.apply_job': 'guard_starter',
   'guard.view_jobs': 'guard_starter',
   'guard.create_profile': 'guard_starter',
   'guard.advanced_alerts': 'guard_starter',
   'guard.priority_profile': 'guard-pro',
-  'guard.profile_boost': 'guard-pro',
+  'guard.profile_boost': 'guard-basic',
   'guard.performance_analytics': 'guard-pro',
   'guard.priority_support': 'guard-pro',
   'guard.direct_contact': 'guard-pro',
@@ -90,14 +61,14 @@ const FEATURE_UNLOCK_MESSAGE: Record<string, string> = {
   'client.team_access': 'Client Enterprise',
   'client.custom_contracts': 'Client Enterprise',
   'client.api_access': 'Client Enterprise',
-  'client.job_history': 'Client Pro or Client Enterprise',
-  'client.job_tracker': 'Client Pro or Client Enterprise',
+  'client.job_history': 'Client Starter, Client Pro or Client Enterprise',
+  'client.job_tracker': 'Client Starter, Client Pro or Client Enterprise',
   'guard.apply_job': 'Guard Starter and above',
   'guard.view_jobs': 'Guard Starter and above',
   'guard.create_profile': 'Guard Starter and above',
   'guard.advanced_alerts': 'Guard Starter, Guard Pro, or Guard Elite',
   'guard.priority_profile': 'Guard Pro or Guard Elite',
-  'guard.profile_boost': 'Guard Pro or Guard Elite',
+  'guard.profile_boost': 'Guard Basic, Guard Pro or Guard Elite',
   'guard.performance_analytics': 'Guard Pro or Guard Elite',
   'guard.priority_support': 'Guard Pro or Guard Elite',
   'guard.direct_contact': 'Guard Pro or Guard Elite',
@@ -107,16 +78,16 @@ const FEATURE_UNLOCK_MESSAGE: Record<string, string> = {
 
 const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { icon: string; label: string; detail: string }[] }> = {
   'client.advanced_matching': {
-    title: 'Why upgrade to Advanced Matching?',
-    desc: 'Stop scrolling through irrelevant applications. Let our matching engine find the best guards for your jobs automatically.',
-    points: [
-      { icon: 'ri-user-search-line', label: 'Smart Filtering', detail: 'Match guards by licence type, experience level, location proximity, and past performance ratings.' },
-      { icon: 'ri-flashlight-line', label: 'Instant Shortlists', detail: 'Get a ranked shortlist of the top 5 guards within minutes of posting a job.' },
-      { icon: 'ri-history-line', label: 'Repeat Booking Recognition', detail: 'System prioritises guards you have booked before and rated highly, saving you time.' },
-      { icon: 'ri-shield-check-line', detail: 'Compliance Auto-Check', label: 'Each matched guard is automatically verified for valid SIA licence and right-to-work before appearing.' },
-      { icon: 'ri-bar-chart-2-line', label: 'Match Quality Score', detail: 'Every match includes a quality score so you can see exactly why a guard was recommended.' },
-    ],
-  },
+  "title": "Compare matched guard profiles",
+  "desc": "Use profile information to compare applicants against your requirements. Check the licence and right-to-work information shown for the booking; a match score is not an automatic compliance approval.",
+  "points": [
+    {
+      "icon": "ri-user-search-line",
+      "label": "Compare applicants",
+      "detail": "Review experience, ratings, licence information and the available matching criteria."
+    }
+  ]
+},
   'client.job_templates': {
     title: 'Why upgrade to Job Templates?',
     desc: 'Posting the same type of job over and over? Templates turn 15 minutes of form-filling into 30 seconds.',
@@ -206,14 +177,16 @@ const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { 
     ],
   },
   'client.api_access': {
-    title: 'Why upgrade to API Access?',
-    desc: 'Integrate QuickGuard directly into your own systems — HR platforms, scheduling tools, or internal dashboards.',
-    points: [
-      { icon: 'ri-code-s-slash-line', label: 'Full REST API', detail: 'Programmatically create jobs, fetch guard lists, and retrieve reports.' },
-      { icon: 'ri-plug-line', label: 'Webhook Support', detail: 'Receive real-time events when guards are assigned, complete shifts, or cancel.' },
-      { icon: 'ri-key-2-line', label: 'Secure API Keys', detail: 'Rotate keys, set IP allowlists, and monitor usage from your dashboard.' },
-    ],
-  },
+  "title": "Discuss an integration",
+  "desc": "API integrations are available by arrangement with QuickGuard support. Self-service API-key rotation, IP allowlists and customer webhook management are not available in this dashboard.",
+  "points": [
+    {
+      "icon": "ri-customer-service-line",
+      "label": "Contact support",
+      "detail": "Describe your integration requirements so the team can confirm availability and scope before you rely on them."
+    }
+  ]
+},
   'client.job_history': {
     title: 'Why upgrade to Job History?',
     desc: 'See your complete booking archive — every job, every guard, every payment across the entire history of your account.',
@@ -224,42 +197,49 @@ const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { 
     ],
   },
   'client.job_tracker': {
-    title: 'Why upgrade to Job Tracker?',
-    desc: 'Real-time visibility into every active job — know who is on site, who is running late, and who has checked out.',
-    points: [
-      { icon: 'ri-radar-line', label: 'Live Status Board', detail: 'See every active job with real-time guard check-in, break, and check-out status.' },
-      { icon: 'ri-map-pin-line', label: 'GPS Verification', detail: 'Confirm guards are at the right location with geolocation check-in and check-out.' },
-      { icon: 'ri-alert-line', label: 'No-Show Alerts', detail: 'Get immediate alerts if a guard does not check in within 15 minutes of shift start.' },
-      { icon: 'ri-timer-line', label: 'Attendance Reports', detail: 'Weekly reports showing punctuality, early departures, and total hours per guard.' },
-    ],
-  },
+  "title": "Follow your jobs",
+  "desc": "View the status and attendance information recorded for your jobs. Weekly attendance reports and automatic no-show response times are not promised.",
+  "points": [
+    {
+      "icon": "ri-radar-line",
+      "label": "Recorded job status",
+      "detail": "Review the check-in, completion and payment information available for each booking."
+    }
+  ]
+},
   'guard.advanced_alerts': {
-    title: 'Why upgrade to Advanced Job Alerts?',
-    desc: 'Get notified the moment a job matching your profile is posted — before other guards even see it.',
-    points: [
-      { icon: 'ri-notification-3-line', label: 'Instant Push Notifications', detail: 'Receive alerts on your phone the second a matching job goes live.' },
-      { icon: 'ri-filter-line', label: 'Custom Alert Filters', detail: 'Set alerts by postcode radius, pay rate minimum, licence type, and shift length.' },
-      { icon: 'ri-flashlight-line', label: 'First-Mover Advantage', detail: 'Apply before the job fills up — many Pro jobs are filled within the first hour.' },
-    ],
-  },
+  "title": "Job alerts for your preferences",
+  "desc": "Receive supported notifications for matching jobs when your notification settings allow them. Delivery depends on the channel, device permissions and availability; alerts do not guarantee a booking.",
+  "points": [
+    {
+      "icon": "ri-notification-line",
+      "label": "Notification settings",
+      "detail": "Review your enabled channels and travel preferences in your account."
+    }
+  ]
+},
   'guard.priority_profile': {
-    title: 'Why upgrade to Priority Profile?',
-    desc: 'Get your profile seen first. Priority profiles appear at the top of client search results and get more bookings.',
-    points: [
-      { icon: 'ri-arrow-up-circle-line', label: 'Top of Search Results', detail: 'Your profile ranks above non-priority guards when clients search by postcode or licence.' },
-      { icon: 'ri-eye-line', label: 'Featured Profile Badge', detail: 'A verified badge on your profile signals trust and quality to clients browsing guards.' },
-      { icon: 'ri-bar-chart-2-line', label: 'Profile Performance Stats', detail: 'See how many clients viewed your profile, how often you appear in searches, and your booking conversion rate.' },
-    ],
-  },
+  "title": "Priority profile eligibility",
+  "desc": "Compare the profile features in each membership. Profile eligibility does not guarantee a search position, invitation or booking.",
+  "points": [
+    {
+      "icon": "ri-user-line",
+      "label": "Profile information",
+      "detail": "Keep your professional details and availability up to date."
+    }
+  ]
+},
   'guard.profile_boost': {
-    title: 'Why upgrade to Profile Boost?',
-    desc: 'Get an extra visibility push. Boosted profiles appear in a dedicated featured section clients cannot miss.',
-    points: [
-      { icon: 'ri-rocket-line', label: 'Featured Placement', detail: 'Your profile appears in the Featured Guards carousel on the client dashboard.' },
-      { icon: 'ri-thumb-up-line', label: 'Higher Booking Rate', detail: 'Boosted guards receive on average 3x more booking invitations than non-boosted profiles.' },
-      { icon: 'ri-refresh-line', label: 'Weekly Boost Refresh', detail: 'Your boost refreshes weekly so your profile stays visible to new clients.' },
-    ],
-  },
+  "title": "Profile boost entitlement",
+  "desc": "The catalogue records profile-boost eligibility for this plan. Featured placement and scheduled boost controls are planned; this does not guarantee a search position, invitation or booking.",
+  "points": [
+    {
+      "icon": "ri-user-line",
+      "label": "Keep your profile current",
+      "detail": "Accurate experience, licence details and availability help clients assess your suitability."
+    }
+  ]
+},
   'guard.performance_analytics': {
     title: 'Why upgrade to Performance Analytics?',
     desc: 'Understand your earning patterns, booking trends, and client ratings to maximise your income.',
@@ -289,41 +269,10 @@ const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { 
     title: 'Why upgrade to a bigger application allowance?',
     desc: 'Increase your monthly application allowance so you can apply for more jobs each month.',
     points: [
-      { icon: 'ri-arrow-up-circle-line', label: 'Higher Monthly Allowance', detail: 'Guard Elite raises your allowance to 40 applications per month, up from 25 on Guard Pro.' },
-      { icon: 'ri-money-pound-circle-line', label: 'Maximise Earnings', detail: 'More applications mean more bookings and more shifts filled each month.' },
+      { icon: 'ri-arrow-up-circle-line', label: 'Higher Monthly Allowance', detail: 'Compare the current application allowances listed with each plan.' },
+      { icon: 'ri-money-pound-circle-line', label: 'Maximise Earnings', detail: 'A larger application allowance lets you apply to more suitable jobs; it does not guarantee a booking.' },
     ],
   },
-};
-
-const planDescriptions: Record<string, string> = {
-  'client_free': 'Free account — publish up to 1 job per month, pay per job',
-  'client-starter': 'For small businesses with regular security needs',
-  'client-pro': 'For growing companies with high-volume needs',
-  'client-enterprise': 'For multi-site and enterprise security needs',
-  'guard_starter': 'Free starter plan for new guards',
-  'guard-basic': 'Perfect for getting started',
-  'guard-pro': 'For active security professionals',
-  'guard-elite': 'Full access to all features',
-};
-
-const planBadges: Record<string, string> = {
-  'client-pro': 'POPULAR',
-  'guard-elite': 'MOST POPULAR',
-};
-
-const planLimitations: Record<string, string[]> = {
-  'client_free': ['Limited to 1 job per month', 'Upgrade required for advanced matching', 'Upgrade required for job templates', 'Upgrade required for analytics dashboard', 'Upgrade required for direct contact', 'Upgrade required for multi-site features'],
-  'client-starter': ['Limited to 10 jobs per month', 'No priority matching', 'No dedicated support'],
-  'client-pro': ['Limited to 30 jobs per month', 'No dedicated account manager', 'No bulk posting'],
-  'guard_starter': ['Limited to 2 applications/month', 'No advanced job alerts', 'No performance analytics', 'No priority support'],
-  'guard-basic': ['Limited to 10 applications/month', 'No advanced job alerts', 'No performance analytics', 'No priority support'],
-  'guard-pro': ['Limited to 25 applications/month'],
-};
-
-const getFeatureLabel = (key: string, audience: string) => {
-  if (audience === 'client' && clientFeatureLabels[key]) return clientFeatureLabels[key];
-  if (audience === 'guard' && guardFeatureLabels[key]) return guardFeatureLabels[key];
-  return key.split('.').pop()?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || key;
 };
 
 function UpgradeContent() {
@@ -332,76 +281,51 @@ function UpgradeContent() {
   const preselectedPlan = searchParams.get('plan') || '';
 
   const [audience, setAudience] = useState<'client' | 'guard' | null>(null);
-  const [plans, setPlans] = useState<any[]>([]);
+  const catalogue = usePublicPricing();
+  const plans = catalogue.plans.filter(plan => !audience || plan.audience === audience).map(presentPricingPlan);
   const [currentPlan, setCurrentPlan] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [audienceLoading, setAudienceLoading] = useState(true);
+  const [membershipError, setMembershipError] = useState(false);
+  const loading = catalogue.loading || audienceLoading;
   const [subscribing, setSubscribing] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [confirmSwitch, setConfirmSwitch] = useState<any>(null);
   const [switchSuccess, setSwitchSuccess] = useState<{ oldPlanName: string; newPlanName: string } | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState<number>(0);
 
-  const isKnownFeature = reason && (clientFeatureLabels[reason] || guardFeatureLabels[reason]);
+  const isKnownFeature = reason && (clientFeatureLabels[reason] || guardFeatureLabels[reason] || ['guard_application_limit_reached', 'guard.plan_verification_failed', 'job_limit_reached'].includes(reason));
   const featureName = reason ? getFeatureLabel(reason, audience || 'client') : '';
-  const recommendedPlan = FEATURE_RECOMMENDED_PLAN[reason] || preselectedPlan;
-  const unlockMessage = FEATURE_UNLOCK_MESSAGE[reason] || '';
+  const featureIncluded = planIncludesFeature(currentPlan, reason);
+  const currentCataloguePlan = currentPlan ? { ...currentPlan, slug: currentPlan.plan_slug } : null;
+  const isCatalogueFeature = reason.startsWith('client.') || reason.startsWith('guard.');
+  const recommendedPlan = isCatalogueFeature ? recommendedFeaturePlan(plans, reason, currentCataloguePlan) || preselectedPlan : FEATURE_RECOMMENDED_PLAN[reason] || preselectedPlan;
+  const unlockMessage = (isCatalogueFeature ? featurePlanNames(plans, reason) : '') || FEATURE_UNLOCK_MESSAGE[reason] || '';
 
   useEffect(() => {
+    let active = true;
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (user) {
-        const { data: userData } = await supabase.from('users').select('user_type').eq('id', user.id).maybeSingle();
-        const aud = userData?.user_type === 'client' || userData?.user_type === 'guard' ? userData.user_type : null;
-        setAudience(aud);
-
-        if (aud) {
-          const p = await getPlansForAudience(aud);
-          const enriched = p.map((plan: any) => ({
-            ...plan,
-            description: planDescriptions[plan.slug] || '',
-            badge: planBadges[plan.slug] || undefined,
-            limitations: planLimitations[plan.slug] || undefined,
-          }));
-          setPlans(enriched);
-        } else {
-          const { data } = await supabase
-            .from('plans')
-            .select('*')
-            .eq('active', true)
-            .order('audience', { ascending: true })
-            .order('monthly_price_pence', { ascending: true });
-          const enriched = (data || []).map((plan: any) => ({
-            ...plan,
-            description: planDescriptions[plan.slug] || '',
-            badge: planBadges[plan.slug] || undefined,
-            limitations: planLimitations[plan.slug] || undefined,
-          }));
-          setPlans(enriched);
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        if (!active) return;
+        if (user) {
+          const { data: userData, error: roleError } = await supabase.from('users').select('user_type').eq('id', user.id).maybeSingle();
+          if (roleError) throw roleError;
+          if (!active) return;
+          const aud = userData?.user_type === 'client' || userData?.user_type === 'guard' ? userData.user_type : null;
+          setAudience(aud);
+          const cp = await getActivePlan(user.id);
+          if (active) setCurrentPlan(cp);
         }
-
-        const cp = await getActivePlan(user.id);
-        setCurrentPlan(cp);
-      } else {
-        const { data } = await supabase
-          .from('plans')
-          .select('*')
-          .eq('active', true)
-          .order('audience', { ascending: true })
-          .order('monthly_price_pence', { ascending: true });
-        const enriched = (data || []).map((plan: any) => ({
-          ...plan,
-          description: planDescriptions[plan.slug] || '',
-          badge: planBadges[plan.slug] || undefined,
-          limitations: planLimitations[plan.slug] || undefined,
-        }));
-        setPlans(enriched);
+      } catch {
+        if (active) setMembershipError(true);
+      } finally {
+        if (active) setAudienceLoading(false);
       }
-
-      setLoading(false);
     };
     load();
-  }, [reason]);
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (redirectCountdown <= 0) return;
@@ -493,12 +417,6 @@ function UpgradeContent() {
 
   const benefit = FEATURE_BENEFITS[reason];
 
-  const calculateSavings = (monthlyPence: number, annualPence: number) => {
-    if (monthlyPence === 0) return 0;
-    const monthlyCost = monthlyPence * 12;
-    return Math.round(((monthlyCost - annualPence) / monthlyCost) * 100);
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0B1933] flex items-center justify-center">
@@ -515,6 +433,11 @@ function UpgradeContent() {
       <NavSidebar />
 
       <main className="max-w-5xl mx-auto px-6 py-20">
+        {(catalogue.error || catalogue.feesError || membershipError) && <div role="alert" className="mb-8 rounded-xl border border-amber-400/30 p-4 text-amber-200">
+          <p>{catalogue.error || (membershipError ? 'Your current membership could not be confirmed. Refresh or contact support before changing plans.' : 'Some booking fees could not be confirmed. Checkout confirms the fee before payment.')}</p>
+          {catalogue.error && <button type="button" onClick={catalogue.retry} className="mt-3 underline">Retry pricing</button>}
+        </div>}
+
         {audience && (
           <Link
             href={audience === 'client' ? '/client/dashboard' : '/guard/dashboard'}
@@ -527,10 +450,10 @@ function UpgradeContent() {
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-400/20 text-teal-400 px-4 py-1.5 rounded-full text-sm font-medium mb-6">
             <i className="ri-lock-unlock-line" />
-            {reason ? 'Upgrade Required' : 'Upgrade Your Plan'}
+            {featureIncluded ? 'Included in Your Plan' : reason ? 'Compare Plans' : 'Choose Your Plan'}
           </div>
           <h1 className="text-4xl font-bold text-white mb-4">
-            {isKnownFeature ? `Unlock ${featureName}` : reason ? 'Upgrade Your Plan' : 'Choose Your Plan'}
+            {featureIncluded ? `${featureName} is included` : isKnownFeature ? `Unlock ${featureName}` : reason ? 'Upgrade Your Plan' : 'Choose Your Plan'}
           </h1>
 
           {reason === 'guard_application_limit_reached' && (
@@ -550,22 +473,10 @@ function UpgradeContent() {
                 <div className="bg-[#0e1628] rounded-xl border border-slate-700/50 p-4">
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Plan Application Limits</p>
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Guard Starter</span>
-                      <span className="text-slate-400">2 applications per month</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Guard Basic</span>
-                      <span className="text-slate-400">10 applications per month</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Guard Pro</span>
-                      <span className="text-slate-400">25 applications per month</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Guard Elite</span>
-                      <span className="text-teal-400 font-semibold">40 applications per month</span>
-                    </div>
+                    {plans.filter(plan => plan.audience === 'guard').map(plan => <div key={plan.slug} className="flex items-center justify-between gap-4">
+                      <span className="text-slate-300">{plan.name}</span>
+                      <span className="text-slate-400">{planAllowanceText(plan)}</span>
+                    </div>)}
                   </div>
                 </div>
               </div>
@@ -607,22 +518,10 @@ function UpgradeContent() {
                 <div className="bg-[#0e1628] rounded-xl border border-slate-700/50 p-4">
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Plan Job Posting Limits</p>
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Free Starter</span>
-                      <span className="text-slate-400">1 job per month</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Client Starter</span>
-                      <span className="text-slate-400">10 jobs per month</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Client Pro</span>
-                      <span className="text-slate-400">30 jobs per month</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Client Enterprise</span>
-                      <span className="text-teal-400 font-semibold">Unlimited jobs</span>
-                    </div>
+                    {plans.filter(plan => plan.audience === 'client').map(plan => <div key={plan.slug} className="flex items-center justify-between gap-4">
+                      <span className="text-slate-300">{plan.name}</span>
+                      <span className="text-slate-400">{planAllowanceText(plan)}</span>
+                    </div>)}
                   </div>
                 </div>
               </div>
@@ -632,10 +531,10 @@ function UpgradeContent() {
           {isKnownFeature && reason !== 'guard_application_limit_reached' && reason !== 'guard.plan_verification_failed' && reason !== 'job_limit_reached' && (
             <div className="max-w-xl mx-auto">
               <p className="text-slate-300 text-lg mb-2">
-                {featureName} is not included in your current plan.
+                {featureIncluded ? `${featureName} is included in your current plan.` : `${featureName} requires an eligible plan.`}
               </p>
               <p className="text-slate-400">
-                Upgrade to <span className="text-teal-400 font-semibold">{unlockMessage}</span> to unlock this feature.
+                {featureIncluded ? 'Your current plan includes this feature. Contact support if access is unavailable.' : <>Available with <span className="text-teal-400 font-semibold">{unlockMessage}</span>. Review feature availability before changing your plan.</>}
               </p>
             </div>
           )}
@@ -850,14 +749,7 @@ function UpgradeContent() {
           <div className={`grid grid-cols-1 gap-8 ${plans.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : plans.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
             {plans.map((plan) => {
               const isSelected = recommendedPlan === plan.slug;
-              const monthlyPrice = plan.monthly_price_pence / 100;
-              const annualMonthlyEquiv = plan.stripe_annual_price_id
-                ? Math.round((plan.monthly_price_pence * 10) / 100)
-                : Math.round(plan.monthly_price_pence * 0.85 / 100);
-              const price = billingCycle === 'monthly' ? monthlyPrice : annualMonthlyEquiv;
-              const savings = plan.stripe_annual_price_id
-                ? calculateSavings(plan.monthly_price_pence, plan.monthly_price_pence * 10)
-                : 15;
+              const priceAvailable = subscriptionPrice(plan, billingCycle) !== null;
               const accentColor = plan.audience === 'guard' ? 'blue' : 'teal';
               const isPopular = !!plan.badge || isSelected;
               const borderColor = accentColor === 'teal' ? 'border-teal-500' : 'border-blue-500';
@@ -892,32 +784,12 @@ function UpgradeContent() {
                       </div>
                     </div>
                     <p className="text-slate-400 mb-6 text-sm">{plan.description}</p>
+                    <p className="text-sm text-teal-400 mb-4">{plan.audience === 'client' ? `${bookingFeeText(plan)} booking service fee, in addition to guard pay. Payment processing included.` : 'Keep your full agreed pay. No guard commission. Standard payouts included.'}</p>
 
                     <div className="mb-6">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-bold text-white">£{price}</span>
-                        <span className="text-slate-400">/month</span>
-                      </div>
-                      {billingCycle === 'annual' && plan.monthly_price_pence > 0 && (
-                        <p className="text-sm text-emerald-400 font-semibold mt-1">
-                          Save {savings}% with annual billing
-                        </p>
-                      )}
-                      {billingCycle === 'annual' && plan.monthly_price_pence > 0 && (
-                        <p className="text-sm text-slate-500 mt-0.5">
-                          Billed £{plan.stripe_annual_price_id ? plan.monthly_price_pence * 10 / 100 : Math.round(plan.monthly_price_pence * 0.85 / 100) * 12} annually
-                        </p>
-                      )}
-                      {plan.monthly_price_pence === 0 && (
-                        <p className="text-sm text-slate-500 mt-1">No credit card required</p>
-                      )}
-                      {plan.monthly_price_pence === 0 && (
-                        <div className="mt-3 bg-amber-500/10 border border-amber-400/20 rounded-xl p-3 flex items-start gap-2.5">
-                          <i className="ri-information-line text-amber-400 text-sm flex-shrink-0 mt-0.5" />
-                          <p className="text-xs text-amber-300 leading-relaxed">
-                            A service charge applies to all jobs on free accounts. Upgrade to a paid plan for lower fees.
-                          </p>
-                        </div>
+                      <PlanPrice plan={plan} billingCycle={billingCycle} />
+                      {plan.monthly_price_pence === 0 && plan.audience === 'client' && (
+                        <p className="text-xs text-amber-300 mt-3">Booking service fees apply when you pay for a booking; guard pay is separate from your subscription.</p>
                       )}
                     </div>
 
@@ -948,9 +820,9 @@ function UpgradeContent() {
                     ) : (
                       <button
                         onClick={() => handleSubscribe(plan)}
-                        disabled={subscribing === plan.slug}
+                        disabled={subscribing === plan.slug || !priceAvailable}
                         className={`w-full py-3.5 rounded-xl font-bold text-base transition-all whitespace-nowrap block text-center ${bgColor} text-white ${hoverBg} shadow-lg ${
-                          subscribing === plan.slug ? 'opacity-60 cursor-wait' : 'cursor-pointer'
+                          subscribing === plan.slug || !priceAvailable ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
                         }`}
                       >
                         {subscribing === plan.slug ? 'Processing...' : 'Subscribe'}

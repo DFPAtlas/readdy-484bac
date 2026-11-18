@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { SITE_URL } from '@/lib/seo-helpers';
 
 interface Props {
@@ -46,6 +47,21 @@ export default function IndustrySchema({ name, slug, description, services = [] 
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
+      <nav aria-label="Breadcrumb trail" className="sr-only">
+        <ol>
+          <li>
+            <Link href="/">Home</Link>
+            <span> / </span>
+          </li>
+          <li>
+            <Link href="/industries">Industries</Link>
+            <span> / </span>
+          </li>
+          <li>
+            <Link href={`/${slug}`}>{name}</Link>
+          </li>
+        </ol>
+      </nav>
       {services.length > 0 && (
         <script
           type="application/ld+json"

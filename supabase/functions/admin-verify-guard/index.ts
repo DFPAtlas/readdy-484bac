@@ -93,6 +93,7 @@ Deno.serve(async function(req) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
     }
     const isServiceRole = authHeader === 'Bearer ' + supabaseServiceKey;
+    let reviewerId: string | null = null;
     if (!isServiceRole) {
       const jwtToken = authHeader.replace('Bearer ', '').trim();
       if (!jwtToken || jwtToken === Deno.env.get('SUPABASE_ANON_KEY')) {
@@ -112,6 +113,7 @@ Deno.serve(async function(req) {
       if (!adminUser || !adminUser.is_active) {
         return new Response(JSON.stringify({ error: 'Admin access required' }), { status: 403, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
       }
+      reviewerId = userId;
     }
     let body;
     try {
@@ -130,7 +132,7 @@ Deno.serve(async function(req) {
       return new Response(JSON.stringify({ error: 'Invalid action. Must be: approve, reject, suspend, restore, or manual_sia_verify' }), { status: 400, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
     }
     const supabaseQ = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
-    const guardResult = await supabaseQ.from('guards').select('id, user_id, full_name, email, verification_status').eq('id', guardId).maybeSingle();
+    const guardResult = await supabaseQ.from('guards').select('id, user_id, full_name, email, verification_status, verified_by').eq('id', guardId).maybeSingle();
     if (guardResult.error) {
       return new Response(JSON.stringify({ error: 'Guard lookup failed' }), { status: 500, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
     }
@@ -144,10 +146,14 @@ Deno.serve(async function(req) {
       return new Response(JSON.stringify({ success: true, message: 'SIA manually verified', action: 'manual_sia_verified' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
     }
     if (action === 'approve') {
-      if (guard.verification_status === 'approved' || guard.verification_status === 'verified') {
-        return new Response(JSON.stringify({ error: 'Guard is already verified/approved' }), { status: 400, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
+      if (!reviewerId) {
+        return new Response(JSON.stringify({ error: 'An active admin with MFA must approve the guard' }), { status: 403, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
       }
-      await updateGuard(supabaseQ, guardId, { verification_status: 'approved', is_active: true, sia_verified: true, sia_verified_at: now, verified_at: now, dashboard_access: true, profile_completed: true, rejection_reason: null, rejected_at: null, updated_at: now });
+      if (guard.verification_status === 'approved' || guard.verification_status === 'verified') {
+        if (!guard.verified_by) await updateGuard(supabaseQ, guardId, { verified_by: reviewerId, verified_at: now });
+        return new Response(JSON.stringify({ success: true, guard_id: guardId, status: guard.verification_status, action: 'approved' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
+      }
+      await updateGuard(supabaseQ, guardId, { verified_by: reviewerId, verification_status: 'approved', is_active: true, sia_verified: true, sia_verified_at: now, verified_at: now, dashboard_access: true, profile_completed: true, rejection_reason: null, rejected_at: null, updated_at: now });
       if (guard.user_id) {
         await safeExecute(async function() { await supabaseQ.from('users').update({ verification_status: 'approved', updated_at: now }).eq('id', guard.user_id); });
       }
@@ -188,6 +194,9 @@ Deno.serve(async function(req) {
     if (action === 'restore') {
       if (guard.verification_status !== 'suspended') {
         return new Response(JSON.stringify({ error: 'Only suspended guards can be restored' }), { status: 400, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
+      }
+      if (!guard.verified_by) {
+        return new Response(JSON.stringify({ error: 'Approve this guard before restoring access' }), { status: 409, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
       }
       await updateGuard(supabaseQ, guardId, { verification_status: 'approved', is_active: true, dashboard_access: true, profile_completed: true, rejection_reason: null, updated_at: now });
       return new Response(JSON.stringify({ success: true, message: 'Guard restored successfully', action: 'restored' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });

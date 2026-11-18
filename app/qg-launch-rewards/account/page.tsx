@@ -557,7 +557,7 @@ export default function QGLaunchAccountPage() {
               </div>
               <div className="mt-4 pt-4 border-t border-[#1a2b4a]">
                 <p className="text-[10px] text-slate-600 leading-relaxed">
-                  QG Tokens are discount credits only. They have no cash value, cannot be withdrawn, sold, transferred, or exchanged for money. Tokens become usable only after your full QuickGuard account is verified. Single-level referrals only. QuickGuard may reject fraudulent, duplicate, or self-referrals at its discretion.
+                  QG Tokens are discount credits only. They have no cash value, cannot be withdrawn, sold, transferred, or exchanged for money. Eligible tokens can be linked after your full account is verified. Checkout redemption is planned and is not available yet. Single-level referrals only. QuickGuard may reject fraudulent, duplicate, or self-referrals at its discretion.
                 </p>
               </div>
             </div>

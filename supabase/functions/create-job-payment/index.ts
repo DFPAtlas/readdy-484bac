@@ -78,7 +78,7 @@ serve(async (req) => {
       );
     }
 
-    let body: { jobId?: string };
+    let body: { jobId?: string; taxDisclaimerAccepted?: boolean };
     try {
       body = await req.json();
     } catch {
@@ -112,7 +112,7 @@ serve(async (req) => {
 
     const { data: jobData, error: jobErr } = await supabaseService
       .from('jobs')
-      .select('id, job_title, client_id, status, hourly_rate, start_date, end_date, start_time, end_time, number_of_guards, number_of_days, tax_disclaimer_accepted, payment_status')
+      .select('id, job_title, client_id, status, hourly_rate, start_date, end_date, start_time, end_time, number_of_guards, number_of_days, payment_status')
       .eq('id', jobId)
       .maybeSingle();
 
@@ -181,6 +181,22 @@ serve(async (req) => {
       );
     }
 
+    const { data: guardsEligible, error: eligibilityError } = await supabaseService.rpc(
+      'checkout_guards_are_eligible',
+      { booking_id: jobId, assignment_ids: assignments.map((assignment) => assignment.id) },
+    );
+    if (eligibilityError) {
+      console.error('[create-job-payment] Guard eligibility check failed:', eligibilityError.message);
+      return new Response(JSON.stringify({ error: 'Unable to check guard eligibility' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (guardsEligible !== true) {
+      return new Response(JSON.stringify({ error: 'A selected guard no longer meets the booking requirements. Review your guard selection before paying.' }), {
+        status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Stored agreed amounts must match the authoritative schedule
     // (daily shift hours x number of days). Bookings priced by the old
     // span x days calculation are refused, never silently re-priced or charged.
@@ -211,6 +227,28 @@ serve(async (req) => {
         error: 'The selected guard amounts do not match this job\'s scheduled hours. Please reselect your guards so the booking can be repriced.',
         code: 'booking_amount_mismatch', scheduledHours,
       }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const { data: acceptanceRecorded, error: acceptanceError } = await supabaseService
+      .rpc('record_job_payment_tax_acceptance', {
+        p_job_id: jobId,
+        p_user_id: user.id,
+        p_accepted: body.taxDisclaimerAccepted === true,
+      });
+
+    if (acceptanceError) {
+      console.error('[create-job-payment] Tax acknowledgement could not be saved:', acceptanceError.message);
+      return new Response(
+        JSON.stringify({ error: 'Unable to save the tax responsibility statement' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    if (acceptanceRecorded !== true) {
+      return new Response(
+        JSON.stringify({ error: 'Accept the tax responsibility statement on a booking awaiting payment' }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     const { data: existingTx } = await supabaseService
@@ -448,7 +486,7 @@ serve(async (req) => {
       guard_payout_amount: totalGuardNetGbp,
       quickguard_net_fee: totalPlatformFeeGbp + totalGuardServiceFeeGbp - totalStripeFeeGbp,
       client_total_charge: totalClientChargeGbp,
-      tax_disclaimer_accepted: jobData.tax_disclaimer_accepted || false,
+      tax_disclaimer_accepted: acceptanceRecorded,
       currency: 'GBP',
       updated_at: nowIso,
     };

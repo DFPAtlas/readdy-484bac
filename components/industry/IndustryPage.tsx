@@ -1,4 +1,4 @@
-import Header from '@/components/Header';
+import NavSidebar from '@/components/NavSidebar';
 import Footer from '@/components/Footer';
 import IndustryHero from './IndustryHero';
 import IndustryProblems from './IndustryProblems';
@@ -16,7 +16,7 @@ import type { IndustryData } from './types';
 export default function IndustryPage({ data }: { data: IndustryData }) {
   return (
     <div className="min-h-screen bg-[#0B1933]">
-      <Header />
+      <NavSidebar />
       <IndustryHero
         eyebrow={data.eyebrow}
         headline={data.headline}
