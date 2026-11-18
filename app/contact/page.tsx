@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import ContactClient from './ContactClient';
 import ContactSchema from './ContactSchema';
+import { getContactEnquiry } from '@/lib/contact-enquiry';
 
 export const metadata: Metadata = {
   title: 'Contact QuickGuard for Security Hire',
@@ -35,11 +36,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ContactPage() {
+export default async function ContactPage({ searchParams }: { searchParams: Promise<{ subject?: string | string[] }> }) {
+  const enquiry = getContactEnquiry((await searchParams).subject);
   return (
     <>
       <ContactSchema />
-      <ContactClient />
+      <ContactClient key={enquiry.subject} initialEnquiry={enquiry} />
     </>
   );
 }
