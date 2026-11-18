@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { loadCompanyDashboardData } from '@/lib/company-dashboard-data';
 import { resolveCompanyTab, type CompanyTab } from '@/lib/company-navigation';
 import Link from 'next/link';
 import PortalSidebar from '@/components/PortalSidebar';
@@ -97,64 +98,44 @@ export default function CompanyDashboardClient() {
   const [compliance, setCompliance] = useState<ComplianceRecord[]>([]);
   const [training, setTraining] = useState<TrainingRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const mountedRef = useRef(false);
+  const requestRef = useRef(0);
   const [activeTab, setActiveTab] = useState<CompanyTab>('overview');
   useEffect(() => { setActiveTab(resolveCompanyTab(searchParams.get('tab'))); }, [searchParams]);
   const [unreadMessages, setUnreadMessages] = useState(0);
 
   const loadDashboard = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.replace('/company/login'); return; }
-
-    const { data: companyData } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!companyData) {
-      await supabase.auth.signOut({ scope: 'local' });
-      router.replace('/company/login?error=company-profile-not-found');
-      return;
+    if (!mountedRef.current) return;
+    const request = ++requestRef.current;
+    const current = () => mountedRef.current && request === requestRef.current;
+    setLoading(true); setLoadError('');
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (!current()) return;
+      if (authError) throw new Error('Your company account could not be confirmed. Please retry.');
+      if (!user) { router.replace('/company/login'); return; }
+      const { data: companyData, error: companyError } = await supabase.from('companies').select('*').eq('user_id', user.id).maybeSingle();
+      if (!current()) return;
+      if (companyError) throw new Error('Your company profile could not be loaded. Please retry.');
+      if (!companyData) { router.replace('/company/login?error=company-profile-not-found'); return; }
+      const data = await loadCompanyDashboardData(supabase, companyData.id, user.id);
+      if (!current()) return;
+      setCompany(companyData as Company);
+      setSites(data.sites); setStaff(data.staff); setRotas(data.rotas); setIncidents(data.incidents);
+      setCompliance(data.compliance); setTraining(data.training); setUnreadMessages(data.unreadMessages);
+    } catch (cause) {
+      if (current()) setLoadError(cause instanceof Error ? cause.message : 'Company dashboard data could not be loaded.');
+    } finally {
+      if (current()) setLoading(false);
     }
-    setCompany(companyData as Company);
-
-    const [
-      sitesRes, staffRes, rotasRes, incidentsRes, complianceRes, trainingRes, msgsRes
-    ] = await Promise.all([
-      supabase.from('company_sites').select('*').eq('company_id', companyData.id).order('created_at', { ascending: false }),
-      supabase.from('company_staff').select('*, company_sites(site_name)').eq('company_id', companyData.id).order('created_at', { ascending: false }),
-      supabase.from('rotas').select('*, company_sites(site_name), guards(full_name)').eq('company_id', companyData.id).gte('shift_date', new Date().toISOString().split('T')[0]).order('shift_date', { ascending: true }).limit(20),
-      supabase.from('incidents').select('*, company_sites(site_name)').eq('company_id', companyData.id).order('reported_at', { ascending: false }).limit(10),
-      supabase.from('compliance_records').select('*').eq('company_id', companyData.id).order('created_at', { ascending: false }),
-      supabase.from('training_records').select('*, guards(full_name)').eq('company_id', companyData.id).order('completion_date', { ascending: false }).limit(10),
-      supabase.from('messages').select('id').eq('receiver_id', user.id).eq('is_read', false),
-    ]);
-
-    setSites(sitesRes.data || []);
-    setStaff((staffRes.data || []).map((s: any) => ({
-      ...s,
-      site_name: s.company_sites?.site_name || 'Unassigned',
-    })));
-    setRotas((rotasRes.data || []).map((r: any) => ({
-      ...r,
-      site_name: r.company_sites?.site_name || '',
-      guard_name: r.guards?.full_name || 'Unassigned',
-    })));
-    setIncidents((incidentsRes.data || []).map((i: any) => ({
-      ...i,
-      site_name: i.company_sites?.site_name || '',
-    })));
-    setCompliance(complianceRes.data || []);
-    setTraining((trainingRes.data || []).map((t: any) => ({
-      ...t,
-      guard_name: t.guards?.full_name || '',
-    })));
-    setUnreadMessages(msgsRes.data?.length || 0);
-
-    setLoading(false);
   }, [router]);
 
-  useEffect(() => { loadDashboard(); }, [loadDashboard]);
+  useEffect(() => {
+    mountedRef.current = true;
+    void loadDashboard();
+    return () => { mountedRef.current = false; };
+  }, [loadDashboard]);
 
   useEffect(() => {
     if (!company?.id) return;
@@ -193,6 +174,14 @@ export default function CompanyDashboardClient() {
       </div>
     );
   }
+
+  if (loadError) return <main className="min-h-screen bg-[#0B1933] text-white flex items-center justify-center px-6">
+    <div role="alert" className="max-w-xl rounded-xl border border-amber-500/30 bg-amber-500/10 p-6">
+      <h1 className="text-xl font-bold mb-3">Company dashboard unavailable</h1><p>{loadError}</p>
+      <button type="button" onClick={() => void loadDashboard()} className="mt-4 text-teal-300 underline">Retry dashboard</button>
+      <Link href="/contact?subject=company-dashboard" className="ml-6 text-teal-300 underline">Contact support</Link>
+    </div>
+  </main>;
 
   if (!company) return null;
 
