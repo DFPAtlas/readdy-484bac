@@ -72,7 +72,7 @@ test('failed request insert does not report success or create follow-up writes',
 
 test('attendance panel opens the request modal with the candidate and affected assignment choices',()=>{
   const Suggestions=()=>null, Modal=()=>null;
-  const mocks={...common,'@/lib/supabase':{supabase:{}},'./ReplacementGuardSuggestions':{default:Suggestions},'./ReplacementRequestModal':{default:Modal}};
+  const mocks={...common,'@/lib/supabase':{supabase:{}},'@/lib/client-attendance-issues':{saveClientAttendanceIssue:async()=>{}},'./ReplacementGuardSuggestions':{default:Suggestions},'./ReplacementRequestModal':{default:Modal}};
   for(const name of ['GuardAttendanceCard','AttendanceSummary','AttendanceWarnings','ReplacementStatusTracker'])mocks['./'+name]={default:()=>null};
   const h=harness(dir+'AttendancePanel.tsx',[],mocks);
   const affected={id:'original',guard_id:'absent',attendance_status:'no_show',guards:{id:'absent',full_name:'Absent Guard'}};
