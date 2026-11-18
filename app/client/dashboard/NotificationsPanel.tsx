@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { changeClientNotifications } from '@/lib/client-notification-inbox';
+import { normalizeJobLink } from '@/lib/job-links';
 import CategoryBadge from '@/app/client/notifications/CategoryBadge';
 import PriorityBadge from '@/app/client/notifications/PriorityBadge';
 
@@ -51,23 +53,48 @@ function getActionButton(n: Notification): { label: string; icon: string; href: 
   return n.link ? { label: 'View', icon: 'ri-arrow-right-line', href: n.link } : null;
 }
 
+interface InboxScope {
+  owner: string;
+  active: boolean;
+  request: number;
+  ready: boolean;
+  mutating: boolean;
+  refresh: () => Promise<void>;
+}
+
 export default function NotificationsPanel({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [actionPending, setActionPending] = useState(false);
+  const inboxRef = useRef<InboxScope | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const navigationRef = useRef(0);
   const router = useRouter();
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   useEffect(() => {
-    let cancelled = false;
-    let latestRequest = 0;
+    const scope: InboxScope = { owner: userId, active: true, request: 0, ready: false, mutating: false, refresh: async () => {} };
+    inboxRef.current = scope;
     setNotifications([]);
-    if (!userId) { setLoading(false); return; }
+    setLoadError(false);
+    setActionError('');
+    setActionPending(false);
+    if (!userId) {
+      setLoading(false);
+      setLoadError(true);
+      return () => { scope.active = false; };
+    }
     const fetchNotifications = async () => {
-      const request = ++latestRequest;
+      if (!scope.active || scope.mutating) return;
+      const request = ++scope.request;
+      const current = () => scope.active && inboxRef.current === scope && request === scope.request;
+      scope.ready = false;
       setLoading(true);
+      setLoadError(false);
       try {
         const { data, error } = await supabase
           .from('notifications')
@@ -77,28 +104,31 @@ export default function NotificationsPanel({ userId }: { userId: string }) {
           .order('priority', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(20);
-        if (cancelled || request !== latestRequest) return;
-        if (error) throw error;
-        setNotifications(data || []);
-      } catch (error) {
-        if (!cancelled && request === latestRequest) console.error('Unable to load notifications:', error);
+        if (!current()) return;
+        if (error || !Array.isArray(data)) throw new Error('Unable to load notifications.');
+        setNotifications(data);
+        scope.ready = true;
+      } catch {
+        if (current()) setLoadError(true);
       } finally {
-        if (!cancelled && request === latestRequest) setLoading(false);
+        if (current()) setLoading(false);
       }
     };
-    const refresh = () => { if (!cancelled) void fetchNotifications(); };
+    scope.refresh = fetchNotifications;
+    const refresh = () => { if (scope.active) void fetchNotifications(); };
     refresh();
     const channel = supabase
       .channel(`client-notifications-${userId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'app', table: 'notifications', filter: `user_id=eq.${userId}` }, refresh)
       .on('postgres_changes', { event: 'UPDATE', schema: 'app', table: 'notifications', filter: `user_id=eq.${userId}` }, refresh)
       .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(channel); };
+    return () => { scope.active = false; void supabase.removeChannel(channel); };
   }, [userId]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        navigationRef.current += 1;
         setOpen(false);
       }
     }
@@ -106,28 +136,55 @@ export default function NotificationsPanel({ userId }: { userId: string }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
-  const markAllRead = async () => {
-    const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
-    if (unreadIds.length === 0) return;
-    await supabase.from('notifications').update({ is_read: true, read: true }).in('id', unreadIds);
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true, read: true })));
+  const retryLoad = () => {
+    const scope = inboxRef.current;
+    if (scope?.owner === userId) void scope.refresh();
   };
 
-  const markOneRead = async (id: string) => {
-    await supabase.from('notifications').update({ is_read: true, read: true }).eq('id', id);
-    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, is_read: true, read: true } : n));
-  };
-
-  const handleActionClick = (n: Notification) => {
-    if (!n.is_read) markOneRead(n.id);
-    setOpen(false);
-    const action = getActionButton(n);
-    if (action?.href) {
-      router.push(action.href);
+  const markRead = async (ids: string[]) => {
+    const scope = inboxRef.current;
+    if (!scope || scope.owner !== userId || !scope.active || !scope.ready || scope.mutating || ids.length === 0) return false;
+    scope.mutating = true;
+    scope.request += 1;
+    const current = () => scope.active && inboxRef.current === scope;
+    setActionPending(true);
+    setActionError('');
+    try {
+      const result = await changeClientNotifications(supabase, userId, ids, 'mark_read');
+      if (!current()) return false;
+      const confirmed = new Set(result.confirmedIds);
+      setNotifications(previous => previous.map(n => confirmed.has(n.id) ? { ...n, is_read: true } : n));
+      if (!result.complete) setActionError('Some read changes could not be confirmed. Check the refreshed list before retrying.');
+      return result.complete;
+    } catch {
+      if (current()) setActionError('Read changes could not be confirmed. Check the refreshed list before retrying.');
+      return false;
+    } finally {
+      if (current()) {
+        scope.mutating = false;
+        setActionPending(false);
+        void scope.refresh();
+      }
     }
   };
 
+  const markAllRead = () => markRead(notifications.filter(n => !n.is_read).map(n => n.id));
+  const markOneRead = (id: string) => markRead([id]);
+
+  const handleActionClick = async (n: Notification) => {
+    // Keep the warning visible when the automatic mark-read step is unconfirmed.
+    const scope = inboxRef.current;
+    if (!scope || scope.owner !== userId || !scope.active || !scope.ready || scope.mutating) return;
+    const navigation = ++navigationRef.current;
+    if (!n.is_read && !(await markOneRead(n.id))) return;
+    if (!scope.active || inboxRef.current !== scope || navigation !== navigationRef.current) return;
+    setOpen(false);
+    const action = getActionButton(n);
+    if (action?.href) router.push(normalizeJobLink(action.href));
+  };
+
   const handleToggle = () => {
+    navigationRef.current += 1;
     setOpen((v) => !v);
   };
 
@@ -141,7 +198,7 @@ export default function NotificationsPanel({ userId }: { userId: string }) {
         aria-label="Notifications"
       >
         <i className="ri-notification-3-line text-slate-400 text-lg"></i>
-        {unreadCount > 0 && (
+        {!loading && !loadError && unreadCount > 0 && (
           <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
@@ -153,22 +210,23 @@ export default function NotificationsPanel({ userId }: { userId: string }) {
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-[#1e2d4d]">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">Notifications</h3>
-              {unreadCount > 0 && (
+              {!loading && !loadError && unreadCount > 0 && (
                 <span className="bg-red-500/15 text-red-400 text-xs font-bold px-2 py-0.5 rounded-full border border-red-500/25">
                   {unreadCount} new
                 </span>
               )}
-              {urgentCount > 0 && (
+              {!loading && !loadError && urgentCount > 0 && (
                 <span className="bg-amber-500/15 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full border border-amber-500/25">
                   {urgentCount} urgent
                 </span>
               )}
             </div>
             <div className="flex items-center gap-2">
-              {unreadCount > 0 && (
+              {!loading && !loadError && unreadCount > 0 && (
                 <button
-                  onClick={markAllRead}
-                  className="text-xs text-teal-500 dark:text-teal-400 font-semibold hover:underline cursor-pointer whitespace-nowrap"
+                  onClick={() => { void markAllRead(); }}
+                  disabled={actionPending || loading || loadError}
+                  className="text-xs text-teal-500 dark:text-teal-400 font-semibold hover:underline cursor-pointer whitespace-nowrap disabled:opacity-50"
                 >
                   Mark all read
                 </button>
@@ -176,10 +234,23 @@ export default function NotificationsPanel({ userId }: { userId: string }) {
             </div>
           </div>
 
+          {actionError && (
+            <div role="alert" className="mx-4 mt-3 rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
+              <p>{actionError}</p>
+              <button onClick={retryLoad} disabled={actionPending || loading} className="mt-2 font-semibold underline disabled:opacity-50">Reload notifications</button>
+            </div>
+          )}
+
           <div className="max-h-[480px] overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="w-6 h-6 border-2 border-teal-500 dark:border-teal-400 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : loadError ? (
+              <div role="alert" className="px-6 py-10 text-center">
+                <p className="text-sm font-semibold text-red-600 dark:text-red-400">Unable to load notifications</p>
+                <p className="mt-1 text-xs text-slate-500">Please retry to check for updates.</p>
+                <button onClick={retryLoad} className="mt-3 text-sm font-semibold text-teal-600 dark:text-teal-400 underline">Retry</button>
               </div>
             ) : notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-14 px-6 text-center">
@@ -204,7 +275,7 @@ export default function NotificationsPanel({ userId }: { userId: string }) {
                         <div className="flex items-start gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                              <PriorityBadge priority={n.priority || 1} />
+                              <PriorityBadge priority={n.priority ?? 1} />
                               <CategoryBadge category={n.category || n.type || 'general'} />
                             </div>
                             <div className="flex items-start justify-between gap-2">
@@ -226,16 +297,18 @@ export default function NotificationsPanel({ userId }: { userId: string }) {
                             {action && (
                               <div className="flex items-center gap-2 mt-2">
                                 <button
-                                  onClick={() => handleActionClick(n)}
-                                  className="inline-flex items-center gap-1 text-xs font-semibold text-teal-500 dark:text-teal-400 hover:text-teal-600 transition-colors cursor-pointer whitespace-nowrap"
+                                  onClick={() => { void handleActionClick(n); }}
+                                  disabled={actionPending || loading || loadError}
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-teal-500 dark:text-teal-400 hover:text-teal-600 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
                                 >
                                   <i className={action.icon}></i>
                                   {action.label}
                                 </button>
                                 {!n.is_read && (
                                   <button
-                                    onClick={() => markOneRead(n.id)}
-                                    className="text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors cursor-pointer whitespace-nowrap"
+                                    onClick={() => { void markOneRead(n.id); }}
+                                disabled={actionPending || loading || loadError}
+                                    className="text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
                                   >
                                     Mark as read
                                   </button>
@@ -244,8 +317,9 @@ export default function NotificationsPanel({ userId }: { userId: string }) {
                             )}
                             {!action && !n.is_read && (
                               <button
-                                onClick={() => markOneRead(n.id)}
-                                className="mt-2 text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors cursor-pointer whitespace-nowrap"
+                                onClick={() => { void markOneRead(n.id); }}
+                                disabled={actionPending || loading || loadError}
+                                className="mt-2 text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
                               >
                                 Mark as read
                               </button>
@@ -261,11 +335,11 @@ export default function NotificationsPanel({ userId }: { userId: string }) {
           </div>
 
           <div className="px-5 py-3 border-t border-slate-200 dark:border-[#1e2d4d] bg-slate-50/50 dark:bg-[#0B1933]/50 flex items-center justify-between">
-            <p className="text-xs text-slate-500">Showing last {notifications.length} notifications</p>
+            <p className="text-xs text-slate-500">{loadError ? 'Notifications unavailable' : loading ? 'Loading notifications…' : `Showing last ${notifications.length} notifications`}</p>
             <Link
               href="/client/notifications"
-              onClick={() => setOpen(false)}
-              className="text-xs text-teal-500 dark:text-teal-400 font-semibold hover:underline cursor-pointer whitespace-nowrap"
+              onClick={() => { navigationRef.current += 1; setOpen(false); }}
+              className="text-xs text-teal-500 dark:text-teal-400 font-semibold hover:underline cursor-pointer whitespace-nowrap disabled:opacity-50"
             >
               View All →
             </Link>
