@@ -16,7 +16,7 @@ No database schema, permission, MFA, ownership, status catalogue or delivery-rou
 
 13 targeted tests passed: seven admin-write regression cases, four inbox-read cases and two guard ownership/requester cases. These use mocks and an isolated PostgreSQL fixture; no production ticket is modified. TypeScript passed. Targeted lint passed after correcting a test-only prefer-const warning.
 
-The admin/financial gate, full unit suite and production build are being checked before review. The local validation build explicitly overrides the tracked public Supabase settings with a loopback placeholder. The GitHub Next build step uses the same overrides; its output is validation-only and is not deployed. Readdy production settings are unchanged.
+The admin/financial gate passed, all 424 unit tests passed with concurrency limited to two, and the complete production build passed (212 static pages). The build reports only the eight existing blog image warnings. GitHub CI remains the final merge gate. The local validation build explicitly overrides the tracked public Supabase settings with a loopback placeholder. The GitHub Next build step uses the same overrides; its output is validation-only and is not deployed. Readdy production settings are unchanged.
 
 ## Deployment and signed-in checks
 
