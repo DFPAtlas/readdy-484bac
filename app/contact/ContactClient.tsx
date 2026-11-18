@@ -4,7 +4,6 @@ import Footer from '../../components/Footer';
 import NavSidebar from '../../components/NavSidebar';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import ContactSchema from './ContactSchema';
 import { HUMAN_SUPPORT_HOURS } from '@/lib/customer-guidance';
 import type { ContactEnquiry } from '@/lib/contact-enquiry';
 
@@ -126,7 +125,6 @@ export default function ContactClient({ initialEnquiry = { subject: '', category
 
   return (
     <div className="min-h-screen bg-[#0B1933]">
-      <ContactSchema />
       <NavSidebar />
 
       <section className="relative pt-32 pb-24 bg-[#0e1628] border-b border-slate-800/60">

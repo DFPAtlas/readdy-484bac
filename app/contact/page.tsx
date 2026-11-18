@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import ContactClient from './ContactClient';
+import { Suspense } from 'react';
+import ContactEnquiryWrapper from './ContactEnquiryWrapper';
 import ContactSchema from './ContactSchema';
-import { getContactEnquiry } from '@/lib/contact-enquiry';
 
 export const metadata: Metadata = {
   title: 'Contact QuickGuard for Security Hire',
@@ -36,12 +36,21 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function ContactPage({ searchParams }: { searchParams: Promise<{ subject?: string | string[] }> }) {
-  const enquiry = getContactEnquiry((await searchParams).subject);
+export default function ContactPage() {
   return (
     <>
       <ContactSchema />
-      <ContactClient key={enquiry.subject} initialEnquiry={enquiry} />
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-[#0B1933] flex items-center justify-center">
+            <div className="w-10 h-10 flex items-center justify-center">
+              <i className="ri-loader-4-line text-2xl text-teal-400 animate-spin" />
+            </div>
+          </div>
+        }
+      >
+        <ContactEnquiryWrapper />
+      </Suspense>
     </>
   );
 }
