@@ -571,8 +571,8 @@ export default function ClientRewardsPage() {
               <div className="bg-[#111d35] border border-[#1a2b4a] rounded-2xl p-12 text-center">
                 <div className="w-12 h-12 flex items-center justify-center mx-auto rounded-full bg-teal-500/10 mb-4"><i className="ri-coupon-line text-teal-400 text-xl"></i></div>
                 <p className="text-slate-400">Checkout redemption is not available yet. Eligible recorded rewards will remain visible here.</p>
-                <Link href="/client/payment-centre" className="mt-4 inline-block px-6 py-3 bg-teal-500 text-slate-900 font-bold rounded-xl hover:bg-teal-400 transition-all text-sm whitespace-nowrap cursor-pointer">
-                  Use Tokens Now
+                <Link href="/qg-launch-rewards/terms" className="mt-4 inline-block px-6 py-3 bg-teal-500 text-slate-900 font-bold rounded-xl hover:bg-teal-400 transition-all text-sm whitespace-nowrap cursor-pointer">
+                  View programme terms
                 </Link>
               </div>
             ) : (

@@ -21,3 +21,7 @@ An anonymous read confirmed `app.get_guard_promotion_summary()` is still configu
 Verification includes restored-file blob comparison, source-link comparison, full unit suite, TypeScript/ESLint, the admin/financial frontend gate and a production build. Final results are recorded in the PR. The original report remains at `docs/consistency-repairs-2026-11-17.md` as a historical record of PR #156.
 
 After merge, import the latest main into Readdy before publishing. Publishing an older Readdy project snapshot can overwrite the reviewed GitHub repairs again. Rewards redemption and full company editing remain separate development work; PR #158 handles the existing company/payout flows.
+
+## Follow-up review
+
+The recovered client and guard rewards pages still had a “Use Tokens Now” link below the redemption-unavailable notice. Both links now say “View programme terms” and open the existing rewards terms page. This copy/link correction follows the original exact restoration; it does not enable token redemption or change payments.
