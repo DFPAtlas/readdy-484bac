@@ -20,6 +20,7 @@ interface CityData {
   services: { icon: string; title: string; description: string }[];
   areas: string[];
   faqs: { question: string; answer: string }[];
+  testimonials: { name: string; company: string; text: string; rating: number }[];
   nearbyLinks: { city: string; slug: string }[];
 }
 
@@ -164,6 +165,36 @@ export default function CityPageClient({ data }: { data: CityData }) {
               <div key={i} className="bg-[#111d35] border border-slate-700/50 rounded-xl px-4 py-3 text-center hover:border-teal-500/30 transition-all cursor-default">
                 <i className="ri-map-pin-line text-teal-400 text-sm mr-1"></i>
                 <span className="text-slate-300 text-sm font-medium">{area}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 bg-[#0e1628]" aria-labelledby="testimonials-heading">
+        <div className="max-w-7xl mx-auto px-6 md:px-8">
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-400/20 text-teal-400 px-4 py-1.5 rounded-full text-sm font-medium mb-4">
+              <i className="ri-star-line"></i>
+              Client Reviews
+            </div>
+            <h2 id="testimonials-heading" className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Trusted by Businesses in {data.city}
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {data.testimonials.map((t, i) => (
+              <div key={i} className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-7 hover:border-teal-500/30 transition-all">
+                <div className="flex gap-1 mb-4">
+                  {Array.from({ length: t.rating }).map((_, j) => (
+                    <i key={j} className="ri-star-fill text-amber-400 text-sm"></i>
+                  ))}
+                </div>
+                <p className="text-slate-300 text-sm leading-relaxed mb-5 italic">&ldquo;{t.text}&rdquo;</p>
+                <div>
+                  <p className="text-white font-semibold text-sm">{t.name}</p>
+                  <p className="text-slate-500 text-xs">{t.company}</p>
+                </div>
               </div>
             ))}
           </div>

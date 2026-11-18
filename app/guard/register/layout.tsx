@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Register as a Security Guard UK | SIA Verified | QuickGuard',
   description:
-    'Join QuickGuard as an SIA-licensed security guard. Find flexible security jobs across the UK, review advertised pay rates, and receive payment after completion and the applicable release checks. Free registration.',
+    'Join QuickGuard as an SIA-licensed security guard. Find flexible security jobs across the UK, earn £15-30/hr, and get paid weekly. Free registration.',
   keywords:
     'register security guard UK, SIA licence, security jobs, door supervisor register, QuickGuard guard signup',
   alternates: {

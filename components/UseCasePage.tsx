@@ -22,6 +22,9 @@ interface UseCaseData {
   heroImage: string;
   steps: Step[];
   faqs: FAQ[];
+  testimonialQuote: string;
+  testimonialAuthor: string;
+  testimonialVenue: string;
   venueCategory: string;
   ctaLabel: string;
 }
@@ -59,7 +62,7 @@ export default function UseCasePage({ data }: { data: UseCaseData }) {
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 bg-teal-500/15 border border-teal-400/30 text-teal-300 px-4 py-1.5 rounded-full text-sm font-medium mb-6 backdrop-blur-sm">
               <i className="ri-shield-check-line"></i>
-              Find SIA-Licensed Security Guards
+              SIA-Verified Guards Available Now
             </div>
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 leading-[1.1] text-white">
               {data.headline}
@@ -139,6 +142,23 @@ export default function UseCasePage({ data }: { data: UseCaseData }) {
                 <p className="text-sm text-slate-400">{s.desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 bg-[#0B1933] border-b border-slate-800/60" aria-label="Testimonial">
+        <div className="max-w-3xl mx-auto px-6 md:px-8 text-center">
+          <div className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 md:p-12">
+            <div className="w-12 h-12 bg-teal-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-teal-400/20">
+              <i className="ri-double-quotes-l text-2xl text-teal-400"></i>
+            </div>
+            <blockquote className="text-xl md:text-2xl text-white font-medium leading-relaxed mb-6">
+              &ldquo;{data.testimonialQuote}&rdquo;
+            </blockquote>
+            <div>
+              <p className="font-semibold text-teal-400">{data.testimonialAuthor}</p>
+              <p className="text-sm text-slate-500">{data.testimonialVenue}</p>
+            </div>
           </div>
         </div>
       </section>

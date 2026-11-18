@@ -233,7 +233,7 @@ export default function GuardRegister() {
   const socialEnabled = portalDefaults?.social_login_enabled !== false;
   const trustBadges = portalDefaults?.trust_badges || [
     { icon: 'ri-shield-star-line', text: 'SIA licence checks' },
-    { icon: 'ri-money-pound-circle-line', text: 'Secure Stripe payments' },
+    { icon: 'ri-money-pound-circle-line', text: 'Weekly Payouts' },
     { icon: 'ri-verified-badge-line', text: 'Manage your own tax' },
   ];
 

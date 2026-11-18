@@ -56,7 +56,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           !pathname.startsWith('/company') &&
           !pathname.startsWith('/maintenance') &&
           !pathname.startsWith('/upgrade') &&
-          !pathname.startsWith('/accessibility')
+          !pathname.startsWith('/accessibility') &&
+          !pathname.startsWith('/blog')
         ) {
           router.push('/');
         }

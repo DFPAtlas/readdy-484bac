@@ -52,6 +52,9 @@ const data = {
     { q: 'Is there a minimum number of shifts?', a: 'No. Book a single night, a weekend, or a full season. You are never locked into a contract.' },
     { q: 'What are typical hourly rates for door supervisors?', a: 'Rates typically range from £13 to £20 per hour depending on location and night. You set the rate and guards choose whether to apply.' },
   ],
+  testimonialQuote: 'We used to pay £22 per hour through an agency for our club in Shoreditch. With QuickGuard we pay £15 direct to the guard plus a small platform fee. The quality is the same — actually better because we get to choose who works our door.',
+  testimonialAuthor: 'Marcus T.',
+  testimonialVenue: 'Venue Manager, East London',
 };
 
 export default function NightclubSecurityPage() {

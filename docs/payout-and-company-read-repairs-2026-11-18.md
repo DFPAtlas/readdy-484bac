@@ -27,3 +27,9 @@ Sixteen targeted regression cases cover supported schema fields, ownership scope
 This change uses existing APIs and requires no database migration or Edge Function deployment. No real Stripe account was created, no bank details were changed, and no payment was initiated during verification. Existing payments, payout execution and the December offer schedule are unchanged. Frontend changes require merge, Readdy import and publication.
 
 Company management CRUD and rewards redemption remain separate development work. This repair makes the existing company read view report its data honestly; it does not complete those modules.
+
+## Merge reconciliation after PR #157
+
+Merged current main, including PR #157 and Readdy v2363. Resolved the company-dashboard conflict by retaining the reviewed read-error handling, correct unread flag and supported navigation. Restored the companion company-navigation helper, sidebar tab links, server Suspense wrapper and existing catalogue/navigation regressions removed by the sync.
+
+PR #157 pricing/dependency repairs and the new blog/launch/navigation/sitemap work remain unchanged from main. This resolution does not restore unrelated audit changes reverted by the Readdy sync. The database and existing Stripe/payment execution paths are unchanged.

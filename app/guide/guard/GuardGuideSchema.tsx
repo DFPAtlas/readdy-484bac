@@ -21,7 +21,7 @@ export default function GuardGuideSchema() {
         '@type': 'HowToStep',
         position: 2,
         name: 'SIA Verification',
-        text: 'Submit your SIA licence number during profile setup. Your licence must pass an initial check and your profile must be approved before you can take work. Timing varies and manual review may be needed. Planned: QuickGuard is developing an AI agent to check guards’ SIA licence status weekly and flag suspended, revoked or expired licences for review.',
+        text: 'Submit your SIA licence number during profile setup. Our system automatically checks against the official SIA register and approval typically completes within 5–10 minutes. Planned: QuickGuard is developing an AI agent to check guards’ SIA licence status weekly and flag suspended, revoked or expired licences for review.',
         url: `${SITE_URL}/guide/guard#step-02`,
       },
       {
@@ -35,7 +35,7 @@ export default function GuardGuideSchema() {
         '@type': 'HowToStep',
         position: 4,
         name: 'Complete Jobs and Get Paid',
-        text: 'Work your assigned shift professionally. The client pays before the booking is confirmed. After shift completion, payouts follow the confirmation, dispute and Stripe account checks; bank arrival times can vary.',
+        text: 'Work your assigned shift professionally. The client processes payment through the platform after completion and funds are securely transferred to your registered UK bank account.',
         url: `${SITE_URL}/guide/guard#step-04`,
       },
     ],

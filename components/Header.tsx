@@ -444,6 +444,11 @@ export default function Header() {
                 </Link>
               </li>
               <li>
+                <Link href="/blog" prefetch={false} onClick={handleLinkClick} className={navLinkClass('/blog')}>
+                  Blog
+                </Link>
+              </li>
+              <li>
                 <Link href="/contact" prefetch={false} onClick={handleLinkClick} className={navLinkClass('/contact')}>
                   Contact
                 </Link>
@@ -792,6 +797,9 @@ export default function Header() {
                 </li>
                 <li>
                   <Link href="/pricing" prefetch={false} onClick={handleLinkClick} className={mobileNavLinkClass('/pricing')}>Pricing</Link>
+                </li>
+                <li>
+                  <Link href="/blog" prefetch={false} onClick={handleLinkClick} className={mobileNavLinkClass('/blog')}>Blog</Link>
                 </li>
                 <li>
                   <Link href="/contact" prefetch={false} onClick={handleLinkClick} className={mobileNavLinkClass('/contact')}>Contact</Link>

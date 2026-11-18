@@ -1,16 +1,4 @@
 import { CANCELLATION_GUIDANCE, GUARD_CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
-export type ClientPlan = {
-  slug: string;
-  name: string;
-  serviceFeePct: number;
-  postingAllowance: string;
-};
-
-export type GuardMembership = {
-  name: string;
-  monthlyPrice: number;
-};
-
 export type CancellationWindow = {
   label: string;
   outcome: string;
@@ -34,19 +22,6 @@ export type HelpTopic = {
   desc: string;
   href: string;
 };
-
-export const CLIENT_PLANS: ClientPlan[] = [
-  { slug: "free", name: "Free", serviceFeePct: 15, postingAllowance: "1 job posting per month" },
-  { slug: "starter", name: "Starter", serviceFeePct: 10, postingAllowance: "10 job postings per month" },
-  { slug: "pro", name: "Pro", serviceFeePct: 7.5, postingAllowance: "30 job postings per month" },
-  { slug: "enterprise", name: "Enterprise", serviceFeePct: 5, postingAllowance: "Unlimited job postings" },
-];
-
-export const GUARD_MEMBERSHIPS: GuardMembership[] = [
-  { name: "Basic", monthlyPrice: 10 },
-  { name: "Pro", monthlyPrice: 19 },
-  { name: "Elite", monthlyPrice: 29 },
-];
 
 export const CANCELLATION_WINDOWS: CancellationWindow[] = [
   { label: "Before payment", outcome: "No booking payment to refund", detail: "Posting a job does not capture the booking payment.", tone: "good" },

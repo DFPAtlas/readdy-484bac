@@ -72,7 +72,7 @@ export default function QGLaunchRewardsPage() {
             Help Build the QuickGuard Network &amp; Earn Discount Credits
           </h1>
           <p className="text-lg text-slate-300 max-w-xl mb-8 leading-relaxed">
-            Refer verified guards and businesses to QuickGuard. Earn QG Tokens towards planned platform discounts. Redemption is not available at checkout yet. Tokens have no cash value.
+            Refer verified guards and businesses to QuickGuard. Earn QG Tokens that reduce your subscription, job posting, and platform costs. No cash — real platform value.
           </p>
           <div className="flex flex-wrap gap-4">
             <Link
@@ -128,7 +128,7 @@ export default function QGLaunchRewardsPage() {
             {[
               { icon: 'ri-verified-badge-line', title: 'Verified Guards', desc: 'Only SIA-licensed guards with verified profiles earn rewards.' },
               { icon: 'ri-building-2-line', title: 'Genuine Clients', desc: 'Real businesses with verified contact details. No fake accounts.' },
-              { icon: 'ri-discount-percent-line', title: 'Discount Credits Only', desc: 'Planned platform discounts; checkout redemption is not available yet. No cash withdrawals or transfers.' },
+              { icon: 'ri-discount-percent-line', title: 'Discount Credits Only', desc: 'Tokens reduce platform costs. No cash withdrawals or transfers.' },
               { icon: 'ri-shield-check-line', title: 'Fair Referral Rules', desc: 'Single-level referrals. Fraud detection protects the programme.' },
             ].map((item) => (
               <div key={item.title} className="bg-[#111d35] border border-[#1a2b4a] rounded-2xl p-5 text-center">
@@ -148,7 +148,7 @@ export default function QGLaunchRewardsPage() {
         <div className="max-w-5xl mx-auto text-center">
           <h2 className="text-3xl font-bold text-white mb-4">100 QG Tokens = £{poundsPer100.toFixed(0)} QuickGuard Credit</h2>
           <p className="text-slate-400 max-w-2xl mx-auto text-lg">
-            QG Tokens are recorded credits towards planned QuickGuard discounts. Checkout redemption is not available yet. They have no cash value, cannot be withdrawn or transferred, and are exclusively for use on the QuickGuard platform.
+            QG Tokens are discount credits that reduce your costs on QuickGuard. They have no cash value, cannot be withdrawn or transferred, and are exclusively for use on the QuickGuard platform.
           </p>
         </div>
       </section>

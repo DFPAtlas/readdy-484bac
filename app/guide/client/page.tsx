@@ -470,7 +470,7 @@ export default function ClientGuidePage() {
                 </div>
               </div>
               <h2 className="text-3xl font-extrabold text-white mb-3">Ready to Hire Your Security Team?</h2>
-              <p className="text-slate-400 text-lg mb-8 max-w-xl mx-auto">Find SIA-licensed security professionals for your business through QuickGuard.</p>
+              <p className="text-slate-400 text-lg mb-8 max-w-xl mx-auto">Join thousands of businesses that trust QuickGuard to find verified, SIA-licensed security professionals.</p>
               <div className="flex flex-wrap gap-4 justify-center">
                 <Link
                   href="/client/register"
