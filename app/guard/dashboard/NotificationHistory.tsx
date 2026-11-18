@@ -3,6 +3,8 @@
 import { normalizeJobLink } from '@/lib/job-links';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { changeClientNotifications as changeOwnedNotifications } from '@/lib/client-notification-inbox';
+import { saveGuardNotificationSnooze } from '@/lib/notification-snooze';
 import Link from 'next/link';
 
 interface Notification {
@@ -94,7 +96,7 @@ function formatDateLabel(dateStr: string) {
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-function SnoozeDropdown({ onSnooze, onClose }: { onSnooze: (iso: string) => void; onClose: () => void }) {
+function SnoozeDropdown({ onSnooze, onClose, disabled = false }: { onSnooze: (iso: string) => void; onClose: () => void; disabled?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -112,6 +114,7 @@ function SnoozeDropdown({ onSnooze, onClose }: { onSnooze: (iso: string) => void
         <button
           key={opt.label}
           onClick={() => { onSnooze(opt.getValue()); onClose(); }}
+          disabled={disabled}
           className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-300 hover:bg-amber-500/10 hover:text-amber-400 transition-colors cursor-pointer"
         >
           <i className={`${opt.icon} text-amber-400 text-base`}></i>
@@ -138,16 +141,29 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [actionPending, setActionPending] = useState(false);
+  const [clearCount, setClearCount] = useState(0);
   const PER_PAGE = 15;
 
   const mountedRef = useRef(false);
   const requestRef = useRef(0);
+  const lifetimeRef = useRef<symbol | null>(null);
+  const writingRef = useRef(false);
+  const loadedOwnerRef = useRef<string | null>(null);
+  const clearIdsRef = useRef<string[]>([]);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchAll = useCallback(async () => {
-    if (!mountedRef.current || !guardUserId) return;
+    if (!mountedRef.current || writingRef.current) return;
     const request = ++requestRef.current;
-    const isCurrent = () => mountedRef.current && request === requestRef.current;
+    const lifetime = lifetimeRef.current;
+    const isCurrent = () => mountedRef.current && lifetime === lifetimeRef.current && request === requestRef.current;
+    loadedOwnerRef.current = null;
     setLoading(true);
+    setLoadError(false);
     try {
+      if (!guardUserId) throw new Error('Notification owner is unavailable.');
       const { data, error } = await supabase
         .from('notifications')
         .select('id, title, message, type, is_read, link, created_at, snoozed_until')
@@ -155,7 +171,12 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
         .eq('user_type', 'guard')
         .order('created_at', { ascending: false })
         .limit(200);
-      if (isCurrent() && !error) setNotifications(data || []);
+      if (!isCurrent()) return;
+      if (error || !Array.isArray(data)) throw new Error('Unable to load notifications.');
+      setNotifications(data);
+      loadedOwnerRef.current = guardUserId;
+    } catch {
+      if (isCurrent()) setLoadError(true);
     } finally {
       if (isCurrent()) setLoading(false);
     }
@@ -163,72 +184,121 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
 
   useEffect(() => {
     mountedRef.current = true;
-    let active = true;
+    lifetimeRef.current = Symbol('guard-history');
+    writingRef.current = false;
+    loadedOwnerRef.current = null;
+    clearIdsRef.current = [];
+    setClearCount(0);
+    setActionPending(false);
+    setActionError('');
+    setClearing(false);
+    setDeletingId(null);
+    setSnoozeToast({ show: false, label: '' });
     setNotifications([]);
     setPage(1);
     setExpandedId(null);
     setConfirmDeleteId(null);
     setSnoozeOpenId(null);
     setShowClearConfirm(false);
-    fetchAll();
-    const refresh = () => { if (active) fetchAll(); };
-    const channel = supabase
+    void fetchAll();
+    const refresh = () => { if (mountedRef.current) void fetchAll(); };
+    let active = true;
+    const channel = guardUserId ? supabase
       .channel(`notif-history-${guardUserId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'app', table: 'notifications', filter: `user_id=eq.${guardUserId}` }, refresh)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'app', table: 'notifications', filter: `user_id=eq.${guardUserId}` }, refresh)
-      .subscribe();
+      .on('postgres_changes', { event: 'INSERT', schema: 'app', table: 'notifications', filter: `user_id=eq.${guardUserId}` }, () => { if (active) refresh(); })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'app', table: 'notifications', filter: `user_id=eq.${guardUserId}` }, () => { if (active) refresh(); })
+      .subscribe() : null;
     return () => {
       active = false;
       mountedRef.current = false;
-      supabase.removeChannel(channel);
+      lifetimeRef.current = null;
+      loadedOwnerRef.current = null;
+      requestRef.current += 1;
+      if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [guardUserId, fetchAll]);
 
-  const markAsRead = async (id: string) => {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-  };
-
-  const markAllAsRead = async () => {
-    const ids = filtered.filter(n => !n.is_read).map(n => n.id);
-    if (!ids.length) return;
-    await supabase.from('notifications').update({ is_read: true }).in('id', ids);
-    setNotifications(prev => prev.map(n => ids.includes(n.id) ? { ...n, is_read: true } : n));
-  };
-
-  const clearAll = async () => {
-    setClearing(true);
-    const ids = filtered.map(n => n.id);
-    if (ids.length) {
-      await supabase.from('notifications').delete().in('id', ids);
-      setNotifications(prev => prev.filter(n => !ids.includes(n.id)));
+  const runAction = async (action: 'mark_read' | 'delete' | 'snooze', ids: string[], until: string | null = null, clear = false) => {
+    if (!mountedRef.current || writingRef.current || loading || loadError ||
+        loadedOwnerRef.current !== guardUserId || !guardUserId || ids.length === 0) return false;
+    writingRef.current = true;
+    requestRef.current += 1;
+    const lifetime = lifetimeRef.current;
+    const current = () => mountedRef.current && lifetime === lifetimeRef.current;
+    setActionPending(true);
+    setActionError('');
+    setSnoozeToast({ show: false, label: '' });
+    if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
+    if (clear) setClearing(true);
+    else if (action === 'delete') setDeletingId(ids[0]);
+    try {
+      let confirmedIds: string[];
+      let complete: boolean;
+      let savedUntil: string | null = null;
+      if (action === 'snooze') {
+        const result = await saveGuardNotificationSnooze(supabase, guardUserId, ids[0], until);
+        savedUntil = result.snoozedUntil;
+        confirmedIds = [ids[0]];
+        complete = true;
+      } else {
+        const result = await changeOwnedNotifications(supabase, guardUserId, ids, action);
+        confirmedIds = result.confirmedIds;
+        complete = result.complete;
+      }
+      if (!current()) return false;
+      const confirmed = new Set(confirmedIds);
+      setNotifications(previous => previous.flatMap(n => {
+        if (!confirmed.has(n.id)) return [n];
+        if (action === 'delete') return [];
+        return [action === 'mark_read' ? { ...n, is_read: true } : { ...n, snoozed_until: savedUntil }];
+      }));
+      if (clear) {
+        clearIdsRef.current = ids.filter(id => !confirmed.has(id));
+        setClearCount(clearIdsRef.current.length);
+      }
+      if (!complete) {
+        setActionError('Some notification changes could not be confirmed. Check the refreshed history before retrying.');
+      } else {
+        if (clear) setShowClearConfirm(false);
+        if (action === 'delete') setConfirmDeleteId(null);
+        if (action === 'snooze') {
+          setSnoozeOpenId(null);
+          if (savedUntil !== null) {
+            setSnoozeToast({ show: true, label: new Date(savedUntil).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) });
+            toastTimerRef.current = setTimeout(() => {
+              if (current()) setSnoozeToast({ show: false, label: '' });
+            }, 3000);
+          }
+        }
+      }
+      return complete;
+    } catch {
+      if (current()) setActionError('Notification changes could not be confirmed. Check the refreshed history before retrying.');
+      return false;
+    } finally {
+      if (current()) {
+        writingRef.current = false;
+        setActionPending(false);
+        setClearing(false);
+        setDeletingId(null);
+        void fetchAll();
+      }
     }
-    setClearing(false);
-    setShowClearConfirm(false);
-    setPage(1);
   };
 
-  const deleteNotification = async (id: string) => {
-    setDeletingId(id);
-    await supabase.from('notifications').delete().eq('id', id);
-    setNotifications(prev => prev.filter(n => n.id !== id));
-    setDeletingId(null);
-    setConfirmDeleteId(null);
+  const markAsRead = (id: string) => runAction('mark_read', [id]);
+  const markAllAsRead = () => runAction('mark_read', filtered.filter(n => !n.is_read).map(n => n.id));
+  const openClearConfirm = () => {
+    if (writingRef.current || loading || loadError || loadedOwnerRef.current !== guardUserId) return;
+    clearIdsRef.current = filtered.map(n => n.id);
+    setClearCount(clearIdsRef.current.length);
+    setShowClearConfirm(clearIdsRef.current.length > 0);
   };
-
-  const snoozeNotification = async (id: string, until: string) => {
-    await supabase.from('notifications').update({ snoozed_until: until }).eq('id', id);
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, snoozed_until: until } : n));
-    const opt = SNOOZE_OPTIONS.find(o => o.getValue() === until);
-    const label = opt?.label ?? 'later';
-    setSnoozeToast({ show: true, label });
-    setTimeout(() => setSnoozeToast({ show: false, label: '' }), 3000);
-  };
-
-  const unsnoozeNotification = async (id: string) => {
-    await supabase.from('notifications').update({ snoozed_until: null }).eq('id', id);
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, snoozed_until: null } : n));
-  };
+  const clearAll = () => runAction('delete', [...clearIdsRef.current], null, true);
+  const deleteNotification = (id: string) => runAction('delete', [id]);
+  const snoozeNotification = (id: string, until: string) => runAction('snooze', [id], until);
+  const unsnoozeNotification = (id: string) => runAction('snooze', [id], null);
 
   const filtered = notifications.filter(n => {
     const typeOk = typeFilter === 'all' || n.type === typeFilter;
@@ -241,12 +311,24 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
   });
 
   const snoozedCount = notifications.filter(isSnoozed).length;
-  const totalPages = Math.ceil(filtered.length / PER_PAGE);
-  const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const visiblePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((visiblePage - 1) * PER_PAGE, visiblePage * PER_PAGE);
   const unreadCount = filtered.filter(n => !n.is_read).length;
 
   const handleTypeFilter = (val: string) => { setTypeFilter(val); setPage(1); };
   const handleReadFilter = (val: 'all' | 'unread' | 'read') => { setReadFilter(val); setPage(1); };
+
+  useEffect(() => {
+    if (loading || loadError || actionPending) return;
+    setPage(previous => Math.min(previous, totalPages));
+    setConfirmDeleteId(previous => previous && notifications.some(n => n.id === previous) ? previous : null);
+    if (clearIdsRef.current.length > 0) {
+      clearIdsRef.current = clearIdsRef.current.filter(id => notifications.some(n => n.id === id));
+      setClearCount(clearIdsRef.current.length);
+      if (clearIdsRef.current.length === 0) setShowClearConfirm(false);
+    }
+  }, [notifications, loading, loadError, actionPending, totalPages]);
 
   const groupedNotifications = useMemo(() => {
     const groups: Record<string, Notification[]> = {};
@@ -266,12 +348,29 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
     );
   }
 
+  if (loadError) {
+    return (
+      <div role="alert" className="rounded-xl border border-red-500/25 bg-red-500/10 px-6 py-10 text-center">
+        <h3 className="text-base font-semibold text-red-400">Unable to load notification history</h3>
+        <p className="mt-2 text-sm text-slate-400">Please retry to check your notifications.</p>
+        {actionError && <p className="mt-2 text-sm text-red-400">{actionError}</p>}
+        <button onClick={() => { void fetchAll(); }} className="mt-4 text-sm font-semibold text-teal-400 underline">Retry loading history</button>
+      </div>
+    );
+  }
+
   return (
     <div>
+      {actionError && (
+        <div role="alert" className="mb-4 rounded-xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-400">
+          <p>{actionError}</p>
+          <button onClick={() => { void fetchAll(); }} disabled={actionPending} className="mt-2 font-semibold underline disabled:opacity-50">Reload history</button>
+        </div>
+      )}
       {snoozeToast.show && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-amber-500 text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-2.5 text-sm font-medium">
           <i className="ri-alarm-line text-lg"></i>
-          Snoozed — you&apos;ll be reminded in {snoozeToast.label.toLowerCase()}
+          Snoozed until {snoozeToast.label}
         </div>
       )}
 
@@ -283,13 +382,14 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
             </div>
             <h3 className="text-lg font-semibold text-white text-center mb-2">Clear All Notifications?</h3>
             <p className="text-sm text-slate-400 text-center mb-6">
-              This will permanently delete <span className="font-semibold text-slate-300">{filtered.length}</span> notification{filtered.length !== 1 ? 's' : ''}. This cannot be undone.
+              This will permanently delete <span className="font-semibold text-slate-300">{clearCount}</span> notification{clearCount !== 1 ? 's' : ''}. This cannot be undone.
             </p>
+            {actionError && <p role="alert" className="mb-4 text-sm text-red-400">{actionError}</p>}
             <div className="flex gap-3">
               <button onClick={() => setShowClearConfirm(false)} className="flex-1 px-4 py-2.5 border border-[#1e2d4d] text-slate-300 text-sm font-medium rounded-xl hover:bg-[#162036] cursor-pointer whitespace-nowrap">
                 Cancel
               </button>
-              <button onClick={clearAll} disabled={clearing} className="flex-1 px-4 py-2.5 bg-red-500 text-white text-sm font-medium rounded-xl hover:bg-red-600 disabled:opacity-60 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2">
+              <button onClick={() => { void clearAll(); }} disabled={actionPending || clearCount === 0} className="flex-1 px-4 py-2.5 bg-red-500 text-white text-sm font-medium rounded-xl hover:bg-red-600 disabled:opacity-60 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2">
                 {clearing ? <i className="ri-loader-4-line animate-spin"></i> : <i className="ri-delete-bin-line"></i>}
                 {clearing ? 'Clearing...' : 'Clear All'}
               </button>
@@ -314,13 +414,13 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
           </div>
           <div className="flex items-center gap-3">
             {unreadCount > 0 && (
-              <button onClick={markAllAsRead} className="px-4 py-2 bg-teal-500/15 text-teal-400 text-sm font-medium rounded-lg hover:bg-teal-500/25 transition-colors whitespace-nowrap cursor-pointer">
+              <button onClick={() => { void markAllAsRead(); }} disabled={actionPending} className="px-4 py-2 bg-teal-500/15 text-teal-400 text-sm font-medium rounded-lg hover:bg-teal-500/25 transition-colors whitespace-nowrap cursor-pointer">
                 <i className="ri-check-double-line mr-1.5"></i>
                 Mark all read
               </button>
             )}
             {filtered.length > 0 && (
-              <button onClick={() => setShowClearConfirm(true)} className="px-4 py-2 bg-red-500/10 text-red-400 text-sm font-medium rounded-lg hover:bg-red-500/20 transition-colors whitespace-nowrap cursor-pointer">
+              <button onClick={openClearConfirm} disabled={actionPending} className="px-4 py-2 bg-red-500/10 text-red-400 text-sm font-medium rounded-lg hover:bg-red-500/20 transition-colors whitespace-nowrap cursor-pointer">
                 <i className="ri-delete-bin-line mr-1.5"></i>
                 Clear All
               </button>
@@ -334,12 +434,13 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
             <input
               type="text"
               placeholder="Search notifications..."
+              disabled={actionPending}
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
               className="w-full pl-10 pr-4 py-2.5 bg-[#162036] border border-[#1e2d4d] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500/50 transition-colors"
             />
             {searchQuery && (
-              <button onClick={() => { setSearchQuery(''); setPage(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer">
+              <button onClick={() => { setSearchQuery(''); setPage(1); }} disabled={actionPending} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer">
                 <i className="ri-close-line"></i>
               </button>
             )}
@@ -362,7 +463,7 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Type</p>
               <div className="flex flex-wrap gap-2">
                 {TYPE_FILTERS.map(f => (
-                  <button key={f.value} onClick={() => handleTypeFilter(f.value)}
+                  <button key={f.value} onClick={() => handleTypeFilter(f.value)} disabled={actionPending}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer ${typeFilter === f.value ? 'bg-teal-500 text-white' : 'bg-[#0B1933] text-slate-400 hover:bg-[#1a2642] border border-[#1e2d4d]'}`}>
                     {f.label}
                   </button>
@@ -373,7 +474,7 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Status</p>
               <div className="flex items-center bg-[#0B1933] rounded-lg p-1 w-fit">
                 {(['all', 'unread', 'read'] as const).map(v => (
-                  <button key={v} onClick={() => handleReadFilter(v)}
+                  <button key={v} onClick={() => handleReadFilter(v)} disabled={actionPending}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap cursor-pointer capitalize ${readFilter === v ? 'bg-[#162036] text-white shadow-sm border border-[#1e2d4d]' : 'text-slate-500 hover:text-white'}`}>
                     {v}
                   </button>
@@ -386,6 +487,7 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
         <div className="flex items-center gap-3">
           <button
             onClick={() => { setShowSnoozed(false); setPage(1); }}
+            disabled={actionPending}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer ${!showSnoozed ? 'bg-[#162036] text-white border border-[#1e2d4d]' : 'bg-[#0B1933] text-slate-500 hover:bg-[#162036] border border-[#1e2d4d]'}`}
           >
             <i className="ri-notification-3-line text-base"></i>
@@ -398,6 +500,7 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
           </button>
           <button
             onClick={() => { setShowSnoozed(true); setPage(1); }}
+            disabled={actionPending}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer ${showSnoozed ? 'bg-amber-500 text-white' : 'bg-[#0B1933] text-slate-500 hover:bg-[#162036] border border-[#1e2d4d]'}`}
           >
             <i className="ri-alarm-line text-base"></i>
@@ -505,7 +608,7 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
                                 </Link>
                               )}
                               {!n.is_read && !snoozed && (
-                                <button onClick={() => markAsRead(n.id)} className="px-3 py-1.5 border border-[#1e2d4d] text-slate-400 text-xs font-medium rounded-lg hover:bg-[#162036] whitespace-nowrap cursor-pointer">
+                                <button onClick={() => { void markAsRead(n.id); }} disabled={actionPending} className="px-3 py-1.5 border border-[#1e2d4d] text-slate-400 text-xs font-medium rounded-lg hover:bg-[#162036] whitespace-nowrap cursor-pointer">
                                   Mark read
                                 </button>
                               )}
@@ -517,7 +620,8 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
 
                               {snoozed ? (
                                 <button
-                                  onClick={() => unsnoozeNotification(n.id)}
+                                  onClick={() => { void unsnoozeNotification(n.id); }}
+                                  disabled={actionPending}
                                   className="px-3 py-1.5 bg-amber-500/15 text-amber-400 text-xs font-medium rounded-lg hover:bg-amber-500/25 whitespace-nowrap cursor-pointer flex items-center gap-1"
                                 >
                                   <i className="ri-alarm-warning-line text-xs"></i>
@@ -527,6 +631,7 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
                                 <div className="relative">
                                   <button
                                     onClick={() => setSnoozeOpenId(snoozeOpenId === n.id ? null : n.id)}
+                                    disabled={actionPending}
                                     className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
                                     title="Snooze notification"
                                   >
@@ -534,7 +639,8 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
                                   </button>
                                   {snoozeOpenId === n.id && (
                                     <SnoozeDropdown
-                                      onSnooze={(iso) => snoozeNotification(n.id, iso)}
+                                      disabled={actionPending}
+                                      onSnooze={(iso) => { void snoozeNotification(n.id, iso); }}
                                       onClose={() => setSnoozeOpenId(null)}
                                     />
                                   )}
@@ -544,7 +650,7 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
                               {isConfirmingDelete ? (
                                 <div className="flex items-center gap-1.5">
                                   <span className="text-xs text-slate-500 whitespace-nowrap">Delete?</span>
-                                  <button onClick={() => deleteNotification(n.id)} disabled={isDeleting}
+                                  <button onClick={() => { void deleteNotification(n.id); }} disabled={actionPending}
                                     className="px-2.5 py-1.5 bg-red-500 text-white text-xs font-medium rounded-lg hover:bg-red-600 disabled:opacity-60 whitespace-nowrap cursor-pointer flex items-center gap-1">
                                     {isDeleting ? <i className="ri-loader-4-line animate-spin text-xs"></i> : <i className="ri-check-line text-xs"></i>}
                                     Yes
@@ -555,7 +661,7 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
                                   </button>
                                 </div>
                               ) : (
-                                <button onClick={() => setConfirmDeleteId(n.id)}
+                                <button onClick={() => setConfirmDeleteId(n.id)} disabled={actionPending}
                                   className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                                   title="Delete notification">
                                   <i className="ri-delete-bin-line text-sm"></i>
@@ -574,17 +680,17 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2 mt-8">
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              <button onClick={() => setPage(Math.max(1, visiblePage - 1))} disabled={visiblePage === 1 || actionPending}
                 className="w-9 h-9 flex items-center justify-center rounded-lg border border-[#1e2d4d] text-slate-400 hover:bg-[#162036] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
                 <i className="ri-arrow-left-s-line text-lg"></i>
               </button>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                <button key={p} onClick={() => setPage(p)}
-                  className={`w-9 h-9 flex items-center justify-center rounded-lg text-sm font-medium cursor-pointer transition-colors ${page === p ? 'bg-teal-500 text-white' : 'border border-[#1e2d4d] text-slate-400 hover:bg-[#162036]'}`}>
+                <button key={p} onClick={() => setPage(p)} disabled={actionPending}
+                  className={`w-9 h-9 flex items-center justify-center rounded-lg text-sm font-medium cursor-pointer transition-colors ${visiblePage === p ? 'bg-teal-500 text-white' : 'border border-[#1e2d4d] text-slate-400 hover:bg-[#162036]'}`}>
                   {p}
                 </button>
               ))}
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              <button onClick={() => setPage(Math.min(totalPages, visiblePage + 1))} disabled={visiblePage === totalPages || actionPending}
                 className="w-9 h-9 flex items-center justify-center rounded-lg border border-[#1e2d4d] text-slate-400 hover:bg-[#162036] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
                 <i className="ri-arrow-right-s-line text-lg"></i>
               </button>
