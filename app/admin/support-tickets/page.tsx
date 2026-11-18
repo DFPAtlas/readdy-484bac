@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { loadAdminSupportInbox } from '@/lib/support-inbox-reads';
+import { updateAdminSupportTicket } from '@/lib/admin-support-ticket-writes';
 import Link from 'next/link';
 
 interface SupportTicket {
@@ -61,6 +62,16 @@ export default function AdminSupportTicketsPage() {
 
   const mountedRef = useRef(false);
   const requestRef = useRef(0);
+  const savingRef = useRef(false);
+  const lifetimeRef = useRef<symbol | null>(null);
+  const editorRef = useRef({ id: null as string | null, version: 0 });
+  const renderedEditor = editorRef.current;
+  const selectTicket = useCallback((ticket: SupportTicket | null) => {
+    editorRef.current = { id: ticket?.id ?? null, version: editorRef.current.version + 1 };
+    setSelected(ticket);
+    setAdminNote(ticket?.admin_notes || '');
+    setToast(null);
+  }, []);
   const fetchTickets = useCallback(async () => {
     if (!mountedRef.current) return;
     const request = ++requestRef.current;
@@ -72,16 +83,19 @@ export default function AdminSupportTicketsPage() {
       setTickets(enriched);
       setLoadError(false);
     } catch {
-      if (current()) { setLoadError(true); setSelected(null); setAdminNote(''); }
+      if (current()) { setLoadError(true); selectTicket(null); }
     } finally {
       if (current()) setLoading(false);
     }
-  }, []);
+  }, [selectTicket]);
 
   useEffect(() => {
     mountedRef.current = true;
+    lifetimeRef.current = Symbol('admin-support');
+    savingRef.current = false;
+    setSaving(false);
     void fetchTickets();
-    return () => { mountedRef.current = false; requestRef.current += 1; };
+    return () => { mountedRef.current = false; lifetimeRef.current = null; requestRef.current += 1; };
   }, [fetchTickets]);
 
   useEffect(() => {
@@ -106,37 +120,49 @@ export default function AdminSupportTicketsPage() {
     if (toast) { const t = setTimeout(() => setToast(null), 4000); return () => clearTimeout(t); }
   }, [toast]);
 
-  const handleSaveNote = async () => {
-    if (!selected || !adminNote.trim()) return;
+  const saveTicketChange = async (
+    ticketId: string,
+    updates: { admin_notes?: string; status?: string; resolved_at?: string; updated_at: string },
+    successMessage: string,
+  ) => {
+    if (!mountedRef.current || loadError || savingRef.current || editorRef.current !== renderedEditor || editorRef.current.id !== ticketId) return;
+    const lifetime = lifetimeRef.current;
+    const editor = editorRef.current;
+    const current = () => mountedRef.current && lifetimeRef.current === lifetime;
+    const currentEditor = () => current() && editorRef.current === editor;
+    savingRef.current = true;
     setSaving(true);
+    setToast(null);
     try {
-      const { error } = await supabase
-        .from('support_tickets')
-        .update({ admin_notes: adminNote, updated_at: new Date().toISOString() })
-        .eq('id', selected.id);
-      if (error) throw error;
-      setToast({ message: 'Notes saved', type: 'success' });
-      setSelected({ ...selected, admin_notes: adminNote });
-      fetchTickets();
-    } catch (err: any) {
-      setToast({ message: err?.message || 'Failed to save notes', type: 'error' });
+      const saved = await updateAdminSupportTicket(supabase, ticketId, updates);
+      if (!current()) return;
+      requestRef.current += 1;
+      setLoading(false);
+      setTickets(previous => previous.map(ticket => ticket.id === saved.id ? { ...ticket, ...saved } : ticket));
+      if (currentEditor()) {
+        setSelected(previous => previous?.id === saved.id ? { ...previous, ...saved } : previous);
+        setToast({ message: successMessage, type: 'success' });
+      }
+    } catch {
+      if (currentEditor()) setToast({ message: 'The ticket update could not be confirmed. Reload the inbox before trying again.', type: 'error' });
     } finally {
-      setSaving(false);
+      if (current()) {
+        savingRef.current = false;
+        setSaving(false);
+      }
     }
   };
 
+  const handleSaveNote = async () => {
+    if (!selected || !adminNote.trim()) return;
+    await saveTicketChange(selected.id, { admin_notes: adminNote, updated_at: new Date().toISOString() }, 'Notes saved');
+  };
+
   const handleChangeStatus = async (ticketId: string, newStatus: string) => {
-    try {
-      const updates: any = { status: newStatus, updated_at: new Date().toISOString() };
-      if (newStatus === 'resolved') updates.resolved_at = new Date().toISOString();
-      const { error } = await supabase.from('support_tickets').update(updates).eq('id', ticketId);
-      if (error) throw error;
-      setToast({ message: `Ticket marked as ${newStatus}`, type: 'success' });
-      if (selected?.id === ticketId) setSelected({ ...selected, status: newStatus });
-      fetchTickets();
-    } catch (err: any) {
-      setToast({ message: err?.message || 'Failed to update status', type: 'error' });
-    }
+    if (selected?.id !== ticketId || selected.status === newStatus) return;
+    const updates: { status: string; updated_at: string; resolved_at?: string } = { status: newStatus, updated_at: new Date().toISOString() };
+    if (newStatus === 'resolved') updates.resolved_at = updates.updated_at;
+    await saveTicketChange(ticketId, updates, `Ticket marked as ${newStatus}`);
   };
 
   const formatDate = (d: string | null) => {
@@ -284,7 +310,7 @@ export default function AdminSupportTicketsPage() {
                   </thead>
                   <tbody className="divide-y divide-[#1a2b4a]">
                     {filtered.map(ticket => (
-                      <tr key={ticket.id} className="hover:bg-[#0a1a2f]/50 transition-colors cursor-pointer" onClick={() => { setSelected(ticket); setAdminNote(ticket.admin_notes || ''); }}>
+                      <tr key={ticket.id} className="hover:bg-[#0a1a2f]/50 transition-colors cursor-pointer" onClick={() => selectTicket(ticket)}>
                         <td className="px-4 py-3">
                           <span className="text-xs font-mono text-slate-400">{ticket.ticket_reference || ticket.id.slice(0, 8).toUpperCase()}</span>
                         </td>
@@ -336,14 +362,14 @@ export default function AdminSupportTicketsPage() {
       </div>
 
       {selected && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelected(null)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => selectTicket(null)}>
           <div className="bg-[#111d35] rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-xl border border-[#1a2b4a]" onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 bg-[#111d35] border-b border-[#1a2b4a] px-6 py-4 flex items-center justify-between z-10">
               <div>
                 <h2 className="text-lg font-bold text-white">{selected.subject}</h2>
                 <p className="text-xs text-slate-400">{selected.ticket_reference || selected.id.slice(0, 8)}</p>
               </div>
-              <button onClick={() => setSelected(null)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-[#1a2b4a] text-slate-400">
+              <button onClick={() => selectTicket(null)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-[#1a2b4a] text-slate-400">
                 <i className="ri-close-line text-xl"></i>
               </button>
             </div>
@@ -382,7 +408,7 @@ export default function AdminSupportTicketsPage() {
                 <textarea value={adminNote} onChange={(e) => setAdminNote(e.target.value)} maxLength={500} className="w-full px-4 py-3 rounded-xl border border-[#1a2b4a] focus:ring-2 focus:ring-teal-500 focus:border-transparent text-sm resize-none h-24 bg-[#0a1628] text-white placeholder-slate-500" placeholder="Add internal notes..." />
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-xs text-slate-400">{adminNote.length}/500</span>
-                  <button onClick={handleSaveNote} disabled={saving || !adminNote.trim()} className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-500 disabled:opacity-50 whitespace-nowrap transition-colors">{saving ? 'Saving...' : 'Save Notes'}</button>
+                  <button onClick={handleSaveNote} disabled={saving || loadError || !adminNote.trim()} className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-500 disabled:opacity-50 whitespace-nowrap transition-colors">{saving ? 'Saving...' : 'Save Notes'}</button>
                 </div>
               </div>
 
@@ -390,14 +416,14 @@ export default function AdminSupportTicketsPage() {
                 <p className="text-xs font-bold text-slate-400 uppercase mb-2">Update Status</p>
                 <div className="flex flex-wrap gap-2">
                   {['open', 'pending', 'in_progress', 'resolved', 'closed'].map(s => (
-                    <button key={s} onClick={() => handleChangeStatus(selected.id, s)} disabled={selected.status === s} className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+                    <button key={s} onClick={() => handleChangeStatus(selected.id, s)} disabled={saving || loadError || selected.status === s} className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
                         selected.status === s ? 'bg-[#1a2b4a] text-slate-500 cursor-default' : 'bg-[#1a2b4a] text-slate-400 hover:bg-[#1e2d4d] hover:text-white'
                       }`}>{s.replace(/_/g, ' ')}</button>
                   ))}
                 </div>
               </div>
 
-              <button onClick={() => setSelected(null)} className="w-full py-3 bg-[#1a2b4a] text-slate-400 rounded-xl font-semibold hover:bg-[#1e2d4d] hover:text-white transition-colors whitespace-nowrap">Close</button>
+              <button onClick={() => selectTicket(null)} className="w-full py-3 bg-[#1a2b4a] text-slate-400 rounded-xl font-semibold hover:bg-[#1e2d4d] hover:text-white transition-colors whitespace-nowrap">Close</button>
             </div>
           </div>
         </div>
