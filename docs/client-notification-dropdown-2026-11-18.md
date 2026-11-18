@@ -14,7 +14,7 @@ A shared synchronous action lock blocks overlapping requests. Account-specific l
 
 Eleven new dropdown tests cover returned/thrown/malformed loads and retry; true empty results and query scopes; failed single/mark-all actions; duplicate clicks; partial/zero-row acknowledgements; notifications arriving during writes; action navigation and cancellation after closing the panel; account changes; unmounts; and rendered alerts/disabled controls. The targeted set also includes the twelve existing inbox tests and three notification/template dependency tests (26 targeted tests in total).
 
-Final full-suite, TypeScript, lint, admin/financial gate and production build results will be recorded before review. Automated failures use mocks. The production build uses the loopback Supabase placeholder from PR #164.
+All 455 local unit tests passed, including the eleven new dropdown tests. The 26-test targeted and related set, TypeScript, repository lint, the admin/financial gate and the final production build also passed (212 static pages). Targeted lint has no warnings; the eight existing blog image warnings remain in the repository/build output. Automated failures use mocks. The production build uses the loopback Supabase placeholder from PR #164. GitHub checks remain the merge gate; live signed-in checks are still required after publication.
 
 ## Deployment and signed-in checks
 
