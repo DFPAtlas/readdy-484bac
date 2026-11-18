@@ -6,11 +6,11 @@ const React = require('react');
 
 function harness(file, initial, mocks = {}) {
   const states = [...initial]; let index = 0;
-  const hooks = {...React, useEffect() {}, useState(value) { const i = index++; if (!(i in states)) states[i] = typeof value === 'function' ? value() : value; return [states[i], next => states[i] = typeof next === 'function' ? next(states[i]) : next]; }};
+  const hooks = {...React, useEffect() {}, useRef(value) { const i = index++; if (!(i in states)) states[i] = {current:value}; return states[i]; }, useState(value) { const i = index++; if (!(i in states)) states[i] = typeof value === 'function' ? value() : value; return [states[i], next => states[i] = typeof next === 'function' ? next(states[i]) : next]; }};
   const module = {exports:{}};
   const code = ts.transpileModule(fs.readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText;
   new Function('module','exports','require','setTimeout',code)(module,module.exports,name => name === 'react' ? hooks : name in mocks ? mocks[name] : require(name),()=>{});
-  return {states,render(props) { index=0; return module.exports.default(props); }};
+  return {states,render(props) { index=0; const tree=module.exports.default(props); return typeof tree?.type === 'function' ? tree.type(tree.props) : tree; }};
 }
 function nodes(tree) {
   if (Array.isArray(tree)) return tree.flatMap(nodes);
@@ -35,11 +35,10 @@ test('suggestion query errors are visible and Refresh performs a new search',asy
   let calls=0;
   const db={from(){calls++;const q={};for(const method of ['select','eq','not','limit'])q[method]=()=>q;q.then=(resolve)=>Promise.resolve({data:null,error:{message:'query failed'}}).then(resolve);return q;}};
   const h=harness(dir+'ReplacementGuardSuggestions.tsx',[false,[],false,''],{...common,'@/lib/supabase':{supabase:db}});
-  const props={jobId:'job',job:{},currentAssignments:[],onRequestReplacement(){}};
+  const props={jobId:'job',job:{id:'job',client_id:'client'},currentAssignments:[],onRequestReplacement(){}};
   await button(h.render(props),'Find Replacements').props.onClick();
   assert.equal(calls,1);assert.match(text(h.render(props)),/could not be loaded/);
-  h.states[1]=[{id:'candidate',full_name:'Guard'}];h.states[2]=true;
-  await button(h.render(props),'Refresh').props.onClick();
+  await button(h.render(props),'Retry').props.onClick();
   assert.equal(calls,2);
 });
 

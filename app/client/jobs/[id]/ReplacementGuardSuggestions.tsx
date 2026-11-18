@@ -2,7 +2,7 @@
 
 import QuickGuardImage from '@/components/QuickGuardImage';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
@@ -31,7 +31,17 @@ interface ReplacementGuardSuggestionsProps {
   onRequestMore?: () => void;
 }
 
-export default function ReplacementGuardSuggestions({
+export default function ReplacementGuardSuggestions(props: ReplacementGuardSuggestionsProps) {
+  // Changing the search context retires its state and pending requests together.
+  const context = JSON.stringify([
+    props.jobId, props.job?.id, props.job?.client_id,
+    props.job?.required_license_type || props.job?.required_licence_types?.[0],
+    props.currentAssignments.map(a => a.guard_id || a.guards?.id).filter(Boolean).sort(),
+  ]);
+  return <ReplacementSuggestions key={context} {...props} />;
+}
+
+function ReplacementSuggestions({
   jobId,
   job,
   currentAssignments,
@@ -42,22 +52,39 @@ export default function ReplacementGuardSuggestions({
   const [suggestions, setSuggestions] = useState<Guard[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
+  const active = useRef(true);
+  const requestSequence = useRef(0);
+
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+      requestSequence.current += 1;
+    };
+  }, []);
 
   const loadSuggestions = async () => {
+    if (!active.current) return;
+    const request = ++requestSequence.current;
+    const isCurrent = () => active.current && request === requestSequence.current;
     setLoading(true);
     setError('');
+    setLoaded(false);
+    setSuggestions([]);
     try {
-      const guards = await fetchSuggestions();
+      if (!jobId || !job?.client_id || job.id !== jobId) throw new Error('Missing job context');
+      const guards = await fetchSuggestions(isCurrent);
+      if (!isCurrent()) return;
       setSuggestions(guards);
       setLoaded(true);
     } catch {
-      setError('Replacement suggestions could not be loaded. Please try again.');
+      if (isCurrent()) setError('Replacement suggestions could not be loaded. Please try again.');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
 
-  const fetchSuggestions = async (): Promise<Guard[]> => {
+  const fetchSuggestions = async (isCurrent: () => boolean): Promise<Guard[]> => {
     const results: Guard[] = [];
     const currentGuardIds = currentAssignments.map(a => a.guard_id || a.guards?.id).filter(Boolean);
     const requiredLicenceType = job?.required_license_type || job?.required_licence_types?.[0];
@@ -70,15 +97,17 @@ export default function ReplacementGuardSuggestions({
       .not('guard_id', 'in', `(${currentGuardIds.join(',') || '00000000-0000-0000-0000-000000000000'})`)
       .limit(3);
 
-    if (applicantsError) throw applicantsError;
-    const applicantIds = (applicants || []).map((a: any) => a.guard_id).filter(Boolean);
+    if (!isCurrent()) return [];
+    if (applicantsError || !Array.isArray(applicants)) throw applicantsError || new Error('Invalid applicants');
+    const applicantIds = applicants.map((a: any) => a.guard_id).filter(Boolean);
     if (applicantIds.length > 0) {
       const { data: applicantProfiles, error: profilesError } = await supabase
         .from('guard_public_profiles')
         .select('id, full_name, profile_photo_url:profile_image_url, sia_verified, average_rating:rating, total_reviews, total_jobs_completed, years_experience, location')
         .in('id', applicantIds);
-      if (profilesError) throw profilesError;
-      (applicantProfiles || []).forEach((g: any) => {
+      if (!isCurrent()) return [];
+      if (profilesError || !Array.isArray(applicantProfiles)) throw profilesError || new Error('Invalid profiles');
+      applicantProfiles.forEach((g: any) => {
         if (!results.find(r => r.id === g.id)) {
           results.push({ ...g, reason: 'Applied to this job', availability: 'Availability to confirm' });
         }
@@ -92,8 +121,9 @@ export default function ReplacementGuardSuggestions({
       .eq('job_id', jobId)
       .limit(5);
 
-    if (pastError) throw pastError;
-    const siteGuardIds = (pastAssignments || []).map((a: any) => a.guard_id).filter(Boolean);
+    if (!isCurrent()) return [];
+    if (pastError || !Array.isArray(pastAssignments)) throw pastError || new Error('Invalid assignments');
+    const siteGuardIds = pastAssignments.map((a: any) => a.guard_id).filter(Boolean);
     if (siteGuardIds.length > 0) {
       const { data: otherSiteJobs, error: jobsError } = await supabase
         .from('jobs')
@@ -102,8 +132,9 @@ export default function ReplacementGuardSuggestions({
         .neq('id', jobId)
         .limit(10);
 
-      if (jobsError) throw jobsError;
-      if (otherSiteJobs && otherSiteJobs.length > 0) {
+      if (!isCurrent()) return [];
+      if (jobsError || !Array.isArray(otherSiteJobs)) throw jobsError || new Error('Invalid jobs');
+      if (otherSiteJobs.length > 0) {
         const { data: otherAssignments, error: assignmentsError } = await supabase
           .from('job_assignments')
           .select('guard_id')
@@ -111,16 +142,18 @@ export default function ReplacementGuardSuggestions({
           .not('guard_id', 'in', `(${currentGuardIds.join(',') || '00000000-0000-0000-0000-000000000000'})`)
           .limit(10);
 
-        if (assignmentsError) throw assignmentsError;
-        const historicalGuardIds = [...new Set((otherAssignments || []).map((a: any) => a.guard_id).filter(Boolean))].slice(0, 3);
+        if (!isCurrent()) return [];
+        if (assignmentsError || !Array.isArray(otherAssignments)) throw assignmentsError || new Error('Invalid historical assignments');
+        const historicalGuardIds = [...new Set(otherAssignments.map((a: any) => a.guard_id).filter(Boolean))].slice(0, 3);
         if (historicalGuardIds.length > 0) {
           const { data: historicalProfiles, error: profilesError } = await supabase
             .from('guard_public_profiles')
             .select('id, full_name, profile_photo_url:profile_image_url, sia_verified, average_rating:rating, total_reviews, total_jobs_completed, years_experience, location')
             .in('id', historicalGuardIds);
 
-          if (profilesError) throw profilesError;
-          (historicalProfiles || []).forEach((g: any) => {
+          if (!isCurrent()) return [];
+          if (profilesError || !Array.isArray(historicalProfiles)) throw profilesError || new Error('Invalid historical profiles');
+          historicalProfiles.forEach((g: any) => {
             if (!results.find(r => r.id === g.id)) {
               results.push({
                 ...g,
@@ -147,8 +180,9 @@ export default function ReplacementGuardSuggestions({
     }
 
     const { data: nearbyGuards, error: nearbyError } = await query;
-    if (nearbyError) throw nearbyError;
-    (nearbyGuards || []).forEach((g: any) => {
+    if (!isCurrent()) return [];
+    if (nearbyError || !Array.isArray(nearbyGuards)) throw nearbyError || new Error('Invalid verified profiles');
+    nearbyGuards.forEach((g: any) => {
       if (!results.find(r => r.id === g.id)) {
         results.push({
           ...g,
@@ -179,7 +213,7 @@ export default function ReplacementGuardSuggestions({
             ) : (
               <i className="ri-search-line"></i>
             )}
-            {loading ? 'Searching…' : 'Find Replacements'}
+            {loading ? 'Searching…' : error ? 'Retry' : 'Find Replacements'}
           </button>
         </div>
         <div className="bg-[#162036] rounded-xl border border-[#1e2d4d] p-8 text-center">
@@ -187,7 +221,7 @@ export default function ReplacementGuardSuggestions({
             <i className="ri-user-search-line text-2xl text-slate-600"></i>
           </div>
           {error && <p role="alert" className="text-sm text-red-400 mb-3">{error}</p>}
-          <p className="text-sm text-slate-500">Click &quot;Find Replacements&quot; to see available guards</p>
+          <p className="text-sm text-slate-500">Search for guards to consider. Availability still needs confirmation.</p>
         </div>
       </div>
     );
@@ -201,6 +235,9 @@ export default function ReplacementGuardSuggestions({
             <i className="ri-user-search-line text-violet-400 text-lg"></i>
             Suggested Replacements
           </h3>
+          <button onClick={loadSuggestions} disabled={loading} className="text-xs font-semibold text-violet-400 hover:text-violet-300 cursor-pointer whitespace-nowrap">
+            <i className="ri-refresh-line"></i> Refresh
+          </button>
         </div>
         <div className="bg-[#162036] rounded-xl border border-[#1e2d4d] p-8 text-center">
           <div className="w-12 h-12 bg-[#111d35] rounded-xl flex items-center justify-center mx-auto mb-3">
