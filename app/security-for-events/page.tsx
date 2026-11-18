@@ -1,3 +1,4 @@
+import { OVERRUN_GUIDANCE } from '@/lib/customer-guidance';
 import UseCasePage from '@/components/UseCasePage';
 import type { Metadata } from 'next';
 import UseCaseSchema from '../security-for-building-sites/UseCaseSchema';
@@ -49,12 +50,9 @@ const data = {
     { q: 'How many guards do I need for my event?', a: 'As a rough guide: 1 guard per 75 guests for low-key events, 1 per 50 for parties with alcohol, and 1 per 25 for festivals or large public events. You can also ask guards to advise when they apply.' },
     { q: 'Can guards manage guest lists and door entry?', a: 'Yes. Many event guards have experience running guest lists, checking invites, wristband distribution, and managing VIP entry. Mention this in your job description.' },
     { q: 'Do you provide guards for festivals and public events?', a: 'Yes. QuickGuard covers everything from intimate private parties to multi-day festivals. Post the event details and multiple guards can apply as a team.' },
-    { q: 'What if the event runs late?', a: 'Guards are paid by the hour. If the event overruns, discuss directly with the guard. QuickGuard supports fair overtime practices.' },
+    { q: 'What if the event runs late?', a: OVERRUN_GUIDANCE },
     { q: 'Can I book the same guards for my annual event?', a: 'Absolutely. Save guard profiles and re-invite them for next year. Many event organisers build a trusted team this way.' },
   ],
-  testimonialQuote: 'We organise a summer garden party for 200 guests every year. Last year we paid an agency £3,200 for two security staff. This year through QuickGuard we paid £1,450 for the same coverage with guards we actually chose and trust. Never going back.',
-  testimonialAuthor: 'Sophie L.',
-  testimonialVenue: 'Event Organiser, Surrey',
 };
 
 export default function EventSecurityPage() {

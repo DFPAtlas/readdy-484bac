@@ -523,7 +523,7 @@ export default function GuardGuidePage() {
                 </div>
               </div>
               <h2 className="text-3xl font-extrabold text-white mb-3">Ready to Start Finding Security Work?</h2>
-              <p className="text-slate-400 text-lg mb-8 max-w-xl mx-auto">Join thousands of SIA-licensed guards who trust QuickGuard to find reliable, well-paid security jobs across the UK.</p>
+              <p className="text-slate-400 text-lg mb-8 max-w-xl mx-auto">Create your guard profile and explore security jobs across the UK with QuickGuard.</p>
               <div className="flex flex-wrap gap-4 justify-center">
                 <Link
                   href="/guard/register"

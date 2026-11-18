@@ -1,5 +1,7 @@
 'use client';
 
+import { REWARDS_REDEMPTION_NOTICE } from '@/lib/customer-guidance';
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -96,7 +98,7 @@ export default function ClientRewardsPage() {
   const shareEmail = () => {
     const link = `${window.location.origin}/qg-launch-rewards?ref=${referralCode}`;
     const subject = encodeURIComponent('Join QuickGuard — QG Launch Rewards');
-    const body = encodeURIComponent(`Hi! I'm using QuickGuard for security staffing and thought you'd be interested. Create a verified guard or client profile and we both earn QG Tokens (discount credits that reduce your platform costs).\n\n${link}\n\n100 QG Tokens = £10 QuickGuard credit. Reduce your subscription and job posting costs.`);
+    const body = encodeURIComponent(`Hi! I'm using QuickGuard for security staffing and thought you'd be interested. Create a verified guard or client profile and we both earn QG Tokens (credits towards planned platform discounts).\n\n${link}\n\n100 QG Tokens = £10 QuickGuard credit. Checkout redemption is planned and is not available yet.`);
     window.open(`mailto:?subject=${subject}&body=${body}`);
   };
 
@@ -170,7 +172,8 @@ export default function ClientRewardsPage() {
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-bold">QG Rewards</h1>
-            <p className="text-slate-400 text-sm mt-1">Refer businesses and guards — reduce your platform costs</p>
+              <p role="status" className="my-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-200">{REWARDS_REDEMPTION_NOTICE}</p>
+            <p className="text-slate-400 text-sm mt-1">Refer businesses and guards — earn credits towards planned discounts</p>
           </div>
           <Link href="/client/dashboard" className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors text-sm whitespace-nowrap cursor-pointer">
             <div className="w-4 h-4 flex items-center justify-center"><i className="ri-arrow-left-line"></i></div>
@@ -253,7 +256,7 @@ export default function ClientRewardsPage() {
                       {preAccountData.pre_account_status === 'linked' && (
                         <p className="flex items-center gap-1 text-amber-400 text-xs self-end pb-2">
                           <div className="w-3.5 h-3.5 flex items-center justify-center"><i className="ri-information-line"></i></div>
-                          These tokens will become usable after your QuickGuard account is verified.
+                          Eligible tokens can be linked after account verification. Checkout redemption is planned and is not available yet.
                         </p>
                       )}
                     </div>
@@ -286,7 +289,7 @@ export default function ClientRewardsPage() {
 
             <div className="bg-[#111d35] border border-[#1a2b4a] rounded-2xl p-6 mb-6">
               <h3 className="text-lg font-bold text-white mb-3">How to use your QG Tokens</h3>
-              <p className="text-slate-400 text-sm mb-4">Invite businesses that need security or guards you trust. QG Tokens activate after verified account creation. Use them to reduce subscription costs, job posting fees, and future QuickGuard platform credits.</p>
+              <p className="text-slate-400 text-sm mb-4">Invite businesses that need security or guards you trust. QG Tokens activate after verified account creation. Redemption is planned and is not available at checkout yet.</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="bg-[#0B1933] rounded-xl p-4 border border-[#1a2b4a]">
                   <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/10 mb-2"><i className="ri-store-2-line text-teal-400"></i></div>
@@ -301,7 +304,7 @@ export default function ClientRewardsPage() {
                 <div className="bg-[#0B1933] rounded-xl p-4 border border-[#1a2b4a]">
                   <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/10 mb-2"><i className="ri-discount-percent-line text-teal-400"></i></div>
                   <p className="text-white text-sm font-semibold">Reduce Costs</p>
-                  <p className="text-slate-500 text-xs mt-1">Use tokens as discount credits on your subscription and job postings.</p>
+                  <p className="text-slate-500 text-xs mt-1">Keep track of eligible rewards. Checkout redemption is planned and is not available yet.</p>
                 </div>
               </div>
             </div>
@@ -567,9 +570,9 @@ export default function ClientRewardsPage() {
             {redemptions.length === 0 ? (
               <div className="bg-[#111d35] border border-[#1a2b4a] rounded-2xl p-12 text-center">
                 <div className="w-12 h-12 flex items-center justify-center mx-auto rounded-full bg-teal-500/10 mb-4"><i className="ri-coupon-line text-teal-400 text-xl"></i></div>
-                <p className="text-slate-400">No redemptions yet. Use your tokens when subscribing or paying for QuickGuard services.</p>
-                <Link href="/client/payment-centre" className="mt-4 inline-block px-6 py-3 bg-teal-500 text-slate-900 font-bold rounded-xl hover:bg-teal-400 transition-all text-sm whitespace-nowrap cursor-pointer">
-                  Use Tokens Now
+                <p className="text-slate-400">Checkout redemption is not available yet. Eligible recorded rewards will remain visible here.</p>
+                <Link href="/qg-launch-rewards/terms" className="mt-4 inline-block px-6 py-3 bg-teal-500 text-slate-900 font-bold rounded-xl hover:bg-teal-400 transition-all text-sm whitespace-nowrap cursor-pointer">
+                  View programme terms
                 </Link>
               </div>
             ) : (

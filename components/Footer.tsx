@@ -1,3 +1,4 @@
+import { HUMAN_SUPPORT_HOURS } from '@/lib/customer-guidance';
 import Link from 'next/link';
 import CookieSettingsButton from '@/components/CookieSettingsButton';
 import FooterExitPopupTestIcon from '@/components/qg-rewards/FooterExitPopupTestIcon';
@@ -330,8 +331,8 @@ export default function Footer() {
               <li className="text-slate-400 text-sm flex items-start gap-2">
                 <i className="ri-time-line text-lg mt-0.5 text-teal-400" aria-hidden="true"></i>
                 <div>
-                  <p>Mon-Fri: 9:00 AM - 6:00 PM</p>
-                  <p>Sat-Sun: 10:00 AM - 4:00 PM</p>
+                  <p>{HUMAN_SUPPORT_HOURS}</p>
+                  <p>AI support available 24/7</p>
                 </div>
               </li>
             </ul>

@@ -87,14 +87,14 @@ export default function QGLaunchRewardsTermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-white mb-3">7. Token Redemption</h2>
             <div className="space-y-2 text-sm text-slate-400 leading-relaxed">
-              <p>Tokens can be used to reduce costs on:</p>
+              <p>Redemption is planned, not available at checkout yet. Proposed eligible charges include:</p>
               <ul className="list-disc pl-5 space-y-1.5">
                 <li>QuickGuard subscription plans.</li>
                 <li>Job posting fees.</li>
                 <li>Profile boosts and featured listings.</li>
                 <li>Future QuickGuard platform credits.</li>
               </ul>
-              <p>The maximum discount per transaction is capped (typically 50% of the invoice). The final redemption value is calculated securely by QuickGuard at checkout. Tokens already converted to credit at checkout are final and cannot be reversed unless the transaction is refunded according to standard QuickGuard refund policies.</p>
+              <p>We will publish eligible charges, conversion rates, transaction limits and refund handling before redemption opens. Current subscription and booking payments use their normal prices; recorded tokens do not automatically discount them.</p>
             </div>
           </section>
 
