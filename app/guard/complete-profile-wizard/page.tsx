@@ -859,7 +859,7 @@ function GuardCompleteProfileWizardContent() {
                     </div>
                     <div>
                       <h4 className="font-semibold text-white mb-1">Get Hired Faster</h4>
-                      <p className="text-sm text-slate-400">Complete profiles get 3x more job offers</p>
+                      <p className="text-sm text-slate-400">Complete profiles help clients assess your experience and suitability</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">

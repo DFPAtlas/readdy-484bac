@@ -1,5 +1,7 @@
 'use client';
 
+import { CANCELLATION_GUIDANCE, GUARD_CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
+
 import QuickGuardImage from '@/components/QuickGuardImage';
 
 import { useState } from 'react';
@@ -18,7 +20,7 @@ const faqs = [
   { question: 'How do I get started as a Guard?', answer: 'Register as a guard, upload your SIA licence, and complete your profile. Once verified, you can browse available jobs and submit applications directly through the platform.', icon: 'ri-shield-user-line' },
   { question: 'Is SIA licence verification required?', answer: 'Yes. All security guards must hold a valid SIA licence. Every guard must pass an initial SIA licence check before they can take work through QuickGuard. We are also developing an AI agent to re-check licence status weekly and flag suspended, revoked or expired licences for review.', icon: 'ri-verified-badge-line' },
   { question: 'How does payment work?', answer: 'Clients review the agreed guard pay, plan service fee and any eligible promotion, then pay securely via Stripe before the booking is confirmed. Funds are held with Stripe and released to the guard after completion and the applicable release checks. All transactions are encrypted and processed through our secure platform.', icon: 'ri-secure-payment-line' },
-  { question: 'Can I cancel or edit a job after posting?', answer: "Yes. You can cancel a job from My Jobs until the guard's payout has started. Refunds follow our published cancellation policy: more than 24 hours before the shift, a full refund including the service fee; 12\u201324 hours before, a 50% refund of the guard fee (the service fee is retained); under 12 hours, no refund. If a guard cancels, you receive a full refund including the service fee. Refund requests are reviewed by our team. To change job details once a guard is booked, contact support.", icon: 'ri-edit-2-line' },
+  { question: 'Can I cancel or edit a job after posting?', answer: `${CANCELLATION_GUIDANCE} ${GUARD_CANCELLATION_GUIDANCE} ${REFUND_TIMING_GUIDANCE} To change a booked job, contact support.`, icon: 'ri-edit-2-line' },
   { question: 'How long does guard verification take?', answer: 'Verification timing can vary depending on the licence check and whether manual review is required. You will receive an email notification once your profile has been reviewed and approved.', icon: 'ri-time-line' },
   { question: 'What subscription plans are available?', answer: 'We offer flexible plans for clients of all sizes. Visit our Pricing page to compare features and choose the plan that best suits your business needs.', icon: 'ri-price-tag-3-line' },
   { question: 'How do I raise a complaint?', answer: 'You can submit a complaint directly from your job detail page. Our team reviews all complaints promptly and will keep you updated on the resolution progress.', icon: 'ri-feedback-line' },
@@ -235,7 +237,7 @@ function CancellationSection() {
   return (
     <div className="mb-16">
       <p className="text-xs font-bold uppercase tracking-[0.2em] mb-3 text-teal-400">Cancelling a booking</p>
-      <h2 className="text-2xl md:text-3xl font-bold text-white mb-8">The earlier you cancel, the more you get back</h2>
+      <h2 className="text-2xl md:text-3xl font-bold text-white mb-8">Cancellation and refund review</h2>
 
       <div className="flex flex-col md:flex-row rounded-2xl overflow-hidden border border-slate-700/50">
         {CANCELLATION_WINDOWS.map((w) => {

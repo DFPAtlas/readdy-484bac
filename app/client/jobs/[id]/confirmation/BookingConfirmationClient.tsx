@@ -1,5 +1,7 @@
 'use client';
 
+import { CANCELLATION_ACKNOWLEDGEMENT } from '@/lib/customer-guidance';
+
 import QuickGuardImage from '@/components/QuickGuardImage';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -674,7 +676,7 @@ export default function BookingConfirmationClient({ jobId }: { jobId: string }) 
                     <div>
                       <p className="text-sm font-semibold text-slate-200">Cancellation & Refund Terms</p>
                       <p className="text-xs text-slate-500 mt-1">
-                        I understand the cancellation policy: cancellations within 24 hours may incur a fee. Full refunds are available for cancellations made 48+ hours before the shift start.
+                        {CANCELLATION_ACKNOWLEDGEMENT}
                         {/* TODO: Link to formal cancellation policy when available */}
                       </p>
                     </div>
