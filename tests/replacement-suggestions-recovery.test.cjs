@@ -115,3 +115,39 @@ test('search identity resets for job, client, licence or assigned-guard changes,
   const a=h.key({...props,currentAssignments:[{guard_id:'a'},{guard_id:'b'}]});
   assert.equal(h.key({...props,currentAssignments:[{guard_id:'b'},{guard_id:'a'}]}),a);
 });
+
+test('details disclose the selected candidate in place, toggle correctly and keep request guard tied to that candidate',async()=>{
+  const chosen=[];
+  const context={...props,onRequestReplacement:(...args)=>chosen.push(args)};
+  const h=harness(async call=>({data:call.table==='guard_public_profiles'?[
+    {...guard('Alice'),location:'Watford',years_experience:4,total_jobs_completed:12,total_reviews:3,average_rating:4.5,sia_verified:true,phone:'private-phone',user_id:'private-user'},
+    {...guard('Beth'),location:'Stevenage',years_experience:2,total_jobs_completed:6},
+  ]:[]}));
+  await button(h.render(context),'Find Replacements').props.onClick();const queries=h.calls.length;
+  button(h.render(context),'View details for Alice').props.onClick();
+  const section=nodes(h.render(context)).find(n=>n.type==='section');assert.match(text(section),/Alice.*Watford.*4 years.*12.*3.*4.5 \/ 5/s);assert.doesNotMatch(text(section),/Stevenage|private-phone|private-user/);
+  const toggle=button(h.render(context),'Hide details for Alice');assert.equal(toggle.props['aria-expanded'],true);assert.equal(toggle.props['aria-controls'],section.props.id);
+  assert.match(renderToStaticMarkup(h.render(context)),/Availability and suitability still need confirmation/);
+  button(h.render(context),'View details for Beth').props.onClick();assert.match(text(nodes(h.render(context)).find(n=>n.type==='section')),/Beth.*Stevenage/s);
+  const beth=nodes(h.render(context)).find(n=>n.type==='section').props.id;
+  const card=nodes(h.render(context)).find(n=>n.type==='div'&&nodes(n).some(child=>child.type==='button'&&child.props['aria-controls']===beth)&&nodes(n).filter(child=>child.type==='button'&&text(child).trim()==='Request guard').length===1);
+  button(card,'Request guard').props.onClick();assert.deepEqual(chosen,[['Beth','Beth']]);assert.equal(h.calls.length,queries);
+  button(h.render(context),'Hide details for Beth').props.onClick();assert.equal(nodes(h.render(context)).some(n=>n.type==='section'),false);
+  assert.equal(nodes(h.render(context)).some(n=>n.type==='a'||n.props?.href?.includes('/applicants')),false);
+});
+
+test('missing profile fields are labelled and legitimate zero values do not become invented experience or ratings',async()=>{
+  const h=harness(async call=>({data:call.table==='guard_public_profiles'?[{...guard('Zero'),total_jobs_completed:0,total_reviews:0,years_experience:0,average_rating:0}]:[]}));
+  await button(h.render(),'Find Replacements').props.onClick();button(h.render(),'View details for Zero').props.onClick();
+  const section=nodes(h.render()).find(n=>n.type==='section');const values=nodes(section).filter(n=>n.type==='dd').map(text);
+  assert.deepEqual(values,['Not provided','0 years','0','0','Not provided','Verification not confirmed','Needs confirmation']);
+  assert.doesNotMatch(renderToStaticMarkup(h.render()),/NaN|undefined|0 reviews|0 yrs exp/);
+});
+
+test('refresh retires open details even when the same candidate returns or the refresh fails',async()=>{
+  let failed=false;const h=harness(async call=>failed?{data:null,error:{message:'offline'}}:{data:call.table==='guard_public_profiles'?[guard('Alice')]:[]});
+  await button(h.render(),'Find Replacements').props.onClick();button(h.render(),'View details for Alice').props.onClick();
+  await button(h.render(),'Refresh').props.onClick();assert.equal(nodes(h.render()).some(n=>n.type==='section'),false);assert.equal(button(h.render(),'View details for Alice').props['aria-expanded'],false);
+  button(h.render(),'View details for Alice').props.onClick();failed=true;await button(h.render(),'Refresh').props.onClick();
+  assert.equal(nodes(h.render()).some(n=>n.type==='section'),false);assert.ok(button(h.render(),'Retry'));
+});

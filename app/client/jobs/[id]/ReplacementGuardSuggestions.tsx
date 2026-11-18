@@ -4,21 +4,17 @@ import QuickGuardImage from '@/components/QuickGuardImage';
 
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import Link from 'next/link';
 
 interface Guard {
   id: string;
   full_name: string;
   profile_photo_url?: string;
-  phone?: string;
-  user_id?: string;
   sia_verified?: boolean;
   average_rating?: number | null;
   total_reviews?: number | null;
   total_jobs_completed?: number | null;
   years_experience?: number | null;
   location?: string | null;
-  distance?: number;
   availability?: string;
   reason?: string;
 }
@@ -62,6 +58,7 @@ function ReplacementSuggestions({
       requestSequence.current += 1;
     };
   }, []);
+  const [expandedGuardId, setExpandedGuardId] = useState<string | null>(null);
 
   const loadSuggestions = async () => {
     if (!active.current) return;
@@ -71,6 +68,7 @@ function ReplacementSuggestions({
     setError('');
     setLoaded(false);
     setSuggestions([]);
+    setExpandedGuardId(null);
     try {
       if (!jobId || !job?.client_id || job.id !== jobId) throw new Error('Missing job context');
       const guards = await fetchSuggestions(isCurrent);
@@ -279,7 +277,7 @@ function ReplacementSuggestions({
         {suggestions.map((guard) => {
           const initials = guard.full_name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || '??';
           return (
-            <div key={guard.id} className="flex items-center gap-3 p-3 bg-[#162036] rounded-xl border border-[#1e2d4d] hover:border-violet-500/30 transition-colors">
+            <div key={guard.id} className="flex flex-wrap items-center gap-3 p-3 bg-[#162036] rounded-xl border border-[#1e2d4d] hover:border-violet-500/30 transition-colors">
               <div className="w-11 h-11 rounded-full bg-[#111d35] flex items-center justify-center flex-shrink-0 overflow-hidden border border-[#1e2d4d]">
                 {guard.profile_photo_url ? (
                   <QuickGuardImage src={guard.profile_photo_url} alt={initials} className="w-full h-full object-cover" />
@@ -298,16 +296,16 @@ function ReplacementSuggestions({
                   )}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
-                  {guard.average_rating && (
+                  {typeof guard.average_rating === 'number' && Number.isFinite(guard.average_rating) && guard.average_rating > 0 && guard.average_rating <= 5 && (
                     <span className="flex items-center gap-0.5">
                       <i className="ri-star-fill text-amber-400"></i>
                       {guard.average_rating.toFixed(1)}
                     </span>
                   )}
-                  {guard.total_reviews && (
+                  {typeof guard.total_reviews === 'number' && Number.isFinite(guard.total_reviews) && guard.total_reviews > 0 && (
                     <span>({guard.total_reviews} reviews)</span>
                   )}
-                  {guard.years_experience && (
+                  {typeof guard.years_experience === 'number' && Number.isFinite(guard.years_experience) && guard.years_experience > 0 && (
                     <span>{guard.years_experience} yrs exp</span>
                   )}
                   {guard.location && (
@@ -335,13 +333,37 @@ function ReplacementSuggestions({
                   <i className="ri-user-add-line"></i>
                   Request guard
                 </button>
-                <Link href={`/client/jobs/applicants?id=${encodeURIComponent(jobId)}`}>
-                  <button className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-slate-300 bg-[#111d35] hover:bg-[#1a2642] px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap w-full">
-                    <i className="ri-eye-line"></i>
-                    View Profile
-                  </button>
-                </Link>
+                <button
+                  onClick={() => setExpandedGuardId(current => current === guard.id ? null : guard.id)}
+                  disabled={loading}
+                  aria-expanded={expandedGuardId === guard.id}
+                  aria-controls={`replacement-guard-details-${guard.id}`}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-slate-300 bg-[#111d35] hover:bg-[#1a2642] px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap w-full"
+                >
+                  <i className="ri-eye-line"></i>
+                  {expandedGuardId === guard.id ? 'Hide details' : 'View details'}
+                  <span className="sr-only"> for {guard.full_name || 'Unknown Guard'}</span>
+                </button>
               </div>
+              {expandedGuardId === guard.id && (
+                <section
+                  id={`replacement-guard-details-${guard.id}`}
+                  aria-label={`Public details for ${guard.full_name || 'Unknown Guard'}`}
+                  className="basis-full border-t border-[#1e2d4d] pt-3"
+                >
+                  <h4 className="text-sm font-semibold text-slate-200 mb-3">{guard.full_name || 'Unknown Guard'} — public details</h4>
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div><dt className="text-slate-500">Location</dt><dd className="text-slate-300">{guard.location || 'Not provided'}</dd></div>
+                    <div><dt className="text-slate-500">Experience</dt><dd className="text-slate-300">{typeof guard.years_experience === 'number' && Number.isFinite(guard.years_experience) && guard.years_experience >= 0 ? `${guard.years_experience} ${guard.years_experience === 1 ? 'year' : 'years'}` : 'Not provided'}</dd></div>
+                    <div><dt className="text-slate-500">Completed jobs</dt><dd className="text-slate-300">{typeof guard.total_jobs_completed === 'number' && Number.isFinite(guard.total_jobs_completed) && guard.total_jobs_completed >= 0 ? guard.total_jobs_completed : 'Not provided'}</dd></div>
+                    <div><dt className="text-slate-500">Reviews</dt><dd className="text-slate-300">{typeof guard.total_reviews === 'number' && Number.isFinite(guard.total_reviews) && guard.total_reviews >= 0 ? guard.total_reviews : 'Not provided'}</dd></div>
+                    <div><dt className="text-slate-500">Rating</dt><dd className="text-slate-300">{typeof guard.average_rating === 'number' && Number.isFinite(guard.average_rating) && guard.average_rating > 0 && guard.average_rating <= 5 ? `${guard.average_rating.toFixed(1)} / 5` : 'Not provided'}</dd></div>
+                    <div><dt className="text-slate-500">SIA verification</dt><dd className="text-slate-300">{guard.sia_verified ? 'Verified in QuickGuard' : 'Verification not confirmed'}</dd></div>
+                    <div><dt className="text-slate-500">Availability</dt><dd className="text-slate-300">Needs confirmation</dd></div>
+                  </dl>
+                  <p className="text-xs text-slate-500 mt-3">These details come from the guard&apos;s public profile. Availability and suitability still need confirmation.</p>
+                </section>
+              )}
             </div>
           );
         })}
