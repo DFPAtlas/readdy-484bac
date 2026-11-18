@@ -46,7 +46,7 @@ export default function CookiePolicy() {
                   <ul className="space-y-2 text-sm">
                     <li><a href="#third-party" className="text-teal-400 hover:text-teal-300">7. Third-Party Cookies</a></li>
                     <li><a href="#push-notifications" className="text-teal-400 hover:text-teal-300">8. Push Notifications</a></li>
-                    <li><a href="#cookie-table" className="text-teal-400 hover:text-teal-300">9. Complete Cookie List</a></li>
+                    <li><a href="#cookie-table" className="text-teal-400 hover:text-teal-300">9. Core Cookie and Browser Storage Inventory</a></li>
                     <li><a href="#manage" className="text-teal-400 hover:text-teal-300">10. Managing Your Preferences</a></li>
                     <li><a href="#browser-controls" className="text-teal-400 hover:text-teal-300">11. Browser Controls</a></li>
                     <li><a href="#changes" className="text-teal-400 hover:text-teal-300">12. Changes to This Policy</a></li>
@@ -149,7 +149,7 @@ export default function CookiePolicy() {
                       icon: 'ri-device-line',
                       title: 'Mobile Installation Reminder',
                       text: 'If you dismiss our mobile app installation prompt, we store this preference so we do not show it again on your current device.',
-                      names: 'pwaPromptDismissed (localStorage key)',
+                      names: 'quickguard_install_dismissed (localStorage key)',
                       duration: 'Persistent (until you clear browser data)',
                       domain: 'Stored locally on your device',
                     },
@@ -195,17 +195,17 @@ export default function CookiePolicy() {
                   {[
                     {
                       icon: 'ri-sun-line',
-                      title: 'Theme & Display Preferences',
-                      text: 'If you switch between light and dark mode, your theme preference is stored locally so the correct theme is applied on your next visit.',
-                      names: 'theme-preference (localStorage key)',
+                      title: 'Navigation Role Preference',
+                      text: 'When you select a guard or client navigation role, the preference is remembered on this device.',
+                      names: 'quickguard_active_role (localStorage key)',
                       duration: 'Persistent (until you clear browser data)',
                       domain: 'Stored locally on your device',
                     },
                     {
                       icon: 'ri-dashboard-line',
                       title: 'Dashboard Layout Preferences',
-                      text: 'If you customise your dashboard layout (such as collapsing or expanding panels, rearranging widgets, or setting default views), these preferences are stored to maintain your personalised layout across sessions.',
-                      names: 'dashboard-layout-prefs (localStorage key)',
+                      text: 'When you collapse or expand the account sidebar, the preference is remembered on this device.',
+                      names: 'portal-sidebar-collapsed (localStorage key)',
                       duration: 'Persistent (until you clear browser data)',
                       domain: 'Stored locally on your device',
                     },
@@ -385,10 +385,10 @@ export default function CookiePolicy() {
 
               <section id="cookie-table">
                 <h2 className="text-2xl font-bold text-white mb-4 border-b border-teal-500/30 pb-2">
-                  9. Complete Cookie List
+                  9. Core Cookie and Browser Storage Inventory
                 </h2>
                 <p className="text-slate-400 mb-4">
-                  The following table lists every cookie and local storage item used on our Platform, along with its purpose, type, duration, and whether it is first-party or third-party.
+                  The following table describes principal cookie and browser-storage groups used by the Platform. Exact provider-managed entries can vary with the services and browser features you use. Account and administration screens may also retain temporary interface state.
                 </p>
 
                 <div className="overflow-x-auto">
@@ -404,13 +404,20 @@ export default function CookiePolicy() {
                     </thead>
                     <tbody>
                       {[
-                        { name: 'sb-*-auth-token', cat: 'Necessary', purpose: 'Supabase authentication session token — keeps you signed in', duration: 'Session', party: 'First-party' },
+                        { name: 'sb-*-auth-token', cat: 'Necessary', purpose: 'Supabase authentication session token — keeps you signed in', duration: 'Retained while signed in; credentials are refreshed and cleared on sign-out', party: 'First-party' },
                         { name: 'sb-*-auth-token-code-verifier', cat: 'Necessary', purpose: 'PKCE code verifier for secure OAuth authentication flow', duration: 'Session', party: 'First-party' },
-                        { name: 'cookieConsent', cat: 'Necessary', purpose: 'Stores your cookie consent preferences (localStorage)', duration: 'Persistent', party: 'First-party' },
-                        { name: 'pwaPromptDismissed', cat: 'Necessary', purpose: 'Remembers if you dismissed the mobile install prompt (localStorage)', duration: 'Persistent', party: 'First-party' },
-                        { name: 'theme-preference', cat: 'Functional', purpose: 'Stores your light/dark theme preference (localStorage)', duration: 'Persistent', party: 'First-party' },
-                        { name: 'dashboard-layout-prefs', cat: 'Functional', purpose: 'Stores customised dashboard panel preferences (localStorage)', duration: 'Persistent', party: 'First-party' },
+                        { name: 'cookieConsent', cat: 'Necessary', purpose: 'Stores your cookie consent preferences (localStorage)', duration: 'Preference is rechecked after 180 days', party: 'First-party' },
+                        { name: 'quickguard_install_dismissed', cat: 'Necessary', purpose: 'Remembers if you dismissed the mobile install prompt (localStorage)', duration: 'Persistent', party: 'First-party' },
+                        { name: 'quickguard_active_role', cat: 'Functional', purpose: 'Remembers the guard/client navigation role you selected (localStorage)', duration: 'Persistent', party: 'First-party' },
+                        { name: 'portal-sidebar-collapsed', cat: 'Functional', purpose: 'Remembers whether the account sidebar is collapsed (localStorage)', duration: 'Persistent', party: 'First-party' },
                         { name: 'QuickGuard AI Support session', cat: 'Necessary', purpose: 'Maintains AI support chat session during support conversations', duration: 'Session', party: 'Third-party (AI support)' },
+                        { name: 'qg_pending_job_draft_v1', cat: 'Necessary', purpose: 'Retains an immediate-booking draft so you can continue after signing in; submitted when you post the job', duration: '24 hours or until cleared/submitted', party: 'First-party' },
+                        { name: 'qg_referral_code', cat: 'Necessary', purpose: 'Preserves an invited referral code for the referral journey and submits it when linking the account', duration: 'Session or persistent until cleared', party: 'First-party' },
+                        { name: 'qg_exit_popup_*', cat: 'Necessary', purpose: 'Remembers launch-popup display and dismissal state', duration: 'Session or configured cooldown', party: 'First-party' },
+                        { name: 'quickguard_push_dismissed_*', cat: 'Necessary', purpose: 'Remembers a dismissed notification-permission prompt', duration: 'Persistent until cleared', party: 'First-party' },
+                        { name: 'guard_wizard_edit', cat: 'Necessary', purpose: 'Retains the requested guard-profile editing flow', duration: 'Until editing state is cleared', party: 'First-party' },
+                        { name: 'qg-admin-sidebar-collapsed / admin_payment_test_timeline', cat: 'Functional', purpose: 'Administrator-only interface preferences and recent test-action history', duration: 'Persistent until cleared', party: 'First-party' },
+                        { name: '_ga / _ga_*', cat: 'Analytics', purpose: 'Google Analytics measurement, loaded only after analytics consent', duration: 'Provider-dependent; consent can be withdrawn', party: 'First-party / Google Analytics' },
                         { name: 'Stripe cookies', cat: 'Necessary', purpose: 'Fraud prevention and secure payment processing', duration: 'Varies', party: 'Third-party (stripe.com)' },
                       ].map((row, i) => (
                         <tr key={i} className={`border-b border-slate-700/50 ${i % 2 === 1 ? 'bg-[#0e1628]/50' : ''}`}>
@@ -431,7 +438,7 @@ export default function CookiePolicy() {
 
                 <div className="bg-teal-500/10 border border-teal-400/20 p-4 rounded-xl mt-4">
                   <p className="text-sm text-slate-400">
-                    <strong className="text-teal-300">Note on localStorage:</strong> Items stored in localStorage are not technically cookies but serve a similar function. They are stored locally on your device and are never transmitted to our servers. Clearing your browser data will remove all localStorage items.
+                    <strong className="text-teal-300">Note on localStorage:</strong> Browser storage is kept on your device, but selected values are used when you request a service: authentication credentials authenticate API calls, referral codes link referrals, and a saved job draft is sent when you post it. Storage contents are not all uploaded automatically. Clearing browser data removes locally stored items and may sign you out or discard an unfinished draft.
                   </p>
                 </div>
               </section>

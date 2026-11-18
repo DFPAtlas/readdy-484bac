@@ -4,7 +4,7 @@ import MobileAppShowcase from './MobileAppShowcase';
 export const metadata: Metadata = {
   title: 'QuickGuard Mobile App | Security Guard Booking On The Go | UK',
   description:
-    'Download the QuickGuard mobile app for iOS and Android. Post jobs, find guards, track shifts, and process payments on the go. SIA-verified security staffing in your pocket.',
+    'Preview proposed QuickGuard mobile interfaces for guards, supervisors and area managers. This design preview is not a downloadable iOS or Android application.',
   keywords:
     'QuickGuard mobile app, security guard app UK, hire security app, security staffing app, guard booking app',
   alternates: {
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'QuickGuard Mobile App | UK Security Guard Booking',
-    description: 'Download the QuickGuard mobile app. Post jobs, find guards, and process payments on the go.',
+    description: 'Explore the QuickGuard mobile design preview. Proposed interfaces are shown for review; this is not an app-store download.',
     url: 'https://quickguard.uk/mobile-app',
     siteName: 'QuickGuard',
     type: 'website',
