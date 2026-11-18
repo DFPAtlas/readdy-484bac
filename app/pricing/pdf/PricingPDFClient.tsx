@@ -3,97 +3,32 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
+import { usePublicPricing } from '@/lib/use-public-pricing';
+import { bookingFeeText, planAllowanceText } from '@/lib/public-pricing';
+import { getFeatureLabel, presentPricingPlan } from '@/lib/pricing-presentation';
+import PlanPrice from '@/components/pricing/PlanPrice';
 
 export default function PricingPDFClient() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
 
-  // Printable snapshot of the configured GBP catalogue. All checkout uses /pricing.
-  const clientPlans = [
-    { name: 'Free', monthlyPrice: 0, annualPrice: 0, description: 'For trying the platform', features: ['1 job posting per month', '15% booking service fee', 'Payment processing included'], cta: 'Get Started' },
-    { name: 'Starter', monthlyPrice: 49, annualPrice: 490, description: 'For regular security needs', features: ['10 job postings per month', '10% booking service fee', 'Payment processing included'], cta: 'View Plans' },
-    { name: 'Pro', monthlyPrice: 99, annualPrice: 990, description: 'For growing businesses', features: ['30 job postings per month', '7.5% booking service fee', 'Payment processing included'], cta: 'View Plans' },
-    { name: 'Enterprise', monthlyPrice: 199, annualPrice: 1990, description: 'For enterprise security needs', features: ['Unlimited job postings', '5% booking service fee', 'Payment processing included'], cta: 'View Plans' },
-  ];
-
-  const guardPlans = [
-    {
-      name: 'Free Starter',
-      price: 0,
-      description: 'For starting your security career',
-      features: [
-        '2 job applications per month',
-        'Access to standard jobs',
-        'Job alerts',
-        'Verified guard profile',
-        'Secure payment processing',
-      ],
-      cta: 'Create Free Account',
-      link: '/guard/register',
-      isFree: true,
-      popular: false,
-    },
-    {
-      name: 'Guard Basic',
-      price: 10,
-      description: 'Perfect for getting started',
-      features: [
-        '10 job applications per month',
-        'Access to standard jobs',
-        'Job alerts',
-        'Verified guard profile',
-        'Secure payment processing',
-      ],
-      cta: 'Get Started',
-      link: '/guard/register',
-      isFree: false,
-      popular: false,
-    },
-    {
-      name: 'Guard Pro',
-      price: 19,
-      description: 'For active security professionals',
-      features: [
-        '25 job applications per month',
-        'Priority profile placement',
-        'Profile boost',
-        'Advanced job alerts',
-        'Performance analytics',
-        'Priority support',
-        'Direct client contact',
-      ],
-      cta: 'Get Started',
-      link: '/guard/register',
-      isFree: false,
-      popular: false,
-    },
-    {
-      name: 'Guard Elite',
-      price: 29,
-      description: 'Full access to all features',
-      features: [
-        'Up to 40 applications per month',
-        'Priority profile placement',
-        'Profile boost',
-        'Advanced job alerts',
-        'Performance analytics',
-        'Priority support',
-        'Direct client contact',
-      ],
-      cta: 'Get Started',
-      link: '/guard/register',
-      isFree: false,
-      popular: true,
-    },
-  ];
-
-  const calculateSavings = (monthly: number, annual: number) => {
-    if (monthly === 0) return 0;
-    const monthlyCost = monthly * 12;
-    return Math.round(((monthlyCost - annual) / monthlyCost) * 100);
-  };
+  const catalogue = usePublicPricing();
+  const clientPlans = catalogue.plans.filter(plan => plan.audience === 'client').map(plan => ({
+    ...presentPricingPlan(plan),
+    features: [planAllowanceText(plan), `${bookingFeeText(plan)} booking service fee`, 'Payment processing included', ...plan.features.map(feature => getFeatureLabel(feature, plan.audience))],
+    cta: plan.monthly_price_pence === 0 ? 'Get Started Free' : 'View Plans',
+  }));
+  const guardPlans = catalogue.plans.filter(plan => plan.audience === 'guard').map(plan => ({
+    ...presentPricingPlan(plan),
+    features: [planAllowanceText(plan), ...plan.features.map(feature => getFeatureLabel(feature, plan.audience))],
+    cta: plan.monthly_price_pence === 0 ? 'Create Free Account' : 'View Plans',
+    link: plan.monthly_price_pence === 0 ? '/guard/register' : '/pricing',
+    isFree: plan.monthly_price_pence === 0,
+  }));
+  const canPrint = !catalogue.loading && !catalogue.error && !catalogue.feesError;
+  const clientFeeSummary = clientPlans.map(plan => `${plan.name}: ${bookingFeeText(plan)}`).join('; ');
 
   const handlePrint = () => {
-    window.print();
+    if (canPrint) window.print();
   };
 
   return (
@@ -133,6 +68,7 @@ export default function PricingPDFClient() {
             </div>
             <button
               onClick={handlePrint}
+            disabled={!canPrint}
               className="inline-flex items-center gap-2 bg-teal-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-teal-700 transition-all whitespace-nowrap cursor-pointer shadow"
             >
               <i className="ri-download-line" />
@@ -147,9 +83,15 @@ export default function PricingPDFClient() {
             <span className="font-[family-name:var(--font-pacifico)] text-3xl text-teal-600">QuickGuard</span>
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">QuickGuard Pricing Guide</h1>
-          <p className="text-slate-500 text-sm">Complete pricing for clients and security guards — updated November 2026</p>
+          <p className="text-slate-500 text-sm">Current catalogue prices for clients and security guards</p>
           <div className="w-24 h-0.5 bg-teal-500 mx-auto mt-4" />
         </div>
+
+        {(catalogue.loading || catalogue.error || catalogue.feesError) && <div role="status" className="mb-8 border border-amber-300 bg-amber-50 rounded-xl p-5 text-amber-900">
+          <p>{catalogue.loading ? 'Loading current plans and fees…' : catalogue.error || 'Current booking fees could not be confirmed. Please retry before printing.'}</p>
+          {!catalogue.loading && <button type="button" onClick={catalogue.retry} className="underline mt-3 print:hidden">Retry pricing</button>}
+        </div>}
+        {catalogue.retrievedAt && <p className="text-xs text-slate-500 mb-6">Catalogue retrieved {new Date(catalogue.retrievedAt).toLocaleString('en-GB')}. Prices and eligible offers are confirmed at checkout.</p>}
 
         {/* Client Plans */}
         <section className="mb-12 print:mb-8">
@@ -165,9 +107,7 @@ export default function PricingPDFClient() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 print:gap-4">
             {clientPlans.map((plan) => {
-              const price = billingCycle === 'monthly' ? plan.monthlyPrice : Math.round(plan.annualPrice / 12);
-              const savings = calculateSavings(plan.monthlyPrice, plan.annualPrice);
-              const isPopular = plan.name === 'Professional';
+              const isPopular = !!plan.badge;
 
               return (
                 <div
@@ -180,23 +120,14 @@ export default function PricingPDFClient() {
                     <h3 className="font-bold text-slate-900">{plan.name}</h3>
                     {isPopular && (
                       <span className="bg-teal-600 text-white text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap">
-                        Popular
+                        {plan.badge}
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mb-4">{plan.description}</p>
 
                   <div className="mb-4 pb-4 border-b border-slate-200">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-3xl font-bold text-slate-900">£{price}</span>
-                      <span className="text-sm text-slate-500">/month</span>
-                    </div>
-                    {billingCycle === 'annual' && savings > 0 && (
-                      <p className="text-xs text-teal-600 font-semibold mt-1">Save {savings}% annually</p>
-                    )}
-                    {billingCycle === 'annual' && price > 0 && (
-                      <p className="text-xs text-slate-400 mt-0.5">Billed £{plan.annualPrice} per year</p>
-                    )}
+                    <PlanPrice plan={plan} billingCycle={billingCycle} print />
                   </div>
 
                   <ul className="space-y-2">
@@ -209,7 +140,7 @@ export default function PricingPDFClient() {
                   </ul>
 
                   <div className="mt-4 print:hidden">
-                    {plan.monthlyPrice === 0 ? (
+                    {plan.monthly_price_pence === 0 ? (
                       <Link
                         href="/client/register"
                         className="w-full py-2.5 rounded-lg font-semibold text-sm transition-all whitespace-nowrap block text-center bg-slate-100 text-slate-900 hover:bg-slate-200"
@@ -226,7 +157,7 @@ export default function PricingPDFClient() {
                         {plan.cta}
                       </a>
                     )}
-                    {plan.monthlyPrice === 0 && (
+                    {plan.monthly_price_pence === 0 && (
                       <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
                         <i className="ri-information-line text-amber-600 text-sm flex-shrink-0 mt-0.5" />
                         <p className="text-xs text-amber-700 leading-relaxed">
@@ -255,7 +186,7 @@ export default function PricingPDFClient() {
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:gap-3">
             {guardPlans.map((plan) => {
-              const isPopular = plan.popular;
+              const isPopular = !!plan.badge;
 
               return (
                 <div
@@ -268,20 +199,14 @@ export default function PricingPDFClient() {
                     <h3 className="font-bold text-slate-900">{plan.name}</h3>
                     {isPopular && (
                       <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap">
-                        Popular
+                        {plan.badge}
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mb-3">{plan.description}</p>
 
                   <div className="mb-3 pb-3 border-b border-slate-200">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-bold text-slate-900">£{plan.price}</span>
-                      <span className="text-xs text-slate-500">/month</span>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {plan.isFree ? 'Free forever — no card needed' : 'Billed monthly · Cancel anytime'}
-                    </p>
+                    <PlanPrice plan={plan} billingCycle={billingCycle} print />
                   </div>
 
                   <ul className="space-y-1.5 flex-1">
@@ -318,7 +243,7 @@ export default function PricingPDFClient() {
               <i className="ri-time-line text-xl text-amber-600" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Typical Guard Hourly Rates</h2>
+              <h2 className="text-xl font-bold text-slate-900">Illustrative Hourly Budgets</h2>
               <p className="text-sm text-slate-500">What clients pay per hour for different security roles</p>
             </div>
           </div>
@@ -362,7 +287,7 @@ export default function PricingPDFClient() {
             </table>
           </div>
           <p className="text-xs text-slate-400 mt-3">
-            Rates vary by location, shift length, and urgency. Client booking service fees are Free 15%, Starter 10%, Pro 7.5% and Enterprise 5%. Processing is included, and guards keep their full agreed pay.
+            These budget ranges are examples, not platform prices or guard quotes. Set your job rate and agree the booking with your selected guard. Client booking service fees: {clientFeeSummary || 'unavailable until current pricing loads'}. Processing is included, and guards keep their full agreed pay.
           </p>
         </section>
 
@@ -393,7 +318,7 @@ export default function PricingPDFClient() {
                   </li>
                   <li className="flex items-start gap-2">
                     <i className="ri-check-line text-teal-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-slate-700">Booking service fee set by your plan: Free 15%, Starter 10%, Pro 7.5%, Enterprise 5%</span>
+                    <span className="text-slate-700">Booking service fee set by your plan: {clientFeeSummary || 'unavailable until current pricing loads'}</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <i className="ri-check-line text-teal-600 mt-0.5 flex-shrink-0" />
@@ -444,7 +369,7 @@ export default function PricingPDFClient() {
                 <span className="font-bold text-teal-800 text-sm">Free Plan Available</span>
               </div>
               <p className="text-sm text-slate-600">
-                Create a free account and publish up to 1 job per month, paying only for each booking. No subscription is required to get started.
+                A free client account has no subscription charge. Your current posting allowance is listed above; guard pay and booking service fees apply when you confirm a booking.
               </p>
             </div>
             <div className="rounded-xl border border-blue-200 bg-blue-50/30 p-5">
@@ -490,7 +415,7 @@ export default function PricingPDFClient() {
             </div>
           </div>
           <p className="text-xs text-slate-400 text-center mt-4 print:mt-2">
-            All prices shown in GBP. VAT applies where applicable. Prices subject to change. 24/7 support is provided by our AI assistant; issues needing human review can be escalated during business hours. Last updated November 2026.
+            All prices shown in GBP. VAT applies where applicable. Prices subject to change. 24/7 support is provided by our AI assistant; issues needing human review can be escalated during business hours. This guide uses the catalogue retrieved for this visit.
           </p>
         </div>
       </div>

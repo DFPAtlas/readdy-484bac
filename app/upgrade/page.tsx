@@ -1,49 +1,18 @@
 'use client';
 
 import { featurePlanNames, planIncludesFeature, recommendedFeaturePlan } from '@/lib/plan-catalogue';
+import { clientFeatureLabels, guardFeatureLabels, getFeatureLabel, presentPricingPlan } from '@/lib/pricing-presentation';
+import { subscriptionPrice, planAllowanceText, bookingFeeText } from '@/lib/public-pricing';
+import PlanPrice from '@/components/pricing/PlanPrice';
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { getPlansForAudience, getActivePlan } from '@/lib/entitlements';
+import { getActivePlan } from '@/lib/entitlements';
+import { usePublicPricing } from '@/lib/use-public-pricing';
 import NavSidebar from '@/components/NavSidebar';
-
-const clientFeatureLabels: Record<string, string> = {
-  'client.post_job': 'Job Posting',
-  'client.view_guard_profiles': 'View Guard Profiles',
-  'client.escrow_payments': 'Held Job Payments with Stripe',
-  'client.advanced_matching': 'Advanced Guard Matching',
-  'client.priority_support': 'Priority Support',
-  'client.job_templates': 'Job Templates',
-  'client.analytics_dashboard': 'Analytics Dashboard',
-  'client.direct_contact': 'Direct Guard Contact',
-  'client.unlimited_jobs': 'Unlimited Jobs',
-  'client.bulk_posting': 'Bulk Job Posting',
-  'client.multi_site': 'Multi-Site Management',
-  'client.team_access': 'Team Access',
-  'client.custom_contracts': 'Custom Contracts',
-  'client.api_access': 'API integration (by arrangement)',
-  'client.job_history': 'Job History',
-  'client.job_tracker': 'Live Job Tracker',
-};
-
-const guardFeatureLabels: Record<string, string> = {
-  'guard.apply_job': 'Job Applications',
-  'guard.view_jobs': 'View Jobs',
-  'guard.create_profile': 'Create Guard Profile',
-  'guard.advanced_alerts': 'Advanced Job Alerts',
-  'guard.priority_profile': 'Priority Profile',
-  'guard.profile_boost': 'Profile boost entitlement (placement planned)',
-  'guard.performance_analytics': 'Performance Analytics',
-  'guard.priority_support': 'Priority Support',
-  'guard.direct_contact': 'Direct Contact',
-  'guard.unlimited_applications': 'Up to 40 Applications per Month',
-  'guard_application_limit_reached': 'Monthly Application Limit Reached',
-  'guard.plan_verification_failed': 'Plan Verification Failed',
-  'job_limit_reached': 'Monthly Job Posting Limit Reached',
-};
 
 const FEATURE_RECOMMENDED_PLAN: Record<string, string> = {
   'client.post_job': 'client_free',
@@ -300,41 +269,10 @@ const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { 
     title: 'Why upgrade to a bigger application allowance?',
     desc: 'Increase your monthly application allowance so you can apply for more jobs each month.',
     points: [
-      { icon: 'ri-arrow-up-circle-line', label: 'Higher Monthly Allowance', detail: 'Guard Elite raises your allowance to 40 applications per month, up from 25 on Guard Pro.' },
-      { icon: 'ri-money-pound-circle-line', label: 'Maximise Earnings', detail: 'More applications mean more bookings and more shifts filled each month.' },
+      { icon: 'ri-arrow-up-circle-line', label: 'Higher Monthly Allowance', detail: 'Compare the current application allowances listed with each plan.' },
+      { icon: 'ri-money-pound-circle-line', label: 'Maximise Earnings', detail: 'A larger application allowance lets you apply to more suitable jobs; it does not guarantee a booking.' },
     ],
   },
-};
-
-const planDescriptions: Record<string, string> = {
-  'client_free': 'Free account — publish up to 1 job per month, pay per job',
-  'client-starter': 'For small businesses with regular security needs',
-  'client-pro': 'For growing companies with high-volume needs',
-  'client-enterprise': 'For multi-site and enterprise security needs',
-  'guard_starter': 'Free starter plan for new guards',
-  'guard-basic': 'Perfect for getting started',
-  'guard-pro': 'For active security professionals',
-  'guard-elite': 'For professionals seeking more job opportunities',
-};
-
-const planBadges: Record<string, string> = {
-  'client-pro': 'RECOMMENDED',
-  'guard-elite': 'MORE APPLICATIONS',
-};
-
-const planLimitations: Record<string, string[]> = {
-  'client_free': ['Limited to 1 job per month', 'Upgrade required for advanced matching', 'Upgrade required for job templates', 'Upgrade required for analytics dashboard', 'Upgrade required for direct contact', 'Upgrade required for multi-site features'],
-  'client-starter': ['Limited to 10 jobs per month', 'No priority matching', 'No dedicated support'],
-  'client-pro': ['Limited to 30 jobs per month', 'No dedicated account manager', 'No bulk posting'],
-  'guard_starter': ['Limited to 2 applications/month', 'No performance analytics', 'No priority support'],
-  'guard-basic': ['Limited to 10 applications/month', 'No advanced job alerts', 'No performance analytics', 'No priority support'],
-  'guard-pro': ['Limited to 25 applications/month'],
-};
-
-const getFeatureLabel = (key: string, audience: string) => {
-  if (audience === 'client' && clientFeatureLabels[key]) return clientFeatureLabels[key];
-  if (audience === 'guard' && guardFeatureLabels[key]) return guardFeatureLabels[key];
-  return key.split('.').pop()?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || key;
 };
 
 function UpgradeContent() {
@@ -343,16 +281,19 @@ function UpgradeContent() {
   const preselectedPlan = searchParams.get('plan') || '';
 
   const [audience, setAudience] = useState<'client' | 'guard' | null>(null);
-  const [plans, setPlans] = useState<any[]>([]);
+  const catalogue = usePublicPricing();
+  const plans = catalogue.plans.filter(plan => !audience || plan.audience === audience).map(presentPricingPlan);
   const [currentPlan, setCurrentPlan] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [audienceLoading, setAudienceLoading] = useState(true);
+  const [membershipError, setMembershipError] = useState(false);
+  const loading = catalogue.loading || audienceLoading;
   const [subscribing, setSubscribing] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [confirmSwitch, setConfirmSwitch] = useState<any>(null);
   const [switchSuccess, setSwitchSuccess] = useState<{ oldPlanName: string; newPlanName: string } | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState<number>(0);
 
-  const isKnownFeature = reason && (clientFeatureLabels[reason] || guardFeatureLabels[reason]);
+  const isKnownFeature = reason && (clientFeatureLabels[reason] || guardFeatureLabels[reason] || ['guard_application_limit_reached', 'guard.plan_verification_failed', 'job_limit_reached'].includes(reason));
   const featureName = reason ? getFeatureLabel(reason, audience || 'client') : '';
   const featureIncluded = planIncludesFeature(currentPlan, reason);
   const currentCataloguePlan = currentPlan ? { ...currentPlan, slug: currentPlan.plan_slug } : null;
@@ -361,61 +302,30 @@ function UpgradeContent() {
   const unlockMessage = (isCatalogueFeature ? featurePlanNames(plans, reason) : '') || FEATURE_UNLOCK_MESSAGE[reason] || '';
 
   useEffect(() => {
+    let active = true;
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (user) {
-        const { data: userData } = await supabase.from('users').select('user_type').eq('id', user.id).maybeSingle();
-        const aud = userData?.user_type === 'client' || userData?.user_type === 'guard' ? userData.user_type : null;
-        setAudience(aud);
-
-        if (aud) {
-          const p = await getPlansForAudience(aud);
-          const enriched = p.map((plan: any) => ({
-            ...plan,
-            description: planDescriptions[plan.slug] || '',
-            badge: planBadges[plan.slug] || undefined,
-            limitations: planLimitations[plan.slug] || undefined,
-          }));
-          setPlans(enriched);
-        } else {
-          const { data } = await supabase
-            .from('plans')
-            .select('*')
-            .eq('active', true)
-            .order('audience', { ascending: true })
-            .order('monthly_price_pence', { ascending: true });
-          const enriched = (data || []).map((plan: any) => ({
-            ...plan,
-            description: planDescriptions[plan.slug] || '',
-            badge: planBadges[plan.slug] || undefined,
-            limitations: planLimitations[plan.slug] || undefined,
-          }));
-          setPlans(enriched);
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        if (!active) return;
+        if (user) {
+          const { data: userData, error: roleError } = await supabase.from('users').select('user_type').eq('id', user.id).maybeSingle();
+          if (roleError) throw roleError;
+          if (!active) return;
+          const aud = userData?.user_type === 'client' || userData?.user_type === 'guard' ? userData.user_type : null;
+          setAudience(aud);
+          const cp = await getActivePlan(user.id);
+          if (active) setCurrentPlan(cp);
         }
-
-        const cp = await getActivePlan(user.id);
-        setCurrentPlan(cp);
-      } else {
-        const { data } = await supabase
-          .from('plans')
-          .select('*')
-          .eq('active', true)
-          .order('audience', { ascending: true })
-          .order('monthly_price_pence', { ascending: true });
-        const enriched = (data || []).map((plan: any) => ({
-          ...plan,
-          description: planDescriptions[plan.slug] || '',
-          badge: planBadges[plan.slug] || undefined,
-          limitations: planLimitations[plan.slug] || undefined,
-        }));
-        setPlans(enriched);
+      } catch {
+        if (active) setMembershipError(true);
+      } finally {
+        if (active) setAudienceLoading(false);
       }
-
-      setLoading(false);
     };
     load();
-  }, [reason]);
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (redirectCountdown <= 0) return;
@@ -507,12 +417,6 @@ function UpgradeContent() {
 
   const benefit = FEATURE_BENEFITS[reason];
 
-  const calculateSavings = (monthlyPence: number, annualPence: number) => {
-    if (monthlyPence === 0) return 0;
-    const monthlyCost = monthlyPence * 12;
-    return Math.round(((monthlyCost - annualPence) / monthlyCost) * 100);
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0B1933] flex items-center justify-center">
@@ -529,6 +433,11 @@ function UpgradeContent() {
       <NavSidebar />
 
       <main className="max-w-5xl mx-auto px-6 py-20">
+        {(catalogue.error || catalogue.feesError || membershipError) && <div role="alert" className="mb-8 rounded-xl border border-amber-400/30 p-4 text-amber-200">
+          <p>{catalogue.error || (membershipError ? 'Your current membership could not be confirmed. Refresh or contact support before changing plans.' : 'Some booking fees could not be confirmed. Checkout confirms the fee before payment.')}</p>
+          {catalogue.error && <button type="button" onClick={catalogue.retry} className="mt-3 underline">Retry pricing</button>}
+        </div>}
+
         {audience && (
           <Link
             href={audience === 'client' ? '/client/dashboard' : '/guard/dashboard'}
@@ -564,22 +473,10 @@ function UpgradeContent() {
                 <div className="bg-[#0e1628] rounded-xl border border-slate-700/50 p-4">
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Plan Application Limits</p>
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Guard Starter</span>
-                      <span className="text-slate-400">2 applications per month</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Guard Basic</span>
-                      <span className="text-slate-400">10 applications per month</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Guard Pro</span>
-                      <span className="text-slate-400">25 applications per month</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Guard Elite</span>
-                      <span className="text-teal-400 font-semibold">40 applications per month</span>
-                    </div>
+                    {plans.filter(plan => plan.audience === 'guard').map(plan => <div key={plan.slug} className="flex items-center justify-between gap-4">
+                      <span className="text-slate-300">{plan.name}</span>
+                      <span className="text-slate-400">{planAllowanceText(plan)}</span>
+                    </div>)}
                   </div>
                 </div>
               </div>
@@ -621,22 +518,10 @@ function UpgradeContent() {
                 <div className="bg-[#0e1628] rounded-xl border border-slate-700/50 p-4">
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Plan Job Posting Limits</p>
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Free Starter</span>
-                      <span className="text-slate-400">1 job per month</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Client Starter</span>
-                      <span className="text-slate-400">10 jobs per month</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Client Pro</span>
-                      <span className="text-slate-400">30 jobs per month</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-300">Client Enterprise</span>
-                      <span className="text-teal-400 font-semibold">Unlimited jobs</span>
-                    </div>
+                    {plans.filter(plan => plan.audience === 'client').map(plan => <div key={plan.slug} className="flex items-center justify-between gap-4">
+                      <span className="text-slate-300">{plan.name}</span>
+                      <span className="text-slate-400">{planAllowanceText(plan)}</span>
+                    </div>)}
                   </div>
                 </div>
               </div>
@@ -864,14 +749,7 @@ function UpgradeContent() {
           <div className={`grid grid-cols-1 gap-8 ${plans.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : plans.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
             {plans.map((plan) => {
               const isSelected = recommendedPlan === plan.slug;
-              const monthlyPrice = plan.monthly_price_pence / 100;
-              const annualMonthlyEquiv = plan.stripe_annual_price_id
-                ? Math.round((plan.monthly_price_pence * 10) / 100)
-                : Math.round(plan.monthly_price_pence * 0.85 / 100);
-              const price = billingCycle === 'monthly' ? monthlyPrice : annualMonthlyEquiv;
-              const savings = plan.stripe_annual_price_id
-                ? calculateSavings(plan.monthly_price_pence, plan.monthly_price_pence * 10)
-                : 15;
+              const priceAvailable = subscriptionPrice(plan, billingCycle) !== null;
               const accentColor = plan.audience === 'guard' ? 'blue' : 'teal';
               const isPopular = !!plan.badge || isSelected;
               const borderColor = accentColor === 'teal' ? 'border-teal-500' : 'border-blue-500';
@@ -906,32 +784,12 @@ function UpgradeContent() {
                       </div>
                     </div>
                     <p className="text-slate-400 mb-6 text-sm">{plan.description}</p>
+                    <p className="text-sm text-teal-400 mb-4">{plan.audience === 'client' ? `${bookingFeeText(plan)} booking service fee, in addition to guard pay. Payment processing included.` : 'Keep your full agreed pay. No guard commission. Standard payouts included.'}</p>
 
                     <div className="mb-6">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-bold text-white">£{price}</span>
-                        <span className="text-slate-400">/month</span>
-                      </div>
-                      {billingCycle === 'annual' && plan.monthly_price_pence > 0 && (
-                        <p className="text-sm text-emerald-400 font-semibold mt-1">
-                          Save {savings}% with annual billing
-                        </p>
-                      )}
-                      {billingCycle === 'annual' && plan.monthly_price_pence > 0 && (
-                        <p className="text-sm text-slate-500 mt-0.5">
-                          Billed £{plan.stripe_annual_price_id ? plan.monthly_price_pence * 10 / 100 : Math.round(plan.monthly_price_pence * 0.85 / 100) * 12} annually
-                        </p>
-                      )}
-                      {plan.monthly_price_pence === 0 && (
-                        <p className="text-sm text-slate-500 mt-1">No credit card required</p>
-                      )}
-                      {plan.monthly_price_pence === 0 && (
-                        <div className="mt-3 bg-amber-500/10 border border-amber-400/20 rounded-xl p-3 flex items-start gap-2.5">
-                          <i className="ri-information-line text-amber-400 text-sm flex-shrink-0 mt-0.5" />
-                          <p className="text-xs text-amber-300 leading-relaxed">
-                            A service charge applies to all jobs on free accounts. Upgrade to a paid plan for lower fees.
-                          </p>
-                        </div>
+                      <PlanPrice plan={plan} billingCycle={billingCycle} />
+                      {plan.monthly_price_pence === 0 && plan.audience === 'client' && (
+                        <p className="text-xs text-amber-300 mt-3">Booking service fees apply when you pay for a booking; guard pay is separate from your subscription.</p>
                       )}
                     </div>
 
@@ -962,9 +820,9 @@ function UpgradeContent() {
                     ) : (
                       <button
                         onClick={() => handleSubscribe(plan)}
-                        disabled={subscribing === plan.slug}
+                        disabled={subscribing === plan.slug || !priceAvailable}
                         className={`w-full py-3.5 rounded-xl font-bold text-base transition-all whitespace-nowrap block text-center ${bgColor} text-white ${hoverBg} shadow-lg ${
-                          subscribing === plan.slug ? 'opacity-60 cursor-wait' : 'cursor-pointer'
+                          subscribing === plan.slug || !priceAvailable ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
                         }`}
                       >
                         {subscribing === plan.slug ? 'Processing...' : 'Subscribe'}

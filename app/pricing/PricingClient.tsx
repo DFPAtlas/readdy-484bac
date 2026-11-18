@@ -8,152 +8,30 @@ import NavSidebar from '@/components/NavSidebar';
 import PricingBreadcrumb from './PricingBreadcrumb';
 import { supabase } from '@/lib/supabase';
 import { calculatePaygFees, formatCurrency } from '@/lib/payg-fees';
+import { usePublicPricing } from '@/lib/use-public-pricing';
+import { subscriptionPrice, bookingFeeText, type PublicPricingPlan } from '@/lib/public-pricing';
+import { getFeatureLabel, presentPricingPlan } from '@/lib/pricing-presentation';
+import PlanPrice from '@/components/pricing/PlanPrice';
 
-interface Plan {
-  slug: string;
-  name: string;
-  description: string;
-  monthly_price_pence: number;
-  stripe_price_id: string | null;
-  stripe_annual_price_id: string | null;
-  features: string[];
-  limitations?: string[];
-  badge?: string;
-  audience: string;
-  bookingFee?: number;
-  bookingFeeFixedPence?: number;
-}
-
-const clientFeatureLabels: Record<string, string> = {
-  'client.post_job': 'Job postings',
-  'client.ai_matching': 'AI guard matching',
-  'client.email_support': 'Email support',
-  'client.standard_payments': 'Standard payments',
-  'client.escrow_payments': 'Standard payments',
-  'client.job_templates': 'Job templates',
-  'client.analytics': 'Advanced analytics',
-  'client.priority_support': 'Priority support',
-  'client.bulk_posting': 'Bulk posting',
-  'client.dedicated_manager': 'Dedicated account manager',
-  'client.unlimited_jobs': 'Unlimited jobs',
-  'client.performance_analytics': 'Performance analytics',
-  'client.priority_listing': 'Priority listing',
-  'client.view_guard_profiles': 'View guard profiles',
-  'client.advanced_matching': 'Advanced guard matching',
-  'client.analytics_dashboard': 'Analytics dashboard',
-  'client.direct_contact': 'Direct guard contact',
-  'client.multi_site': 'Multi-site management',
-  'client.team_access': 'Team access',
-  'client.custom_contracts': 'Custom contracts',
-  'client.api_access': 'API access',
-  'client.job_history': 'Job history',
-  'client.job_tracker': 'Job tracker',
-};
-
-const guardFeatureLabels: Record<string, string> = {
-  'guard.job_applications': 'Job applications',
-  'guard.ai_matching': 'AI job matching',
-  'guard.email_support': 'Email support',
-  'guard.profile_visibility': 'Profile visibility',
-  'guard.secure_payments': 'Secure payments',
-  'guard.performance_analytics': 'Performance analytics',
-  'guard.priority_support': 'Priority support',
-  'guard.bulk_apply': 'Bulk applications',
-  'guard.dedicated_manager': 'Dedicated account manager',
-  'guard.unlimited_applications': 'Up to 40 applications per month',
-  'guard.enhanced_profile': 'Enhanced profile',
-  'guard.priority_listing': 'Priority listing',
-  'guard.apply_job': 'Apply for jobs',
-  'guard.view_jobs': 'View jobs',
-  'guard.create_profile': 'Create a guard profile',
-  'guard.priority_profile': 'Priority profile placement',
-  'guard.profile_boost': 'Profile boost',
-  'guard.advanced_alerts': 'Advanced job alerts',
-  'guard.direct_contact': 'Direct client contact',
-};
-
-const planDescriptions: Record<string, string> = {
-  'client_free': 'For occasional security bookings',
-  'guard_starter': 'For starting your security career',
-  'client-starter': 'For small businesses with regular security needs',
-  'client-pro': 'For growing companies with high-volume needs',
-  'client-enterprise': 'For multi-site and enterprise security needs',
-  'guard-basic': 'Perfect for getting started',
-  'guard-pro': 'For active security professionals',
-  'guard-elite': 'For professionals seeking more job opportunities',
-};
-
-const planBadges: Record<string, string> = {
-  'client-pro': 'RECOMMENDED',
-  'guard-elite': 'MORE APPLICATIONS',
-};
-
-const planLimitations: Record<string, string[]> = {
-  'client_free': ['Limited to 1 job per month', 'Upgrade required for advanced matching', 'Upgrade required for job templates', 'Upgrade required for analytics dashboard', 'Upgrade required for direct contact', 'Upgrade required for multi-site features'],
-  'client-starter': ['Limited to 10 jobs per month', 'No priority matching', 'No dedicated support'],
-  'client-pro': ['Limited to 30 jobs per month', 'No dedicated account manager', 'No bulk posting'],
-  'guard_starter': ['Limited to 2 applications per month', 'No performance analytics', 'No priority support'],
-  'guard-basic': ['Limited to 10 applications per month', 'No performance analytics', 'No priority support'],
-  'guard-pro': ['Limited to 25 applications per month'],
-};
-
-const getFeatureLabel = (key: string, audience: string) => {
-  if (audience === 'client' && clientFeatureLabels[key]) return clientFeatureLabels[key];
-  if (audience === 'guard' && guardFeatureLabels[key]) return guardFeatureLabels[key];
-  return key.split('.').pop()?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || key;
-};
+interface Plan extends PublicPricingPlan { badge?: string; limitations?: string[]; }
 
 export default function PricingClient() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [paygServiceFeePct, setPaygServiceFeePct] = useState<number | null>(null);
-  const [paygFixedFeePence, setPaygFixedFeePence] = useState(0);
-  const [pricingError, setPricingError] = useState(false);
+  const catalogue = usePublicPricing();
+  const clientPlans = catalogue.plans.filter(plan => plan.audience === 'client').map(presentPricingPlan);
+  const guardPlans = catalogue.plans.filter(plan => plan.audience === 'guard').map(presentPricingPlan);
+  const freePlan = clientPlans.find(plan => plan.slug === 'client_free');
+  const paygServiceFeePct = freePlan?.bookingFee ?? null;
+  const paygFixedFeePence = freePlan?.bookingFeeFixedPence ?? 0;
+  const pricingError = !!catalogue.error || catalogue.feesError;
+  const plansLoading = catalogue.loading;
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [subscribingPlan, setSubscribingPlan] = useState<string | null>(null);
   const [user, setUser] = useState<{ id: string; email: string; role: 'guard' | 'client' | null } | null>(null);
-  const [clientPlans, setClientPlans] = useState<Plan[]>([]);
-  const [guardPlans, setGuardPlans] = useState<Plan[]>([]);
-  const [plansLoading, setPlansLoading] = useState(true);
   const [switchSuccess, setSwitchSuccess] = useState<{ oldPlanName: string; newPlanName: string } | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState<number>(0);
 
   useEffect(() => {
-    const loadPlans = async () => {
-      const { data, error: plansError } = await supabase
-        .from('plans')
-        .select('*')
-        .eq('active', true)
-        .order('monthly_price_pence', { ascending: true });
-
-      // Publish only catalogue fees from the same app rules used by checkout.
-      const { data: feeRules, error: feesError } = await supabase.rpc('get_public_client_pricing_fees');
-      const validFees = ((feeRules || []) as { plan_slug: string; platform_fee_percent: number; platform_fee_fixed_pence: number }[])
-        .filter(r => r.platform_fee_percent != null && Number.isFinite(Number(r.platform_fee_percent)) && Number(r.platform_fee_percent) >= 0 && Number(r.platform_fee_percent) <= 100
-          && r.platform_fee_fixed_pence != null && Number.isSafeInteger(Number(r.platform_fee_fixed_pence)) && Number(r.platform_fee_fixed_pence) >= 0);
-      const bookingFees = new Map(validFees.map(r => [r.plan_slug, r]));
-      const freeFee = bookingFees.get('client_free');
-      if (!feesError && freeFee) {
-        setPaygServiceFeePct(Number(freeFee.platform_fee_percent));
-        setPaygFixedFeePence(Number(freeFee.platform_fee_fixed_pence));
-      }
-      setPricingError(!!plansError || !!feesError || !freeFee || !data?.length
-        || data.some((p: Plan) => p.audience === 'client' && !bookingFees.has(p.slug)));
-      if (data) {
-        const enriched = data.map((p: any) => ({
-          ...p,
-          bookingFee: bookingFees.has(p.slug) ? Number(bookingFees.get(p.slug)!.platform_fee_percent) : undefined,
-          bookingFeeFixedPence: bookingFees.has(p.slug) ? Number(bookingFees.get(p.slug)!.platform_fee_fixed_pence) : undefined,
-          description: planDescriptions[p.slug] || '',
-          badge: planBadges[p.slug] || undefined,
-          limitations: planLimitations[p.slug] || undefined,
-        }));
-        setClientPlans(enriched.filter((p: Plan) => p.audience === 'client'));
-        setGuardPlans(enriched.filter((p: Plan) => p.audience === 'guard'));
-      }
-      setPlansLoading(false);
-    };
-    loadPlans();
-
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setUser(null); return; }
@@ -265,12 +143,6 @@ export default function PricingClient() {
     serviceFeeFixedPence: paygFixedFeePence,
   });
 
-  const calculateSavings = (monthlyPence: number, annualPence: number) => {
-    if (monthlyPence === 0) return 0;
-    const monthlyCost = monthlyPence * 12;
-    return Math.round(((monthlyCost - annualPence) / monthlyCost) * 100);
-  };
-
   const faqs = [
     { question: 'When am I charged?', answer: 'Posting a job does not charge the booking payment. Once you have reviewed applicants and selected your guards, you review the agreed guard pay, your plan’s service fee and any eligible promotion, then pay securely through Stripe before the booking is confirmed. Funds are held with Stripe and released to the guard after completion and the applicable release checks.' },
     { question: 'What if a guard cancels?', answer: `${GUARD_CANCELLATION_GUIDANCE} ${REFUND_TIMING_GUIDANCE}` },
@@ -283,11 +155,7 @@ export default function PricingClient() {
   ];
 
   const renderPlanCard = (plan: Plan, index: number, accentColor: string) => {
-    const monthlyPrice = plan.monthly_price_pence / 100;
-    const annualTotal = (plan.monthly_price_pence * 10) / 100;
-    const annualMonthlyEquiv = (annualTotal / 12).toFixed(2);
-    const price = billingCycle === 'monthly' ? monthlyPrice : annualMonthlyEquiv;
-    const savings = calculateSavings(plan.monthly_price_pence, plan.monthly_price_pence * 10);
+    const priceAvailable = subscriptionPrice(plan, billingCycle) !== null;
     const isPopular = !!plan.badge;
     const borderColor = accentColor === 'teal' ? 'border-teal-500' : 'border-blue-500';
     const textColor = accentColor === 'teal' ? 'text-teal-400' : 'text-blue-400';
@@ -321,26 +189,10 @@ export default function PricingClient() {
             </div>
           </div>
           <p className="text-slate-400 mb-6 text-sm">{plan.description}</p>
-          <p className="text-sm text-teal-400 mb-4">{plan.audience === "client" ? (plan.bookingFee != null ? `${plan.bookingFee}%${plan.bookingFeeFixedPence ? ` + ${formatCurrency(plan.bookingFeeFixedPence / 100)}` : ''} booking service fee, in addition to guard pay. Payment processing included.` : "Service fee shown before you confirm payment.") : "Keep your full agreed pay. No guard commission. Standard payouts included."}</p>
+          <p className="text-sm text-teal-400 mb-4">{plan.audience === "client" ? (plan.bookingFee != null ? `${bookingFeeText(plan)} booking service fee, in addition to guard pay. Payment processing included.` : "Service fee shown before you confirm payment.") : "Keep your full agreed pay. No guard commission. Standard payouts included."}</p>
 
           <div className="mb-6">
-            <div className="flex flex-wrap items-baseline gap-2">
-              <span className="text-4xl font-bold text-white">£{price}</span>
-              <span className="text-slate-400">{billingCycle === 'annual' && plan.monthly_price_pence > 0 ? '/month equivalent' : '/month'}</span>
-            </div>
-            {billingCycle === 'annual' && plan.monthly_price_pence > 0 && (
-              <p className="text-sm text-emerald-400 font-semibold mt-1">
-                Save {savings}% with annual billing
-              </p>
-            )}
-            {billingCycle === 'annual' && plan.monthly_price_pence > 0 && (
-              <p className="text-sm text-slate-500 mt-0.5">
-                Billed {formatCurrency(annualTotal)} upfront each year
-              </p>
-            )}
-            {plan.monthly_price_pence === 0 && (
-              <p className="text-sm text-slate-500 mt-1">No credit card required</p>
-            )}
+            <PlanPrice plan={plan} billingCycle={billingCycle} />
             {plan.monthly_price_pence === 0 && plan.audience === 'client' && (
               <div className="mt-3 bg-amber-500/10 border border-amber-400/20 rounded-xl p-3 flex items-start gap-2.5">
                 <i className="ri-information-line text-amber-400 text-sm flex-shrink-0 mt-0.5" />
@@ -378,9 +230,9 @@ export default function PricingClient() {
           ) : (
             <button
               onClick={() => handleSubscribe(plan)}
-              disabled={subscribingPlan === plan.slug}
+              disabled={subscribingPlan === plan.slug || !priceAvailable}
               className={`w-full py-3.5 rounded-xl font-bold text-base transition-all whitespace-nowrap block text-center ${bgColor} text-white ${hoverBg} shadow-lg ${
-                subscribingPlan === plan.slug ? 'opacity-60 cursor-wait' : 'cursor-pointer'
+                subscribingPlan === plan.slug || !priceAvailable ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
               }`}
             >
               {subscribingPlan === plan.slug ? 'Processing...' : 'Subscribe'}
@@ -436,7 +288,7 @@ export default function PricingClient() {
               Simple plans. No surprises.
             </h1>
             <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-              Choose a monthly or annual subscription, or start with a free account. Cancel renewal anytime. A free client account can publish 1 job per month; a free guard account can submit 2 applications per month. Guard pay and booking service fees are separate from subscriptions.
+              Choose a monthly or annual subscription, or start with a free account. Cancel renewal anytime. Current posting and application allowances are listed with each plan. Guard pay and booking service fees are separate from subscriptions.
             </p>
 
             <div className="inline-flex items-center bg-slate-800/80 backdrop-blur-sm rounded-full p-1 gap-1 border border-slate-700">
@@ -469,9 +321,10 @@ export default function PricingClient() {
 
         <div className="max-w-7xl mx-auto px-6 py-20">
           {pricingError && (
-            <p role="alert" className="mb-10 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-amber-200">
-              Some pricing details could not be loaded. Please refresh or contact support@quickguard.uk. Your final booking service fee is shown before you confirm payment.
-            </p>
+            <div role="alert" className="mb-10 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-amber-200">
+              <p>Some pricing details could not be loaded. Please retry or contact support@quickguard.uk. Your final booking service fee is shown before you confirm payment.</p>
+              <button type="button" onClick={catalogue.retry} className="mt-3 underline">Retry pricing</button>
+            </div>
           )}
           {/* CLIENT PLANS */}
           <div className="text-center mb-14">
