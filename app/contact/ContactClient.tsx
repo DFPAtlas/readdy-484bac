@@ -6,14 +6,15 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import ContactSchema from './ContactSchema';
 import { HUMAN_SUPPORT_HOURS } from '@/lib/customer-guidance';
+import type { ContactEnquiry } from '@/lib/contact-enquiry';
 
-export default function ContactClient() {
+export default function ContactClient({ initialEnquiry = { subject: '', category: '' } }: { initialEnquiry?: ContactEnquiry }) {
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    subject: '',
-    category: '',
+    subject: initialEnquiry.subject,
+    category: initialEnquiry.category,
     message: '',
   });
 

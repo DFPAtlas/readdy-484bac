@@ -613,6 +613,9 @@ export default function CompanyDashboardClient() {
               {activeTab === 'reports' && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Reports</h3>
+                  <p role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-slate-700 dark:text-slate-300">
+                    Company report generation and downloads are not available in this portal yet. The report types below are planned. Contact support to discuss the information you need.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {[
                       { title: 'Staff Report', desc: 'Staff activity and attendance summary', icon: 'ri-team-line', color: 'violet' },
@@ -622,25 +625,28 @@ export default function CompanyDashboardClient() {
                       { title: 'Training Report', desc: 'Staff training completion and gaps', icon: 'ri-book-open-line', color: 'teal' },
                       { title: 'Incident Report', desc: 'Incident trends and resolution metrics', icon: 'ri-alert-line', color: 'red' },
                     ].map(report => (
-                      <div key={report.title} className="bg-slate-50 dark:bg-[#0B1933] rounded-xl p-5 border border-slate-200 dark:border-[#1e2d4d] hover:border-violet-500/30 transition-all cursor-pointer">
+                      <div key={report.title} className="bg-slate-50 dark:bg-[#0B1933] rounded-xl p-5 border border-slate-200 dark:border-[#1e2d4d]">
                         <div className={`w-10 h-10 bg-${report.color}-500/15 rounded-lg flex items-center justify-center mb-3`}>
                           <i className={`${report.icon} text-${report.color}-400 text-lg`}></i>
                         </div>
                         <h4 className="font-semibold text-slate-900 dark:text-white">{report.title}</h4>
+                        <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 mt-1">Planned</p>
                         <p className="text-sm text-slate-500 mt-1">{report.desc}</p>
                       </div>
                     ))}
                   </div>
+                  <Link href="/contact?subject=company-reports" className="inline-flex items-center gap-2 text-violet-600 dark:text-violet-300 font-semibold underline">Ask about company reports</Link>
                 </div>
               )}
 
               {activeTab === 'billing' && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Billing Overview</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">These are recorded company details. Invoice downloads and subscription changes are not available in this portal. Contact support for billing assistance.</p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div className="bg-slate-50 dark:bg-[#0B1933] rounded-xl p-5 border border-slate-200 dark:border-[#1e2d4d]">
-                      <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">Current Plan</p>
-                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{company.subscription_status || 'Free'}</p>
+                      <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">Recorded Subscription Status</p>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{company.subscription_status || 'Not recorded'}</p>
                     </div>
                     <div className="bg-slate-50 dark:bg-[#0B1933] rounded-xl p-5 border border-slate-200 dark:border-[#1e2d4d]">
                       <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">Total Revenue</p>
@@ -651,9 +657,9 @@ export default function CompanyDashboardClient() {
                       <p className="text-2xl font-bold text-slate-900 dark:text-white">{company.vat_number || 'Not Set'}</p>
                     </div>
                   </div>
-                  <Link href="/pricing" className="inline-flex items-center gap-2 px-6 py-3 bg-violet-500 text-white rounded-xl font-semibold hover:bg-violet-600 transition-colors whitespace-nowrap cursor-pointer">
+                  <Link href="/contact?subject=company-billing" className="inline-flex items-center gap-2 px-6 py-3 bg-violet-500 text-white rounded-xl font-semibold hover:bg-violet-600 transition-colors whitespace-nowrap cursor-pointer">
                     <i className="ri-arrow-right-line"></i>
-                    Manage Billing
+                    Ask about company billing
                   </Link>
                 </div>
               )}
@@ -664,6 +670,7 @@ export default function CompanyDashboardClient() {
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">Messages</h3>
                     <Link href="/contact?subject=company-messages" className="text-sm text-violet-500 dark:text-violet-400 font-medium hover:underline whitespace-nowrap">Contact Support</Link>
                   </div>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">This view shows your unread message count only. Reading and replying to messages are not available in this portal yet. Contact support for assistance.</p>
                   {unreadMessages > 0 ? (
                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-5">
                       <div className="flex items-center gap-3">
@@ -672,14 +679,14 @@ export default function CompanyDashboardClient() {
                         </div>
                         <div>
                           <p className="font-semibold text-blue-300">You have {unreadMessages} unread message{unreadMessages !== 1 ? 's' : ''}</p>
-                          <p className="text-sm text-blue-400/70">Check your messages for updates from staff and clients</p>
+                          <p className="text-sm text-blue-400/70">Contact support about these messages.</p>
                         </div>
                       </div>
                     </div>
                   ) : (
                     <div className="text-center py-12">
                       <i className="ri-message-3-line text-6xl text-slate-300 dark:text-slate-600"></i>
-                      <p className="text-slate-500 mt-4">No new messages</p>
+                      <p className="text-slate-500 mt-4">No unread messages recorded</p>
                     </div>
                   )}
                 </div>
