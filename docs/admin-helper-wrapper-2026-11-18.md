@@ -15,10 +15,18 @@ The proposed migration keeps the public function's identity, signature, owner an
 
 ## Release status
 
-This is a proposed database-only repair. It has not been applied to production. Before deployment, rehearse against a staging copy of the production policy/routine inventory and verify representative admin and customer read/write paths, then compare the Security Advisor result. In particular retain the MFA, disabled-admin and owner-access checks from the regression suite. No real payment or support email is needed for these checks.
+This is a proposed database-only repair. It has not been applied to production. A hosted isolated rehearsal has now passed against copies of the 42 dependent policies across 28 fixture tables. The test helper bodies used the same active-admin/MFA predicate with the admin table redirected to isolated synthetic rows. Existing checkout tables and policies were not modified. Production rollout still needs the recorded preflight checks and post-deployment verification. In particular retain the MFA, disabled-admin and owner-access checks from the regression suite. No real payment or support email is needed for these checks.
 
-The [flagged advisor rule](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable) should no longer match the public function after it becomes an invoker; that result is not yet established in a deployed environment. The separate pg_net extension warning remains outside this change.
+The [flagged advisor rule](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable) should no longer match the public function after it becomes an invoker; the hosted rehearsal confirmed that warning disappears after the delegate migration. The separate pg_net extension warning remains outside this change.
 
 If a controlled rollout fails, restore the captured original public function definition via CREATE OR REPLACE, preserving its owner and grants. This restores the existing duplicate-definer implementation and its warning. Do not drop either helper or revoke caller grants as a rollback shortcut.
 
 No frontend or Edge Function changes are included. PR 146 was separately closed as obsolete after confirming its legacy public push table has already been removed.
+
+
+## Hosted rehearsal result — 18 November
+
+- Test Batabase (PostgreSQL 17.11): baseline, delegate and rollback all passed eight actor/MFA combinations, 27 policy-backed admin read paths, owner billing reads, admin writes, legacy routine calls, absent-claims denial, anonymous denial and backend access.
+- The legacy function retained its OID, owner, ACL and 51 policy dependency edges. The sole intended catalog change was its security-definer flag becoming false; rollback restored the original implementation and the same decision results.
+- Security Advisor reported the public security-definer warning in the prepared baseline and omitted it after delegation. Fixture cleanup removed the isolated schema and the two helpers, which had not existed in the partial test database before rehearsal. Test migration history remains as evidence.
+- This fixture copies the dependent policies and exercises representative paths. It is not a complete staging clone or browser/payment UAT. No real user account, checkout fixture, payment or email was modified.
