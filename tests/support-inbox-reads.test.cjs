@@ -64,7 +64,7 @@ test('all three inboxes ignore old/closed-screen results and expose silent-refre
     const start = source.indexOf(`  const ${name} = useCallback`), end = source.indexOf('\n  useEffect(',start), block = source.slice(start,end);
     const writes = [], redirects = [], reads = [deferred(),deferred(),deferred(),deferred(),deferred()]; let next=0;
     const env = { useCallback: fn=>fn, mountedRef: {current:true}, requestRef: {current:0},
-      supabase: {}, loadOwnedSupportInbox: ()=>reads[next++].promise, loadAdminSupportInbox: ()=>reads[next++].promise,
+      supabase: {}, selectTicket: () => writes.push({key:'setSelected',value:null}), loadOwnedSupportInbox: ()=>reads[next++].promise, loadAdminSupportInbox: ()=>reads[next++].promise,
       router: {replace: path=>redirects.push(path)}, getInitials: ()=> 'EX', capitalize: s=>s,
       ...Object.fromEntries([...new Set([...block.matchAll(/\b(set[A-Z]\w*)\(/g)].map(m=>m[1]))].map(key=>[key,value=>writes.push({key,value})])),
     };
@@ -88,6 +88,7 @@ test('error UI renders retry instead of an apparently empty inbox across all rol
     const page={exports:{}};
     new Function('require','exports',compile(fs.readFileSync(path,'utf8')))(name=>{
       if(name==='react')return hooks;
+      if(name==='@/lib/admin-support-ticket-writes')return {};
       if(name==='@/lib/supabase')return {supabase:{}};
       if(name==='@/lib/support-inbox-reads')return helpers.exports;
       if(name==='next/navigation')return {useRouter:()=>({replace(){}}),useSearchParams:()=>new URLSearchParams()};

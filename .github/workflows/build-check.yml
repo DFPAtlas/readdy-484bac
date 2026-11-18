@@ -55,4 +55,9 @@ jobs:
         run: npm run test:unit
 
       - name: Next build
+        # Validation output is never deployed. Override the tracked public settings
+        # so prerendering uses a local placeholder rather than production Supabase.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:9
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: quickguard-build-placeholder
         run: npm run build

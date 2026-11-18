@@ -118,6 +118,7 @@ test('admin enrichment identifies guard requesters without relabelling client co
     const mod = { exports: {} };
     new Function('require', 'exports', compile(adminSource))(name => {
       if (name === 'react') return hooks;
+      if (name === '@/lib/admin-support-ticket-writes') return {};
       if (name === '@/lib/supabase') return { supabase: {} };
       if (name === '@/lib/support-inbox-reads') return helpers.exports;
       if (name === 'next/link') return { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) };
