@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { saveSupportReply } from '@/lib/support-conversation';
 import StatusBadge from './StatusBadge';
 import PriorityBadge from './PriorityBadge';
 
@@ -70,17 +71,22 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState(false);
+  const [notice, setNotice] = useState('');
   const [warning, setWarning] = useState('');
   const [ticketStatus, setTicketStatus] = useState(ticket.status);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const activeTicketRef = useRef<string | null>(null);
   const requestRef = useRef(0);
+  const sendingRef = useRef(false);
   const lifetimeRef = useRef<symbol | null>(null);
 
   const loadMessages = useCallback(async () => {
     if (activeTicketRef.current !== ticket.id) return;
     const request = ++requestRef.current;
+    const lifetime = lifetimeRef.current;
+    const current = () => activeTicketRef.current === ticket.id && lifetimeRef.current === lifetime && request === requestRef.current;
     setLoading(true);
     try {
       const { data, error: loadError } = await supabase
@@ -89,15 +95,14 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
         .eq('ticket_id', ticket.id)
         .eq('is_internal', false)
         .order('created_at', { ascending: true });
-      if (activeTicketRef.current !== ticket.id || request !== requestRef.current) return;
-      if (loadError) throw loadError;
-      setMessages(data || []);
-    } catch (loadError) {
-      if (activeTicketRef.current === ticket.id && request === requestRef.current) {
-        setError(loadError instanceof Error ? loadError.message : 'Unable to load ticket messages');
-      }
+      if (!current()) return;
+      if (loadError || !Array.isArray(data)) throw new Error('Unable to load ticket messages');
+      setMessages(data);
+      setLoadError(false);
+    } catch {
+      if (current()) setLoadError(true);
     } finally {
-      if (activeTicketRef.current === ticket.id && request === requestRef.current) setLoading(false);
+      if (current()) setLoading(false);
     }
   }, [ticket.id]);
 
@@ -107,6 +112,10 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
     setMessages([]);
     setReplyText('');
     setError('');
+    setLoadError(false);
+    setNotice('');
+    setWarning('');
+    sendingRef.current = false;
     setSending(false);
     void loadMessages();
     const channel = supabase
@@ -128,59 +137,43 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
 
   useEffect(() => {
     setTicketStatus(ticket.status);
-  }, [ticket.status]);
+  }, [ticket.id, ticket.status]);
 
   const handleSendReply = async () => {
-    if (!replyText.trim()) return;
+    if (activeTicketRef.current !== ticket.id || !replyText.trim() || sendingRef.current || loading || loadError || ticketStatus === 'resolved' || ticketStatus === 'closed') return;
+    sendingRef.current = true;
     setError('');
     setWarning('');
+    setNotice('');
     setSending(true);
     const lifetime = lifetimeRef.current;
     const current = () => activeTicketRef.current === ticket.id && lifetime === lifetimeRef.current;
+    let saved = false;
     try {
-      const { data: createdMessage, error: msgError } = await supabase
-        .from('ticket_messages')
-        .insert({
-          ticket_id: ticket.id,
-          sender_id: clientId,
-          sender_type: 'client',
-          message_text: replyText.trim(),
-          is_internal: false,
-        })
-        .select('id, created_at')
-        .single();
-
-      if (msgError || !createdMessage?.id) {
-        throw new Error('Failed to send reply');
-      }
-
-      if (ticketStatus !== 'resolved' && ticketStatus !== 'closed') {
-        const { error: updateError } = await supabase
-          .from('support_tickets')
-          .update({ status: 'under_review', updated_at: new Date().toISOString() })
-          .eq('id', ticket.id);
-        if (updateError) throw updateError;
-        if (current()) setTicketStatus('under_review');
-      }
-
-      if (current()) {
+      const result = await saveSupportReply(supabase, {
+        ticketId: ticket.id, senderId: clientId, senderType: 'client', text: replyText, status: ticketStatus,
+      }, () => {
+        saved = true;
+        if (!current()) return;
         setReplyText('');
-        onUpdated();
+        setNotice('Your reply was saved.');
         void loadMessages();
+      });
+      if (current()) {
+        if (result.statusUpdated) setTicketStatus('under_review');
+        setWarning(result.warnings.join(' '));
+        onUpdated();
       }
-
-      const { error: bridgeError } = await supabase.functions.invoke(
-        'dfp-support-message-bridge',
-        { body: { messageId: createdMessage.id } },
-      );
-
-      if (bridgeError && current()) {
-        setWarning('Your reply was saved, but delivery to support could not be confirmed.');
+    } catch {
+      if (current()) {
+        if (saved) setWarning('Your reply was saved, but the conversation could not be refreshed. Reload before sending another reply.');
+        else setError('Your reply could not be confirmed as saved. Reload the conversation before trying again.');
       }
-    } catch (err: any) {
-      if (current()) setError(err.message || 'Failed to send reply');
     } finally {
-      if (current()) setSending(false);
+      if (current()) {
+        sendingRef.current = false;
+        setSending(false);
+      }
     }
   };
 
@@ -322,6 +315,11 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
                 <div className="flex items-center justify-center py-8">
                   <div className="w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
+              ) : loadError ? (
+                <div role="alert" className="rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                  <p>We could not load this conversation. Replies may be missing.</p>
+                  <button onClick={() => void loadMessages()} className="mt-2 font-semibold underline cursor-pointer">Retry loading conversation</button>
+                </div>
               ) : messages.length === 0 ? (
                 <div className="text-center py-6">
                   <div className="w-10 h-10 bg-[#111d35] rounded-xl flex items-center justify-center mx-auto mb-2">
@@ -357,21 +355,16 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
                 </div>
               )}
 
+              {notice && <p role="status" className="mt-3 text-sm text-emerald-400">{notice}</p>}
+              {warning && <p role="status" className="mt-3 text-sm text-amber-400">{warning}</p>}
+              {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
+
               {/* Reply Box */}
               {canReply && (
                 <div className="mt-4 pt-4 border-t border-[#1e2d4d]">
-                  {warning && (
-                    <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 mb-3 text-sm text-amber-400">
-                      {warning}
-                    </div>
-                  )}
-                  {error && (
-                    <div className="bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2 mb-3 text-sm text-red-400">
-                      {error}
-                    </div>
-                  )}
                   <div className="flex gap-2">
                     <textarea
+                      disabled={sending}
                       value={replyText}
                       onChange={(e) => setReplyText(e.target.value)}
                       rows={2}
@@ -381,7 +374,8 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
                     />
                     <button
                       onClick={handleSendReply}
-                      disabled={sending || !replyText.trim()}
+                      aria-label="Send reply"
+                      disabled={sending || loading || loadError || !replyText.trim()}
                       className="self-end w-10 h-10 flex items-center justify-center bg-teal-500 text-white rounded-xl hover:bg-teal-600 transition-colors cursor-pointer disabled:opacity-50 flex-shrink-0"
                     >
                       {sending ? (
