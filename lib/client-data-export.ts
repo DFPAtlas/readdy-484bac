@@ -11,7 +11,7 @@ export type ClientExportRow = Record<string, any>;
 export type ClientExportData = Partial<Record<ClientExportCategory, ClientExportRow[]>>;
 
 const fields = {
-  profile: 'id, user_id, company_name, first_name, last_name, email, phone, industry, company_size, address_line1, address_line2, city, postcode, website, vat_number, billing_email, company_registration_number, trading_name, billing_address_line1, billing_address_line2, billing_city, billing_postcode, subscription_tier, subscription_status, verified, verification_status, created_at, updated_at',
+  profile: 'id, user_id, company_name, first_name, last_name, email, phone, industry, company_size, address_line1, address_line2, city, postcode, website, description, vat_number, billing_email, company_registration_number, trading_name, billing_address_line1, billing_address_line2, billing_city, billing_postcode, subscription_tier, subscription_status, verified, verification_status, created_at, updated_at',
   contacts: 'id, contact_type, name, role, email, phone, is_default, created_at, updated_at',
   jobs: 'id, job_title, venue_name, venue_city, venue_postcode, start_date, end_date, start_time, end_time, status, number_of_guards, hourly_rate, urgency, assigned_count, applications_count, created_at, updated_at',
   assignments: 'id, job_id, guard_id, status, assigned_at, completed_at, payment_status, payment_amount',

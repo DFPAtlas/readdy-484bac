@@ -95,7 +95,8 @@
     "billing_city",
     "billing_postcode",
     "stripe_customer_created_at",
-    "stripe_billing_portal_last_opened_at"
+    "stripe_billing_portal_last_opened_at",
+    "description"
   ],
   "job_assignments": [
     "id",

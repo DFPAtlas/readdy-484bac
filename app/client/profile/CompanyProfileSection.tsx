@@ -276,10 +276,11 @@ export default function CompanyProfileSection({ profile, onUpdate, onError }: Pr
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              Company Description
+            <label htmlFor="company-description" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Company Description (optional)
             </label>
             <textarea
+              id="company-description"
               name="description"
               value={form.description || ""}
               onChange={handleChange}

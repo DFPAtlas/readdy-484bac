@@ -16,7 +16,7 @@ const exp = load('lib/client-data-export.ts', { './client-job-list': listing });
 const all = exp.CLIENT_EXPORT_CATEGORIES.map(c => c.key);
 function fixtures() {
   const jobs = Array.from({ length: 9 }, (_, i) => ({ id: 'job-' + i, client_id: C, job_title: 'Job ' + i, status: i < 4 ? 'paid_out' : 'cancelled', is_deleted: i === 8 ? null : false, assigned_count: 0, created_at: '2026-10-05T12:00:00Z' }));
-  return { clients: [{ id: C, user_id: U, company_name: 'Synthetic, "Export" Ltd', address_line2: 'Suite 1', billing_address_line1: 'Billing address', notes: 'PRIVATE_INTERNAL', stripe_customer_id: 'PRIVATE_PROVIDER' }], client_contacts: [], jobs,
+  return { clients: [{ id: C, user_id: U, company_name: 'Synthetic, "Export" Ltd', description: 'Company description\nNew line', address_line2: 'Suite 1', billing_address_line1: 'Billing address', notes: 'PRIVATE_INTERNAL', stripe_customer_id: 'PRIVATE_PROVIDER' }], client_contacts: [], jobs,
     job_assignments: jobs.slice(0, 8).map((job, i) => ({ id: 'assignment-' + i, job_id: job.id, guard_id: 'guard', status: i < 4 ? 'completed' : 'cancelled', payment_amount: 80 })),
     transactions: jobs.map((j, i) => ({ id: 'tx-' + i, client_id: C, job_id: j.id, status: i === 0 ? 'partially_refunded' : 'completed', amount: 80, refund_amount: i === 0 ? 20 : null, created_at: '2026-10-03T12:00:00Z', receipt_url: 'PRIVATE_LINK' })),
     subscription_payments: [0, 1].map(i => ({ id: 'subscription-payment-' + i, subscription_id: 'recorded-subscription', user_id: U, amount: 49, status: 'paid', period_start: '2026-10-01', billing_reason: 'subscription_cycle', created_at: '2026-10-04T12:00:00Z', stripe_invoice_id: 'PRIVATE_PROVIDER' })),
@@ -61,6 +61,7 @@ test('all eight deployed-schema categories load and preserve the existing accoun
   assert.equal(data.guards[0].guard_name, 'Inactive assigned guard'); assert.equal(data.guards[0].sia_verified, true); assert.equal(data.guards[0].guard_account_active, false); assert.equal(data.guards[0].rating, 0);
   assert.equal(data.jobs.find(j => j.id === 'job-0').assigned_count, 1); assert.equal(data.jobs.find(j => j.id === 'job-0').recorded_assigned_count, 0);
   assert.equal(data.profile[0].billing_address_line1, 'Billing address'); assert.deepEqual(data.profile[0].site_contacts, []);
+  assert.equal(data.profile[0].description, 'Company description\nNew line');
   assert.equal(data.payments.filter(p => p.type === 'subscription').length, 2); assert.equal(data.payments.find(p => p.type === 'subscription').period_start, '2026-10-01');
   assert.doesNotMatch(JSON.stringify(data), /PRIVATE_|stripe_customer_id|admin_notes|file_url|receipt_url|sia_licence_front_url/);
   assert.equal(db.calls.some(c => c.table === 'guards'), false);
@@ -129,9 +130,11 @@ test('rectangular CSV and JSON retain all selected/empty categories, subscriptio
   const mapped = parsed.map(row => Object.fromEntries(header.map((key, i) => [key, row[i]])));
   assert.equal(mapped.filter(r => r.export_row_type === 'record').length, 33); assert.deepEqual(mapped.filter(r => r.export_row_type === 'empty_category').map(r => r.export_category), ['messages', 'documents']);
   assert.equal(mapped.find(r => r.type === 'subscription').period_start, '2026-10-01'); assert.equal(mapped.find(r => r.export_category === 'tickets').category, 'technical_issue');
+  assert.equal(mapped.find(r => r.export_category === 'profile').description, 'Company description\nNew line');
   assert.equal(mapped.find(r => r.id === 'job-0').job_title[0], "'"); assert.equal(mapped.find(r => r.export_category === 'guards').sia_verified, 'true'); assert.equal(mapped.find(r => r.export_category === 'guards').guard_account_active, 'false');
   assert.deepEqual(JSON.parse(mapped.find(r => r.export_category === 'guards').licence_types), ['security_guard']); assert.match(mapped.find(r => r.export_category === 'tickets').description, /Line 1\r\nLine 2, "quoted"/);
   const json = JSON.parse(JSON.stringify(exp.buildClientExport(data, C, U, 'Synthetic'))); assert.deepEqual(json.export_metadata.categories, all); assert.equal(json.export_metadata.record_counts.documents, 0); assert.equal(json.profile[0].site_contacts.length, 1);
+  assert.equal(json.profile[0].description, 'Company description\nNew line');
   assert.doesNotMatch(csv + JSON.stringify(json), /PRIVATE_|admin_notes|file_url|stripe_invoice_id/);
 });
 

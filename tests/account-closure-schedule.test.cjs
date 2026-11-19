@@ -1,6 +1,8 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const {PGlite}=require('@electric-sql/pglite');
 const USER='11111111-1111-4111-8111-111111111111',GUARD='22222222-2222-4222-8222-222222222222',ADMIN='33333333-3333-4333-8333-333333333333';
 const migration=fs.readFileSync('supabase/migrations/20261013051710_account_closure_retention.sql','utf8').split('-- BEGIN RETENTION SCHEDULER')[0];
+const descriptionMigrationName=fs.readdirSync('supabase/migrations').find(name=>name.endsWith('_add_client_company_description.sql'));
+const descriptionMigration=fs.readFileSync('supabase/migrations/'+descriptionMigrationName,'utf8');
 async function fixture(){const db=new PGlite();await db.exec(`
  create role anon;create role authenticated;create role service_role bypassrls;create role authenticator;
  create schema app;create schema auth;create schema storage;
@@ -34,8 +36,19 @@ async function fixture(){const db=new PGlite();await db.exec(`
  insert into storage.objects values(gen_random_uuid(),'${USER}');
  insert into app.transactions values(gen_random_uuid(),'${USER}',80);
  set request.jwt.claims='{"role":"service_role","sub":"${USER}"}';
- `);await db.exec(migration);return db;}
+ `);await db.exec(descriptionMigration);await db.exec(migration);return db;}
 async function close(db){return (await db.query(`select app.begin_account_closure('${USER}','${USER}') as closure`)).rows[0].closure;}
+test('scheduled client profile minimisation clears company description while preserving the ledger',async()=>{
+ const db=await fixture();try{
+  await db.query('delete from app.guards where user_id=$1',[USER]);
+  await db.query("insert into app.clients(id,user_id,email,is_active,description) values(gen_random_uuid(),$1,'company@test.invalid',true,'Synthetic company description')",[USER]);
+  const r=await close(db);await db.query(`select app.confirm_account_closure('${r.id}')`);
+  await db.exec("update app.account_closures set closed_at=now()-interval '3 years',profile_purge_at=now()-interval '1 year';");
+  const task=(await claim(db))[0];assert.equal(task.leased_stage,'profile');await db.query('select app.finish_account_retention_task($1,$2,null)',[task.id,task.lease_token]);
+  assert.equal((await db.query('select description from app.clients')).rows[0].description,null);
+  assert.equal((await db.query('select amount from app.transactions')).rows[0].amount,'80');
+ }finally{await db.close();}
+});
 async function claim(db){return (await db.query('select * from app.claim_account_retention_tasks(10)')).rows;}
 
 test('closure fixes dates, is idempotent, disables profiles/entitlements without erasing ledger',async()=>{const db=await fixture();try{const a=await close(db),b=await close(db);assert.equal(a.id,b.id);assert.equal(a.closed_at,b.closed_at);assert.equal(new Date(a.profile_purge_at).getUTCFullYear(),new Date(a.closed_at).getUTCFullYear()+2);assert.equal(new Date(a.documents_purge_at).getUTCFullYear(),new Date(a.closed_at).getUTCFullYear()+3);assert.equal((await db.query('select is_active from app.guards')).rows[0].is_active,false);assert.equal((await db.query('select is_active from app.user_entitlements')).rows[0].is_active,false);assert.equal((await db.query('select amount from app.transactions')).rows[0].amount,'80');}finally{await db.close();}});

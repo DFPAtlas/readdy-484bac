@@ -41,6 +41,6 @@ Retest unselected Job History/Selected Guards previews, unchanged selection, nin
 
 No profile, job, assignment, ticket, message, payment, refund, subscription or notification was created or modified during this repair. No private production CSV/JSON was delivered or saved as a report attachment. Automated fixture content is synthetic.
 
-## Separate finding retained
+## Company Description follow-up
 
-Schema inspection also confirms that editing Company Description in Company Profile submits clients.description, which does not exist in the deployed schema. An unchanged undefined field may be omitted during JSON serialization, so this is specifically a description-edit save problem, not evidence that every unchanged save fails. It remains separate C12 controlled-save follow-up; no production save was attempted and this export PR does not change company-profile writes.
+The export investigation found that Company Description edits submitted a missing clients.description column; unchanged undefined values could be omitted, so not every unchanged save was affected. The follow-up migration now adds the intended nullable text field and the profile export includes it. The existing form write and confirmation rules are preserved. See [Company Description persistence](client-company-description-2026-11-19.md) for database/security/local-save evidence. No production profile save was performed; controlled published save/reopen/clear/Retry and actual export acceptance remain open.
