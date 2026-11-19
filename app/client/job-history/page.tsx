@@ -269,6 +269,9 @@ export default function ClientJobHistoryClient() {
       const data = await response.json();
       if (controller.signal.aborted) return;
       if (!response.ok || data.error) throw new Error(data.error || 'Failed to load job history');
+      if (!data.client?.id || !Array.isArray(data.jobs) || !Number.isInteger(data.totalCount) || data.totalCount < 0) {
+        throw new Error('Job history returned an incomplete response. Please try again.');
+      }
       setJobs(data.jobs || []);
       setStats(data.stats || null);
       setTotalCount(data.totalCount || 0);
@@ -434,7 +437,7 @@ export default function ClientJobHistoryClient() {
           )}
 
           {/* Stats */}
-          {stats && (
+          {stats && !error && (
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
               {STAT_CARDS.map((card) => {
                 const value = (stats as any)[card.key];
@@ -455,7 +458,7 @@ export default function ClientJobHistoryClient() {
           )}
 
           {/* Spend Summary */}
-          {stats && (
+          {stats && !error && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <div className="bg-white dark:bg-[#111d35] rounded-xl border border-slate-200 dark:border-[#1e2d4d] p-4 flex items-center gap-4">
                 <div className="w-12 h-12 bg-emerald-500/10 rounded-lg flex items-center justify-center">
@@ -555,7 +558,7 @@ export default function ClientJobHistoryClient() {
                 </button>
               </div>
             </div>
-            <p className="text-xs text-slate-500 mt-3">{totalCount} result{totalCount !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-slate-500 mt-3">{error ? 'Results unavailable' : `${totalCount} result${totalCount !== 1 ? 's' : ''}`}</p>
           </div>
 
           {/* Job List */}
@@ -569,7 +572,7 @@ export default function ClientJobHistoryClient() {
                 </div>
               ))}
             </div>
-          ) : jobs.length === 0 && !loading ? (
+          ) : jobs.length === 0 && !loading && !error ? (
             <div className="bg-white dark:bg-[#111d35] rounded-2xl border border-slate-200 dark:border-[#1e2d4d] p-16 text-center">
               <div className="w-16 h-16 bg-slate-100 dark:bg-[#162036] rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <i className="ri-history-line text-3xl text-slate-400"></i>

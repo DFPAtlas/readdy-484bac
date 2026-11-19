@@ -72,3 +72,11 @@ verify_jwt = false
 [functions.submit-replacement-request]
 # Validates the bearer token; a service-only transaction checks ownership and closure.
 verify_jwt = false
+
+[functions.get-client-job-history]
+# Validates auth.getUser(), account closure and client ownership inside the handler.
+verify_jwt = false
+
+[functions.get-client-assigned-guards]
+# Validates auth.getUser(), account closure, job ownership and actual assignments.
+verify_jwt = false

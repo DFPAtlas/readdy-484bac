@@ -23,6 +23,7 @@ import RefundRequestModal from '../RefundRequestModal';
 import CancelJobModal from '../CancelJobModal';
 import BookingStatusBadge from '../BookingStatusBadge';
 import { canSendJobMessage } from '@/lib/message-permissions';
+import { loadClientJobAssignments } from '@/lib/client-job-assignments';
 
 interface GuardReview {
   id: string;
@@ -175,6 +176,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   const router = useRouter();
   const { loading: authLoading, allowed } = useClientGuard();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [job, setJob] = useState<any>(null);
   const [assignedGuards, setAssignedGuards] = useState<any[]>([]);
   const [timeline, setTimeline] = useState<any[]>([]);
@@ -225,6 +227,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
   const loadJobDetail = useCallback(async () => {
     if (!mountedRef.current) return;
+    setLoading(true);
+    setLoadError(null);
     const request = ++requestRef.current;
     const isCurrent = () => mountedRef.current && request === requestRef.current;
     try {
@@ -260,10 +264,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       setJob(jobData);
 
       const [assignmentsData, cancellationData, refundData, transactionData, activityData] = await Promise.all([
-        supabase
-          .from('job_assignments')
-          .select('*')
-          .eq('job_id', jobId),
+        loadClientJobAssignments(supabase, jobId),
         supabase
           .schema('app')
           .from('job_cancellations')
@@ -293,33 +294,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       ]);
 
       if (!isCurrent()) return;
-      const rawAssignments = assignmentsData.data || [];
-      const assignedGuardIds = [...new Set(rawAssignments.map((a: any) => a.guard_id).filter(Boolean))];
-      const guardMap: Record<string, any> = {};
+      const hydratedAssignments = assignmentsData;
 
-      if (assignedGuardIds.length > 0) {
-        const { data: safeGuardProfiles } = await supabase
-          .from('client_applicant_profiles')
-          .select('id:guard_id, user_id:guard_user_id, full_name, profile_photo_url:profile_image_url, sia_licence_number, sia_verified, sia_expiry_date, licence_types, profile_completed, verification_status, certifications, sia_verified_at, average_rating:rating, total_reviews, total_jobs_completed')
-          .eq('job_id', jobId)
-          .in('guard_id', assignedGuardIds);
-
-        (safeGuardProfiles || []).forEach((g: any) => {
-          guardMap[g.id] = {
-            ...g,
-            phone: null,
-            sia_licence_front_url: null,
-            sia_licence_back_url: null,
-          };
-        });
-      }
-
-      const hydratedAssignments = rawAssignments.map((a: any) => ({
-        ...a,
-        guards: guardMap[a.guard_id] || null,
-      }));
-
-      if (!isCurrent()) return;
       setAssignedGuards(hydratedAssignments);
       setCancellation(cancellationData.data || null);
       setRefundRequests(refundData.data || []);
@@ -329,7 +305,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       setTimeline(timelineEvents);
 
       await fetchGuardReviews(client.id, request);
-    } catch {
+    } catch (error) {
+      if (isCurrent()) setLoadError(error instanceof Error ? error.message : 'Job details could not be loaded. Please try again.');
     } finally {
       if (isCurrent()) setLoading(false);
     }
@@ -523,6 +500,16 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     );
   }
 
+  if (loadError) return (
+    <div className="min-h-screen bg-[#0B1933] text-slate-200 flex items-center justify-center p-6">
+      <div role="alert" className="max-w-lg text-center space-y-4">
+        <p>{loadError}</p>
+        <button onClick={() => { void loadJobDetail(); }} className="bg-teal-500 text-white px-6 py-3 rounded-xl">Retry job details</button>
+        <Link href="/client/jobs" className="block text-teal-400">Back to My Jobs</Link>
+      </div>
+    </div>
+  );
+
   if (!job) return null;
 
   const tabs = [
@@ -553,6 +540,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       licence_types: g?.licence_types || null,
       sia_licence_front_url: g?.sia_licence_front_url || null,
       sia_licence_back_url: g?.sia_licence_back_url || null,
+      licence_documents_private: g?.licence_documents_private,
       profile_completed: g?.profile_completed || null,
       verification_status: g?.verification_status || null,
       certifications: g?.certifications || null,

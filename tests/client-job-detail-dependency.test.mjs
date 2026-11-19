@@ -11,7 +11,7 @@ test('job detail discards superseded reads and reads completed after cleanup', a
   const env = {
     jobId: 'job-a', router: { push: path => redirects.push(path) },
     useRef: current => ({current}), useCallback: fn => fn,
-    getInitials: () => 'CL', buildTimeline: () => [],
+    getInitials: () => 'CL', buildTimeline: () => [], loadClientJobAssignments: async () => [],
     supabase: {
       auth: {getUser: () => new Promise(resolve => pending.push(resolve))},
       from(table) {
@@ -32,7 +32,9 @@ test('job detail discards superseded reads and reads completed after cleanup', a
   const count = updates.length;
   pending[0]({data:{user:null}}); await older;
   assert.equal(updates.length, count); assert.deepEqual(redirects, []);
-  const closing = api.loadJobDetail(); api.mountedRef.current = false;
+  const closing = api.loadJobDetail();
+  const closingCount = updates.length;
+  api.mountedRef.current = false;
   pending[2]({data:{user:null}}); await closing;
-  assert.equal(updates.length, count); assert.deepEqual(redirects, []);
+  assert.equal(updates.length, closingCount); assert.deepEqual(redirects, []);
 });

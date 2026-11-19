@@ -28,6 +28,8 @@ interface Guard {
   average_rating?: number | null;
   total_reviews?: number | null;
   total_jobs_completed?: number | null;
+  is_active?: boolean;
+  licence_documents_private?: boolean;
 }
 
 interface Assignment {
@@ -232,6 +234,7 @@ export default function AssignedGuardsSection({
             licence_types: g?.licence_types || null,
             sia_licence_front_url: g?.sia_licence_front_url || null,
             sia_licence_back_url: g?.sia_licence_back_url || null,
+            licence_documents_private: g?.licence_documents_private,
             profile_completed: g?.profile_completed || null,
             verification_status: g?.verification_status || null,
             certifications: g?.certifications || null,
@@ -252,6 +255,7 @@ export default function AssignedGuardsSection({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-slate-200 truncate">{guardName}</p>
+                  {g?.is_active === false && <p className="text-xs text-slate-400">Inactive guard account</p>}
                   {g?.sia_licence_number && (
                     <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                       <i className="ri-shield-check-line text-emerald-400"></i>
