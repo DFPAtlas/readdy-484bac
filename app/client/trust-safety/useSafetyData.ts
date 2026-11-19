@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { loadClientSafetyData } from '@/lib/client-safety-data';
 
 interface SafetyCheck {
   id: string;
@@ -50,6 +51,9 @@ interface JobWithSafety {
   uniform_details: string | null;
   sia_licence_required: boolean;
   required_license_type: string | null;
+  required_licence_types?: string[] | null;
+  specific_licences?: string[] | null;
+  is_deleted?: boolean | null;
   assigned_count: number;
   applications_count: number;
   payment_status: string | null;
@@ -69,20 +73,6 @@ interface Incident {
   description: string;
 }
 
-interface SafetyCounts {
-  totalJobs: number;
-  missingSafetyInfo: number;
-  highRiskJobs: number;
-  complianceWarnings: number;
-  missingEmergencyContacts: number;
-  missingSiteInstructions: number;
-  jobsWithSIARequired: number;
-  jobsLoneWorker: number;
-  jobsWithIncidents: number;
-  openTickets: number;
-  urgentTickets: number;
-}
-
 export interface GuardAssignment {
   id: string;
   guard_id: string;
@@ -94,170 +84,45 @@ export interface GuardAssignment {
     sia_verified: boolean;
     sia_expiry_date: string | null;
     sia_licence_type: string | null;
+    licence_types?: string[] | null;
   } | null;
 }
 
 export interface SafetyData {
+  client: { id: string; company_name: string; contact_name: string } | null;
   jobs: JobWithSafety[];
   incidents: Incident[];
-  counts: SafetyCounts;
   loading: boolean;
   error: string | null;
+  retry: () => void;
 }
 
-export function useSafetyData(): SafetyData {
+export function useSafetyData(enabled = true): SafetyData {
+  const [client, setClient] = useState<SafetyData['client']>(null);
   const [jobs, setJobs] = useState<JobWithSafety[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setError('Not authenticated');
-        setLoading(false);
-        return;
-      }
-
-      const { data: clientData } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!clientData) {
-        setError('Client not found');
-        setLoading(false);
-        return;
-      }
-
-      const clientId = clientData.id;
-
-      const [jobsRes, safetyRes, ticketsRes] = await Promise.all([
-        supabase
-          .from('jobs')
-          .select('*')
-          .eq('client_id', clientId)
-          .eq('is_deleted', false)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('job_safety_checks')
-          .select('*')
-          .eq('client_id', clientId),
-        supabase
-          .from('support_tickets')
-          .select('id, ticket_reference, job_id, category, subject, priority, status, created_at, resolved_at, description')
-          .eq('client_id', clientId)
-          .eq('is_deleted', false)
-          .order('created_at', { ascending: false }),
-      ]);
-
-      const jobsData = (jobsRes.data || []) as any[];
-      const safetyChecks = (safetyRes.data || []) as SafetyCheck[];
-      const ticketsData = (ticketsRes.data || []) as Incident[];
-
-      const safetyMap: Record<string, SafetyCheck> = {};
-      safetyChecks.forEach((s) => {
-        safetyMap[s.job_id] = s;
-      });
-
-      const jobsWithSafety: JobWithSafety[] = jobsData.map((j) => ({
-        ...j,
-        safety_check: safetyMap[j.id],
-      }));
-
-      setJobs(jobsWithSafety);
-      setIncidents(ticketsData);
-    } catch (e: any) {
-      setError(e.message || 'Failed to load safety data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  const [revision, setRevision] = useState(0);
+  const sequence = useRef(0);
   useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const counts: SafetyCounts = (() => {
-    const now = new Date();
-    const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-
-    let missingSafetyInfo = 0;
-    let highRiskJobs = 0;
-    let complianceWarnings = 0;
-    let missingEmergencyContacts = 0;
-    let missingSiteInstructions = 0;
-    let jobsLoneWorker = 0;
-
-    jobs.forEach((job) => {
-      const sc = job.safety_check;
-      const hasSafetyCheck = !!sc;
-      const isSoon = job.start_date && new Date(job.start_date) <= in48h && new Date(job.start_date) >= now;
-
-      if (job.risk_level === 'high' || job.risk_level === 'urgent') {
-        highRiskJobs++;
-      }
-      if (job.lone_worker_flag) {
-        jobsLoneWorker++;
-      }
-      if (!job.emergency_contact_name && !job.emergency_contact_phone) {
-        missingEmergencyContacts++;
-      }
-      if (!job.site_access_instructions && !job.parking_instructions && !job.special_instructions) {
-        missingSiteInstructions++;
-      }
-
-      const checklist = sc || {
-        site_address_confirmed: false,
-        site_contact_available: false,
-        emergency_contact_added: false,
-        site_access_instructions_added: false,
-        risk_notes_added: false,
-        lone_worker_flagged: false,
-        parking_details_added: false,
-        required_sia_selected: false,
-      };
-
-      const completed = Object.values(checklist).filter(Boolean).length;
-      const total = 8;
-      if (completed < total) {
-        missingSafetyInfo++;
-      }
-
-      if (isSoon && !hasSafetyCheck) {
-        complianceWarnings++;
-      }
-      if (job.sia_licence_required && !sc?.required_sia_selected) {
-        complianceWarnings++;
-      }
-      if (job.lone_worker_flag && !sc?.lone_worker_flagged) {
-        complianceWarnings++;
-      }
-    });
-
-    const jobsWithIncidents = new Set(incidents.filter((i) => i.job_id).map((i) => i.job_id)).size;
-
-    return {
-      totalJobs: jobs.length,
-      missingSafetyInfo,
-      highRiskJobs,
-      complianceWarnings,
-      missingEmergencyContacts,
-      missingSiteInstructions,
-      jobsWithSIARequired: jobs.filter((j) => j.sia_licence_required).length,
-      jobsLoneWorker,
-      jobsWithIncidents,
-      openTickets: incidents.filter((i) => i.status !== 'closed' && i.status !== 'resolved').length,
-      urgentTickets: incidents.filter((i) => i.priority === 'urgent' && i.status !== 'closed' && i.status !== 'resolved').length,
-    };
-  })();
-
-  return { jobs, incidents, counts, loading, error };
+    let retired = false;
+    const request = ++sequence.current;
+    const current = () => !retired && request === sequence.current;
+    setClient(null); setJobs([]); setIncidents([]); setError(null);
+    setLoading(enabled);
+    if (enabled) {
+      void loadClientSafetyData(supabase).then(result => {
+        if (!current()) return;
+        setClient(result.client); setJobs(result.jobs); setIncidents(result.incidents);
+      }).catch(() => {
+        if (current()) setError('Safety records could not be loaded. Please retry.');
+      }).finally(() => { if (current()) setLoading(false); });
+    }
+    return () => { retired = true; };
+  }, [enabled, revision]);
+  const retry = useCallback(() => setRevision(value => value + 1), []);
+  return { client, jobs, incidents, loading, error, retry };
 }
 
 export function useUpdateSafetyCheck() {

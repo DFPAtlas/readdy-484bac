@@ -37,18 +37,18 @@ test('pending verification keeps one poll/countdown pair; terminal status stops 
 });
 function safetyEffect(){
  const source=fs.readFileSync('app/client/trust-safety/TrustSafetyClient.tsx','utf8');
- const start=source.indexOf('    let cancelled = false;');const end=source.indexOf('  }, [jobs]);',start);
+ const start=source.indexOf('    let retired = false;');const end=source.indexOf('  }, [jobs, loading',start);
  assert.ok(start>=0&&end>start);
- return new Function('jobs','supabase','setAssignments','setLoadingAssignments',compile(source.slice(start,end)));
+ return new Function('jobs','supabase','loadSafetyAssignments','setAssignments','setAssignmentsError','setAssignmentsFor','loading','error','checking','blocked',compile(source.slice(start,end)));
 }
 test('safety assignments reload for a same-size replacement job set, discard late results, and clear empty sets',async()=>{
- const effect=safetyEffect();const writes=[],loading=[],queries=[];const old=deferred();
- const db={from:()=>{const q={select:()=>q,in:(key,ids)=>{queries.push(ids);return ids.includes('old')?old.promise:Promise.resolve({data:[{id:'assignment-new',job_id:'new',guard_id:null}]})}};return q}};
- const first=effect([{id:'old'}],db,v=>writes.push(v),v=>loading.push(v));first();
- const second=effect([{id:'new'}],db,v=>writes.push(v),v=>loading.push(v));await flush();assert.ok(writes.at(-1).new);
- old.resolve({data:[{id:'assignment-old',job_id:'old',guard_id:null}]});await flush();assert.ok(writes.at(-1).new);assert.equal(writes.length,1);
- second();effect([],db,v=>writes.push(v),v=>loading.push(v));assert.deepEqual(writes.at(-1),{});assert.equal(loading.at(-1),false);
- assert.deepEqual(queries,[['old'],['new']]);
+ const effect=safetyEffect();const writes=[],ready=[],errors=[],queries=[];const old=deferred();
+ const load=async(_db,jobs)=>{queries.push(jobs.map(j=>j.id));return jobs.some(j=>j.id==='old')?old.promise:Object.fromEntries(jobs.map(j=>[j.id,[{id:'assignment-'+j.id}]]))};
+ const run=jobs=>effect(jobs,{},load,v=>writes.push(v),v=>errors.push(v),v=>ready.push(v),false,null,false,false);
+ const first=run([{id:'old'}]);first();const newJobs=[{id:'new'}];const second=run(newJobs);await flush();assert.ok(writes.at(-1).new);assert.equal(ready.at(-1),newJobs);
+ const count=writes.length;old.resolve({old:[{id:'assignment-old'}]});await flush();assert.ok(writes.at(-1).new);assert.equal(writes.length,count);
+ second();const empty=[];run(empty);await flush();assert.deepEqual(writes.at(-1),{});assert.equal(ready.at(-1),empty);
+ assert.deepEqual(queries,[['old'],['new'],[]]);assert.ok(errors.every(e=>e===null));
 });
 
 function paymentHarness(){

@@ -1,5 +1,7 @@
 'use client';
 
+import { loadOwnedWizardDraft, restoreWizardDraft } from '@/lib/client-wizard-draft';
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -104,6 +106,11 @@ function PostJobContent() {
   const [sitesLoading, setSitesLoading] = useState(true);
   const [draftSaveStatus, setDraftSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [draftRestoreLoading, setDraftRestoreLoading] = useState(false);
+  const [draftRestoreError, setDraftRestoreError] = useState('');
+  const [draftRetry, setDraftRetry] = useState(0);
+  const appliedWizardDraftRef = useRef<string | null>(null);
+  const requestedDraftId = searchParams.get('draft');
   const [activeStep, setActiveStep] = useState(1);
   const [toastMessage, setToastMessage] = useState('');
   const [paygServiceFeePct, setPaygServiceFeePct] = useState<number | null>(null);
@@ -177,7 +184,7 @@ function PostJobContent() {
     if (!allowed || !clientData || restoredDraftRef.current) return;
     const draft = loadPendingJobDraft();
     if (!draft) return;
-    if (!isImmediateMode && !searchParams.get('source')) return;
+    if (searchParams.get('draft') || (!isImmediateMode && !searchParams.get('source'))) return;
     restoredDraftRef.current = true;
     submissionIdRef.current = draft.submissionId || submissionIdRef.current || createSubmissionId();
     const mapped = mapPendingDraftToClientForm(draft);
@@ -262,44 +269,59 @@ function PostJobContent() {
     setDraftSaveStatus('saving');
     try {
       if (currentDraftId) {
-        await supabase.schema('app').from('job_drafts').update({
+        const { data: saved, error } = await supabase.schema('app').from('job_drafts').update({
           draft_name: formData.jobTitle || 'Untitled Draft',
           form_data: formData,
           last_saved_at: new Date().toISOString(),
-        }).eq('id', currentDraftId);
+        }).eq('id', currentDraftId).eq('client_id', clientId).select('id').maybeSingle();
+        if (error || !saved) throw error || new Error('Saved wizard draft could not be updated.');
       } else {
-        const { data } = await supabase.schema('app').from('job_drafts').insert({
+        const { data, error } = await supabase.schema('app').from('job_drafts').insert({
           client_id: clientId,
           draft_name: formData.jobTitle || 'Untitled Draft',
           form_data: formData,
         }).select().maybeSingle();
-        if (data) setCurrentDraftId(data.id);
+        if (error || !data) throw error || new Error('Saved wizard draft could not be created.');
+        setCurrentDraftId(data.id);
       }
       setDraftSaveStatus('saved');
       setToastMessage('Draft saved successfully');
       if (clientId) loadDraftsAndTemplates(clientId);
       setTimeout(() => setDraftSaveStatus('idle'), 2000);
     } catch {
+      setToastMessage('Wizard draft could not be saved. Please retry.');
       setDraftSaveStatus('idle');
     }
   }, [clientId, currentDraftId, formData, loadDraftsAndTemplates]);
 
-  const loadDraft = (draft: any) => {
-    const raw = draft.form_data || {};
-    setFormData(prev => ({
-      ...defaultFormData,
-      ...raw,
-      startTime: sanitiseTime(raw.startTime),
-      endTime: sanitiseTime(raw.endTime),
-      contactName: prev.contactName,
-      contactEmail: prev.contactEmail,
-      contactPhone: prev.contactPhone,
-    }));
-    setCurrentDraftId(draft.id);
-    setShowDrafts(false);
-    setToastMessage('Draft loaded');
-    setActiveStep(1);
-  };
+  const loadDraft = useCallback((draft: any) => {
+    try {
+      const raw = restoreWizardDraft(defaultFormData, draft.form_data);
+      setFormData(prev => ({ ...raw, startTime: sanitiseTime(raw.startTime), endTime: sanitiseTime(raw.endTime),
+        contactName: prev.contactName, contactEmail: prev.contactEmail, contactPhone: prev.contactPhone }));
+      setCurrentDraftId(draft.id); setShowDrafts(false); setDraftRestoreError('');
+      setToastMessage('Saved wizard draft loaded'); setActiveStep(1);
+      return true;
+    } catch {
+      setDraftRestoreError('This saved wizard draft is invalid. Return to Saved Wizard Drafts or start a new form.');
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    let retired = false;
+    if (!requestedDraftId) { appliedWizardDraftRef.current = null; setDraftRestoreError(''); setDraftRestoreLoading(false); return; }
+    if (!allowed || authLoading || checking || blocked || !clientId) return;
+    const key = `${clientId}:${requestedDraftId}`;
+    if (appliedWizardDraftRef.current === key) return;
+    setDraftRestoreLoading(true); setDraftRestoreError('');
+    void loadOwnedWizardDraft(supabase, clientId, requestedDraftId).then(draft => {
+      if (!retired && loadDraft(draft)) appliedWizardDraftRef.current = key;
+    }).catch(() => {
+      if (!retired) setDraftRestoreError('This saved wizard draft could not be loaded. Please retry or return to Saved Wizard Drafts.');
+    }).finally(() => { if (!retired) setDraftRestoreLoading(false); });
+    return () => { retired = true; };
+  }, [requestedDraftId, clientId, allowed, authLoading, checking, blocked, loadDraft, draftRetry]);
 
   const deleteDraft = async (id: string) => {
     await supabase.schema('app').from('job_drafts').delete().eq('id', id);
@@ -520,7 +542,7 @@ function PostJobContent() {
       setPostSubmitWarnings(result.warnings || []);
 
       if (currentDraftId) {
-        Promise.resolve(supabase.schema('app').from('job_drafts').delete().eq('id', currentDraftId)).then(() => {
+        Promise.resolve(supabase.schema('app').from('job_drafts').delete().eq('id', currentDraftId).eq('client_id', clientId)).then(() => {
           setCurrentDraftId(null);
         }).catch(() => {});
       }
@@ -540,7 +562,18 @@ function PostJobContent() {
     }
   };
 
-  if (authLoading || !allowed || checking) {
+  if (allowed && !authLoading && !checking && !blocked && draftRestoreError) return (
+    <div className="min-h-screen bg-[#0B1933] text-slate-200 flex items-center justify-center p-6">
+      <div role="alert" className="max-w-lg text-center space-y-4">
+        <p>{draftRestoreError}</p>
+        <button onClick={() => setDraftRetry(value => value + 1)} className="bg-teal-500 text-white px-6 py-3 rounded-xl">Retry saved draft</button>
+        <Link href="/client/jobs?tab=wizard_drafts" className="block text-teal-400">Saved Wizard Drafts</Link>
+        <Link href="/client/post-job" className="block text-teal-400">Start a new form</Link>
+      </div>
+    </div>
+  );
+
+  if (authLoading || !allowed || checking || (!blocked && draftRestoreLoading) || (!!requestedDraftId && !blocked && allowed && !draftRestoreError && appliedWizardDraftRef.current !== `${clientId}:${requestedDraftId}`)) {
     return (
       <div className="min-h-screen bg-[#0B1933] flex flex-col lg:flex-row">
         <PortalSidebar role="client" displayName="Client" subtitle="Free" initials="CL" />
@@ -714,7 +747,7 @@ function PostJobContent() {
               </button>
               <button onClick={() => setShowDrafts(true)} className="bg-[#162036] hover:bg-[#1a2642] text-slate-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap flex items-center gap-2 border border-[#1e2d4d]">
                 <i className="ri-draft-line text-teal-400"></i>
-                Drafts {drafts.length > 0 && <span className="bg-teal-500/20 text-teal-400 px-1.5 py-0.5 rounded text-xs">{drafts.length}</span>}
+                Saved Wizard Drafts {drafts.length > 0 && <span className="bg-teal-500/20 text-teal-400 px-1.5 py-0.5 rounded text-xs">{drafts.length}</span>}
               </button>
               <button onClick={() => setShowDuplicate(true)} className="bg-[#162036] hover:bg-[#1a2642] text-slate-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap flex items-center gap-2 border border-[#1e2d4d]">
                 <i className="ri-file-copy-2-line text-teal-400"></i>

@@ -1,5 +1,7 @@
 'use client';
 
+import { isOperationalSafetyJob, safetyShiftStart } from '@/lib/client-safety';
+
 interface AttentionItem {
   type: string;
   label: string;
@@ -51,8 +53,9 @@ export default function NeedsAttentionBadge({ items, compact = false }: NeedsAtt
 
 export function getAttentionItems(job: any): AttentionItem[] {
   const items: AttentionItem[] = [];
+  if (!isOperationalSafetyJob(job)) return items;
   const now = new Date().getTime();
-  const startTime = job.start_date ? new Date(job.start_date).getTime() : 0;
+  const startTime = safetyShiftStart(job) || 0;
   const hoursToStart = startTime ? (startTime - now) / (1000 * 60 * 60) : Infinity;
 
   if (['open', 'pending', 'awaiting_guard_selection'].includes(job.status) && (job.applications_count || 0) === 0) {

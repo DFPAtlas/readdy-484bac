@@ -1,5 +1,6 @@
 'use client';
 
+import { CLIENT_JOB_LIST_STATUSES, isCompletedClientJob, isScheduledDraftJob, loadClientJobSummary, loadClientWizardDrafts } from '@/lib/client-job-list';
 import { cancelClientJobs } from '@/lib/client-job-actions';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -30,7 +31,8 @@ const REALTIME_DEBOUNCE_MS = 1500;
 
 const TABS = [
   { key: 'all', label: 'All Jobs', icon: 'ri-list-check-2' },
-  { key: 'drafts', label: 'Drafts', icon: 'ri-draft-line' },
+  { key: 'drafts', label: 'Draft Jobs', icon: 'ri-draft-line' },
+  { key: 'wizard_drafts', label: 'Saved Wizard Drafts', icon: 'ri-draft-line' },
   { key: 'featured', label: 'Featured', icon: 'ri-vip-crown-line' },
   { key: 'scheduled', label: 'Scheduled', icon: 'ri-calendar-schedule-line' },
   { key: 'posted', label: 'Posted', icon: 'ri-send-plane-line' },
@@ -42,19 +44,7 @@ const TABS = [
   { key: 'cancelled', label: 'Cancelled', icon: 'ri-close-circle-line' },
 ];
 
-const STATUS_FILTERS: Record<string, string[]> = {
-  all: [],
-  drafts: [],
-  featured: [],
-  scheduled: [],
-  posted: ['open', 'pending'],
-  applications_open: ['awaiting_guard_selection'],
-  awaiting_payment: ['awaiting_payment', 'payment_pending'],
-  confirmed: ['confirmed'],
-  active: ['in_progress', 'active'],
-  completed: ['completed'],
-  cancelled: ['cancelled'],
-};
+const STATUS_FILTERS = CLIENT_JOB_LIST_STATUSES;
 
 const STATUS_LABELS = bookingLabels;
 
@@ -79,7 +69,12 @@ const JOB_FILTER_CONFIGS = [
       { value: 'awaiting_payment', label: 'Awaiting Payment' },
       { value: 'confirmed', label: 'Confirmed' },
       { value: 'in_progress', label: 'Active' },
+      { value: 'draft', label: 'Draft' },
       { value: 'completed', label: 'Completed' },
+      { value: 'payout_approved', label: 'Payout Pending' },
+      { value: 'paid_out', label: 'Paid Out' },
+      { value: 'review_pending', label: 'Review Pending' },
+      { value: 'closed', label: 'Closed' },
       { value: 'cancelled', label: 'Cancelled' },
       { value: 'disputed', label: 'Disputed' },
     ],
@@ -236,14 +231,14 @@ export default function JobManagement() {
     setToastType(type);
   }, []);
 
-  const buildJobQuery = useCallback(() => {
+  const buildJobQuery = useCallback((offset = 0) => {
     let query = supabase
       .from('jobs')
       .select('*, job_assignments(id, guard_id)', { count: 'exact' })
       .eq('client_id', clientId)
       .eq('is_deleted', false);
 
-    if (activeTab !== 'all' && activeTab !== 'drafts' && activeTab !== 'scheduled' && activeTab !== 'featured') {
+    if (activeTab !== 'all' && activeTab !== 'wizard_drafts' && activeTab !== 'scheduled' && activeTab !== 'featured') {
       const statuses = STATUS_FILTERS[activeTab];
       if (activeTab === 'applications_open') query = query.or('status.eq.awaiting_guard_selection,and(status.eq.open,applications_count.gt.0)');
       else if (statuses && statuses.length > 0) {
@@ -256,7 +251,7 @@ export default function JobManagement() {
     }
 
     if (activeTab === 'scheduled') {
-      query = query.eq('is_draft', true).gt('publish_at', new Date().toISOString());
+      query = query.eq('status', 'draft').eq('is_draft', true).gt('publish_at', new Date().toISOString());
     }
 
     if (statusFilter !== 'all') {
@@ -289,7 +284,7 @@ export default function JobManagement() {
       query = query.order('created_at', { ascending: false });
     }
 
-    query = query.limit(JOBS_PER_PAGE);
+    query = query.order('id', { ascending: false }).range(offset, offset + JOBS_PER_PAGE - 1);
 
     return query;
   }, [clientId, activeTab, statusFilter, dateFrom, dateTo, searchQuery, sortBy]);
@@ -304,12 +299,14 @@ export default function JobManagement() {
     else setRefreshing(true);
 
     try {
-      const query = buildJobQuery();
-      const [{ data: jobsData, count, error }, summary] = await Promise.all([query, supabase.from('jobs').select('id, status, applications_count, assigned_count, number_of_guards, is_featured, is_draft, publish_at, start_date, special_instructions').eq('client_id', clientId).eq('is_deleted', false)]);
+      const query = activeTab === 'wizard_drafts' ? Promise.resolve({ data: [], count: 0, error: null }) : buildJobQuery();
+      const [{ data: jobsData, count, error }, summary, wizardDrafts] = await Promise.all([
+        query, loadClientJobSummary(supabase, clientId), loadClientWizardDrafts(supabase, clientId),
+      ]);
       if (!isCurrent()) return;
-      if (summary.error) throw summary.error;
-      setSummaryJobs((summary.data || []) as ClientJob[]);
-      if (error) throw error;
+      if (error || !Array.isArray(jobsData) || typeof count !== 'number') throw error || new Error('Invalid jobs response');
+      setSummaryJobs(summary as ClientJob[]);
+      setDrafts(wizardDrafts);
 
       setHasMore((count || 0) > JOBS_PER_PAGE);
 
@@ -342,21 +339,6 @@ export default function JobManagement() {
       setPaymentMap(pmap);
       setJobs(formattedJobs);
 
-      if (activeTab === 'drafts') {
-        try {
-          const { data: draftsData } = await supabase
-            .schema('app')
-            .from('job_drafts')
-            .select('id, draft_name, last_saved_at')
-            .eq('client_id', clientId)
-            .order('last_saved_at', { ascending: false });
-          if (!isCurrent()) return;
-          setDrafts(draftsData || []);
-        } catch {
-          if (isCurrent()) setDrafts([]);
-        }
-      }
-
       if (!isCurrent()) return;
       setLastUpdated(new Date());
     } catch {
@@ -378,29 +360,12 @@ export default function JobManagement() {
     const isCurrent = () => !cancelledRef.current && request === requestRef.current && moreRequest === moreRequestRef.current;
     setLoadingMore(true);
     try {
-      const q = searchQuery.trim();
-      let query = supabase
-        .from('jobs')
-        .select('*, job_assignments(id, guard_id)')
-        .eq('client_id', clientId)
-        .eq('is_deleted', false);
+      const query = buildJobQuery(jobs.length);
 
-      if (activeTab !== 'all' && activeTab !== 'drafts' && activeTab !== 'scheduled' && activeTab !== 'featured') {
-        const statuses = STATUS_FILTERS[activeTab];
-        if (activeTab === 'applications_open') query = query.or('status.eq.awaiting_guard_selection,and(status.eq.open,applications_count.gt.0)');
-        else if (statuses && statuses.length > 0) query = query.in('status', statuses);
-      }
-      if (activeTab === 'featured') query = query.eq('is_featured', true);
-      if (activeTab === 'scheduled') query = query.eq('is_draft', true).gt('publish_at', new Date().toISOString());
-      if (statusFilter !== 'all') query = query.eq('status', statusFilter);
-      if (dateFrom) query = query.gte('start_date', dateFrom);
-      if (dateTo) query = query.lte('start_date', dateTo);
-      if (q) query = query.or(`job_title.ilike.%${q}%,venue_name.ilike.%${q}%,venue_city.ilike.%${q}%,venue_postcode.ilike.%${q}%,booking_reference.ilike.%${q}%`);
-      query = query.order('created_at', { ascending: false }).range(jobs.length, jobs.length + JOBS_PER_PAGE - 1);
-
-      const { data: moreData, count } = await query;
+      const { data: moreData, count, error } = await query;
       if (!isCurrent()) return;
-      const moreJobs = moreData || [];
+      if (error || !Array.isArray(moreData) || typeof count !== 'number') throw error || new Error('Invalid jobs response');
+      const moreJobs = moreData;
       setHasMore(jobs.length + moreJobs.length < (count || 0));
 
       const allIds = [...jobs, ...moreJobs].map((j: any) => j.id);
@@ -437,7 +402,7 @@ export default function JobManagement() {
     } finally {
       if (isCurrent()) setLoadingMore(false);
     }
-  }, [clientId, activeTab, statusFilter, dateFrom, dateTo, searchQuery, jobs, paymentMap, loadingMore, showToast]);
+  }, [clientId, buildJobQuery, jobs, paymentMap, loadingMore, showToast]);
 
   const loadJobsRef = useRef(loadJobs);
   loadJobsRef.current = loadJobs;
@@ -528,8 +493,8 @@ export default function JobManagement() {
   };
 
   const filteredJobs = jobs.filter((job) => {
-    if (activeTab === 'drafts') return false;
-    if (activeTab === 'scheduled') return job.is_draft && job.publish_at && new Date(job.publish_at) > new Date();
+    if (activeTab === 'wizard_drafts') return false;
+    if (activeTab === 'scheduled') return isScheduledDraftJob(job);
 
     if (paymentFilter !== 'all') {
       const ps = paymentMap[job.id] || 'none';
@@ -571,7 +536,7 @@ export default function JobManagement() {
   };
 
   const selectAllJobs = () => {
-    if (activeTab === 'drafts') return;
+    if (activeTab === 'wizard_drafts') return;
     const ids = filteredJobs.map(j => j.id);
     setSelectedJobIds(new Set(ids));
   };
@@ -709,7 +674,7 @@ export default function JobManagement() {
   };
 
   const handleExport = () => {
-    const jobsToExport = activeTab === 'drafts' ? [] : filteredJobs;
+    const jobsToExport = activeTab === 'wizard_drafts' ? [] : filteredJobs;
     if (jobsToExport.length === 0) {
       showToast('No jobs to export', 'warning');
       return;
@@ -757,15 +722,16 @@ export default function JobManagement() {
 
   const stats = {
     total: summaryJobs.length,
-    drafts: drafts.length,
+    drafts: summaryJobs.filter(j => j.status === 'draft').length,
+    wizardDrafts: drafts.length,
     featured: summaryJobs.filter(j => j.is_featured).length,
-    scheduled: summaryJobs.filter(j => j.is_draft && j.publish_at && new Date(j.publish_at) > new Date()).length,
+    scheduled: summaryJobs.filter(j => isScheduledDraftJob(j)).length,
     posted: summaryJobs.filter(j => ['open', 'pending'].includes(j.status)).length,
     applications: summaryJobs.filter(j => j.status === 'awaiting_guard_selection' || (j.status === 'open' && (j.applications_count || 0) > 0)).length,
     awaitingPayment: summaryJobs.filter(j => ['awaiting_payment','payment_pending'].includes(j.status)).length,
-    confirmed: summaryJobs.filter(j => j.status === 'confirmed').length,
+    confirmed: summaryJobs.filter(j => CLIENT_JOB_LIST_STATUSES.confirmed.includes(j.status)).length,
     active: summaryJobs.filter(j => ['in_progress','active'].includes(j.status)).length,
-    completed: summaryJobs.filter(j => j.status === 'completed').length,
+    completed: summaryJobs.filter(isCompletedClientJob).length,
     cancelled: summaryJobs.filter(j => j.status === 'cancelled').length,
     needsAction: summaryJobs.filter(j => getAttentionItems(j).length > 0).length,
   };
@@ -773,6 +739,7 @@ export default function JobManagement() {
   const getTabCount = (key: string) => {
     if (key === 'all') return stats.total;
     if (key === 'drafts') return stats.drafts;
+    if (key === 'wizard_drafts') return stats.wizardDrafts;
     if (key === 'featured') return stats.featured;
     if (key === 'scheduled') return stats.scheduled;
     if (key === 'posted') return stats.posted;
@@ -839,7 +806,7 @@ export default function JobManagement() {
             </button>
             <button
               onClick={handleExport}
-              disabled={exporting || activeTab === 'drafts' || filteredJobs.length === 0}
+              disabled={exporting || activeTab === 'wizard_drafts' || filteredJobs.length === 0}
               className="hidden md:flex items-center gap-2 bg-[#162036] text-slate-400 text-sm font-semibold px-3 py-2 rounded-xl hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 border border-[#1e2d4d]"
             >
               <i className={`ri-download-line ${exporting ? 'animate-pulse' : ''}`}></i>
@@ -870,7 +837,7 @@ export default function JobManagement() {
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3 mb-4 sm:mb-6">
             {[
               { label: 'Total', value: stats.total, icon: 'ri-briefcase-4-line', color: 'text-teal-400' },
-              { label: 'Drafts', value: stats.drafts, icon: 'ri-draft-line', color: 'text-slate-400' },
+              { label: 'Draft Jobs', value: stats.drafts, icon: 'ri-draft-line', color: 'text-slate-400' },
               { label: 'Posted', value: stats.posted, icon: 'ri-send-plane-line', color: 'text-blue-400' },
               { label: 'Applications', value: stats.applications, icon: 'ri-user-received-line', color: 'text-violet-400' },
               { label: 'Payment', value: stats.awaitingPayment, icon: 'ri-secure-payment-line', color: 'text-orange-400' },
@@ -915,6 +882,8 @@ export default function JobManagement() {
             })}
           </div>
 
+          <p className="text-sm text-slate-400 mb-4">Draft Jobs are saved job records. Saved Wizard Drafts are forms you can resume before creating a job.</p>
+          {activeTab !== 'wizard_drafts' && (
           <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4 mb-6">
             <SearchFilterBar
               searchQuery={searchQuery}
@@ -940,7 +909,7 @@ export default function JobManagement() {
               sortBy={sortBy}
               onSortChange={setSortBy}
               sortOptions={JOB_SORT_OPTIONS}
-              resultCount={activeTab === 'drafts' ? drafts.length : filteredJobs.length}
+              resultCount={activeTab === 'wizard_drafts' ? drafts.length : filteredJobs.length}
               loading={loading}
               onClear={handleClearFilters}
               showMobilePanel={showFilters}
@@ -961,7 +930,7 @@ export default function JobManagement() {
               </button>
               <button
                 onClick={handleExport}
-                disabled={exporting || activeTab === 'drafts' || filteredJobs.length === 0}
+                disabled={exporting || activeTab === 'wizard_drafts' || filteredJobs.length === 0}
                 className="flex md:hidden items-center gap-2 px-3 py-2 bg-[#162036] text-slate-400 text-sm font-semibold rounded-xl hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 border border-[#1e2d4d]"
               >
                 <i className={`ri-download-line ${exporting ? 'animate-pulse' : ''}`}></i>
@@ -969,6 +938,7 @@ export default function JobManagement() {
               </button>
             </div>
           </div>
+          )}
 
           {loadError ? (
             <div className="bg-[#111d35] rounded-2xl border border-red-500/20 shadow-sm p-10 md:p-16 text-center">
@@ -991,14 +961,14 @@ export default function JobManagement() {
                 </Link>
               </div>
             </div>
-          ) : activeTab === 'drafts' ? (
+          ) : activeTab === 'wizard_drafts' ? (
             drafts.length === 0 ? (
               <div className="bg-[#111d35] rounded-2xl border border-[#1e2d4d] shadow-sm p-10 md:p-16 text-center">
                 <div className="w-16 h-16 bg-[#162036] rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <i className="ri-draft-line text-3xl text-slate-600"></i>
                 </div>
-                <h3 className="text-lg font-semibold text-slate-200 mb-2">No drafts saved</h3>
-                <p className="text-slate-500 text-sm mb-6">Save a draft while posting a job to continue later</p>
+                <h3 className="text-lg font-semibold text-slate-200 mb-2">No wizard drafts saved</h3>
+                <p className="text-slate-500 text-sm mb-6">Save a form in the posting wizard to continue it here</p>
                 <Link href="/client/post-job" className="inline-flex items-center gap-2 bg-teal-500 text-white text-sm font-semibold px-6 py-3 rounded-xl hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap">
                   <i className="ri-add-line"></i>Post a Job
                 </Link>
@@ -1018,7 +988,7 @@ export default function JobManagement() {
                         </p>
                       </div>
                     </div>
-                    <Link href="/client/post-job">
+                    <Link href={`/client/post-job?draft=${encodeURIComponent(draft.id)}`}>
                       <button className="bg-teal-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap">
                         <i className="ri-edit-line mr-1"></i>Continue
                       </button>
@@ -1035,7 +1005,7 @@ export default function JobManagement() {
               <h3 className="text-lg font-semibold text-slate-200 mb-2">
                 {searchQuery || statusFilter !== 'all' || paymentFilter !== 'all' || dateFrom || dateTo || locationFilter !== 'all'
                   ? 'No jobs match your filters'
-                  : activeTab !== 'all' ? `No ${activeTab.replace(/_/g, ' ')} jobs` : 'No jobs yet'}
+                  : activeTab !== 'all' ? `No ${activeTab === 'drafts' ? 'draft' : activeTab.replace(/_/g, ' ')} jobs` : 'No jobs yet'}
               </h3>
               <p className="text-slate-500 text-sm mb-6">
                 {searchQuery || statusFilter !== 'all' || paymentFilter !== 'all' || dateFrom || dateTo || locationFilter !== 'all'

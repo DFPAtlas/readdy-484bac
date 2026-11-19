@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { useState } from 'react';
 
 interface JobWithSafety {
@@ -195,22 +197,12 @@ export default function EmergencyContactsPanel({ jobs, onSaveJobContact }: Emerg
                   <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">QuickGuard Support</h4>
                 </div>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Phone</span>
-                    <span className="text-slate-900 dark:text-slate-200">0800 123 4567</span>
-                  </div>
+                  <Link href="/client/support" className="block text-teal-500 hover:underline">Open Support Centre</Link>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 dark:text-slate-400">Email</span>
                     <span className="text-slate-900 dark:text-slate-200">support@quickguard.uk</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">AI support</span>
-                    <span className="text-slate-900 dark:text-slate-200">24/7</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Phone line hours</span>
-                    <span className="text-slate-900 dark:text-slate-200">Mon–Fri 9AM–6PM</span>
-                  </div>
+
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">Our AI assistant is available 24/7 to help with platform questions and common issues. For guard no-shows, safety incidents, or other urgent issues, report it in-app to escalate to our team.</p>
               </div>
