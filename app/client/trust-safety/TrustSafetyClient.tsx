@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouteGuard } from '@/hooks/useRouteGuard';
 import { supabase } from '@/lib/supabase';
+import { buildSafetyWarnings, safetyCounts } from '@/lib/client-safety';
+import { loadSafetyAssignments } from '@/lib/client-safety-data';
 import PortalSidebar from '@/components/PortalSidebar';
 import { useSafetyData, useUpdateSafetyCheck, useUpdateJobSafety } from './useSafetyData';
 import SafetyStatsBar from './SafetyStatsBar';
@@ -14,118 +16,30 @@ import IncidentHistory from './IncidentHistory';
 import ComplianceWarnings from './ComplianceWarnings';
 import type { GuardAssignment } from './useSafetyData';
 
-interface ClientDetails {
-  id: string;
-  company_name: string;
-  contact_name: string;
-}
-
 export default function TrustSafetyClient() {
   const { checking, blocked } = useRouteGuard();
-  const [client, setClient] = useState<ClientDetails | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [assignments, setAssignments] = useState<Record<string, GuardAssignment[]>>({});
-  const [, setLoadingAssignments] = useState(false);
+  const [assignmentsFor, setAssignmentsFor] = useState<unknown>(null);
+  const [assignmentsError, setAssignmentsError] = useState<string | null>(null);
+  const [assignmentRevision, setAssignmentRevision] = useState(0);
 
-  const { jobs, incidents, counts, loading } = useSafetyData();
+  const { client, jobs, incidents, loading, error, retry } = useSafetyData(!checking && !blocked);
   const updateSafetyCheck = useUpdateSafetyCheck();
   const updateJobSafety = useUpdateJobSafety();
 
-  const loadClient = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data } = await supabase
-      .from('clients')
-      .select('id, company_name, contact_name')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (data) setClient(data as ClientDetails);
-  }, []);
-
   useEffect(() => {
-    loadClient();
-  }, [loadClient]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (jobs.length === 0) {
-      setAssignments({});
-      setLoadingAssignments(false);
-      return;
-    }
-    const loadAssignments = async () => {
-      setLoadingAssignments(true);
-      const jobIds = jobs.map((j) => j.id);
-      const { data, error: assignmentError } = await supabase
-        .from('job_assignments')
-        .select('id, job_id, guard_id, status')
-        .in('job_id', jobIds);
-      if (cancelled) return;
-      if (assignmentError) throw assignmentError;
-
-      const guardIds = [...new Set((data || []).map((a: any) => a.guard_id).filter(Boolean))];
-      const guardMap: Record<string, any> = {};
-
-      if (guardIds.length > 0) {
-        const { data: safeProfiles, error: profilesError } = await supabase
-          .from('guard_public_profiles')
-          .select('id, full_name, sia_verified, licence_types')
-          .in('id', guardIds);
-
-        if (cancelled) return;
-        if (profilesError) throw profilesError;
-
-        const { data: applicantCompliance, error: complianceError } = await supabase
-          .from('client_applicant_profiles')
-          .select('guard_id, job_id, sia_licence_number, sia_expiry_date, licence_types')
-          .in('job_id', jobIds)
-          .in('guard_id', guardIds);
-
-        if (cancelled) return;
-        if (complianceError) throw complianceError;
-
-        const complianceByJobGuard: Record<string, any> = {};
-        (applicantCompliance || []).forEach((g: any) => {
-          complianceByJobGuard[`${g.job_id}-${g.guard_id}`] = g;
-        });
-
-        (safeProfiles || []).forEach((g: any) => {
-          guardMap[g.id] = g;
-        });
-
-        (data || []).forEach((a: any) => {
-          const safe = guardMap[a.guard_id] || null;
-          const compliance = complianceByJobGuard[`${a.job_id}-${a.guard_id}`] || null;
-          a.guards = safe
-            ? {
-                id: safe.id,
-                full_name: safe.full_name,
-                sia_licence_number: compliance?.sia_licence_number || null,
-                sia_verified: !!safe.sia_verified,
-                sia_expiry_date: compliance?.sia_expiry_date || null,
-                sia_licence_type: compliance?.licence_types?.[0] || safe.licence_types?.[0] || null,
-              }
-            : null;
-        });
-      }
-
-      const map: Record<string, GuardAssignment[]> = {};
-      (data || []).forEach((a: any) => {
-        if (!map[a.job_id]) map[a.job_id] = [];
-        map[a.job_id].push(a as GuardAssignment);
+    let retired = false;
+    setAssignments({}); setAssignmentsError(null); setAssignmentsFor(null);
+    if (!loading && !error && !checking && !blocked) {
+      void loadSafetyAssignments(supabase, jobs).then(result => {
+        if (!retired) { setAssignments(result); setAssignmentsFor(jobs); }
+      }).catch(() => {
+        if (!retired) setAssignmentsError('Assigned guard compliance could not be loaded. Please retry.');
       });
-      if (cancelled) return;
-      setAssignments(map);
-      setLoadingAssignments(false);
-    };
-    void loadAssignments().catch(error => {
-      if (cancelled) return;
-      console.error('Unable to load safety assignments:', error);
-      setAssignments({});
-      setLoadingAssignments(false);
-    });
-    return () => { cancelled = true; };
-  }, [jobs]);
+    }
+    return () => { retired = true; };
+  }, [jobs, loading, error, checking, blocked, assignmentRevision]);
 
   const handleToggle = async (jobId: string, checkId: string | undefined, field: string, value: boolean) => {
     if (!client) return;
@@ -163,7 +77,7 @@ export default function TrustSafetyClient() {
     }
   };
 
-  if (loading || checking) {
+  if (loading || checking || (!error && !assignmentsError && !blocked && assignmentsFor !== jobs)) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-[#0B1933] flex items-center justify-center">
         <div className="animate-spin rounded-full h-10 w-10 border-2 border-teal-500 border-t-transparent" />
@@ -181,6 +95,18 @@ export default function TrustSafetyClient() {
       </div>
     );
   }
+
+  if (error || assignmentsError) return (
+    <div className="min-h-screen bg-[#0B1933] text-slate-200 flex items-center justify-center p-6">
+      <div role="alert" className="max-w-lg text-center space-y-4">
+        <p>{error || assignmentsError}</p>
+        <button onClick={() => { if (error) retry(); else setAssignmentRevision(value => value + 1); }} className="bg-teal-500 text-white px-6 py-3 rounded-xl">Retry safety records</button>
+        <Link href="/client/dashboard" className="block text-teal-400">Back to Dashboard</Link>
+      </div>
+    </div>
+  );
+  const warnings = buildSafetyWarnings(jobs as any, assignments);
+  const counts = safetyCounts(jobs, incidents, warnings);
 
   const initials = client?.company_name
     ? client.company_name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
@@ -263,6 +189,7 @@ export default function TrustSafetyClient() {
 
           {activeTab === 'overview' && (
             <div className="space-y-6">
+              <p className="text-sm text-slate-500 dark:text-slate-400">Warnings and summary cards cover posted and booked jobs. Historical records remain available in the tabs.</p>
               <SafetyStatsBar counts={counts} onTabChange={setActiveTab} />
 
               {counts.complianceWarnings > 0 && (
@@ -274,7 +201,7 @@ export default function TrustSafetyClient() {
                       {counts.complianceWarnings}
                     </span>
                   </div>
-                  <ComplianceWarnings jobs={jobs as any} assignments={assignments} />
+                  <ComplianceWarnings jobs={jobs as any} assignments={assignments} warnings={warnings} />
                 </div>
               )}
 
@@ -377,7 +304,7 @@ export default function TrustSafetyClient() {
                 <i className="ri-error-warning-line text-orange-400 text-lg" />
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">Compliance Warnings</h2>
               </div>
-              <ComplianceWarnings jobs={jobs as any} assignments={assignments} />
+              <ComplianceWarnings jobs={jobs as any} assignments={assignments} warnings={warnings} />
             </div>
           )}
 

@@ -1,4 +1,7 @@
 import { supabase } from './supabase';
+import { isCompletedClientJob } from './client-job-list';
+import { isSafetyStartingSoon } from './client-safety';
+import { loadClientSafetySummary } from './client-safety-data';
 import { paymentTotals } from './financeAmounts';
 import type {
   Client,
@@ -337,14 +340,13 @@ export async function getClientDashboardStats(clientId: string, userId: string):
   error: string | null;
 }> {
   const now = new Date();
-  const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
   const in30d = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
   // Fetch jobs in one query
   const { data: jobsData, error: jobsError } = await supabase
     .from('jobs')
-    .select('id, status, start_date, start_time, created_at, updated_at, applications_count, assigned_count, hourly_rate, number_of_guards, risk_level, emergency_contact_name, emergency_contact_phone, sia_licence_required, lone_worker_flag, job_title, venue_city, venue_postcode, payment_status, agreed_amount')
+    .select('id, status, start_date, start_time, created_at, updated_at, applications_count, assigned_count, hourly_rate, number_of_guards, risk_level, emergency_contact_name, emergency_contact_phone, sia_licence_required, lone_worker_flag, job_title, venue_name, venue_city, venue_postcode, payment_status, agreed_amount, required_license_type, required_licence_types, specific_licences, site_access_instructions, parking_instructions, contact_name, contact_phone')
     .eq('client_id', clientId)
     .eq('is_deleted', false)
     .order('created_at', { ascending: false });
@@ -357,7 +359,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
   const stats: JobStat = {
     total_jobs: jobs.length,
     active_jobs: jobs.filter(j => ['active', 'in_progress'].includes(j.status)).length,
-    completed_jobs: jobs.filter(j => j.status === 'completed').length,
+    completed_jobs: jobs.filter(isCompletedClientJob).length,
     pending_payments: jobs.filter(j => j.status === 'payment_pending' || j.status === 'awaiting_payment').length,
   };
 
@@ -369,15 +371,11 @@ export async function getClientDashboardStats(clientId: string, userId: string):
     selectedCount: jobs.filter(j => j.status === "confirmed").length,
     paymentPendingCount: jobs.filter(j => j.status === "payment_pending" || j.status === "awaiting_payment").length,
     activeCount: jobs.filter(j => j.status === "active" || j.status === "in_progress").length,
-    completedCount: jobs.filter(j => j.status === "completed").length,
+    completedCount: jobs.filter(isCompletedClientJob).length,
   };
 
   const jobsAwaitingPayment = stats.pending_payments;
-  const jobsStartingSoon = jobs.filter(j => {
-    if (!j.start_date || ['cancelled','completed','closed'].includes(j.status)) return false;
-    const d = new Date(j.start_date);
-    return d >= now && d <= in48h;
-  }).length;
+  const jobsStartingSoon = jobs.filter(j => isSafetyStartingSoon(j, now)).length;
 
   // Fetch counts in parallel
   const [
@@ -512,20 +510,9 @@ export async function getClientDashboardStats(clientId: string, userId: string):
   const totalSpend = paymentTotals(txData.filter(t => t.created_at >= startOfMonth)).collected;
   const totalGuardsHired = [...new Set(distinctGuards.map(a => a.guard_id))].length;
 
-  // Safety counts
-  const missingSafetyInfo = 0;
-  let highRiskJobs = 0;
-  const complianceWarnings = 0;
-  let missingEmergencyContacts = 0;
-
-  jobs.forEach(j => {
-    if (j.risk_level === 'high' || j.risk_level === 'urgent') {
-      highRiskJobs++;
-    }
-    if (!j.emergency_contact_name && !j.emergency_contact_phone) {
-      missingEmergencyContacts++;
-    }
-  });
+  let currentSafety;
+  try { currentSafety = await loadClientSafetySummary(supabase, clientId, jobs); }
+  catch { return { stats, actionData: {}, error: 'Safety summary could not be loaded. Please retry.' }; }
 
   const [cancellationsRes, refundsRes, cancelledMonthRes] = await Promise.all([
     jobIds.length > 0
@@ -591,13 +578,13 @@ export async function getClientDashboardStats(clientId: string, userId: string):
       totalGuardsHired,
       totalSpendThisMonth: totalSpend,
       averageFillTime: 0, // TODO: calculate fill times if needed
-      completedThisMonth: jobs.filter(j => j.status === 'completed' && j.updated_at && new Date(j.updated_at) >= new Date(startOfMonth)).length,
+      completedThisMonth: jobs.filter(j => isCompletedClientJob(j) && j.updated_at && new Date(j.updated_at) >= new Date(startOfMonth)).length,
     },
     safetyCounts: {
-      missingSafetyInfo,
-      highRiskJobs,
-      complianceWarnings,
-      missingEmergencyContacts,
+      missingSafetyInfo: currentSafety.missingSafetyInfo,
+      highRiskJobs: currentSafety.highRiskJobs,
+      complianceWarnings: currentSafety.complianceWarnings,
+      missingEmergencyContacts: currentSafety.missingEmergencyContacts,
     },
     pipelineData,
     recentJobs,

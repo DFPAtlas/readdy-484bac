@@ -22,7 +22,7 @@ interface SafetyStatsBarProps {
 export default function SafetyStatsBar({ counts, onTabChange }: SafetyStatsBarProps) {
   const stats = [
     {
-      label: 'Total Jobs',
+      label: 'Operational Jobs',
       value: counts.totalJobs,
       icon: 'ri-briefcase-4-line',
       color: 'text-blue-400',
