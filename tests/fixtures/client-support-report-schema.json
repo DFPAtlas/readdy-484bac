@@ -1,0 +1,4 @@
+{
+  "complaints": ["id", "complaint_id", "filed_by_id", "filed_by_type", "filed_against_id", "filed_against_type", "related_job_id", "category", "severity", "description", "evidence_url", "status", "admin_notes", "client_response", "resolution_notes", "created_at", "updated_at", "resolved_at"],
+  "disputes": ["id", "job_id", "client_id", "guard_id", "assignment_id", "raised_by", "reason", "details", "status", "admin_notes", "resolution", "refund_amount", "admin_decided_by", "stripe_refund_id", "stripe_transfer_id", "created_at", "resolved_at", "updated_at"]
+}

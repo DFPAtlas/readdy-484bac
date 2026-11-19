@@ -139,7 +139,7 @@ test('report financial reads cannot overwrite a newer refresh or a closed screen
   const setters = [...new Set([...body.matchAll(/\b(set[A-Z]\w*)\(/g)].map(match => match[1]))];
   const pending = [], writes = [];
   const env = { useCallback: fn => fn, reportRequest: { current: 0 }, reportMounted: { current: true },
-    loadClientFinanceRecords: () => new Promise(resolve => pending.push(resolve)),
+    loadClientFinanceRecords: () => new Promise(resolve => pending.push(resolve)), loadClientSupportReport: async () => [],
     supabase: { auth: { getUser: async () => ({ data: { user: { id: 'user' } }, error: null }) }, from(table) { const q = { select: () => q, eq: () => q, in: () => q, order: () => q, maybeSingle: async () => ({ data: { id: 'client' } }), then: (resolve, reject) => Promise.resolve({ data: table === 'clients' ? { id: 'client' } : [], error: null }).then(resolve, reject) }; return q; } },
     ...Object.fromEntries(setters.map(name => [name, value => writes.push({ name, value })])),
   };

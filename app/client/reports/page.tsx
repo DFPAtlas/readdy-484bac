@@ -18,6 +18,7 @@ import FinanceReport from './FinanceReport';
 import AttendanceReport from './AttendanceReport';
 import ComplianceReport from './ComplianceReport';
 import SupportReport from './SupportReport';
+import { loadClientSupportReport, filterSupportReport, supportReportSummary, type SupportReportRecord } from '@/lib/client-support-report';
 
 export interface ReportRange {
   from: string;
@@ -28,7 +29,7 @@ export interface ReportData {
   jobs: any[];
   transactions: any[];
   subscriptionPayments: any[];
-  complaints: any[];
+  supportRecords: SupportReportRecord[];
   jobAssignments: any[];
   guards: any[];
   client: any;
@@ -74,7 +75,7 @@ const REPORT_CATEGORIES = [
   {
     key: 'support',
     label: 'Support & Disputes',
-    description: 'Complaints, tickets, and resolution records.',
+    description: 'Support tickets, complaints, job disputes and resolution records.',
     icon: 'ri-customer-service-2-line',
     color: 'from-orange-500/20 to-red-600/20',
     iconColor: 'text-orange-400',
@@ -100,7 +101,7 @@ export default function ClientReportsPage() {
     jobs: [],
     transactions: [],
     subscriptionPayments: [],
-    complaints: [],
+    supportRecords: [],
     jobAssignments: [],
     guards: [],
     client: null,
@@ -146,12 +147,7 @@ export default function ClientReportsPage() {
 
       const { transactions, subscriptionPayments } = await loadClientFinanceRecords(supabase, client.id, user.id);
 
-      const { data: complaints } = await supabase
-        .from('complaints')
-        .select('*')
-        .eq('filed_by_id', user.id)
-        .eq('filed_by_type', 'client')
-        .order('created_at', { ascending: false });
+      const supportRecords = await loadClientSupportReport(supabase, client.id, user.id);
 
       const { data: assignments } = await supabase
         .from('job_assignments')
@@ -168,7 +164,7 @@ export default function ClientReportsPage() {
         jobs: jobs || [],
         transactions: transactions || [],
         subscriptionPayments: subscriptionPayments || [],
-        complaints: complaints || [],
+        supportRecords,
         jobAssignments: assignments || [],
         guards: guards || [],
         client,
@@ -206,18 +202,12 @@ export default function ClientReportsPage() {
   const filteredTransactions = paymentsInRange(reportData.transactions, reportRange);
   const filteredSubscriptionPayments = paymentsInRange(reportData.subscriptionPayments, reportRange);
 
-  const filteredComplaints = reportData.complaints.filter(c => {
-    if (!reportRange.from && !reportRange.to) return true;
-    const d = c.created_at?.slice(0, 10);
-    if (reportRange.from && d < reportRange.from) return false;
-    if (reportRange.to && d > reportRange.to) return false;
-    return true;
-  });
+  const filteredSupportRecords = filterSupportReport(reportData.supportRecords, reportRange);
+  const supportSummary = supportReportSummary(filteredSupportRecords);
 
   const stats = {
     totalJobs: reportData.jobs.length,
     completedJobs: reportData.jobs.filter(j => j.status === 'completed').length,
-    openComplaints: reportData.complaints.filter(c => c.status === 'open').length,
     compliantGuards: reportData.guards.filter(g => g.sia_verified && g.sia_expiry_date && new Date(g.sia_expiry_date) > new Date()).length,
     expiringGuards: reportData.guards.filter(g => {
       if (!g.sia_expiry_date) return false;
@@ -384,7 +374,8 @@ export default function ClientReportsPage() {
             {[
               { label: 'Total Jobs', value: stats.totalJobs, icon: 'ri-briefcase-4-line', color: 'text-teal-400' },
               { label: 'Completed', value: stats.completedJobs, icon: 'ri-checkbox-circle-line', color: 'text-emerald-400' },
-              { label: 'Open Disputes', value: stats.openComplaints, icon: 'ri-error-warning-line', color: 'text-orange-400' },
+              { label: 'Open Support Tickets', value: supportSummary.openTickets, icon: 'ri-error-warning-line', color: 'text-orange-400' },
+              { label: 'Active Job Disputes', value: supportSummary.activeDisputes, icon: 'ri-error-warning-line', color: 'text-orange-400' },
               { label: 'Compliant Guards', value: stats.compliantGuards, icon: 'ri-shield-check-line', color: 'text-emerald-400' },
               { label: 'SIA Expiring', value: stats.expiringGuards, icon: 'ri-timer-flash-line', color: 'text-amber-400' },
             ].map((s) => (
@@ -453,8 +444,8 @@ export default function ClientReportsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {REPORT_CATEGORIES.map((cat) => {
                 const count = cat.key === 'job_history' ? filteredJobs.length
-                  : cat.key === 'finance' ? filteredTransactions.length + reportData.subscriptionPayments.length
-                  : cat.key === 'support' ? filteredComplaints.length
+                  : cat.key === 'finance' ? filteredTransactions.length + filteredSubscriptionPayments.length
+                  : cat.key === 'support' ? filteredSupportRecords.length
                   : cat.key === 'compliance' ? reportData.guards.length
                   : cat.key === 'guard_attendance' ? reportData.jobAssignments.length
                   : 0;
@@ -532,7 +523,7 @@ export default function ClientReportsPage() {
               )}
               {activeReport === 'support' && (
                 <SupportReport
-                  complaints={filteredComplaints}
+                  records={reportData.supportRecords}
                   reportRange={reportRange}
                   onToast={setToast}
                 />
