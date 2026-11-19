@@ -11,15 +11,19 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
   try {
     const authHeader = req.headers.get('authorization') || '';
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey, {
+      db: { schema: 'app' },
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const token = authHeader.replace('Bearer ', '');
+    const token = /^Bearer\s+(\S+)$/i.exec(authHeader)?.[1];
+    if (!token) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -28,30 +32,29 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: client } = await supabase
+    const closure = await supabase.from('account_closures').select('user_id').eq('user_id', user.id).maybeSingle();
+    if (closure.error) throw closure.error;
+    if (closure.data) return new Response(JSON.stringify({ error: 'Account closed' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+    const { data: client, error: clientError } = await supabase
       .from('clients')
       .select('id, company_name, total_spent')
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (!client) {
-      return new Response(
-        JSON.stringify({
-          client: null,
-          jobs: [],
-          stats: null,
-          totalCount: 0,
-          page: 1,
-          pageSize: 10,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    if (clientError) throw clientError;
+    if (!client) return new Response(JSON.stringify({ error: 'Client account not found' }), {
+      status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
     const clientId = client.id;
 
     let body: any = {};
     try { body = await req.json(); } catch { body = {}; }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return new Response(JSON.stringify({ error: 'Invalid filters' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    for (const key of ['search', 'status', 'payment', 'guardSearch', 'dateFrom', 'dateTo']) {
+      if (body[key] != null && (typeof body[key] !== 'string' || body[key].length > 200)) return new Response(JSON.stringify({ error: 'Invalid filters' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     const page = Math.max(1, parseInt(String(body.page)) || 1);
     const pageSize = Math.min(50, Math.max(5, parseInt(String(body.pageSize)) || 10));
@@ -68,7 +71,7 @@ Deno.serve(async (req) => {
         .from('jobs')
         .select('id', { count: 'exact' })
         .eq('client_id', clientId)
-        .eq('is_deleted', false);
+        .or('is_deleted.is.null,is_deleted.eq.false');
       if (search) {
         q = q.or(`job_title.ilike.%${search}%,venue_city.ilike.%${search}%,venue_postcode.ilike.%${search}%`);
       }
@@ -77,9 +80,10 @@ Deno.serve(async (req) => {
         else if (statusFilter === 'awaiting_payment') q = q.in('payment_status', ['pending', 'awaiting_payment']);
         else if (statusFilter === 'funded') q = q.in('payment_status', ['funded', 'paid']);
         else if (statusFilter === 'in_progress') q = q.in('status', ['in_progress', 'active']);
+        else if (statusFilter === 'awaiting_approval') q = q.in('status', ['awaiting_client_approval', 'awaiting_approval']);
         else if (statusFilter === 'completed') q = q.eq('status', 'completed');
         else if (statusFilter === 'disputed') q = q.eq('disputed', true);
-        else if (statusFilter === 'refunded') q = q.not('refunded_at', 'is', null);
+        else if (statusFilter === 'refunded') q = q.eq('payment_status', 'refunded');
         else if (statusFilter === 'cancelled') q = q.eq('status', 'cancelled');
       }
       if (paymentFilter !== 'all') {
@@ -100,11 +104,10 @@ Deno.serve(async (req) => {
           status, payment_status, stripe_payment_intent_id,
           platform_fee, guard_payout_amount,
           created_at, updated_at, applications_count, assigned_count,
-          disputed, disputed_at, disputed_reason, is_deleted,
-          cancelled_at, refund_amount, refunded_at
+          disputed, disputed_at, disputed_reason, is_deleted
         `)
         .eq('client_id', clientId)
-        .eq('is_deleted', false);
+        .or('is_deleted.is.null,is_deleted.eq.false');
       if (search) {
         q = q.or(`job_title.ilike.%${search}%,venue_city.ilike.%${search}%,venue_postcode.ilike.%${search}%`);
       }
@@ -113,15 +116,16 @@ Deno.serve(async (req) => {
         else if (statusFilter === 'awaiting_payment') q = q.in('payment_status', ['pending', 'awaiting_payment']);
         else if (statusFilter === 'funded') q = q.in('payment_status', ['funded', 'paid']);
         else if (statusFilter === 'in_progress') q = q.in('status', ['in_progress', 'active']);
+        else if (statusFilter === 'awaiting_approval') q = q.in('status', ['awaiting_client_approval', 'awaiting_approval']);
         else if (statusFilter === 'completed') q = q.eq('status', 'completed');
         else if (statusFilter === 'disputed') q = q.eq('disputed', true);
-        else if (statusFilter === 'refunded') q = q.not('refunded_at', 'is', null);
+        else if (statusFilter === 'refunded') q = q.eq('payment_status', 'refunded');
         else if (statusFilter === 'cancelled') q = q.eq('status', 'cancelled');
       }
       if (paymentFilter !== 'all') q = q.eq('payment_status', paymentFilter);
       if (dateFrom) q = q.gte('start_date', dateFrom);
       if (dateTo) q = q.lte('start_date', dateTo);
-      q = q.order('created_at', { ascending: false }).range(offset, offset + pageSize - 1);
+      q = q.order('created_at', { ascending: false }).order('id', { ascending: false }).range(offset, offset + pageSize - 1);
       return q;
     }
 
@@ -129,9 +133,13 @@ Deno.serve(async (req) => {
     let jobsData: any[];
 
     if (guardSearch) {
-      const { data: allJobRows, error: countErr } = await buildCountQuery();
-      if (countErr) throw countErr;
-      const allIds = (allJobRows || []).map((j: any) => j.id);
+      const allIds: string[] = [];
+      for (let start = 0; ; start += 500) {
+        const { data: rows, error } = await buildCountQuery().order('created_at', { ascending: false }).order('id', { ascending: false }).range(start, start + 499);
+        if (error) throw error;
+        allIds.push(...(rows || []).map((j: any) => j.id));
+        if (!rows || rows.length < 500) break;
+      }
 
       const guardMatchSet = new Set<string>();
       if (allIds.length > 0) {
@@ -145,16 +153,18 @@ Deno.serve(async (req) => {
             .in('job_id', allIds)
             .ilike('guards.full_name', `%${guardSearch}%`),
         ]);
+        if (assignRes.error) throw assignRes.error;
+        if (appRes.error) throw appRes.error;
         (assignRes.data || []).forEach((a: any) => guardMatchSet.add(a.job_id));
         (appRes.data || []).forEach((a: any) => guardMatchSet.add(a.job_id));
       }
 
-      const matchedIds = Array.from(guardMatchSet);
+      const matchedIds = allIds.filter(id => guardMatchSet.has(id));
       totalCount = matchedIds.length;
       const pageIds = matchedIds.slice(offset, offset + pageSize);
 
       if (pageIds.length > 0) {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('jobs')
           .select(`
             id, job_title, venue_city, venue_postcode,
@@ -163,11 +173,11 @@ Deno.serve(async (req) => {
             status, payment_status, stripe_payment_intent_id,
             platform_fee, guard_payout_amount,
             created_at, updated_at, applications_count, assigned_count,
-            disputed, disputed_at, disputed_reason, is_deleted,
-            cancelled_at, refund_amount, refunded_at
+            disputed, disputed_at, disputed_reason, is_deleted
           `)
-          .in('id', pageIds)
-          .order('created_at', { ascending: false });
+          .in('id', pageIds).eq('client_id', clientId).or('is_deleted.is.null,is_deleted.eq.false')
+          .order('created_at', { ascending: false }).order('id', { ascending: false });
+        if (error) throw error;
         jobsData = data || [];
       } else {
         jobsData = [];
@@ -195,12 +205,13 @@ Deno.serve(async (req) => {
         supabase.from('job_applications').select('id, job_id, guard_id, status, applied_at, guards (id, full_name, profile_image_url, rating)').in('job_id', currentJobIds).order('applied_at', { ascending: false }),
         supabase.from('job_completion_requests').select('id, job_id, guard_id, status, requested_at, client_approved_at, client_disputed_at, dispute_reason, admin_approved_at, notes').in('job_id', currentJobIds).order('requested_at', { ascending: false }),
         supabase.from('disputes').select('id, job_id, guard_id, status, reason, details, resolution, refund_amount, admin_notes, stripe_refund_id, created_at, resolved_at').in('job_id', currentJobIds).order('created_at', { ascending: false }),
-        supabase.from('reviews').select('id, job_id, guard_id, rating, punctuality_rating, professionalism_rating, communication_rating, comment, created_at, guards (full_name)').eq('client_id', user.id).in('job_id', currentJobIds).order('created_at', { ascending: false }),
+        supabase.from('reviews').select('id, job_id, guard_id, rating, punctuality_rating:punctuality, professionalism_rating:professionalism, communication_rating:communication, comment:review_text, created_at, guards (full_name)').eq('client_id', clientId).in('job_id', currentJobIds).order('created_at', { ascending: false }),
         supabase.from('client_reviews').select('id, job_id, guard_id, rating, comment, created_at, guards (full_name)').eq('client_id', clientId).in('job_id', currentJobIds).order('created_at', { ascending: false }),
         supabase.from('payment_audit_logs').select('id, job_id, assignment_id, guard_id, from_status, to_status, changed_by_role, reason, stripe_event_id, created_at').eq('client_id', clientId).in('job_id', currentJobIds).order('created_at', { ascending: false }).limit(200),
-        supabase.from('transactions').select('id, job_id, amount, status, stripe_payment_intent_id, stripe_invoice_id, receipt_url, created_at').eq('client_id', clientId).in('job_id', currentJobIds).order('created_at', { ascending: false }),
+        supabase.from('transactions').select('id, job_id, amount, status, stripe_payment_intent_id:stripe_payment_intent, stripe_invoice_id, receipt_url, created_at, refund_amount, refunded_at').eq('client_id', clientId).in('job_id', currentJobIds).order('created_at', { ascending: false }),
       ]);
 
+      for (const result of results) if (result.error) throw result.error;
       assignments = results[0].data || [];
       applications = results[1].data || [];
       completionRequests = results[2].data || [];
@@ -228,8 +239,8 @@ Deno.serve(async (req) => {
         assigned_count: job.assigned_count || 0,
         disputed: job.disputed, disputed_at: job.disputed_at,
         disputed_reason: job.disputed_reason,
-        cancelled_at: job.cancelled_at,
-        refund_amount: job.refund_amount, refunded_at: job.refunded_at,
+        cancelled_at: null,
+        refund_amount: null, refunded_at: null,
         guards: [], applications: [], completion_requests: [],
         disputes: [], reviews: [], client_reviews: [],
         audit_logs: [], transactions: [],
@@ -317,12 +328,16 @@ Deno.serve(async (req) => {
 
     transactions.forEach((t: any) => {
       const e = jobMap.get(t.job_id);
-      if (e) e.transactions.push({
+      if (e) {
+        if (t.refund_amount != null) e.refund_amount = Number(e.refund_amount || 0) + Number(t.refund_amount);
+        if (t.refunded_at && (!e.refunded_at || t.refunded_at > e.refunded_at)) e.refunded_at = t.refunded_at;
+        e.transactions.push({
         id: t.id, amount: t.amount, status: t.status,
         stripe_payment_intent_id: t.stripe_payment_intent_id,
         stripe_invoice_id: t.stripe_invoice_id,
         receipt_url: t.receipt_url, created_at: t.created_at,
-      });
+        });
+      }
     });
 
     const jobs = Array.from(jobMap.values());
@@ -352,8 +367,8 @@ Deno.serve(async (req) => {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message || 'Internal error' }), {
+  } catch {
+    return new Response(JSON.stringify({ error: 'Job history could not be loaded. Please try again.' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

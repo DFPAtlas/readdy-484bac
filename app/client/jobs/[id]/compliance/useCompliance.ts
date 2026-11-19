@@ -27,6 +27,7 @@ export interface ComplianceInfo {
 }
 
 export interface GuardComplianceData {
+  licence_documents_private?: boolean;
   id: string;
   full_name: string;
   sia_verified: boolean;
@@ -121,7 +122,7 @@ export function computeComplianceInfo(
   const hasLicenceBack = !!guard.sia_licence_back_url;
   if (hasLicenceFront) score += 10;
   if (hasLicenceBack) score += 10;
-  if (!hasLicenceFront && !hasLicenceBack && siaStatus !== "missing") {
+  if (!hasLicenceFront && !hasLicenceBack && siaStatus !== "missing" && !guard.licence_documents_private) {
     attentionReasons.push("Licence documents not uploaded");
   }
 
