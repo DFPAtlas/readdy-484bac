@@ -1,36 +1,14 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
 import { submitGuardApplication } from '@/lib/guard-applications';
-import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
+import { GuardJobInvite as JobInvite, loadGuardJobInvites, guardInviteRate, guardInviteTimestamp } from '@/lib/guard-job-invites';
 import MessageClientModal from '@/app/guard/components/MessageClientModal';
 import { formatDateOnly } from '@/lib/date-only';
-
-interface JobInvite {
-  id: string;
-  status: string;
-  invited_at: string;
-  responded_at: string | null;
-  message: string | null;
-  jobs: {
-    id: string;
-    job_title: string;
-    security_type: string;
-    venue_name: string;
-    venue_city: string;
-    start_date: string;
-    start_time: string;
-    end_time: string;
-    hourly_rate: number;
-    number_of_guards: number;
-    sia_licence_required: boolean;
-    clients: { company_name: string } | null;
-  } | null;
-}
 
 const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
   pending: { label: 'Awaiting Response', bg: 'bg-amber-500/10', text: 'text-amber-400' },
@@ -51,123 +29,134 @@ export default function GuardJobInvitesPage() {
   const [messageModalInvite, setMessageModalInvite] = useState<JobInvite | null>(null);
   const [clientUserId, setClientUserId] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState(false);
+  const mounted = useRef(false);
+  const generation = useRef(0);
+  const readSequence = useRef(0);
+  const reading = useRef(false);
+  const actionSequence = useRef(0);
+  const actionPending = useRef(false);
+  const messageSequence = useRef(0);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retire = useCallback(() => {
+    generation.current++; readSequence.current++; actionSequence.current++; messageSequence.current++;
+    actionPending.current = false; reading.current = false;
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
   const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') => {
+    if (!mounted.current) return;
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+    toastTimer.current = setTimeout(() => { if (mounted.current) setToast(null); }, 3500);
   };
 
   const load = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push('/guard/login'); return; }
-    setGuardUserId(user.id);
-
-    const { data: guard } = await supabase
-      .from('guards')
-      .select('id, full_name, verification_status')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!guard) { router.push('/guard/login'); return; }
-    if (guard.verification_status !== 'approved' && guard.verification_status !== 'verified') { router.push('/guard/onboarding'); return; }
-
-    setGuardId(guard.id);
-    setGuardName(guard.full_name);
-
-    const { data } = await supabase
-      .from('job_invites')
-      .select(`
-        id, status, invited_at, responded_at, message,
-        jobs (
-          id, job_title, security_type, venue_name, venue_city,
-          start_date, start_time, end_time, hourly_rate, number_of_guards,
-          sia_licence_required,
-          clients ( company_name )
-        )
-      `)
-      .eq('guard_id', guard.id)
-      .order('invited_at', { ascending: false });
-
-    setInvites((data || []) as any);
-    setLoading(false);
+    if (!mounted.current || actionPending.current) return;
+    const sequence = ++readSequence.current;
+    generation.current++; messageSequence.current++;
+    const current = () => mounted.current && readSequence.current === sequence;
+    reading.current = true;
+    setLoading(true); setLoadError(false); setInvites([]);
+    setGuardId(null); setGuardUserId(null); setGuardName('Guard'); setMessageModalInvite(null); setClientUserId(null);
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (!current()) return;
+      if (authError) throw authError;
+      if (!user) { setLoadError(true); router.push('/guard/login'); return; }
+      const { data: guard, error: guardError } = await supabase.from('guards')
+        .select('id, user_id, full_name, verification_status, is_active').eq('user_id', user.id).maybeSingle();
+      if (!current()) return;
+      if (guardError) throw guardError;
+      if (!guard) { setLoadError(true); router.push('/guard/login'); return; }
+      if (guard.user_id !== user.id) throw new Error('Guard identity changed');
+      if (guard.is_active === false || !['approved', 'verified'].includes(guard.verification_status)) { setLoadError(true); router.push('/guard/onboarding'); return; }
+      const rows = await loadGuardJobInvites(supabase, guard.id, current);
+      if (!current() || !rows) return;
+      const after = await supabase.auth.getUser();
+      if (!current()) return;
+      if (after.error || after.data.user?.id !== user.id) throw new Error('Session changed');
+      setGuardId(guard.id); setGuardUserId(user.id); setGuardName(guard.full_name || 'Guard'); setInvites(rows);
+    } catch { if (current()) setLoadError(true); }
+    finally { if (current()) { reading.current = false; setLoading(false); } }
   }, [router]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    mounted.current = true;
+    void load();
+    const focus = () => { void load(); };
+    window.addEventListener('focus', focus);
+    let authTimer: ReturnType<typeof setTimeout> | undefined;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
+      if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
+        retire(); setInvites([]); setGuardId(null); setGuardUserId(null); setProcessing(null);
+        setMessageModalInvite(null); setClientUserId(null); setToast(null); setLoading(true);
+        clearTimeout(authTimer);
+        authTimer = setTimeout(() => { if (mounted.current) void load(); }, 0);
+      }
+    });
+    return () => { mounted.current = false; retire(); subscription.unsubscribe(); window.removeEventListener('focus', focus); clearTimeout(authTimer); };
+  }, [load, retire]);
 
   const openMessageModal = async (invite: JobInvite) => {
-    if (!invite.jobs) return;
-    const { data: jobRow } = await supabase
-      .from('jobs')
-      .select('client_id')
-      .eq('id', invite.jobs.id)
-      .maybeSingle();
-    if (!jobRow?.client_id) {
-      showToast('Could not find client for this job.', 'error');
-      return;
-    }
-    const { data: clientRow } = await supabase
-      .from('clients')
-      .select('user_id')
-      .eq('id', jobRow.client_id)
-      .maybeSingle();
-    if (clientRow?.user_id) {
-      setClientUserId(clientRow.user_id);
-      setMessageModalInvite(invite);
-    } else {
-      showToast('Could not find client for this job.', 'error');
-    }
+    if (!invite.jobs || invite.status !== 'accepted' || reading.current || actionPending.current) return;
+    const epoch = generation.current, sequence = ++messageSequence.current;
+    const current = () => mounted.current && generation.current === epoch && messageSequence.current === sequence;
+    try {
+      const jobResult = await supabase.from('jobs').select('client_id').eq('id', invite.jobs.id).maybeSingle();
+      if (!current()) return;
+      if (jobResult.error || !jobResult.data?.client_id) throw new Error('Client unavailable');
+      const result = await supabase.from('clients').select('user_id').eq('id', jobResult.data.client_id).maybeSingle();
+      if (!current()) return;
+      if (result.error || !result.data?.user_id) throw new Error('Client unavailable');
+      setClientUserId(result.data.user_id); setMessageModalInvite(invite);
+    } catch { if (current()) showToast('Client messaging details could not be loaded. Please retry.', 'error'); }
   };
 
   const respond = async (inviteId: string, jobId: string, accept: boolean) => {
-    if (!guardId) return;
+    if (!guardId || !guardUserId || reading.current || actionPending.current || !invites.some(i => i.id === inviteId && i.status === 'pending' && i.jobs?.id === jobId)) return;
+    actionPending.current = true;
+    const epoch = generation.current, sequence = ++actionSequence.current;
+    const current = () => mounted.current && generation.current === epoch && actionSequence.current === sequence;
     setProcessing(inviteId);
     try {
+      const before = await supabase.auth.getUser();
+      if (!current()) return;
+      if (before.error || before.data.user?.id !== guardUserId) throw new Error('Session changed');
       if (!accept) {
-        const { data: declined, error } = await supabase
-          .from('job_invites')
+        const { data: declined, error } = await supabase.from('job_invites')
           .update({ status: 'declined', responded_at: new Date().toISOString() })
-          .eq('id', inviteId)
-          .eq('guard_id', guardId)
-          .eq('status', 'pending')
-          .select('id');
-        if (error || !declined?.length) {
-          showToast('Failed to respond. Please try again.', 'error');
-          return;
-        }
+          .eq('id', inviteId).eq('guard_id', guardId).eq('status', 'pending').select('id, status, responded_at');
+        if (!current()) return;
+        if (error || declined?.length !== 1 || declined[0].id !== inviteId || declined[0].status !== 'declined') throw new Error('Response not confirmed');
+        const after = await supabase.auth.getUser();
+        if (!current()) return;
+        if (after.error || after.data.user?.id !== guardUserId) throw new Error('Session changed');
         showToast('Invite declined.', 'info');
-        setInvites(prev => prev.map(inv => inv.id === inviteId ? { ...inv, status: 'declined' } : inv));
+        setInvites(prev => prev.map(inv => inv.id === inviteId ? { ...inv, status: 'declined', responded_at: declined[0].responded_at } : inv));
         return;
       }
-
-      const limitCheck = await checkGuardApplicationLimit(supabase, guardId);
-      if (!limitCheck.allowed) {
-        if (limitCheck.reason === 'limit_reached') {
-          showToast('You have reached your monthly application limit for your current plan. Upgrade your plan to apply for more jobs this month.', 'error');
-          router.push('/upgrade?reason=guard_application_limit_reached');
-        } else {
-          showToast('We could not verify your guard subscription plan. Please refresh or contact support.', 'error');
-          router.push('/upgrade?reason=guard.plan_verification_failed');
-        }
-        return;
-      }
-
-      // Acceptance and application commit together on the server. If the
-      // application fails, the invite stays pending so the guard can retry;
-      // repeating an accepted invite never creates a second application.
+      // The server handles eligibility, plan limits and replay atomically. A
+      // preflight limit check must not block replay after a lost acceptance reply.
       const result = await submitGuardApplication({ guardId, jobId, inviteId, coverMessage: 'Applied via job invite.' });
-      if (!result.ok) {
+      if (!current()) return;
+      const after = await supabase.auth.getUser();
+      if (!current()) return;
+      if (after.error || after.data.user?.id !== guardUserId) throw new Error('Session changed');
+      if (!result.ok || !result.applicationId) {
         if (result.limitReached) {
-          showToast('You have reached your monthly application limit for your current plan. Upgrade your plan to apply for more jobs this month.', 'error');
+          showToast('You have reached your monthly application limit. Upgrade your plan to apply for more jobs.', 'error');
           router.push('/upgrade?reason=guard_application_limit_reached');
-        } else {
-          showToast(`${result.error || 'Could not accept the invite.'} Your invite is still open — please try again.`, 'error');
-        }
+        } else showToast(result.error || 'The response could not be confirmed. Refresh before retrying.', 'error');
         return;
       }
-
       showToast(result.replayed ? 'Invite already accepted.' : 'Invite accepted! Application submitted.', 'success');
       setInvites(prev => prev.map(inv => inv.id === inviteId ? { ...inv, status: 'accepted' } : inv));
-    } finally {
-      setProcessing(null);
+    } catch { if (current()) showToast('The response could not be confirmed. Refresh before retrying.', 'error'); }
+    finally {
+      if (actionSequence.current === sequence) {
+        actionPending.current = false;
+        if (mounted.current) { setProcessing(null); void load(); }
+      }
     }
   };
 
@@ -176,7 +165,7 @@ export default function GuardJobInvitesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0B1933] flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+        <div role="status" aria-label="Loading invitations" className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -186,7 +175,7 @@ export default function GuardJobInvitesPage() {
       <PortalSidebar
         role="guard"
         displayName={guardName}
-        subtitle="Verified"
+        subtitle={guardId ? 'Verified' : 'Invitations'}
         initials={guardName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
         accentColor="emerald"
       />
@@ -211,24 +200,27 @@ export default function GuardJobInvitesPage() {
             <div>
               <h1 className="text-2xl font-bold text-white flex items-center gap-3">
                 Job Invites
-                {pendingCount > 0 && (
+                {!loadError && pendingCount > 0 && (
                   <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{pendingCount} new</span>
                 )}
               </h1>
-              <p className="text-sm text-slate-500">{invites.length} invite{invites.length !== 1 ? 's' : ''} total</p>
+              <p className="text-sm text-slate-500">{loadError ? 'Invitations unavailable' : `${invites.length} invite${invites.length !== 1 ? 's' : ''} total`}</p>
             </div>
           </div>
 
-          {pendingCount > 0 && (
+          <button type="button" onClick={() => void load()} disabled={processing !== null} className="mb-5 text-teal-400 underline disabled:opacity-50">Refresh invitations</button>
+          {loadError && <div role="alert" className="mb-6 rounded-xl border border-red-500/30 p-4 text-red-300">Invitations could not be loaded. Please retry or sign in again.<button type="button" onClick={() => void load()} className="ml-3 underline">Retry</button></div>}
+
+          {!loadError && pendingCount > 0 && (
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6 flex items-center gap-3">
               <i className="ri-mail-unread-line text-xl text-amber-400"></i>
               <p className="text-sm text-amber-300 font-medium">
-                You have {pendingCount} pending invite{pendingCount !== 1 ? 's' : ''} from clients. Review and respond below.
+                You have {pendingCount} pending invite{pendingCount !== 1 ? 's' : ''} from clients. Review the available details below.
               </p>
             </div>
           )}
 
-          {invites.length === 0 ? (
+          {loadError ? null : invites.length === 0 ? (
             <div className="bg-[#111d35] rounded-2xl border border-[#1e2d4d] p-16 text-center">
               <div className="w-16 h-16 bg-[#162036] rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <i className="ri-mail-line text-3xl text-slate-500"></i>
@@ -245,8 +237,7 @@ export default function GuardJobInvitesPage() {
             <div className="space-y-4">
               {invites.map(invite => {
                 const job = invite.jobs;
-                if (!job) return null;
-                const cfg = statusConfig[invite.status] || statusConfig.pending;
+                const cfg = Object.prototype.hasOwnProperty.call(statusConfig, invite.status || '') ? statusConfig[invite.status!] : { label: 'Status unavailable', bg: 'bg-slate-500/10', text: 'text-slate-400' };
                 const isPending = invite.status === 'pending';
                 const isAccepted = invite.status === 'accepted';
                 return (
@@ -254,34 +245,34 @@ export default function GuardJobInvitesPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <h3 className="text-lg font-semibold text-white">{job.job_title}</h3>
+                          <h3 className="text-lg font-semibold text-white">{job?.job_title || 'Job details unavailable'}</h3>
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.text} border-current/20`}>
                             {cfg.label}
                           </span>
                         </div>
-                        <p className="text-sm text-slate-400 mb-3">{job.clients?.company_name || 'Private Client'}</p>
+                        <p className="text-sm text-slate-400 mb-3">{job?.clients?.company_name || 'Client details unavailable'}</p>
                         {invite.message && (
                           <div className="bg-[#162036] rounded-xl p-3 mb-3 border border-[#1e2d4d]">
                             <p className="text-xs text-slate-500 mb-1 font-medium">Message from client:</p>
                             <p className="text-sm text-slate-300 italic">{invite.message}</p>
                           </div>
                         )}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-400">
+                        {job ? <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-400">
                           <span className="flex items-center gap-1"><i className="ri-map-pin-line text-slate-500"></i>{job.venue_city}</span>
                           <span className="flex items-center gap-1"><i className="ri-calendar-line text-slate-500"></i>{formatDateOnly(job.start_date, { day: 'numeric', month: 'short' })}</span>
-                          <span className="flex items-center gap-1"><i className="ri-time-line text-slate-500"></i>{job.start_time} – {job.end_time}</span>
-                          <span className="flex items-center gap-1 font-semibold text-teal-400"><i className="ri-money-pound-circle-line"></i>£{Number(job.hourly_rate).toFixed(2)}/hr</span>
-                        </div>
+                          <span className="flex items-center gap-1"><i className="ri-time-line text-slate-500"></i>{job.start_time && job.end_time ? `${job.start_time} – ${job.end_time}` : 'Time not recorded'}</span>
+                          <span className="flex items-center gap-1 font-semibold text-teal-400"><i className="ri-money-pound-circle-line"></i>{guardInviteRate(job.hourly_rate)}</span>
+                        </div> : <p className="text-sm text-slate-400">This invitation is retained. Linked job details are unavailable; responding and job navigation are disabled.</p>}
                         <p className="text-xs text-slate-600 mt-3">
-                          Invited {new Date(invite.invited_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          {invite.responded_at && ` · Responded ${new Date(invite.responded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+                          Invited {guardInviteTimestamp(invite.invited_at)}
+                          {invite.responded_at && ` · Responded ${guardInviteTimestamp(invite.responded_at, { day: 'numeric', month: 'short' })}`}
                         </p>
                       </div>
                       <div className="flex flex-col gap-2 flex-shrink-0">
-                        <Link href={`/jobs/detail?id=${job.id}`} className="px-4 py-2 bg-[#162036] text-slate-300 text-sm font-medium rounded-xl border border-[#1e2d4d] hover:border-teal-500/20 transition-colors whitespace-nowrap text-center">
+                        {job && <Link href={`/jobs/detail?id=${encodeURIComponent(job.id)}`} className="px-4 py-2 bg-[#162036] text-slate-300 text-sm font-medium rounded-xl border border-[#1e2d4d] hover:border-teal-500/20 transition-colors whitespace-nowrap text-center">
                           View Job
-                        </Link>
-                        {isAccepted && (
+                        </Link>}
+                        {job && isAccepted && (
                           <button
                             onClick={() => openMessageModal(invite)}
                             className="px-4 py-2 bg-[#162036] text-teal-400 text-sm font-medium rounded-xl border border-[#1e2d4d] hover:border-teal-500/20 transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 cursor-pointer"
@@ -289,18 +280,18 @@ export default function GuardJobInvitesPage() {
                             <i className="ri-message-3-line"></i>Message Client
                           </button>
                         )}
-                        {isPending && (
+                        {job && isPending && (
                           <>
                             <button
                               onClick={() => respond(invite.id, job.id, true)}
-                              disabled={processing === invite.id}
+                              disabled={processing !== null}
                               className="px-4 py-2 bg-teal-500 text-white text-sm font-medium rounded-xl hover:bg-teal-600 transition-colors whitespace-nowrap disabled:opacity-50"
                             >
                               {processing === invite.id ? 'Processing...' : 'Accept & Apply'}
                             </button>
                             <button
                               onClick={() => respond(invite.id, job.id, false)}
-                              disabled={processing === invite.id}
+                              disabled={processing !== null}
                               className="px-4 py-2 bg-red-500/10 text-red-400 text-sm font-medium rounded-xl border border-red-500/20 hover:bg-red-500/20 transition-colors whitespace-nowrap disabled:opacity-50"
                             >
                               Decline
@@ -324,7 +315,7 @@ export default function GuardJobInvitesPage() {
           jobId={messageModalInvite.jobs!.id}
           clientUserId={clientUserId}
           clientName={messageModalInvite.jobs!.clients?.company_name || 'Client'}
-          jobTitle={messageModalInvite.jobs!.job_title}
+          jobTitle={messageModalInvite.jobs!.job_title || 'Job details unavailable'}
           guardUserId={guardUserId}
         />
       )}
