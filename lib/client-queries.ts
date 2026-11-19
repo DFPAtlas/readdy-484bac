@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
-import { isCompletedClientJob } from './client-job-list';
+import { isCompletedClientJob, readAllClientRows } from './client-job-list';
+import { dashboardAttendance } from './client-dashboard-attendance';
 import { isSafetyStartingSoon } from './client-safety';
 import { loadClientSafetySummary } from './client-safety-data';
 import { paymentTotals } from './financeAmounts';
@@ -343,15 +344,15 @@ export async function getClientDashboardStats(clientId: string, userId: string):
   const in30d = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  // Fetch jobs in one query
-  const { data: jobsData, error: jobsError } = await supabase
+  // Read every owned page so dashboard counts and assignment enrichment agree.
+  let jobsData;
+  try { jobsData = await readAllClientRows(() => supabase
     .from('jobs')
-    .select('id, status, start_date, start_time, created_at, updated_at, applications_count, assigned_count, hourly_rate, number_of_guards, risk_level, emergency_contact_name, emergency_contact_phone, sia_licence_required, lone_worker_flag, job_title, venue_name, venue_city, venue_postcode, payment_status, agreed_amount, required_license_type, required_licence_types, specific_licences, site_access_instructions, parking_instructions, contact_name, contact_phone')
+    .select('id, status, start_date, start_time, end_date, end_time, created_at, updated_at, applications_count, assigned_count, hourly_rate, number_of_guards, risk_level, emergency_contact_name, emergency_contact_phone, sia_licence_required, lone_worker_flag, job_title, venue_name, venue_city, venue_postcode, payment_status, agreed_amount, required_license_type, required_licence_types, specific_licences, site_access_instructions, parking_instructions, contact_name, contact_phone')
     .eq('client_id', clientId)
     .eq('is_deleted', false)
-    .order('created_at', { ascending: false });
-
-  if (jobsError) return { stats: { total_jobs: 0, active_jobs: 0, completed_jobs: 0, pending_payments: 0 }, actionData: {}, error: jobsError.message };
+    .order('created_at', { ascending: false }).order('id', { ascending: true })); }
+  catch { return { stats: { total_jobs: 0, active_jobs: 0, completed_jobs: 0, pending_payments: 0 }, actionData: {}, error: 'Dashboard jobs could not be loaded. Please retry.' }; }
 
   const jobs = (jobsData || []).map((j: any) => ({ ...j, postcode: j.venue_postcode })) as unknown as Job[];
   const jobIds = jobs.map(j => j.id);
@@ -388,10 +389,10 @@ export async function getClientDashboardStats(clientId: string, userId: string):
     distinctGuardsRes,
   ] = await Promise.all([
     jobIds.length > 0
-      ? supabase
+      ? readAllClientRows(() => supabase
           .from('job_assignments')
-          .select('job_id, guard_id, status, assigned_at, attendance_status, check_in_time, issue_reported, replacement_requested, late_minutes')
-          .in('job_id', jobIds)
+          .select('id, job_id, guard_id, status, assigned_at, completed_at, attendance_status, guard_confirmed_at, check_in_time, check_out_time, issue_reported, replacement_requested, late_minutes')
+          .in('job_id', jobIds).order('id', { ascending: true })).then(data => ({ data }))
       : Promise.resolve({ data: [] }),
     jobIds.length > 0
       ? supabase.from('reviews').select('job_id, guard_id').eq('client_id', userId).in('job_id', jobIds)
@@ -419,26 +420,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
   const txData = txRes.data || [];
   const distinctGuards = (distinctGuardsRes.data || []) as { guard_id: string }[];
 
-  // Count attendance issues
-  let lateGuards = 0;
-  let noShows = 0;
-  let guardsNotCheckedIn = 0;
-  let jobsNeedingReplacement = 0;
-
-  assignments.forEach(a => {
-    if (a.attendance_status === 'late') lateGuards++;
-    if (a.attendance_status === 'no_show') noShows++;
-    if (a.attendance_status === 'confirmed' || a.attendance_status === 'not_checked_in' || a.attendance_status === 'awaiting_confirmation') {
-      const job = jobs.find(j => j.id === a.job_id);
-      if (job && job.start_date && job.start_time) {
-        const start = new Date(`${job.start_date}T${job.start_time}`);
-        if (now >= start) {
-          guardsNotCheckedIn++;
-        }
-      }
-    }
-    if (a.replacement_requested) jobsNeedingReplacement++;
-  });
+  const { guardsNotCheckedIn, lateGuards, noShows, jobsNeedingReplacement } = dashboardAttendance(jobs, assignments, now);
 
   const guardIds = [...new Set(assignments.map(a => a.guard_id).filter(Boolean))];
 
@@ -464,6 +446,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
 
   const assignmentMap: Record<string, Set<string>> = {};
   assignments.forEach(a => {
+    if (a.status === 'cancelled') return;
     if (!assignmentMap[a.job_id]) assignmentMap[a.job_id] = new Set();
     assignmentMap[a.job_id].add(a.guard_id);
   });
@@ -497,7 +480,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
       payment_status: (() => { const totals = paymentTotals(txData.filter(t => t.job_id === j.id)); return totals.refunded > 0 ? (totals.remaining === 0 ? 'refunded' : 'partially_refunded') : j.payment_status; })(),
       agreed_amount: j.agreed_amount,
       applications_count: j.applications_count || 0,
-      assigned_count: j.assigned_count || 0,
+      assigned_count: riAssigned,
       needs_payment: needsPayment,
       needs_review: j.status === "completed" && riAssigned > 0 && riReviewed < riAssigned,
       reviewed_count: riReviewed,
