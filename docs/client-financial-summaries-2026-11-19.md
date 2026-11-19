@@ -1,5 +1,47 @@
 # Client recorded payment summaries — C07
 
+## Published retest and compact history badge follow-up
+
+PR #185 is merged and published. Signed-in Payment Centre, Payment History,
+Job History, profile billing and All Time Reports all show £551 gross job
+payments, £204 refunds and £347 net. Payment History and Reports separately show
+£98 subscription gross/net and £0 subscription refunds. Payment Centre has zero
+current payable booking value and zero November gross job payments. Report
+finance detail agrees; its Last 30 Days preset shows zero collected job payments
+and £49 subscription payments. All Time restores the all-time amounts. Custom
+native date entry did not establish a report-state change in this automation
+attempt and remains unverified live; UK boundary logic has automated coverage.
+
+All four paid-out Job History cards now say Paid. A remaining serializer/display
+gap leaves the partial-refund history card incorrectly marked Paid while its
+expanded transaction says partially_refunded. The history API retains refund
+state but omits refund_amount from each nested transaction. The follow-up badge
+honours explicit partially_refunded state without inventing an amount. Financial
+summary arithmetic is unchanged and still reads the complete owned ledger.
+
+The new regression runs the real history endpoint fixture, feeds its serialized
+response to the actual label helper and reproduced Paid before this correction.
+It covers paid-out and cancelled jobs plus a compact transaction with no refund
+amount. The badge still requires a published retest after this follow-up ships.
+No migration or function deployment is required.
+
+Follow-up validation: all 615 repository unit tests and 24 focused finance/
+history/refund tests pass. The endpoint-response regression failed before the
+label correction. Typecheck, admin checks and changed-code lint must pass; their
+final results and GitHub Build Check status are recorded in the follow-up PR.
+The prior PR #185 production build is historical evidence, not a new build pass
+for this narrow label correction.
+
+The published dashboard also now shows zero current attendance alerts and one
+assigned guard on each displayed paid-out recent job. Trust & Safety loads with
+zero operational warnings and three retained incidents, including two job-linked
+records; its Support Centre link opens the three-ticket support page. These are
+core display passes, not positive attendance/compliance/mutation or fault-injected
+Retry acceptance. No live record or payment was changed.
+
+The implementation and pre-release instructions below are retained as historical
+evidence and are superseded by the published results above.
+
 The client pages used incompatible financial definitions. Payment History
 counted completed jobs but omitted job refunds; Reports used a different subset;
 Job History presented booking values as Total Spent; profile billing displayed a
