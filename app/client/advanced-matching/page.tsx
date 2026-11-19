@@ -157,6 +157,7 @@ export default function AdvancedMatchingPage() {
   const guards = useMemo(() => rawGuards.map(g => ({ ...g, match_score: computeMatchScore(g, preferences) })), [rawGuards, preferences]);
 
   const active = useRef(true);
+  const invitePending = useRef(false);
   const requestSequence = useRef(0);
   useEffect(() => {
     active.current = true;
@@ -252,50 +253,37 @@ export default function AdvancedMatchingPage() {
   }, [toast]);
 
   const handleInvite = async (guard: MatchedGuard) => {
+    if (invitePending.current) return;
     if (!inviteJobId || !clientId || !clientJobs.some(job => job.id === inviteJobId)) {
       setToast('Please select a job to invite this guard to');
       return;
     }
     setInvitingGuard(guard.id);
+    invitePending.current = true;
+    const jobId = inviteJobId;
+    const sequence = requestSequence.current;
+    const current = () => active.current && requestSequence.current === sequence;
     try {
-      const { data: existing, error: existingError } = await supabase
-        .from('job_invites')
-        .select('id')
-        .eq('job_id', inviteJobId)
-        .eq('guard_id', guard.id)
-        .eq('client_id', clientId)
-        .maybeSingle();
-
-      if (existingError) throw existingError;
-      if (existing) {
-        setInvitedPairs(prev => new Set(prev).add(`${inviteJobId}:${guard.id}`));
-        setToast('This guard has already been invited to this job');
-        setInvitingGuard(null);
-        setInviteJobId(null);
-        setInviteMessage('');
-        return;
-      }
-
-      const { error } = await supabase.from('job_invites').insert({
-        job_id: inviteJobId,
-        guard_id: guard.id,
-        client_id: clientId,
-        status: 'pending',
-        message: inviteMessage || `You've been matched to a security job. Tap to view details and apply.`,
+      const before = await supabase.auth.getUser();
+      if (!current()) return;
+      if (before.error || !before.data.user) throw new Error('Sign in required');
+      const { data, error } = await supabase.rpc('create_client_job_invite', {
+        p_job_id: jobId, p_guard_id: guard.id, p_message: inviteMessage || null,
       });
-
-      if (error) throw error;
-
-      // Guards read these records in Job Invites. Separate notifications must be
-      // delivered server-side; client catalogue profiles do not expose user IDs.
-      setInvitedPairs(prev => new Set(prev).add(`${inviteJobId}:${guard.id}`));
-      setToast(`Invitation added to ${guard.full_name}'s Job Invites`);
+      if (!current()) return;
+      const after = await supabase.auth.getUser();
+      if (!current()) return;
+      if (after.error || after.data.user?.id !== before.data.user.id) throw new Error('Session changed');
+      if (error || !data?.invite_id || typeof data.replayed !== 'boolean') throw error || new Error('Invitation not confirmed');
+      setInvitedPairs(prev => new Set(prev).add(`${jobId}:${guard.id}`));
+      setToast(data.replayed ? 'This guard has already been invited to this job' : `Invitation added to ${guard.full_name}'s Job Invites. Alerts follow their notification preferences.`);
       setInviteJobId(null);
       setInviteMessage('');
     } catch {
-      setToast('Failed to send invite');
+      if (current()) setToast('Invitation could not be confirmed. Check that the job and guard are still available, then retry.');
     } finally {
-      setInvitingGuard(null);
+      invitePending.current = false;
+      if (current()) setInvitingGuard(null);
     }
   };
 

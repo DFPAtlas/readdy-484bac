@@ -37,11 +37,12 @@ function harness(options={}) {
       for(const [method,key,value] of call.filters)if(method==='eq')rows=rows.filter(g=>g[key]===value);
       return {data:rows.map(g=>Object.fromEntries(selected.map(key=>[key,g[key]??null])))};
     }
+    if(call.table==='rpc:create_client_job_invite')return {data:{invite_id:'created-invite',status:'pending',replayed:false},error:null};
     if(call.filters.some(f=>['insert','delete'].includes(f[0])))return {data:null,error:null};
     if(call.filters.some(f=>f[0]==='maybeSingle'))return {data:call.table==='clients'?fixtures.clients:null,error:null};
     return {data:fixtures[call.table] ?? [],error:null};
   };
-  const db={auth:{getUser:async()=>options.auth ? options.auth() : {data:{user:{id:'client-user'}},error:null}},from(table){const call={table,filters:[]};calls.push(call);const q={};for(const method of ['select','eq','in','order','maybeSingle','insert','delete'])q[method]=(...args)=>{call.filters.push([method,...args]);return q;};q.then=(a,b)=>Promise.resolve().then(()=>options.read ? options.read(call,()=>defaultRead(call)) : defaultRead(call)).then(a,b);return q;}};
+  const db={rpc(name,args){const call={table:'rpc:'+name,filters:[['args',args]]};calls.push(call);return Promise.resolve().then(()=>options.read?options.read(call,()=>defaultRead(call)):defaultRead(call));},auth:{getUser:async()=>options.auth ? options.auth() : {data:{user:{id:'client-user'}},error:null}},from(table){const call={table,filters:[]};calls.push(call);const q={};for(const method of ['select','eq','in','order','maybeSingle','insert','delete'])q[method]=(...args)=>{call.filters.push([method,...args]);return q;};q.then=(a,b)=>Promise.resolve().then(()=>options.read ? options.read(call,()=>defaultRead(call)) : defaultRead(call)).then(a,b);return q;}};
   const router={push:path=>redirects.push(path)};
   const module={exports:{}};
   const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
@@ -111,17 +112,18 @@ test('saved guards and job-specific invitations remain separate, including after
 
 test('failed bookmark or invitation writes do not report success or create notifications with private user IDs',async()=>{
   for(const kind of ['favorite','invite']) {
-    const h=harness({read(call,normal){if(call.filters.some(f=>f[0]==='insert'))return {error:{message:'denied'}};return normal();}});await h.start();
+    const h=harness({read(call,normal){if(call.table==='rpc:create_client_job_invite'||call.filters.some(f=>f[0]==='insert'))return {error:{message:'denied'}};return normal();}});await h.start();
     if(kind==='favorite')await nodes(h.render()).find(n=>n.props?.['aria-label']==='Save Alice').props.onClick();
     else {select(h.render(),'Select a job...').props.onChange({target:{value:'job'}});await button(h.render(),'Invite').props.onClick();}
-    assert.match(text(h.render()),/Failed to (update saved guards|send invite)/);assert.equal(h.calls.some(c=>c.table==='notifications'),false);h.unmount();
+    assert.match(text(h.render()),/Failed to update saved guards|Invitation could not be confirmed/);assert.equal(h.calls.some(c=>c.table==='notifications'),false);h.unmount();
   }
 });
 
 test('successful invitation writes only owned job/guard IDs and does not mark guard as saved',async()=>{
   const h=harness();await h.start();select(h.render(),'Select a job...').props.onChange({target:{value:'job'}});await button(h.render(),'Invite').props.onClick();
-  const insert=h.calls.find(c=>c.table==='job_invites'&&c.filters.some(f=>f[0]==='insert')).filters.find(f=>f[0]==='insert')[1];
-  assert.equal(insert.job_id,'job');assert.equal(insert.client_id,'client');assert.equal(insert.guard_id,'Alice');assert.equal(insert.status,'pending');
+  const args=h.calls.find(c=>c.table==='rpc:create_client_job_invite').filters[0][1];
+  assert.deepEqual(args,{p_job_id:'job',p_guard_id:'Alice',p_message:null});
+  assert.equal(h.calls.some(c=>c.table==='job_invites'&&c.filters.some(f=>f[0]==='insert')),false);
   assert.match(text(h.render()),/Invitation added to Alice's Job Invites/);assert.ok(nodes(h.render()).some(n=>n.props?.['aria-label']==='Save Alice'));
   select(h.render(),'Select a job...').props.onChange({target:{value:'job'}});assert.ok(button(h.render(),'Invited'));h.unmount();
 });
@@ -147,4 +149,25 @@ test('a newer retry wins over an older result or error',async()=>{
 test('missing sessions redirect while authentication errors remain retryable',async()=>{
   const absent=harness({auth:()=>({data:{user:null},error:null})});await absent.start();assert.deepEqual(absent.redirects,['/client/login']);assert.equal(absent.calls.length,0);
   const failed=harness({auth:()=>({data:{user:null},error:{message:'offline'}})});assert.ok(button(await failed.start(),'Retry'));assert.equal(failed.calls.length,0);
+});
+
+
+test('invitation replay and rapid double click cannot create duplicate requests or alerts',async()=>{
+  const pending=deferred();const h=harness({read(call,normal){return call.table==='rpc:create_client_job_invite'?pending.promise:normal();}});await h.start();select(h.render(),'Select a job...').props.onChange({target:{value:'job'}});
+  const click=button(h.render(),'Invite').props.onClick;const first=click();await click();await flush();assert.equal(h.calls.filter(c=>c.table==='rpc:create_client_job_invite').length,1);
+  pending.resolve({data:{invite_id:'existing',status:'pending',replayed:true}});await first;assert.match(text(h.render()),/already been invited/);assert.doesNotMatch(text(h.render()),/Alerts follow/);h.unmount();
+});
+test('late invitation result after unmount cannot update the catalogue or announce success',async()=>{
+  const pending=deferred();const h=harness({read(call,normal){return call.table==='rpc:create_client_job_invite'?pending.promise:normal();}});await h.start();select(h.render(),'Select a job...').props.onChange({target:{value:'job'}});
+  const run=button(h.render(),'Invite').props.onClick();await flush();h.unmount();const before=h.writes;pending.resolve({data:{invite_id:'created',status:'pending',replayed:false}});await run;assert.equal(h.writes,before);
+});
+test('unconfirmed invitation result keeps the selected job for Retry and never reports delivery',async()=>{
+  const h=harness({read(call,normal){return call.table==='rpc:create_client_job_invite'?{data:null,error:null}:normal();}});await h.start();select(h.render(),'Select a job...').props.onChange({target:{value:'job'}});await button(h.render(),'Invite').props.onClick();
+  assert.match(text(h.render()),/Invitation could not be confirmed/);assert.equal(select(h.render(),'Select a job...').props.value,'job');assert.equal(button(h.render(),'Invite').props.disabled,false);h.unmount();
+});
+
+
+test('session change after invitation commit cannot mark the old account catalogue as invited',async()=>{
+  let reads=0;const h=harness({auth:()=>({data:{user:{id:++reads<3?'client-user':'changed-user'}}})});await h.start();select(h.render(),'Select a job...').props.onChange({target:{value:'job'}});await button(h.render(),'Invite').props.onClick();
+  assert.match(text(h.render()),/Invitation could not be confirmed/);assert.equal(button(h.render(),'Invite').props.disabled,false);h.unmount();
 });
