@@ -83,6 +83,22 @@ test('job payment badges use collected/refund records independently of booking/p
   assert.equal(finance.clientJobPaymentLabel({ payment_status: null, transactions: [] }), 'Payment status unavailable');
 });
 
+test('the real history endpoint response preserves the partial-refund badge even when nested refund amounts are omitted', async () => {
+  const { loadEndpoint, databaseFixture, sampleRows } = require('./helpers/client-read-fixture.cjs');
+  for (const status of ['paid_out', 'cancelled']) {
+    const rows = sampleRows(); const job = rows.jobs[0]; job.status = status;
+    rows.transactions = [{ ...rows.transactions[0], amount: 92, status: 'partially_refunded', refund_amount: 20 }];
+    const response = await loadEndpoint('get-client-job-history', databaseFixture(rows))({ pageSize: 50 });
+    assert.equal(response.status, 200);
+    const historyJob = response.body.jobs.find(row => row.job_id === job.id);
+    assert.equal(historyJob.transactions[0].status, 'partially_refunded');
+    assert.equal(finance.clientJobPaymentLabel(historyJob), 'Partially Refunded');
+  }
+  // This compact API projection is display evidence only. Do not fabricate a
+  // refund amount or feed it to the complete recorded-payment summaries.
+  assert.equal(finance.clientJobPaymentLabel({ payment_status: 'paid', transactions: [{ amount: 92, status: 'partially_refunded' }] }), 'Partially Refunded');
+});
+
 test('shared summary renders identical explicit job/subscription definitions and error states never display zero money', () => {
   const render = state => {
     const Component = load('app/client/components/ClientSpendingSummary.tsx', { '@/hooks/useClientFinance': { useClientFinance: () => ({ ...state, reload() {} }) }, '@/lib/client-finance': finance, '@/lib/financeAmounts': money }).default;

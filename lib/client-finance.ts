@@ -52,7 +52,9 @@ export function clientJobPaymentLabel(job: { payment_status?: string | null; tra
   const totals = paymentTotals(job.transactions);
   if (totals.collected > 0) {
     if (totals.refunded === totals.collected) return 'Refunded';
-    if (totals.refunded > 0) return 'Partially Refunded';
+    // Compact history transactions may omit refund amounts. Their explicit
+    // state still supports a badge; monetary totals use the complete ledger.
+    if (totals.refunded > 0 || job.transactions.some(t => t.status === 'partially_refunded')) return 'Partially Refunded';
     return 'Paid';
   }
   if (job.payment_status === 'funded') return 'Funded';
