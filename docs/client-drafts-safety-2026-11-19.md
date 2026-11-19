@@ -1,5 +1,41 @@
 # Drafts and current safety warnings — C10 / C13
 
+## Published retest and ticket-schema follow-up
+
+PR #182 is merged and published. Signed-in My Jobs shows Draft Jobs 1, Saved
+Wizard Drafts 1, Completed 4 and All Jobs 9. Both draft tabs select the correct
+record. Continue restores the selected saved form, including 3 December 2026,
+18:00–22:00, and survives reload. Dashboard Draft 1 and Completed 4 agree.
+No draft was saved or posted during this retest.
+
+Trust & Safety still fails with the explicit load error, including after Retry.
+The deployed `app.support_tickets` schema uses `related_job_id`, not `job_id`.
+This follow-up selects `job_id:related_job_id` to preserve the incident model's
+existing field name. It retains client/deletion filters and incident history.
+No schema change or function deployment is required.
+
+A schema snapshot from the deployed table now validates ticket projections,
+filters and ordering in the regression fixture, including empty tables. The
+legacy query failed before the fix; linked, unlinked, foreign and deleted ticket
+cases pass after it. A read-only corrected SQL projection under the existing
+authenticated client role succeeds with three visible tickets, two linked to
+jobs. This SQL check does not establish a published page pass: C13 remains open
+until the follow-up is published and its incident/history/warning UI is retested.
+
+The dashboard separately still shows three historical attendance alerts despite
+zero operational jobs. That remains a C06/dashboard follow-up, outside this
+ticket-schema correction. Controlled positive shift, licence, save/post and
+fault-injected live acceptance remain outstanding.
+
+Follow-up validation: all 596 unit tests pass, including 20 focused safety/draft
+and request-lifecycle checks. Repository typecheck, admin checks and lint on
+the changed code pass. The schema-aware regression failed before the query fix.
+GitHub Build Check must pass before merging this follow-up.
+
+The original implementation and pre-release validation below are retained as
+historical evidence; their pending-publication language is superseded by this
+retest.
+
 My Jobs counted only saved wizard forms as Drafts, loaded that count only after
 opening the tab, and hid actual draft job records. Completed summaries also
 excluded paid-out work. Trust & Safety generated upcoming-shift warnings for

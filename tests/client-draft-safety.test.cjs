@@ -16,6 +16,7 @@ const tracker = load('lib/client-job-tracker.ts', { './attendance-display.cjs': 
 const listing = load('lib/client-job-list.ts', { './client-job-tracker': tracker });
 const drafts = load('lib/client-wizard-draft.ts');
 const safetyData = load('lib/client-safety-data.ts', { './client-job-list': listing, './client-safety': safety });
+const supportTicketColumns = require('./fixtures/client-safety-ticket-schema.json');
 const now = new Date('2026-11-19T16:00:00Z');
 const job = (id, status, extra = {}) => ({ id, status, client_id: 'client', is_deleted: false, job_title: id, start_date: '2026-11-20', start_time: '18:00:00', sia_licence_required: true, required_license_type: 'specific', required_licence_types: ['security_guard'], number_of_guards: 1, ...extra });
 
@@ -33,10 +34,22 @@ function dbFixture(rows, failTable) {
         then(resolve, reject) {
           return Promise.resolve().then(() => {
             if (table === failTable) return { data: null, error: { message: 'read failed' } };
+            if (table === 'support_tickets') {
+              for (const field of call.fields.split(',').map(value => value.trim())) {
+                const column = field.split(':').at(-1);
+                if (column !== '*' && !supportTicketColumns.includes(column)) return { data: null, error: { code: '42703', message: 'Unknown support ticket column: ' + column } };
+              }
+              for (const column of [...call.filters.map(filter => filter[1]), ...call.orders.map(order => order[0])]) {
+                if (!supportTicketColumns.includes(column)) return { data: null, error: { code: '42703', message: 'Unknown support ticket column: ' + column } };
+              }
+            }
             let data = (rows[table] || []).filter(row => call.filters.every(([method, key, value]) => method === 'eq' ? row[key] === value : method === 'in' ? value.includes(row[key]) : row[key] > value));
             data = [...data].sort((a, b) => { for (const [key, asc] of call.orders) { const diff = String(a[key] || '').localeCompare(String(b[key] || '')); if (diff) return asc ? diff : -diff; } return 0; });
             const count = data.length;
             if (call.range) data = data.slice(call.range[0], call.range[1] + 1);
+            if (table === 'support_tickets' && call.fields !== '*') data = data.map(row => Object.fromEntries(call.fields.split(',').map(field => {
+              const [alias, source = alias] = field.trim().split(':'); return [alias, row[source] ?? null];
+            })));
             return { data: call.single ? data[0] || null : data, count, error: null };
           }).then(resolve, reject);
         },
@@ -132,7 +145,7 @@ test('checklist completeness counts eight booleans, and summary warning count ma
 });
 
 test('safety data errors are not empty successes; retained incidents and active assigned profiles stay scoped', async () => {
-  const rows = { clients: [{ id: 'client', user_id: 'user' }], jobs: [job('active', 'confirmed'), job('cancelled', 'cancelled')], job_safety_checks: [], support_tickets: [{ id: 'incident', client_id: 'client', is_deleted: false, job_id: 'cancelled' }], job_assignments: [{ id: 'a', job_id: 'active', guard_id: 'g', status: 'confirmed' }, { id: 'old', job_id: 'cancelled', guard_id: 'g', status: 'confirmed' }] };
+  const rows = { clients: [{ id: 'client', user_id: 'user' }], jobs: [job('active', 'confirmed'), job('cancelled', 'cancelled')], job_safety_checks: [], support_tickets: [{ id: 'incident', client_id: 'client', is_deleted: false, related_job_id: 'cancelled' }], job_assignments: [{ id: 'a', job_id: 'active', guard_id: 'g', status: 'confirmed' }, { id: 'old', job_id: 'cancelled', guard_id: 'g', status: 'confirmed' }] };
   const db = dbFixture(rows); const profileCalls = [];
   db.functions = { invoke: async (name, args) => { profileCalls.push([name, args]); return { data: { profiles: [{ id: 'g', full_name: 'Synthetic', sia_verified: true, licence_types: ['Security Guard'], phone: 'private', sia_licence_number: 'private' }] } }; } };
   const data = await safetyData.loadClientSafetyData(db);
@@ -182,4 +195,29 @@ test('safety hook retires closed-screen results and disabled routes perform no r
   Hook(true); const cleanup = effect(); const count = writes.length; cleanup(); resolve({ client: { id: 'old' }, jobs: [{ id: 'stale' }], incidents: [] }); await flush();
   assert.equal(writes.length, count); assert.equal(reads, 1);
   Hook(false); effect(); await flush(); assert.equal(reads, 1);
+});
+
+test('safety tickets use deployed related_job_id while preserving owned linked/unlinked incident rows', async () => {
+  const rows = { clients: [{ id: 'client', user_id: 'user' }], jobs: [job('cancelled', 'cancelled')], job_safety_checks: [], support_tickets: [
+    { id: 'linked', client_id: 'client', is_deleted: false, related_job_id: 'cancelled', status: 'open' },
+    { id: 'unlinked', client_id: 'client', is_deleted: false, related_job_id: null, status: 'closed' },
+    { id: 'foreign', client_id: 'another-client', is_deleted: false, related_job_id: 'foreign-job' },
+    { id: 'deleted', client_id: 'client', is_deleted: true, related_job_id: 'cancelled' },
+  ] };
+  const db = dbFixture(rows);
+  const result = await safetyData.loadClientSafetyData(db);
+  assert.deepEqual(result.incidents.map(row => [row.id, row.job_id]), [['linked', 'cancelled'], ['unlinked', null]]);
+  assert.equal(result.incidents.some(row => Object.hasOwn(row, 'related_job_id')), false);
+  const call = db.calls.find(call => call.table === 'support_tickets');
+  assert.ok(call.fields.includes('job_id:related_job_id'));
+  const counts = safety.safetyCounts(result.jobs, result.incidents, safety.buildSafetyWarnings(result.jobs));
+  assert.equal(counts.openTickets, 1); assert.equal(counts.jobsWithIncidents, 1); assert.equal(counts.complianceWarnings, 0);
+});
+
+test('schema validation rejects the legacy job_id projection even for an empty ticket table', async () => {
+  const db = dbFixture({});
+  const response = await db.from('support_tickets').select('id, job_id');
+  assert.equal(response.error.code, '42703');
+  const rows = { clients: [{ id: 'client', user_id: 'user' }], jobs: [], job_safety_checks: [], support_tickets: [] };
+  assert.deepEqual((await safetyData.loadClientSafetyData(dbFixture(rows))).incidents, []);
 });
