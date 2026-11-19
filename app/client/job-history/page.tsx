@@ -558,11 +558,11 @@ export default function ClientJobHistoryClient() {
                 </button>
               </div>
             </div>
-            <p className="text-xs text-slate-500 mt-3">{error ? 'Results unavailable' : `${totalCount} result${totalCount !== 1 ? 's' : ''}`}</p>
+            <p className="text-xs text-slate-500 mt-3">{loading || refreshing ? 'Loading results…' : error ? 'Results unavailable' : `${totalCount} result${totalCount !== 1 ? 's' : ''}`}</p>
           </div>
 
           {/* Job List */}
-          {loading && jobs.length === 0 ? (
+          {(loading || refreshing) && jobs.length === 0 ? (
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="bg-white dark:bg-[#111d35] rounded-xl border border-slate-200 dark:border-[#1e2d4d] p-6 animate-pulse">
@@ -572,7 +572,7 @@ export default function ClientJobHistoryClient() {
                 </div>
               ))}
             </div>
-          ) : jobs.length === 0 && !loading && !error ? (
+          ) : jobs.length === 0 && !loading && !error && !refreshing ? (
             <div className="bg-white dark:bg-[#111d35] rounded-2xl border border-slate-200 dark:border-[#1e2d4d] p-16 text-center">
               <div className="w-16 h-16 bg-slate-100 dark:bg-[#162036] rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <i className="ri-history-line text-3xl text-slate-400"></i>

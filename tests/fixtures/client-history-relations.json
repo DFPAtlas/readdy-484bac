@@ -1,0 +1,7 @@
+{
+  "clients": ["users"],
+  "job_assignments": ["guards", "jobs"],
+  "job_applications": ["guards", "jobs"],
+  "reviews": ["job_assignments", "clients", "guards", "jobs"],
+  "client_reviews": []
+}

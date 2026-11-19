@@ -3,6 +3,55 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { loadEndpoint, databaseFixture, sampleRows } = require('./helpers/client-read-fixture.cjs');
 
+test('relationship fixture reproduces the live PGRST200 failure even with no client reviews', async () => {
+  const db = databaseFixture(sampleRows());
+  const failed = await db.from('client_reviews').select('id, guards(full_name)');
+  assert.equal(failed.error.code, 'PGRST200');
+});
+
+test('history loads even when client reviews have no foreign key relationship to guards', async () => {
+  const rows = sampleRows(), db = databaseFixture(rows);
+  const result = await loadEndpoint('get-client-job-history', db)({ pageSize: 50 });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.jobs.length, 12);
+  assert.equal(result.body.totalCount, 12);
+  assert.equal(db.calls.find(call => call.table === 'client_reviews').fields.includes('guards'), false);
+});
+
+test('review names come only from owned job reviews and never require an assignment', async () => {
+  const rows = sampleRows(), job = rows.jobs[0];
+  rows.job_assignments = []; rows.job_applications = [];
+  rows.guards.push({ id: 'foreign-guard', full_name: 'Foreign Guard', phone: 'private' });
+  rows.client_reviews = [
+    { id: 'owned-review', client_id: job.client_id, job_id: job.id, guard_id: 'guard-assigned', rating: 5, comment: 'Synthetic client review' },
+    { id: 'foreign-job-review', client_id: job.client_id, job_id: 'foreign-job', guard_id: 'foreign-guard' },
+    { id: 'foreign-client-review', client_id: 'other-client', job_id: job.id, guard_id: 'foreign-guard' },
+  ];
+  const db = databaseFixture(rows);
+  const result = await loadEndpoint('get-client-job-history', db)({ pageSize: 50 });
+  assert.equal(result.status, 200);
+  const reviews = result.body.jobs.find(row => row.job_id === job.id).client_reviews;
+  assert.deepEqual(reviews.map(review => review.id), ['owned-review']);
+  assert.equal(reviews[0].guard_name, 'Synthetic Inactive Guard');
+  assert.equal(reviews[0].comment, 'Synthetic client review');
+  const profileRead = db.calls.find(call => call.table === 'guards');
+  assert.equal(profileRead.fields, 'id, full_name');
+  assert.equal(profileRead.filters.every(filter => filter(rows.guards[1])), false);
+  assert.equal(JSON.stringify(result.body).includes('Foreign Guard'), false);
+  assert.equal(JSON.stringify(reviews).includes('private'), false);
+});
+
+test('missing review profiles are explicit; failed name reads fail the request', async () => {
+  const rows = sampleRows(), job = rows.jobs[0];
+  rows.client_reviews = [{ id: 'review', client_id: job.client_id, job_id: job.id, guard_id: 'removed-guard', rating: 4 }];
+  const missing = await loadEndpoint('get-client-job-history', databaseFixture(rows))({ pageSize: 50 });
+  assert.equal(missing.status, 200);
+  assert.equal(missing.body.jobs.find(row => row.job_id === job.id).client_reviews[0].guard_name, 'Guard profile unavailable');
+  const failed = await loadEndpoint('get-client-job-history', databaseFixture(rows, { failTable: 'guards' }))({ pageSize: 50 });
+  assert.equal(failed.status, 500);
+  assert.equal(failed.body.jobs, undefined);
+});
+
 test('history uses deployed application columns, returns owned jobs and paginates deterministically', async () => {
   const db = databaseFixture(sampleRows());
   const endpoint = loadEndpoint('get-client-job-history', db);
@@ -63,4 +112,6 @@ test('history error state does not also announce an empty account', () => {
   const source = fs.readFileSync('app/client/job-history/page.tsx', 'utf8');
   assert.ok(source.includes('jobs.length === 0 && !loading && !error'));
   assert.ok(source.includes("error ? 'Results unavailable'"));
+  assert.ok(source.includes('(loading || refreshing) && jobs.length === 0'));
+  assert.ok(source.includes('!error && !refreshing'));
 });

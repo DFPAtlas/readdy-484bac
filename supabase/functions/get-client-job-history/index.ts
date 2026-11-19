@@ -198,6 +198,7 @@ Deno.serve(async (req) => {
     let assignments: any[] = [], applications: any[] = [], completionRequests: any[] = [];
     let disputes: any[] = [], reviews: any[] = [], clientReviews: any[] = [];
     let auditLogs: any[] = [], transactions: any[] = [];
+    const clientReviewGuardNames = new Map<string, string>();
 
     if (currentJobIds.length > 0) {
       const results = await Promise.all([
@@ -206,7 +207,7 @@ Deno.serve(async (req) => {
         supabase.from('job_completion_requests').select('id, job_id, guard_id, status, requested_at, client_approved_at, client_disputed_at, dispute_reason, admin_approved_at, notes').in('job_id', currentJobIds).order('requested_at', { ascending: false }),
         supabase.from('disputes').select('id, job_id, guard_id, status, reason, details, resolution, refund_amount, admin_notes, stripe_refund_id, created_at, resolved_at').in('job_id', currentJobIds).order('created_at', { ascending: false }),
         supabase.from('reviews').select('id, job_id, guard_id, rating, punctuality_rating:punctuality, professionalism_rating:professionalism, communication_rating:communication, comment:review_text, created_at, guards (full_name)').eq('client_id', clientId).in('job_id', currentJobIds).order('created_at', { ascending: false }),
-        supabase.from('client_reviews').select('id, job_id, guard_id, rating, comment, created_at, guards (full_name)').eq('client_id', clientId).in('job_id', currentJobIds).order('created_at', { ascending: false }),
+        supabase.from('client_reviews').select('id, job_id, guard_id, rating, comment, created_at').eq('client_id', clientId).in('job_id', currentJobIds).order('created_at', { ascending: false }),
         supabase.from('payment_audit_logs').select('id, job_id, assignment_id, guard_id, from_status, to_status, changed_by_role, reason, stripe_event_id, created_at').eq('client_id', clientId).in('job_id', currentJobIds).order('created_at', { ascending: false }).limit(200),
         supabase.from('transactions').select('id, job_id, amount, status, stripe_payment_intent_id:stripe_payment_intent, stripe_invoice_id, receipt_url, created_at, refund_amount, refunded_at').eq('client_id', clientId).in('job_id', currentJobIds).order('created_at', { ascending: false }),
       ]);
@@ -220,6 +221,19 @@ Deno.serve(async (req) => {
       clientReviews = results[5].data || [];
       auditLogs = results[6].data || [];
       transactions = results[7].data || [];
+
+      // client_reviews has no FK to guards, so PostgREST cannot embed them.
+      // Derive IDs only from this client's reviews on the owned page of jobs;
+      // retrieve display names separately without exposing private profiles.
+      const reviewGuardIds = [...new Set(clientReviews.map(review => review.guard_id).filter(Boolean))];
+      for (let start = 0; start < reviewGuardIds.length; start += 100) {
+        const { data: profiles, error } = await supabase.from('guards').select('id, full_name')
+          .in('id', reviewGuardIds.slice(start, start + 100));
+        if (error) throw error;
+        for (const profile of profiles || []) {
+          if (profile.full_name) clientReviewGuardNames.set(profile.id, profile.full_name);
+        }
+      }
     }
 
     const jobMap = new Map();
@@ -310,7 +324,7 @@ Deno.serve(async (req) => {
       const e = jobMap.get(r.job_id);
       if (e) e.client_reviews.push({
         id: r.id, guard_id: r.guard_id,
-        guard_name: r.guards?.full_name || 'Unknown',
+        guard_name: clientReviewGuardNames.get(r.guard_id) || 'Guard profile unavailable',
         rating: r.rating, comment: r.comment, created_at: r.created_at,
       });
     });
