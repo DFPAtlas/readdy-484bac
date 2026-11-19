@@ -21,6 +21,21 @@ insert into app.transactions(job_id,transaction_type,status,amount,refunded) val
 insert into app.job_assignments(job_id,status,payment_status,payout_released) values('${JOB}','confirmed','funded',false);
 select set_config('test.uid','${USER}',false);`);await db.exec(fs.readFileSync('supabase/migrations/20261003170540_atomic_client_cancellation.sql','utf8'));await db.exec(fs.readFileSync('supabase/migrations/20261113230019_expose_client_cancellation_in_app_schema.sql','utf8'));return db;}
 const cancel=db=>db.query("select app.cancel_client_job($1,'Other','Sandbox only','full_refund','email') result",[JOB]);
+test('all finished and unsupported lifecycle states reject cancellation without any writes',async()=>{
+  const db=await setup();
+  try {
+    for(const status of ['completed','payout_approved','paid_out','review_pending','closed','disputed','awaiting_client_approval','future_status']){
+      await db.query('update app.jobs set status=$1',[status]);
+      await db.exec('set role authenticated');
+      await assert.rejects(cancel(db),/cannot be cancelled/);
+      await db.exec('reset role');
+      assert.equal((await db.query('select status from app.jobs')).rows[0].status,status);
+      assert.equal((await db.query('select count(*)::int n from app.job_cancellations')).rows[0].n,0);
+      assert.equal((await db.query('select count(*)::int n from app.refund_requests')).rows[0].n,0);
+      assert.equal((await db.query('select status from app.job_assignments')).rows[0].status,'confirmed');
+    }
+  }finally{await db.close();}
+});
 test('cancellation and pending refund commit together and retry creates no duplicates',async()=>{const db=await setup();try{const first=(await cancel(db)).rows[0].result;const retry=(await cancel(db)).rows[0].result;assert.equal(first.refundStatus,'pending');assert.equal(first.requestedAmount,92);assert.equal(retry.refundRequestId,first.refundRequestId);assert.equal((await db.query('select count(*)::int n from app.job_cancellations')).rows[0].n,1);assert.equal((await db.query('select status from app.jobs')).rows[0].status,'cancelled');assert.equal((await db.query('select status from app.job_assignments')).rows[0].status,'cancelled');assert.equal((await db.query('select refunded from app.transactions')).rows[0].refunded,false);}finally{await db.close();}});
 test('legacy half-completed cancellation is reused and only remaining payment is requested',async()=>{const db=await setup();try{await db.exec(`insert into app.job_cancellations(job_id,client_id,cancelled_by,reason,preferred_resolution,status) values('${JOB}','${CLIENT}','client','Other','full_refund','cancelled');update app.transactions set refund_amount=20;`);assert.equal((await cancel(db)).rows[0].result.requestedAmount,72);assert.equal((await db.query('select count(*)::int n from app.job_cancellations')).rows[0].n,1);}finally{await db.close();}});
 test('refund failure rolls back cancellation and job writes',async()=>{const db=await setup();try{await db.exec('alter table app.refund_requests add constraint force_failure check(requested_amount<1)');await assert.rejects(cancel(db),/force_failure/);assert.equal((await db.query('select count(*)::int n from app.job_cancellations')).rows[0].n,0);assert.equal((await db.query('select status from app.jobs')).rows[0].status,'confirmed');}finally{await db.close();}});

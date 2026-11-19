@@ -1,6 +1,6 @@
 'use client';
 
-import { CLIENT_CANCELLABLE_STATUSES } from '@/lib/customer-guidance';
+import { canClientCancelJob } from '@/lib/client-job-actions';
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -38,8 +38,6 @@ const CONTACT_PREFS = [
   { value: 'phone', label: 'Phone', icon: 'ri-phone-line' },
 ];
 
-const ALLOWED_CANCEL_STATUSES: readonly string[] = CLIENT_CANCELLABLE_STATUSES;
-
 export default function CancelJobModal({ job, onClose, onSuccess }: CancelJobModalProps) {
   const router = useRouter();
   const [reason, setReason] = useState('');
@@ -49,13 +47,12 @@ export default function CancelJobModal({ job, onClose, onSuccess }: CancelJobMod
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
-  const canCancel = ALLOWED_CANCEL_STATUSES.includes(job.status);
-  const isCompleted = job.status === 'completed';
+  const canCancel = canClientCancelJob(job);
   const isDisputed = job.status === 'disputed';
-  const isAdminLocked = false; // TODO: Add admin lock field when backend supports it
 
   const handleCancel = async () => {
     setError('');
+    if (!canClientCancelJob(job)) { setError('This job cannot be cancelled. Please contact support.'); return; }
     if (!reason) { setError('Please select a cancellation reason.'); return; }
 
     setConfirming(true);
@@ -84,7 +81,7 @@ export default function CancelJobModal({ job, onClose, onSuccess }: CancelJobMod
     }
   };
 
-  if (isCompleted || isDisputed || isAdminLocked) {
+  if (!canCancel) {
     return (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
         <div className="bg-[#111d35] rounded-2xl shadow-2xl w-full max-w-md border border-[#1e2d4d] p-6" onClick={(e) => e.stopPropagation()}>
@@ -95,11 +92,9 @@ export default function CancelJobModal({ job, onClose, onSuccess }: CancelJobMod
             <h2 className="text-lg font-bold text-white">Cannot Cancel Job</h2>
           </div>
           <p className="text-sm text-slate-400 mb-4">
-            {isCompleted
-              ? 'This job is already completed and cannot be cancelled.'
-              : isDisputed
+            {isDisputed
               ? 'This job is under dispute and cannot be cancelled directly. Please contact support.'
-              : 'This job is locked by admin review and cannot be cancelled.'}
+              : 'This booking is not eligible for cancellation. Finished, paid-out, closed and cancelled jobs cannot be cancelled here. Please contact support if you need help.'}
           </p>
           <div className="flex gap-3">
             <button
@@ -148,15 +143,6 @@ export default function CancelJobModal({ job, onClose, onSuccess }: CancelJobMod
             <div className={`h-1.5 flex-1 rounded-full ${step >= 1 ? 'bg-teal-500' : 'bg-[#1e2d4d]'}`}></div>
             <div className={`h-1.5 flex-1 rounded-full ${step >= 2 ? 'bg-teal-500' : 'bg-[#1e2d4d]'}`}></div>
           </div>
-
-          {!canCancel && (
-            <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-4">
-              <p className="text-sm text-amber-400 font-semibold mb-1">Warning</p>
-              <p className="text-sm text-slate-400">
-                This job is currently active. Cancellation may require admin review and may incur fees.
-              </p>
-            </div>
-          )}
 
           {step === 1 && (
             <>
@@ -292,9 +278,9 @@ export default function CancelJobModal({ job, onClose, onSuccess }: CancelJobMod
                 </p>
                 <ul className="text-sm text-slate-400 space-y-1 list-disc list-inside">
                   <li>Job will be removed from the guard marketplace</li>
-                  <li>Any assigned guards will be notified</li>
+                  <li>Contact support if an assigned guard needs an urgent update</li>
                   <li>Refund eligibility depends on cancellation timing</li>
-                  {!canCancel && <li>Active job cancellations may require admin approval</li>}
+                  <li>Any refund request is reviewed separately; cancellation does not approve or pay a refund</li>
                 </ul>
               </div>
 

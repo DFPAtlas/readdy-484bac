@@ -1,5 +1,7 @@
 'use client';
 
+import { cancelClientJobs } from '@/lib/client-job-actions';
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { ClientJob } from '@/lib/client-types';
@@ -685,28 +687,18 @@ export default function JobManagement() {
   const handleBulkCancel = async () => {
     setBulkProcessing(true);
     setBulkAction('cancel');
-    const ids = Array.from(selectedJobIds);
-    const eligibleIds = ids.filter(jobId => {
-      const job = jobs.find(j => j.id === jobId);
-      return job && !['cancelled', 'completed', 'disputed'].includes(job.status);
-    });
-    let count = 0;
-    if (eligibleIds.length > 0) {
-      try {
-        const { error } = await supabase
-          .from('jobs')
-          .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-          .in('id', eligibleIds)
-          .eq('client_id', clientId);
-        if (!error) count = eligibleIds.length;
-      } catch {}
+    try {
+      const selected = jobs.filter(job => selectedJobIds.has(job.id));
+      const result = await cancelClientJobs(supabase, selected);
+      const unavailable = selectedJobIds.size - selected.length + result.skipped;
+      showToast(`${result.cancelled} cancelled; ${result.failed} failed; ${unavailable} ineligible or unavailable. Any refund request requires review.`);
+      setSelectedJobIds(new Set());
+      setBulkMode(false);
+      void loadJobs(true);
+    } finally {
+      setBulkProcessing(false);
+      setBulkAction('');
     }
-    setBulkProcessing(false);
-    setBulkAction('');
-    setSelectedJobIds(new Set());
-    setBulkMode(false);
-    loadJobs(true);
-    showToast(`${count} job${count !== 1 ? 's' : ''} cancelled`);
   };
 
   const handleBulkAction = (actionKey: string) => {
@@ -1075,7 +1067,7 @@ export default function JobManagement() {
                 actions={[
                   { key: 'duplicate', label: 'Duplicate', icon: 'ri-file-copy-line', variant: 'secondary' },
                   { key: 'export', label: 'Export', icon: 'ri-download-line', variant: 'secondary' },
-                  { key: 'cancel', label: 'Cancel', icon: 'ri-close-circle-line', variant: 'danger', requiresConfirmation: true, confirmationTitle: 'Cancel Selected Jobs', confirmationMessage: 'Only jobs that are not already completed, cancelled, or disputed will be cancelled. Guards will be notified.', confirmButtonText: 'Cancel Jobs', confirmButtonIcon: 'ri-close-circle-line' },
+                  { key: 'cancel', label: 'Cancel', icon: 'ri-close-circle-line', variant: 'danger', requiresConfirmation: true, confirmationTitle: 'Cancel Selected Jobs', confirmationMessage: 'Only eligible jobs will be submitted for cancellation. Payment and payout checks can block individual jobs. Any refund request is recorded for review; no refund is approved or paid here.', confirmButtonText: 'Cancel Jobs', confirmButtonIcon: 'ri-close-circle-line' },
                   { key: 'archive', label: 'Archive', icon: 'ri-archive-line', variant: 'danger', requiresConfirmation: true, confirmationTitle: 'Archive Selected Jobs', confirmationMessage: 'Archived jobs will be hidden from your active list. You can still view them in filters.', confirmButtonText: 'Archive Jobs', confirmButtonIcon: 'ri-archive-line' },
                 ]}
                 onAction={handleBulkAction}

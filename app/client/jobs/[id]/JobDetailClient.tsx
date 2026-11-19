@@ -1,4 +1,5 @@
 "use client";
+import { canClientCancelJob, canClientReviewAssignment } from '@/lib/client-job-actions';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -212,12 +213,14 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   const mountedRef = useRef(false);
 
   const fetchGuardReviews = useCallback(async (clientIdValue: string, request = requestRef.current) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('reviews')
       .select('id, guard_id, rating, review_text, review_status, issue_reported')
       .eq('job_id', jobId)
       .eq('client_id', clientIdValue);
 
+    if (!mountedRef.current || request !== requestRef.current) return;
+    if (error || !Array.isArray(data)) throw new Error('Guard reviews could not be loaded. Please retry.');
     const map: Record<string, GuardReview> = {};
     (data || []).forEach((r) => {
       if (r.guard_id) map[r.guard_id] = r;
@@ -418,12 +421,14 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   };
 
   const handleOpenReviewModal = (guardId: string, guardName: string) => {
+    const assignment = assignedGuards.find(a => a.guard_id === guardId);
+    if (!job || !assignment || !canClientReviewAssignment(job, assignment) || guardReviews[guardId]) return;
     setReviewGuard({ guardId, guardName });
     setReviewModalOpen(true);
   };
 
   const handleReviewSuccess = async () => {
-    await fetchGuardReviews(clientId);
+    await loadJobDetail();
   };
 
   const handleMessageGuard = (guardId: string, guardName: string, guardUserId: string) => {
@@ -524,7 +529,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
   const isReviewable = job.status === 'paid_out' || job.status === 'review_pending';
   const isClosed = job.status === 'closed';
-  const unreviewedGuards = assignedGuards.filter((a) => a.guards?.id && !guardReviews[a.guards.id]);
+  const unreviewedGuards = assignedGuards.filter((a) => a.guards?.id && canClientReviewAssignment(job, a) && !guardReviews[a.guards.id]);
   const reviewedGuards = assignedGuards.filter((a) => a.guards?.id && guardReviews[a.guards.id]);
 
   const requiredLicenceTypes = job?.required_licence_types || (job?.required_license_type ? [job.required_license_type] : null);
@@ -612,7 +617,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
               </Link>
             )}
             {/* Cancel button for eligible jobs */}
-            {job.status !== 'completed' && job.status !== 'cancelled' && job.status !== 'disputed' && (
+            {isClientOwner && canClientCancelJob(job) && (
               <button
                 onClick={() => setShowCancelModal(true)}
                 className="flex items-center gap-2 px-4 py-2 border border-red-500/25 text-red-400 rounded-xl text-sm font-semibold hover:bg-red-500/10 transition-colors cursor-pointer whitespace-nowrap"
@@ -785,6 +790,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
               guards={assignedGuards}
               isCompleted={isReviewable || isClosed}
               isReviewable={isReviewable}
+              jobStatus={job.status}
               jobId={jobId}
               onLeaveReview={handleOpenReviewModal}
               onMessageGuard={handleMessageGuard}
@@ -877,7 +883,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
         />
       )}
 
-      {reviewModalOpen && reviewGuard && (
+      {reviewModalOpen && reviewGuard && !loading && !loadError && (
         <RateGuardModal
           jobId={jobId}
           guardId={reviewGuard.guardId}
