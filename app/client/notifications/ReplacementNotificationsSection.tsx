@@ -14,7 +14,7 @@ interface ReplacementRequest {
   support_ticket_id?: string;
   created_at: string;
   updated_at: string;
-  jobs?: { title: string; location?: string } | null;
+  jobs?: { title: string } | null;
 }
 
 interface ReplacementNotificationsSectionProps {
@@ -97,13 +97,15 @@ export default function ReplacementNotificationsSection({ clientId }: Replacemen
         if (!clientId) throw new Error('Replacement request context is unavailable.');
         const { data, error } = await supabase
           .from('replacement_requests')
-          .select('*, jobs:job_id(title, location)')
+          .select('id, job_id, reason, urgency, required_arrival_time, status, support_ticket_id, created_at, updated_at, jobs:job_id(title:job_title)')
           .eq('client_id', clientId)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          // job_id is a many-to-one FK; the untyped client infers an array here.
+          .returns<ReplacementRequest[]>();
 
         if (cancelled || request !== latestRequest) return;
         if (error || !Array.isArray(data)) throw new Error('Unable to load replacement requests.');
-        setRequests(data as ReplacementRequest[]);
+        setRequests(data);
       } catch {
         if (!cancelled && request === latestRequest) setLoadError(true);
       } finally {
