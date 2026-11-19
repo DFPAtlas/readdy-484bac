@@ -93,6 +93,10 @@ interface Client {
 
 interface Transaction {
   id: string;
+  client_id: string;
+  currency?: string | null;
+  payment_method?: string | null;
+  processed_at?: string | null;
   job_id: string;
   status: string;
   payment_status: string | null;
@@ -1081,8 +1085,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
           invoiceNumber={invoiceNumber}
           onClose={() => setShowInvoicePreview(false)}
           paymentStatus={paymentStatus}
-          paymentDate={formattedTransactionDate}
-          paymentMethod={paymentMethodLabel}
+          transaction={transaction}
         />
       )}
 

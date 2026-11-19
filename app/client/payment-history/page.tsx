@@ -5,50 +5,10 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
-import InvoicePreview from '../jobs/[id]/payment/InvoicePreview';
+import PaymentRecordPreview from '../components/PaymentRecordPreview';
+import { loadClientPaymentRecord, type ClientPaymentDocument } from '@/lib/payments/clientPaymentDocument';
 import { useClientGuard } from '@/hooks/useClientGuard';
 import SearchFilterBar from '../components/SearchFilterBar';
-
-interface InvoiceJob {
-  id: string;
-  job_title: string;
-  security_type: string;
-  venue_name: string;
-  venue_address_line1: string;
-  venue_city: string;
-  venue_postcode: string;
-  start_date: string;
-  end_date: string;
-  start_time: string;
-  end_time: string;
-  number_of_guards: number;
-  hourly_rate: number;
-}
-
-interface InvoiceClient {
-  id: string;
-  company_name: string;
-  contact_name: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  postcode: string;
-}
-
-interface InvoiceGuard {
-  id: string;
-  full_name: string;
-  hours_worked?: number;
-}
-
-interface InvoiceCosts {
-  hours?: number;
-  guardFees: number;
-  serviceFee: number;
-  vat: number;
-  total: number;
-}
 
 const PAYMENT_SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -108,13 +68,7 @@ export default function ClientPaymentHistoryPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [showInvoicePreview, setShowInvoicePreview] = useState(false);
-  const [invoiceData, setInvoiceData] = useState<{
-    job: InvoiceJob;
-    client: InvoiceClient;
-    guards: InvoiceGuard[];
-    costs: InvoiceCosts;
-    invoiceNumber: string;
-  } | null>(null);
+  const [invoiceData, setInvoiceData] = useState<ClientPaymentDocument | null>(null);
   const [emailSending, setEmailSending] = useState(false);
   const [emailToast, setEmailToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [companyName, setCompanyName] = useState('Client');
@@ -123,6 +77,7 @@ export default function ClientPaymentHistoryPage() {
 
   const mountedRef = useRef(false);
   const authRequestRef = useRef(0);
+  const invoiceRequestRef = useRef(0);
   const subscriptionRequestRef = useRef(0);
   const jobsRequestRef = useRef(0);
 
@@ -283,109 +238,23 @@ export default function ClientPaymentHistoryPage() {
     };
   }, [userId, fetchSubscriptionPayments, fetchJobPayments]);
 
-  const calculateHours = (startTime: string, endTime: string, startDate: string, endDate: string | null) => {
-    const start = new Date(`${startDate}T${startTime}`);
-    const end = new Date(`${endDate || startDate}T${endTime}`);
-    let hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-    if (hours < 0) hours += 24;
-    const startD = new Date(startDate);
-    const endD = new Date(endDate || startDate);
-    const days = Math.max(1, Math.ceil((endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-    return hours * days;
-  };
-
-  const handleDownloadInvoice = useCallback(async (transaction: any) => {
-    if (!transaction.job_id && !transaction.jobs?.id) return;
-    const jobId = transaction.job_id || transaction.jobs?.id;
-
+  const handleDownloadInvoice = useCallback(async (transaction: { id: string }) => {
+    const request = ++invoiceRequestRef.current;
+    const authRequest = authRequestRef.current;
+    const isCurrent = () => mountedRef.current && request === invoiceRequestRef.current && authRequest === authRequestRef.current;
     setInvoiceLoading(true);
+    setShowInvoicePreview(false);
+    setInvoiceData(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: clientData } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!clientData) return;
-
-      const { data: jobData } = await supabase
-        .from('jobs')
-        .select(`
-          *,
-          job_assignments!inner (
-            id,
-            guard_id,
-            guards (
-              id,
-              full_name
-            )
-          )
-        `)
-        .eq('id', jobId)
-        .eq('client_id', clientData.id)
-        .maybeSingle();
-
-      if (!jobData) return;
-
-      const hours = calculateHours(jobData.start_time, jobData.end_time, jobData.start_date, jobData.end_date);
-      const guardFees = hours * jobData.hourly_rate * jobData.number_of_guards;
-      const serviceFee = guardFees * 0.10;
-      const subtotal = guardFees + serviceFee;
-      const vat = subtotal * 0.20;
-      const total = subtotal + vat;
-
-      const guards: InvoiceGuard[] = jobData.job_assignments?.map((a: any) => ({
-        id: a.guards?.id || '',
-        full_name: a.guards?.full_name || 'Guard',
-        hours_worked: hours
-      })) || [];
-
-      const job: InvoiceJob = {
-        id: jobData.id,
-        job_title: jobData.job_title || jobData.title || 'Job',
-        security_type: jobData.security_type || 'Security',
-        venue_name: jobData.venue_name || 'N/A',
-        venue_address_line1: jobData.venue_address_line1 || '',
-        venue_city: jobData.venue_city || '',
-        venue_postcode: jobData.venue_postcode || '',
-        start_date: jobData.start_date,
-        end_date: jobData.end_date || jobData.start_date,
-        start_time: jobData.start_time,
-        end_time: jobData.end_time,
-        number_of_guards: jobData.number_of_guards || 1,
-        hourly_rate: jobData.hourly_rate || 0
-      };
-
-      const client: InvoiceClient = {
-        id: clientData.id,
-        company_name: clientData.company_name || '',
-        contact_name: clientData.contact_name || '',
-        email: clientData.email || '',
-        phone: clientData.phone || '',
-        address: clientData.address || '',
-        city: clientData.city || '',
-        postcode: clientData.postcode || ''
-      };
-
-      const costs: InvoiceCosts = {
-        hours,
-        guardFees: Math.round(guardFees * 100) / 100,
-        serviceFee: Math.round(serviceFee * 100) / 100,
-        vat: Math.round(vat * 100) / 100,
-        total: Math.round(total * 100) / 100
-      };
-
-      const invoiceNumber = transaction.invoice_number || `INV-${new Date(transaction.created_at).getFullYear()}${String(new Date(transaction.created_at).getMonth() + 1).padStart(2, '0')}${String(new Date(transaction.created_at).getDate()).padStart(2, '0')}-${job.id.slice(0, 6).toUpperCase()}`;
-
-      setInvoiceData({ job, client, guards, costs, invoiceNumber });
+      const record = await loadClientPaymentRecord(supabase, transaction.id);
+      if (!isCurrent()) return;
+      setInvoiceData(record);
       setShowInvoicePreview(true);
     } catch (error) {
-      console.error('Error generating invoice:', error);
+      if (!isCurrent()) return;
+      setEmailToast({ message: error instanceof Error ? error.message : 'The payment record could not be loaded.', type: 'error' });
     } finally {
-      setInvoiceLoading(false);
+      if (isCurrent()) setInvoiceLoading(false);
     }
   }, []);
 
@@ -1181,12 +1050,8 @@ export default function ClientPaymentHistoryPage() {
       )}
 
       {showInvoicePreview && invoiceData && (
-        <InvoicePreview
-          job={invoiceData.job}
-          client={invoiceData.client}
-          guards={invoiceData.guards}
-          costs={invoiceData.costs}
-          invoiceNumber={invoiceData.invoiceNumber}
+        <PaymentRecordPreview
+          record={invoiceData}
           onClose={() => {
             setShowInvoicePreview(false);
             setInvoiceData(null);
