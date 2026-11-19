@@ -80,3 +80,7 @@ verify_jwt = false
 [functions.get-client-assigned-guards]
 # Validates auth.getUser(), account closure, job ownership and actual assignments.
 verify_jwt = false
+
+[functions.get-client-payment-method-status]
+# Read only; also checks auth.getUser(), account closure and owned client bindings.
+verify_jwt = true

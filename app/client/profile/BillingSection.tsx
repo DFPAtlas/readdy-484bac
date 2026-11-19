@@ -2,6 +2,8 @@ import ClientSpendingSummary from '../components/ClientSpendingSummary';
 import { useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { ClientPaymentMethodState, paymentMethodView } from '@/lib/client-payment-method';
+import PaymentMethodStatus from './PaymentMethodStatus';
 
 interface SubscriptionInfo {
   plan_name: string;
@@ -32,6 +34,8 @@ interface Profile {
 interface Props {
   subscription: SubscriptionInfo | null;
   profile: Profile;
+  paymentMethodState: ClientPaymentMethodState;
+  onRefreshPaymentMethod: () => void;
   onMessage: (type: "success" | "error", text: string) => void;
 }
 
@@ -64,7 +68,8 @@ function statusBadge(status: string) {
   return map[status] || { label: status, bg: "bg-slate-500/15", color: "text-slate-500" };
 }
 
-export default function BillingSection({ subscription, profile, onMessage }: Props) {
+export default function BillingSection({ subscription, profile, paymentMethodState, onRefreshPaymentMethod, onMessage }: Props) {
+  const paymentMethod = paymentMethodView(paymentMethodState);
   const [portalLoading, setPortalLoading] = useState(false);
   const sub = subscription;
   const daysLeft = sub ? getDaysUntil(sub.current_period_end) : null;
@@ -91,6 +96,7 @@ export default function BillingSection({ subscription, profile, onMessage }: Pro
   ];
 
   const handleBillingPortal = async () => {
+    if (!paymentMethod.canOpenPortal || portalLoading) return;
     setPortalLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -193,31 +199,18 @@ export default function BillingSection({ subscription, profile, onMessage }: Pro
       <div className="bg-white dark:bg-[#111d35] rounded-2xl border border-slate-200 dark:border-[#1e2d4d] shadow-sm p-6 mb-4">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Billing & Payment Method</h2>
         <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#162036] border border-slate-200 dark:border-[#1e2d4d] mb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Payment Method</p>
-              <p className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5">
-                {profile.stripe_customer_id ? "Card on file" : "No payment method added"}
-              </p>
-            </div>
-            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${profile.stripe_customer_id ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'}`}>
-              {profile.stripe_customer_id ? (
-                <><div className="w-3 h-3 flex items-center justify-center"><i className="ri-check-line"></i></div>Active</>
-              ) : (
-                <><div className="w-3 h-3 flex items-center justify-center"><i className="ri-add-line"></i></div>Not Set Up</>
-              )}
-            </span>
-          </div>
+          <p className="text-sm text-slate-500 mb-1">Payment Method</p>
+          <PaymentMethodStatus state={paymentMethodState} onRefresh={onRefreshPaymentMethod} />
         </div>
         <button
           onClick={handleBillingPortal}
-          disabled={portalLoading}
+          disabled={portalLoading || !paymentMethod.canOpenPortal}
           className="flex items-center gap-2 px-5 py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-500 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap w-full justify-center"
         >
           <div className="w-4 h-4 flex items-center justify-center">
             <i className="ri-bank-card-line"></i>
           </div>
-          {portalLoading ? "Loading..." : profile.stripe_customer_id ? "Manage Payment Method" : "Add Payment Method"}
+          {portalLoading ? "Loading..." : paymentMethodState.status === 'checked' && paymentMethodState.result.status === 'saved' ? "Manage Payment Method" : "Add Payment Method"}
         </button>
         <p className="text-xs text-slate-500 mt-3 text-center">
           Opens the secure Stripe Billing Portal. Payment details are managed securely via Stripe. No card data is stored on our servers.
@@ -243,7 +236,7 @@ export default function BillingSection({ subscription, profile, onMessage }: Pro
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-500">Payment Method</p>
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              {profile.stripe_customer_id ? "Card on file" : "None added"}
+              {paymentMethod.label}
             </p>
           </div>
         </div>

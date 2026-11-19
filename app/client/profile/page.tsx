@@ -13,6 +13,7 @@ import DocumentsSection from "./DocumentsSection";
 import PreferencesSection from "./PreferencesSection";
 import DataPrivacySection from "./DataPrivacySection";
 import Link from "next/link";
+import { useClientPaymentMethod } from '@/hooks/useClientPaymentMethod';
 
 interface ClientProfile {
   id: string;
@@ -121,6 +122,7 @@ function ClientProfileInner() {
   const [loading, setLoading] = useState(true);
   const [, setLoadError] = useState(false);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
+  const { state: paymentMethodState, refresh: refreshPaymentMethod } = useClientPaymentMethod(profile?.id || null);
   const [contacts, setContacts] = useState<ClientContact[]>([]);
   const [documents, setDocuments] = useState<ClientDocument[]>([]);
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs | null>(null);
@@ -129,7 +131,6 @@ function ClientProfileInner() {
     profileComplete: false,
     billingAdded: false,
     firstJobPosted: false,
-    paymentMethodAdded: false,
     notificationsSet: false,
     documentsUploaded: false,
   });
@@ -211,16 +212,10 @@ function ClientProfileInner() {
         .select("*", { count: "exact", head: true })
         .eq("client_id", cid);
 
-      const { count: txCount } = await supabase
-        .from("transactions")
-        .select("*", { count: "exact", head: true })
-        .eq("client_id", cid);
-
       setHealthData({
         profileComplete: !!(clientData.company_name && clientData.phone && clientData.address_line1),
         billingAdded: !!(clientData.billing_email || clientData.vat_number || clientData.billing_address_line1),
         firstJobPosted: (jobsCount || 0) > 0,
-        paymentMethodAdded: (txCount || 0) > 0 || !!clientData.stripe_customer_id,
         notificationsSet: !!prefsData,
         documentsUploaded: (docsData || []).length > 0,
       });
@@ -487,6 +482,8 @@ function ClientProfileInner() {
                 <BillingSection
                   subscription={subscription}
                   profile={profile}
+                  paymentMethodState={paymentMethodState}
+                  onRefreshPaymentMethod={refreshPaymentMethod}
                   onMessage={(type, text) => showMessage(type, text)}
                 />
               )}
@@ -500,6 +497,8 @@ function ClientProfileInner() {
               )}
               {activeTab === "preferences" && (
                 <PreferencesSection
+                  paymentMethodState={paymentMethodState}
+                  onRefreshPaymentMethod={refreshPaymentMethod}
                   profile={profile}
                   notifPrefs={notifPrefs}
                   healthData={healthData}
