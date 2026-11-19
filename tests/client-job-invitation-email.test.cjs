@@ -1,0 +1,45 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const ts=require('typescript');
+const I='00000000-0000-4000-8000-000000000001',Q='00000000-0000-4000-8000-000000000002';
+function load(path,mocks,globals){const m={exports:{}};const code=ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;new Function('module','exports','require',...Object.keys(globals),code)(m,m.exports,n=>mocks[n]||require(n),...Object.values(globals));}
+function sender(options={}){
+ let handler;const calls=[],requests=[];
+ const rows={email_queue:{id:Q,status:'processing',email_type:'job_invite',dedupe_key:'job-invite:'+I,metadata:{invite_id:I,source_record_id:'job-invite:'+I,...options.metadata},...options.queue},job_invites:{id:I,job_id:'job',client_id:'client',guard_id:'guard',status:'pending',...options.invite},jobs:{id:'job',client_id:'client',job_title:'<script>private</script>',venue_city:'London & city',status:'open',start_date:'2099-12-01',start_time:'12:00:00',...options.job},guards:{id:'guard',user_id:'guard-user',full_name:'<img src=x>',is_active:true,verification_status:'approved',verified_by:'admin',sia_verified:true,sia_licence_number:'SYNTHETIC',sia_expiry_date:'2099-12-01',...options.guard},clients:{id:'client',user_id:'client-user',company_name:'<Client>',is_active:true,...options.client},account_closures:options.closed?[{user_id:'guard-user'}]:[],notification_preferences:options.prefs||null};
+ const db={auth:{admin:{async getUserById(id){calls.push(['auth-user',id]);return {data:{user:{id:'guard-user',email:'verified@example.test',email_confirmed_at:'2026-01-01',...options.user}},error:options.authError};}}},from(table){const call={table,filters:[]};calls.push(call);const q={select(){return q;},eq(k,v){call.filters.push([k,v]);return q;},in(k,v){call.filters.push([k,v]);return q;},update(v){call.update=v;return q;},maybeSingle(){return q;},then(a,b){return Promise.resolve().then(()=>{
+   if(options.dbError===table)return{data:null,error:Error('private DB detail')};if(call.update){if(options.updateError)return{data:null,error:Error('write failed')};rows.email_queue.metadata=call.update.metadata;return{data:{id:Q},error:null};}
+   return{data:rows[table],error:null};
+ }).then(a,b);}};return q;}};
+ load('supabase/functions/send-job-invite-email/index.ts',{'https://esm.sh/@supabase/supabase-js@2.45.0':{createClient:()=>db}},{Deno:{serve(fn){handler=fn;},env:{get:k=>({SUPABASE_URL:'https://test.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'service-fixture',RESEND_API_KEY:'resend-fixture'})[k]}},fetch:async(url,args)=>{requests.push({url,args,body:JSON.parse(args.body)});if(options.providerError)throw Error('private network error');return new Response(JSON.stringify(options.providerBody||{id:'accepted-email'}),{status:options.providerStatus||200});}});
+ return{rows,calls,requests,async run({token='service-fixture',body={invite_id:I,queue_id:Q},method='POST'}={}){const r=await handler(new Request('https://example.test/invite',{method,headers:token?{Authorization:'Bearer '+token}:{},...(method==='POST'?{body:JSON.stringify(body)}:{})}));return{status:r.status,body:await r.json()};}};
+}
+test('sender rejects anonymous/browser tokens, missing claims and crossed queue metadata without provider calls',async()=>{
+ for(const [opts,req,status] of [[{},{token:null},401],[{},{token:'ordinary-user'},401],[{},{body:{invite_id:I}},400],[{queue:{status:'pending'}},{},409],[{queue:{email_type:'job_match'}},{},409],[{metadata:{invite_id:Q}},{},409]]){const h=sender(opts);assert.equal((await h.run(req)).status,status);assert.equal(h.requests.length,0);}
+});
+test('actual sender derives verified auth recipient and escaped content; invite is not represented as a booking',async()=>{
+ const h=sender();const r=await h.run({body:{invite_id:I,queue_id:Q,recipient:'evil@example.test',html:'evil'}});assert.equal(r.status,200);assert.equal(r.body.email_id,'accepted-email');assert.equal(h.requests.length,1);
+ const sent=h.requests[0];assert.equal(sent.url,'https://api.resend.com/emails');assert.deepEqual(sent.body.to,['verified@example.test']);assert.equal(sent.args.headers['Idempotency-Key'],'job-invite:'+I);assert.match(sent.body.html,/&lt;script&gt;|&lt;img/);assert.doesNotMatch(sent.body.html,/<script>|<img|evil@example/);assert.match(sent.body.html,/not a booking/);assert.match(sent.body.html,/https:\/\/quickguard.uk\/guard\/job-invites/);
+ assert.equal(h.rows.email_queue.metadata.provider_message_id,'accepted-email');assert.doesNotMatch(JSON.stringify(r.body),/verified@example|guard-user|SYNTHETIC|resend-fixture/);
+ await h.run();assert.equal(h.requests.length,1); // durable acceptance survives worker completion replay
+});
+test('no-longer-pending invitations, terminal/started/expired jobs and unavailable/closed accounts are suppressed',async()=>{
+ for(const opts of [{invite:{status:'accepted'}},{invite:{status:'declined'}},{job:{client_id:'other'}},{job:{status:'paid_out'}},{job:{payment_status:'funded'}},{job:{is_deleted:true}},{job:{is_draft:true}},{job:{start_date:'2000-01-01'}},{job:{expires_at:'2000-01-01'}},{guard:{is_active:false}},{guard:{verified_by:null}},{guard:{sia_expiry_date:'2000-01-01'}},{guard:{verification_status:'pending'}},{client:{is_active:false}},{closed:true}]){const h=sender(opts);const r=await h.run();assert.equal(r.status,200);assert.equal(r.body.suppressed,true);assert.equal(h.requests.length,0);}
+});
+test('job match preference, all non-instant frequencies and absent verified auth email prevent immediate mail',async()=>{
+ for(const opts of [{prefs:{job_matches:false}},...['daily','weekly','none'].map(email_frequency=>({prefs:{email_frequency}})),{user:{email_confirmed_at:null}},{user:{email:null}}]){const h=sender(opts);const r=await h.run();assert.equal(r.body.suppressed,true);assert.equal(h.requests.length,0);}
+});
+test('database, preference, auth and provider failures never become suppression or success; unrecorded acceptance retries with same key',async()=>{
+ for(const opts of [{dbError:'job_invites'},{dbError:'notification_preferences'},{authError:Error('private auth detail')},{providerError:true},{providerStatus:503},{providerBody:{success:true}},{updateError:true}]){const h=sender(opts);const r=await h.run();assert.equal(r.status,503);assert.equal(r.body.suppressed,undefined);assert.equal(r.body.success,undefined);assert.doesNotMatch(JSON.stringify(r.body),/private|resend-fixture/);}
+ const h=sender({updateError:true});await h.run();await h.run();assert.equal(h.requests[0].args.headers['Idempotency-Key'],h.requests[1].args.headers['Idempotency-Key']);
+});
+function worker(options={}){
+ let handler;const calls=[],requests=[];const email={id:Q,email_type:'job_invite',recipient_email:'PRIVATE_QUEUE_RECIPIENT',subject:'unused',body_html:'unused',metadata:{invite_id:I,job_id:'job'}};
+ const db={rpc:async(name,args)=>{calls.push({name,args});return{data:name==='claim_email_queue'?[email]:options.failRpc===name?false:true,error:null};},from:()=>({insert:async()=>({error:null})})};
+ load('supabase/functions/process-email-queue/index.ts',{'https://deno.land/std@0.168.0/http/server.ts':{serve(fn){handler=fn;}},'https://esm.sh/@supabase/supabase-js@2.39.3':{createClient:()=>db}},{Deno:{env:{get:k=>({SUPABASE_URL:'https://test.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'service-fixture',RESEND_API_KEY:'resend-fixture'})[k]}},fetch:async(url,args)=>{requests.push({url,body:JSON.parse(args.body)});return new Response(JSON.stringify(options.body||{success:true,email_id:'accepted'}),{status:options.status||200});}});
+ return{calls,requests,async run(){const r=await handler(new Request('https://example.test/worker',{method:'POST',headers:{Authorization:'Bearer service-fixture'}}));return r.json();}};
+}
+test('actual queue worker delegates only IDs and completes only confirmed provider acceptance',async()=>{
+ const h=worker();const r=await h.run();assert.equal(r.delegated,1);assert.equal(r.sent,0);assert.deepEqual(h.requests,[{url:'https://test.supabase.co/functions/v1/send-job-invite-email',body:{invite_id:I,queue_id:Q}}]);assert.equal(h.calls.filter(c=>c.name==='complete_email_queue').length,1);
+ for(const opts of [{body:{success:true}},{status:503},{failRpc:'complete_email_queue'}]){const h=worker(opts);const r=await h.run();assert.equal(r.delegated,0);assert.equal(r.failed,1);assert.ok(h.calls.some(c=>c.name==='fail_email_queue'));}
+});
+test('suppressed invite emails are terminal and are never counted as sent/delivered; unconfirmed suppression retries',async()=>{
+ for(const failed of [false,true]){const h=worker({body:{success:false,suppressed:true,reason:'preference_disabled'},failRpc:failed?'suppress_email_queue':null});const r=await h.run();assert.equal(r.sent,0);assert.equal(r.delegated,0);assert.equal(r.suppressed,failed?0:1);assert.equal(r.failed,failed?1:0);assert.equal(h.calls.some(c=>c.name==='complete_email_queue'),false);}
+});

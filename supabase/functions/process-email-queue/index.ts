@@ -98,6 +98,26 @@ serve(async (req) => {
     for (const email of emails) {
       const metadata = email.metadata || {};
       try {
+        if (email.email_type === 'job_invite') {
+          const res = await fetch(`${functionsBaseUrl}/send-job-invite-email`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
+            body: JSON.stringify({ invite_id: metadata.invite_id, queue_id: email.id }),
+          });
+          if (!res.ok) throw new Error('Invitation email worker failed');
+          const result = await res.json();
+          if (result?.suppressed === true) {
+            const parked = await supabase.rpc('suppress_email_queue', { p_queue_id: email.id, p_reason: result.reason || 'invite_unavailable' });
+            if (parked.error || parked.data !== true) throw new Error('Invitation suppression not confirmed');
+            suppressed++;
+          } else {
+            if (result?.success !== true || !result.email_id) throw new Error('Invitation provider acceptance not confirmed');
+            const complete = await supabase.rpc('complete_email_queue', { p_queue_id: email.id });
+            if (complete.error || complete.data !== true) throw new Error('Invitation queue completion not confirmed');
+            delegated++;
+          }
+          continue;
+        }
+
         if (email.email_type === 'cancellation_notification' && metadata.cancellation_id) {
           const res = await fetch(`${functionsBaseUrl}/send-cancellation-notification`, {
             method: 'POST',
