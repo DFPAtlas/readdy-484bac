@@ -9,6 +9,15 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
   status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
 });
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const readAll = async (makeQuery: () => any) => {
+  const rows: any[] = [];
+  for (let offset = 0; ; offset += 200) {
+    const { data, error } = await makeQuery().range(offset, offset + 199);
+    if (error || !Array.isArray(data)) throw error || new Error('Invalid assigned profiles');
+    rows.push(...data);
+    if (data.length < 200) return rows;
+  }
+};
 
 // This projection matches client-visible profile fields. Never return private
 // documents, address, phone, email, bank details or arbitrary guard IDs.
@@ -39,13 +48,14 @@ Deno.serve(async (req) => {
       .eq('client_id', client.id).or('is_deleted.is.null,is_deleted.eq.false').maybeSingle();
     if (jobError) throw jobError;
     if (!job) return json(404, { error: 'Job not found' });
-    const { data: assignments, error: assignmentError } = await db.from('job_assignments')
-      .select('guard_id').eq('job_id', job.id);
-    if (assignmentError) throw assignmentError;
-    const guardIds = [...new Set((assignments || []).map(row => row.guard_id).filter(Boolean))];
+    const assignments = await readAll(() => db.from('job_assignments')
+      .select('id, guard_id').eq('job_id', job.id).order('id', { ascending: true }));
+    const guardIds = [...new Set(assignments.map(row => row.guard_id).filter(Boolean))];
     if (!guardIds.length) return json(200, { profiles: [] });
-    const { data: profiles, error: profileError } = await db.from('guards').select(fields).in('id', guardIds);
-    if (profileError) throw profileError;
+    const profiles: any[] = [];
+    for (let offset = 0; offset < guardIds.length; offset += 100) {
+      profiles.push(...await readAll(() => db.from('guards').select(fields).in('id', guardIds.slice(offset, offset + 100)).order('id', { ascending: true })));
+    }
     // Whitelist again when serializing so later query changes cannot expose
     // private columns. Inactive guards remain identifiable on past assignments.
     const safeProfiles = (profiles || []).map(row => Object.fromEntries(fields.split(', ').map(key => [key, row[key]])));
