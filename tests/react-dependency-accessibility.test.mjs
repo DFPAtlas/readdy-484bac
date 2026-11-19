@@ -13,7 +13,7 @@ function runner(path,mocks,extra={}){
  const hooks={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;return [slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]},useCallback(fn,deps){const i=cursor++;if(!slots[i]||!equal(slots[i].deps,deps))slots[i]={fn,deps};return slots[i].fn},useEffect(fn,deps){const i=cursor++;if(!slots[i]||!equal(slots[i].deps,deps)){pending.push(()=>{slots[i]?.cleanup?.();slots[i]={deps,cleanup:fn()}})}},useRef(initial){const i=cursor++;if(!(i in slots))slots[i]={current:initial};return slots[i]}};
  const mod={exports:{}};
  new Function('module','exports','require',...Object.keys(extra),compile(path))(mod,mod.exports,name=>name==='react'?hooks:name in mocks?mocks[name]:require(name),...Object.values(extra));
- return {render(name,...args){cursor=0;return mod.exports[name](...args)},async effects(){const work=pending;pending=[];work.forEach(fn=>fn());for(let i=0;i<10;i++)await Promise.resolve()}};
+ return {render(name,...args){cursor=0;return mod.exports[name](...args)},async effects(){const work=pending;pending=[];work.forEach(fn=>fn());for(let i=0;i<50;i++)await Promise.resolve()}};
 }
 test('admin pagination stays on the requested page and filter changes reset once without request loops',async()=>{
  const calls=[];const db={auth:{getSession:async()=>({data:{session:{access_token:'test'}}})}};
@@ -28,10 +28,11 @@ test('client monthly spending recomputes the month on refetch without remounting
  let now='2026-10-31T12:00:00Z';
  class Clock extends Date{constructor(...args){super(...(args.length?args:[now]))}}
  const tx=[{id:'oct',amount:10,status:'paid',created_at:'2026-10-20T12:00:00Z'},{id:'nov',amount:20,status:'paid',created_at:'2026-11-01T12:00:00Z'}];
- const db={auth:{getUser:async()=>({data:{user:{id:'user'}}})},from:table=>{const data=table==='clients'?{id:'client'}:table==='transactions'?tx:[];const q={select:()=>q,eq:()=>q,order:()=>q,maybeSingle:async()=>({data}),then:resolve=>Promise.resolve({data}).then(resolve)};return q}};
- const totals=rows=>({collected:rows.reduce((n,r)=>n+r.amount,0),refunded:0,remaining:rows.reduce((n,r)=>n+r.amount,0)});
- const r=runner('hooks/useClientPaymentCentre.ts',{'@/lib/supabase':{supabase:db},'@/lib/financeAmounts':{paymentTotals:totals,paymentAmounts:()=>({refunded:0}),isCollected:()=>true},'@/lib/client-journey':{planLabel:()=> 'Free'}},{Date:Clock});
- let hook=r.render('useClientPaymentCentre');await r.effects();hook=r.render('useClientPaymentCentre');assert.equal(hook.spendingSummary.thisMonthSpend,30);
+ const db={auth:{getUser:async()=>({data:{user:{id:'user'}}})},from:table=>{const data=table==='clients'?{id:'client'}:table==='transactions'?tx:[];const q={select:()=>q,eq:()=>q,order:()=>q,in:()=>q,range:()=>q,maybeSingle:async()=>({data}),then:resolve=>Promise.resolve({data}).then(resolve)};return q}};
+ const load=(path,mocks={})=>{const mod={exports:{}};new Function('module','exports','require','Date',compile(path))(mod,mod.exports,name=>mocks[name]??require(name),Clock);return mod.exports};
+ const finance=load('lib/client-finance.ts',{'./client-job-list':{readAllClientRows:async make=>{const {data,error}=await make().range(0,199);if(error)throw error;return data}},'./financeAmounts':load('lib/financeAmounts.ts')});
+ const r=runner('hooks/useClientPaymentCentre.ts',{'@/lib/supabase':{supabase:db},'@/lib/client-finance':finance,'@/lib/client-journey':{planLabel:()=> 'Free'}},{Date:Clock});
+ let hook=r.render('useClientPaymentCentre');await r.effects();hook=r.render('useClientPaymentCentre');assert.equal(hook.spendingSummary.thisMonthSpend,10);
  now='2026-11-02T12:00:00Z';await hook.refetch();hook=r.render('useClientPaymentCentre');assert.equal(hook.spendingSummary.thisMonthSpend,20);
 });
 test('radio validation has named groups and real error-description targets while preserving native controls',()=>{

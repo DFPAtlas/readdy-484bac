@@ -1,11 +1,13 @@
 export const collectedStatuses = ['succeeded', 'completed', 'paid', 'refunded', 'partially_refunded'];
 export interface FinancialPayment { amount: unknown; refund_amount?: unknown; refunded?: boolean; status: string; }
-export function isCollected(status: string): boolean { return collectedStatuses.includes(status.toLowerCase()); }
+export function isCollected(status: unknown): boolean { return typeof status === 'string' && collectedStatuses.includes(status.toLowerCase()); }
 function money(value: unknown): number { const n = Number(value); return Number.isFinite(n) ? Math.max(0, Math.round(n * 100)) : 0; }
 export function refundAmount(payment: FinancialPayment): number {
   const amount = money(payment.amount);
-  if (payment.status.toLowerCase() === 'refunded' || payment.refunded) return amount / 100;
-  return Math.min(amount, money(payment.refund_amount)) / 100;
+  if (payment.status?.toLowerCase() === 'refunded') return amount / 100;
+  const recorded = money(payment.refund_amount);
+  if (recorded > 0) return Math.min(amount, recorded) / 100;
+  return payment.refunded ? amount / 100 : 0;
 }
 export function paymentAmounts(payment: FinancialPayment, fee = 0) {
   const collectedPence = isCollected(payment.status) ? money(payment.amount) : 0;

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { paymentAmounts, paymentTotals, isCollected } from '@/lib/financeAmounts';
+import { clientSpendingSummary, loadClientFinanceRecords, paymentRefundLabel } from '@/lib/client-finance';
 import { planLabel } from '@/lib/client-journey';
 
 interface SpendingSummary {
@@ -8,6 +8,7 @@ interface SpendingSummary {
   totalSpend: number;
   jobsPaid: number;
   outstandingAmount: number;
+  outstandingUnknownJobs: number;
   refundsTotal: number;
   netSpend: number;
 }
@@ -44,6 +45,7 @@ export function useClientPaymentCentre() {
     totalSpend: 0,
     jobsPaid: 0,
     outstandingAmount: 0,
+    outstandingUnknownJobs: 0,
     refundsTotal: 0,
     netSpend: 0,
   });
@@ -59,15 +61,19 @@ export function useClientPaymentCentre() {
   const [portalLoading, setPortalLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const mounted = useRef(false);
+  const request = useRef(0);
   const fetchAll = useCallback(async () => {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const id = ++request.current;
+    const current = () => mounted.current && request.current === id;
+    if (!current()) return;
 
     setLoading(true);
     setError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (!current()) return;
+      if (authError || !user) throw new Error('Sign in to load payments.');
 
       const { data: client } = await supabase
         .from('clients')
@@ -75,7 +81,8 @@ export function useClientPaymentCentre() {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (!client) { setLoading(false); return; }
+      if (!current()) return;
+      if (!client) throw new Error('Client payments unavailable.');
       setClientId(client.id);
 
       setBillingInfo({
@@ -87,19 +94,9 @@ export function useClientPaymentCentre() {
         planName: planLabel(client.plan_name || client.subscription_tier),
       });
 
-      const { data: transactions, error: transactionsError } = await supabase
-        .from('transactions')
-        .select('id, job_id, amount, status, created_at, receipt_url, invoice_url, refunded, refund_amount, refunded_at')
-        .eq('client_id', client.id)
-        .order('created_at', { ascending: false });
-
-      if (transactionsError) throw transactionsError;
-      const txData = transactions || [];
-      const totals = paymentTotals(txData);
-      const monthTotals = paymentTotals(txData.filter((t: any) => new Date(t.created_at) >= new Date(monthStart)));
-      const paidJobs = new Set(txData.filter((t: any) => isCollected(t.status)).map((t: any) => t.job_id));
-      const outstanding = txData.filter((t: any) => ['pending','pending_payment'].includes(t.status) && !paidJobs.has(t.job_id)).reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
-      setSpendingSummary({ thisMonthSpend: monthTotals.collected, totalSpend: totals.collected, jobsPaid: paidJobs.size, outstandingAmount: outstanding, refundsTotal: totals.refunded, netSpend: totals.remaining });
+      const { transactions: txData, payableJobs } = await loadClientFinanceRecords(supabase, client.id, user.id);
+      if (!current()) return;
+      const summary = clientSpendingSummary(txData, payableJobs);
 
       const jobIds = txData.map((t: any) => t.job_id).filter(Boolean);
       const refundMap: Record<string, string> = {};
@@ -113,7 +110,7 @@ export function useClientPaymentCentre() {
         const { data: jobsData } = await supabase
           .from('jobs')
           .select('id, job_title, payment_status, status')
-          .in('id', jobIds);
+          .in('id', jobIds).eq('client_id', client.id);
         if (jobsData) jobsMap = Object.fromEntries(jobsData.map((j: any) => [j.id, j]));
 
         const { data: assignments } = await supabase
@@ -146,21 +143,23 @@ export function useClientPaymentCentre() {
         paymentStatus: t.status,
         releaseStatus: jobsMap[t.job_id]?.payment_status || t.status,
         jobStatus: jobsMap[t.job_id]?.status || '',
-        refundStatus: t.status === 'partially_refunded' ? `Partially refunded (£${paymentAmounts(t).refunded.toFixed(2)})` : paymentAmounts(t).refunded > 0 ? 'Refunded' : refundMap[t.job_id] === 'pending' ? 'Refund requested' : refundMap[t.job_id] === 'approved' ? 'Refund processing' : refundMap[t.job_id] === 'rejected' ? 'Refund declined' : '—',
+        refundStatus: paymentRefundLabel(t) !== '—' ? paymentRefundLabel(t) : refundMap[t.job_id] === 'pending' ? 'Refund requested' : refundMap[t.job_id] === 'approved' ? 'Refund processing' : refundMap[t.job_id] === 'rejected' ? 'Refund declined' : '—',
         receiptUrl: t.receipt_url || null,
         invoiceUrl: t.invoice_url || null,
         jobId: t.job_id,
       }));
 
+      if (!current()) return;
+      setSpendingSummary(summary);
       setJobPayments(paymentsList);
     } catch {
-      setError('Failed to load payment data');
+      if (current()) setError('Failed to load payment data');
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => { mounted.current = true; fetchAll(); return () => { mounted.current = false; }; }, [fetchAll]);
 
   const handleBillingPortal = useCallback(async (): Promise<string | null> => {
     setPortalLoading(true);
@@ -180,7 +179,7 @@ export function useClientPaymentCentre() {
   }, []);
 
   const exportCsv = useCallback(() => {
-    const headers = ['Date', 'Job Title', 'Guard', 'Amount Paid', 'Payment Status', 'Release Status', 'Refund Status'];
+    const headers = ['Date', 'Job Title', 'Guard', 'Payment Amount', 'Payment Status', 'Release Status', 'Refund Status'];
     const rows = jobPayments.map(p => [
       p.date,
       p.jobTitle,
