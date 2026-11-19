@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { normaliseOptionalWebsite, profileWebsiteForForm } from "@/lib/client-profile-website";
 
 interface CompanyProfile {
   id: string;
@@ -70,9 +71,7 @@ export default function CompanyProfileSection({ profile, onUpdate, onError }: Pr
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<CompanyProfile>({
     ...profile,
-    website: profile.website
-      ? (profile.website.match(/^https?:\/\//) ? profile.website : `https://${profile.website}`)
-      : "https://"
+    website: profileWebsiteForForm(profile.website),
   });
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [sameAsMainContact, setSameAsMainContact] = useState(
@@ -108,41 +107,59 @@ export default function CompanyProfileSection({ profile, onUpdate, onError }: Pr
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
-
-    const { error } = await supabase
-      .from("clients")
-      .update({
-        company_name: form.company_name,
-        company_type: form.company_type,
-        vat_number: form.vat_number,
-        trading_name: form.trading_name,
-        company_registration_number: form.company_registration_number,
-        first_name: form.first_name,
-        last_name: form.last_name,
-        phone: form.phone,
-        billing_email: form.billing_email,
-        website: form.website && form.website !== "https://" ? form.website : "",
-        industry: form.industry,
-        company_size: form.company_size,
-        address_line1: form.address_line1,
-        address_line2: form.address_line2,
-        city: form.city,
-        postcode: form.postcode,
-        billing_address_line1: form.billing_address_line1,
-        billing_address_line2: form.billing_address_line2,
-        billing_city: form.billing_city,
-        billing_postcode: form.billing_postcode,
-        description: form.description,
-      })
-      .eq("id", profile.id);
-
-    setSaving(false);
-    if (error) {
-      onError("Failed to update profile. Please try again.");
+    if (saving) return;
+    let updated: CompanyProfile;
+    try {
+      updated = { ...form, website: normaliseOptionalWebsite(form.website) };
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'Enter a complete website or leave it blank.');
       return;
     }
-    onUpdate(form);
+    setSaving(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("clients")
+        .update({
+          company_name: form.company_name,
+          company_type: form.company_type,
+          vat_number: form.vat_number,
+          trading_name: form.trading_name,
+          company_registration_number: form.company_registration_number,
+          first_name: form.first_name,
+          last_name: form.last_name,
+          phone: form.phone,
+          billing_email: form.billing_email,
+          website: updated.website,
+          industry: form.industry,
+          company_size: form.company_size,
+          address_line1: form.address_line1,
+          address_line2: form.address_line2,
+          city: form.city,
+          postcode: form.postcode,
+          billing_address_line1: form.billing_address_line1,
+          billing_address_line2: form.billing_address_line2,
+          billing_city: form.billing_city,
+          billing_postcode: form.billing_postcode,
+          description: form.description,
+        })
+        .eq("id", profile.id)
+        .select('id')
+        .maybeSingle();
+
+      if (error || data?.id !== profile.id) {
+        onError("Failed to update profile. Please try again.");
+        return;
+      }
+    } catch {
+      onError("Failed to update profile. Please try again.");
+      return;
+    } finally {
+      setSaving(false);
+    }
+    // Keep edits made while the save was in progress.
+    setForm(current => current.website === form.website ? { ...current, website: updated.website } : current);
+    onUpdate(updated);
   };
 
   return (
@@ -164,17 +181,21 @@ export default function CompanyProfileSection({ profile, onUpdate, onError }: Pr
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              Website
+            <label htmlFor="company-website" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Website (optional)
             </label>
             <input
               type="url"
+              id="company-website"
               name="website"
               value={form.website || ""}
               onChange={handleChange}
+              aria-describedby="company-website-help"
+              title="Enter a complete http:// or https:// website, or leave it blank."
               className="w-full px-4 py-2.5 border border-slate-200 dark:border-[#1e2d4d] rounded-lg focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-sm bg-white dark:bg-[#162036] text-slate-900 dark:text-white"
               placeholder="https://www.yourcompany.com"
             />
+            <p id="company-website-help" className="text-xs text-slate-500 mt-1.5">Leave blank if your company does not have a website.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
