@@ -47,7 +47,7 @@ for(const [path,name] of [['app/client/jobs/[id]/ReplacementStatusTracker.tsx','
  test(name+' discards superseded realtime results and cleans its subscription',async()=>{
   const source=fs.readFileSync(path,'utf8');const marker=source.indexOf('export default function '+name+'(');const start=source.indexOf(') {',marker)+3;const body=source.slice(start,source.indexOf('  if (loading) {',start));
   const queue=[],channels=[],removed=[];let reads=0;
-  const db={from:()=>{const q={select:()=>q,eq:()=>q,order:()=>{reads++;return queue.shift()||Promise.resolve({data:[{id:'fresh'}]})}};return q},channel:key=>{const c={key,on:(event,filter,fn)=>{c.notify=fn;return c},subscribe:()=>{channels.push(c);return c}};return c},removeChannel:c=>removed.push(c.key)};
+  const db={from:()=>{let response;const q={select:()=>q,returns:()=>q,eq:()=>q,order:()=>{reads++;response=queue.shift()||Promise.resolve({data:[{id:'fresh'}]});return q},then:(resolve,reject)=>Promise.resolve(response).then(resolve,reject)};return q},channel:key=>{const c={key,on:(event,filter,fn)=>{c.notify=fn;return c},subscribe:()=>{channels.push(c);return c}};return c},removeChannel:c=>removed.push(c.key)};
   const r=harness('return function component({jobId,clientId}){'+body+'return {requests,loading};}',{supabase:db});
   const first=deferred();queue.push(first.promise);const props={jobId:'job',clientId:'client'};r.render(props);await r.runEffects();channels[0].notify();await flush();
   let api=r.render(props);await r.runEffects();assert.equal(api.requests[0].id,'fresh');first.resolve({data:[{id:'stale'}]});await flush();api=r.render(props);await r.runEffects();assert.equal(api.requests[0].id,'fresh');
