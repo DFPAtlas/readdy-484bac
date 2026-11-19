@@ -39,3 +39,13 @@ test('unassigned guards are never returned, and failed reads cannot be presented
   rows.account_closures = [{ user_id: 'user-client' }];
   assert.equal((await loadEndpoint('get-client-assigned-guards', databaseFixture(rows))({ job_id: rows.jobs[0].id })).status, 403);
 });
+
+test('assigned profile endpoint paginates assignments and batches guards without widening the response', async () => {
+  const rows = sampleRows(); const job = rows.jobs[0];
+  rows.guards = Array.from({ length: 205 }, (_, i) => ({ ...rows.guards[0], id: 'guard-' + i }));
+  rows.job_assignments = rows.guards.map((guard, i) => ({ id: 'assignment-' + String(i).padStart(4, '0'), job_id: job.id, guard_id: guard.id }));
+  const db = databaseFixture(rows); const result = await loadEndpoint('get-client-assigned-guards', db)({ job_id: job.id });
+  assert.equal(result.status, 200); assert.equal(result.body.profiles.length, 205); assert.equal(db.calls.filter(c => c.table === 'job_assignments').length, 2);
+  assert.equal(db.calls.filter(c => c.table === 'guards').length, 3);
+  assert.equal(result.body.profiles.some(p => 'phone' in p || 'email' in p || 'bank_account_number' in p), false);
+});
