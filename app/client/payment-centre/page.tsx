@@ -10,6 +10,7 @@ import LiveIndicator from '@/components/LiveIndicator';
 import { useClientPaymentCentre } from '@/hooks/useClientPaymentCentre';
 import type { JobPayment } from '@/hooks/useClientPaymentCentre';
 import { useClientGuard } from '@/hooks/useClientGuard';
+import PaymentDocuments from './PaymentDocuments';
 
 type TabKey = 'overview' | 'history' | 'receipts';
 
@@ -415,7 +416,8 @@ export default function ClientPaymentCentrePage() {
               <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] overflow-hidden">
                 <div className="p-5 border-b border-[#1e2d4d]">
                   <h3 className="font-semibold text-white">Receipts & Invoices</h3>
-                  <p className="text-sm text-slate-400 mt-1">Download receipts and invoices for your job payments</p>
+                  <p className="text-sm text-slate-400 mt-1">Open saved receipts or check Stripe for the latest documents for your job payments. Stripe receipts can be downloaded from the provider page.</p>
+                  <p className="text-sm text-slate-400 mt-2">An invoice appears only if Stripe issued one. A QuickGuard payment record is separate from a provider receipt or tax invoice. Test payments are labelled and are not live charges.</p>
                 </div>
                 {jobPayments.filter(p => p.receiptUrl || p.invoiceUrl).length === 0 && jobPayments.filter(p => isCollected(p.paymentStatus)).length === 0 ? (
                   <div className="p-12 text-center">
@@ -423,7 +425,7 @@ export default function ClientPaymentCentrePage() {
                       <i className="ri-file-text-line text-2xl text-slate-500"></i>
                     </div>
                     <p className="text-slate-400 font-medium">No receipts available</p>
-                    <p className="text-sm text-slate-500 mt-1">Receipts and invoices will appear here after your first job payment.</p>
+                    <p className="text-sm text-slate-500 mt-1">After a successful job payment, check here for its provider documents.</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -438,7 +440,7 @@ export default function ClientPaymentCentrePage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#1e2d4d]">
-                        {jobPayments.filter(p => isCollected(p.paymentStatus) || p.receiptUrl || p.invoiceUrl).map(p => (
+                        {jobPayments.filter(p => (!jobFilter || p.jobId === jobFilter) && (isCollected(p.paymentStatus) || p.receiptUrl || p.invoiceUrl)).map(p => (
                           <tr key={p.id} className="hover:bg-[#162036]/50">
                             <td className="px-5 py-3 text-sm text-slate-400 whitespace-nowrap">
                               {new Date(p.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -449,24 +451,7 @@ export default function ClientPaymentCentrePage() {
                               <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(p.paymentStatus)}`}>{paymentLabel(p.paymentStatus)}</span>
                             </td>
                             <td className="px-5 py-3">
-                              <div className="flex items-center gap-2">
-                                {p.receiptUrl ? (
-                                  <a href={p.receiptUrl} target="_blank" rel="noopener noreferrer"
-                                    className="text-teal-400 hover:text-teal-300 text-xs font-medium whitespace-nowrap flex items-center gap-1">
-                                    <i className="ri-receipt-line"></i>Receipt
-                                  </a>
-                                ) : (
-                                  <span className="text-slate-600 text-xs">Receipt pending</span>
-                                )}
-                                {p.invoiceUrl ? (
-                                  <a href={p.invoiceUrl} target="_blank" rel="noopener noreferrer"
-                                    className="text-teal-400 hover:text-teal-300 text-xs font-medium whitespace-nowrap flex items-center gap-1">
-                                    <i className="ri-file-text-line"></i>Invoice
-                                  </a>
-                                ) : (
-                                  <span className="text-slate-600 text-xs">Not available</span>
-                                )}
-                              </div>
+                              <PaymentDocuments key={p.id} payment={p} />
                             </td>
                           </tr>
                         ))}
