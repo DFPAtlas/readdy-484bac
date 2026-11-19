@@ -207,9 +207,9 @@ export default function ClientPaymentCentrePage() {
                 <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-5 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-20 h-20 bg-amber-500/10 rounded-full -translate-y-8 translate-x-8" />
                   <div className="relative">
-                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Outstanding</p>
-                    <p className="text-2xl font-bold text-white">£{spendingSummary.outstandingAmount.toFixed(2)}</p>
-                    <p className="text-xs text-slate-500 mt-1">Awaiting payment</p>
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Awaiting Payment Booking Value</p>
+                    <p className="text-2xl font-bold text-white">{spendingSummary.outstandingUnknownJobs ? 'Price unavailable' : `£${spendingSummary.outstandingAmount.toFixed(2)}`}</p>
+                    <p className="text-xs text-slate-500 mt-1">Current non-deleted bookings only; retries count once. This is not a settled charge.</p>
                   </div>
                 </div>
                 <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-5 relative overflow-hidden">

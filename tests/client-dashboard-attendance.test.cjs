@@ -41,7 +41,7 @@ function database(rows, override = () => undefined) {
 }
 function query(db) {
   return load('lib/client-queries.ts', { './supabase': { supabase: db }, './client-job-list': listing,
-    './client-dashboard-attendance': attendance, './client-safety': { isSafetyStartingSoon: () => false },
+    './client-dashboard-attendance': attendance, './client-finance': load('lib/client-finance.ts', { './client-job-list': listing, './financeAmounts': load('lib/financeAmounts.ts') }), './client-safety': { isSafetyStartingSoon: () => false },
     './client-safety-data': { loadClientSafetySummary: async () => ({ missingSafetyInfo: 0, highRiskJobs: 0, complianceWarnings: 0, missingEmergencyContacts: 0 }) },
     './financeAmounts': load('lib/financeAmounts.ts'),
   }).getClientDashboardStats('client', 'user');

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
+import { paymentAmounts } from '@/lib/financeAmounts';
+import ClientSpendingSummary from '../components/ClientSpendingSummary';
 import PaymentRecordPreview from '../components/PaymentRecordPreview';
 import { loadClientPaymentRecord, type ClientPaymentDocument } from '@/lib/payments/clientPaymentDocument';
 import { useClientGuard } from '@/hooks/useClientGuard';
@@ -27,6 +29,7 @@ const PAYMENT_FILTER_CONFIGS = [
       { value: 'completed', label: 'Completed' },
       { value: 'pending', label: 'Pending' },
       { value: 'failed', label: 'Failed' },
+      { value: 'partially_refunded', label: 'Partially Refunded' },
       { value: 'refunded', label: 'Refunded' },
       { value: 'disputed', label: 'Disputed' },
     ],
@@ -354,6 +357,7 @@ export default function ClientPaymentHistoryPage() {
         return 'bg-blue-500/10 text-blue-400 border border-blue-500/25';
       case 'failed':
         return 'bg-red-500/10 text-red-400 border border-red-500/25';
+      case 'partially_refunded':
       case 'refunded':
         return 'bg-violet-500/10 text-violet-400 border border-violet-500/25';
       case 'disputed':
@@ -380,6 +384,8 @@ export default function ClientPaymentHistoryPage() {
         return 'Failed';
       case 'refunded':
         return 'Refunded';
+      case 'partially_refunded':
+        return 'Partially Refunded';
       case 'disputed':
         return 'Disputed';
       case 'invoice_sent':
@@ -431,20 +437,6 @@ export default function ClientPaymentHistoryPage() {
     }
     return 0;
   });
-
-  const subTotalSpent = subscriptionPayments
-    .filter(p => p.status === 'succeeded' && !p.refunded)
-    .reduce((sum, p) => sum + parseFloat(p.amount), 0);
-
-  const jobTotalSpent = jobPayments
-    .filter(p => p.status === 'completed')
-    .reduce((sum, p) => sum + parseFloat(p.amount), 0);
-
-  const totalRefunded = subscriptionPayments
-    .filter(p => p.refunded)
-    .reduce((sum, p) => sum + parseFloat(p.refund_amount || 0), 0);
-
-  const failedPayments = subscriptionPayments.filter(p => p.status === 'failed').length;
 
   const handleClearFilters = () => {
     setSearchTerm('');
@@ -609,51 +601,7 @@ export default function ClientPaymentHistoryPage() {
             <p className="text-slate-400 dark:text-slate-500 mt-2">View and manage all your subscription and job payments</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 rounded-xl p-6 text-white border border-emerald-500/25">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 flex items-center justify-center bg-emerald-500/20 rounded-lg">
-                  <i className="ri-vip-crown-line text-xl text-emerald-400"></i>
-                </div>
-                <span className="text-sm font-medium text-emerald-400">Subscription Spent</span>
-              </div>
-              <div className="text-3xl font-bold text-white">£{subTotalSpent.toFixed(2)}</div>
-              <p className="text-sm text-slate-400 mt-2">{subscriptionPayments.filter(p => p.status === 'succeeded').length} payments</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-blue-500/20 to-indigo-600/20 rounded-xl p-6 text-white border border-blue-500/25">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 flex items-center justify-center bg-blue-500/20 rounded-lg">
-                  <i className="ri-briefcase-line text-xl text-blue-400"></i>
-                </div>
-                <span className="text-sm font-medium text-blue-400">Job Payments</span>
-              </div>
-              <div className="text-3xl font-bold text-white">£{jobTotalSpent.toFixed(2)}</div>
-              <p className="text-sm text-slate-400 mt-2">{jobPayments.filter(p => p.status === 'completed').length} transactions</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-violet-500/20 to-pink-600/20 rounded-xl p-6 text-white border border-violet-500/25">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 flex items-center justify-center bg-violet-500/20 rounded-lg">
-                  <i className="ri-refund-line text-xl text-violet-400"></i>
-                </div>
-                <span className="text-sm font-medium text-violet-400">Refunded</span>
-              </div>
-              <div className="text-3xl font-bold text-white">£{totalRefunded.toFixed(2)}</div>
-              <p className="text-sm text-slate-400 mt-2">{subscriptionPayments.filter(p => p.refunded).length} refunds</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-orange-500/20 to-red-600/20 rounded-xl p-6 text-white border border-orange-500/25">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 flex items-center justify-center bg-orange-500/20 rounded-lg">
-                  <i className="ri-error-warning-line text-xl text-orange-400"></i>
-                </div>
-                <span className="text-sm font-medium text-orange-400">Failed</span>
-              </div>
-              <div className="text-3xl font-bold text-white">{failedPayments}</div>
-              <p className="text-sm text-slate-400 mt-2">Requires attention</p>
-            </div>
-          </div>
+          <ClientSpendingSummary subscriptions />
 
           <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-6 mb-6">
             <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
@@ -766,9 +714,9 @@ export default function ClientPaymentHistoryPage() {
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(payment.status)}`}>
                           {getStatusLabel(payment.status)}
                         </span>
-                        {payment.refunded && (
+                        {paymentAmounts(payment).refunded > 0 && (
                           <span className="ml-2 px-2 py-1 rounded-full text-xs font-medium bg-violet-500/10 text-violet-400 border border-violet-500/25">
-                            REFUNDED
+                            {paymentAmounts(payment).refunded < paymentAmounts(payment).collected ? 'PARTIALLY REFUNDED' : 'REFUNDED'}
                           </span>
                         )}
                       </td>
@@ -910,9 +858,9 @@ export default function ClientPaymentHistoryPage() {
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedPayment.status)}`}>
                     {selectedPayment.status?.toUpperCase()}
                   </span>
-                  {selectedPayment.refunded && (
+                  {paymentAmounts(selectedPayment).refunded > 0 && (
                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-violet-500/10 text-violet-400 border border-violet-500/25">
-                      REFUNDED: £{parseFloat(selectedPayment.refund_amount || 0).toFixed(2)}
+                      REFUND RECORDED: £{paymentAmounts(selectedPayment).refunded.toFixed(2)}
                     </span>
                   )}
                 </div>

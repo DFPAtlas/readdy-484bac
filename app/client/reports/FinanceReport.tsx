@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { paymentTotals, paymentAmounts } from '@/lib/financeAmounts';
 
 function getStatusColor(status: string) {
   switch (status) {
@@ -15,6 +16,7 @@ function getStatusColor(status: string) {
       return 'bg-blue-500/10 text-blue-400 border-blue-500/25';
     case 'failed':
       return 'bg-red-500/10 text-red-400 border-red-500/25';
+    case 'partially_refunded':
     case 'refunded':
       return 'bg-violet-500/10 text-violet-400 border-violet-500/25';
     case 'disputed':
@@ -39,6 +41,8 @@ function getStatusLabel(status: string) {
       return 'Failed';
     case 'refunded':
       return 'Refunded';
+    case 'partially_refunded':
+      return 'Partially Refunded';
     case 'disputed':
       return 'Disputed';
     default:
@@ -89,10 +93,11 @@ export default function FinanceReport({
     });
   }, [currentData, statusFilter, searchQuery]);
 
-  const total = filtered.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-  const paidTotal = filtered.filter((i: any) => ['completed', 'succeeded', 'paid'].includes(i.status)).reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+  const totals = paymentTotals(filtered);
+  const paidTotal = totals.collected;
+  const refundedTotal = totals.refunded;
+  const netTotal = totals.remaining;
   const failedTotal = filtered.filter((i: any) => i.status === 'failed').reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
-  const refundedTotal = filtered.filter((i: any) => i.refunded).reduce((sum, i) => sum + (Number(i.refund_amount) || 0), 0);
 
   function handleExportCsv() {
     if (filtered.length === 0) {
@@ -194,6 +199,7 @@ export default function FinanceReport({
               <option value="completed">Paid</option>
               <option value="pending">Pending</option>
               <option value="failed">Failed</option>
+              <option value="partially_refunded">Partially Refunded</option>
               <option value="refunded">Refunded</option>
               <option value="succeeded">Succeeded</option>
             </select>
@@ -240,14 +246,15 @@ export default function FinanceReport({
         </div>
       </div>
 
+      <p className="text-xs text-slate-400 mb-4">These totals follow the selected payment period, tab, status and search filters. Refunds are the recorded lifetime refunds on those payments. Failed attempts are excluded from gross and net spend.</p>
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4">
-          <p className="text-xs text-slate-500 font-medium uppercase">Total</p>
-          <p className="text-xl font-bold text-white">£{total.toFixed(2)}</p>
+          <p className="text-xs text-slate-500 font-medium uppercase">Net Spend</p>
+          <p className="text-xl font-bold text-white">£{netTotal.toFixed(2)}</p>
         </div>
         <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4">
-          <p className="text-xs text-slate-500 font-medium uppercase">Paid</p>
+          <p className="text-xs text-slate-500 font-medium uppercase">Gross Payments</p>
           <p className="text-xl font-bold text-emerald-400">£{paidTotal.toFixed(2)}</p>
         </div>
         <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4">
@@ -289,9 +296,9 @@ export default function FinanceReport({
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(item.status)}`}>
                       {getStatusLabel(item.status)}
                     </span>
-                    {item.refunded && (
+                    {paymentAmounts(item).refunded > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-violet-500/10 text-violet-400 border border-violet-500/25">
-                        Refunded
+                        {paymentAmounts(item).refunded < paymentAmounts(item).collected ? 'Partially Refunded' : 'Refunded'}
                       </span>
                     )}
                   </div>

@@ -3,6 +3,7 @@ import { isCompletedClientJob, readAllClientRows } from './client-job-list';
 import { dashboardAttendance } from './client-dashboard-attendance';
 import { isSafetyStartingSoon } from './client-safety';
 import { loadClientSafetySummary } from './client-safety-data';
+import { paymentsInRange, ukPaymentDay } from './client-finance';
 import { paymentTotals } from './financeAmounts';
 import type {
   Client,
@@ -405,7 +406,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
       .eq('is_deleted', false)
       .in('status', ['open', 'awaiting_client', 'escalated', 'under_review']),
     supabase.from('subscription_payments').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'failed'),
-    supabase.from('transactions').select('job_id, amount, status, refund_amount, refunded, created_at').eq('client_id', clientId),
+    readAllClientRows(() => supabase.from('transactions').select('id, job_id, amount, status, refund_amount, refunded, created_at').eq('client_id', clientId).order('created_at', { ascending: false }).order('id', { ascending: false })).then(data => ({ data, error: null })),
     jobIds.length > 0
       ? supabase.from('job_assignments').select('guard_id').in('job_id', jobIds)
       : Promise.resolve({ data: [] }),
@@ -490,7 +491,7 @@ export async function getClientDashboardStats(clientId: string, userId: string):
   const urgentTickets = openTickets.filter(t => t.priority === 'urgent').length;
   const awaitingReplyTickets = openTickets.filter(t => t.status === 'awaiting_client').length;
 
-  const totalSpend = paymentTotals(txData.filter(t => t.created_at >= startOfMonth)).collected;
+  const totalSpend = paymentTotals(paymentsInRange(txData, { from: ukPaymentDay(now.toISOString())!.slice(0, 7) + '-01', to: ukPaymentDay(now.toISOString())! })).collected;
   const totalGuardsHired = [...new Set(distinctGuards.map(a => a.guard_id))].length;
 
   let currentSafety;

@@ -1,3 +1,4 @@
+import ClientSpendingSummary from '../components/ClientSpendingSummary';
 import { useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -237,11 +238,8 @@ export default function BillingSection({ subscription, profile, onMessage }: Pro
 
       <div className="bg-white dark:bg-[#111d35] rounded-2xl border border-slate-200 dark:border-[#1e2d4d] shadow-sm p-6">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Payment Summary</h2>
+        <ClientSpendingSummary />
         <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#162036] border border-slate-200 dark:border-[#1e2d4d]">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-slate-500">Total Spent</p>
-            <p className="text-lg font-bold text-slate-900 dark:text-white">£{Number(profile.total_spent || 0).toFixed(2)}</p>
-          </div>
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-500">Payment Method</p>
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300">

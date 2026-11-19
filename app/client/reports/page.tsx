@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useClientGuard } from '@/hooks/useClientGuard';
@@ -11,6 +11,8 @@ import UpgradePrompt from '@/components/UpgradePrompt';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
 
+import ClientSpendingSummary from '../components/ClientSpendingSummary';
+import { loadClientFinanceRecords, paymentsInRange } from '@/lib/client-finance';
 import JobHistoryReport from './JobHistoryReport';
 import FinanceReport from './FinanceReport';
 import AttendanceReport from './AttendanceReport';
@@ -108,18 +110,27 @@ export default function ClientReportsPage() {
   const today = new Date().toISOString().split('T')[0];
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+  const reportRequest = useRef(0);
+  const reportMounted = useRef(false);
   const loadData = useCallback(async () => {
+    const id = ++reportRequest.current;
+    const current = () => reportMounted.current && id === reportRequest.current;
+    if (!current()) return;
+    setLoading(true);
+    setLoadError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (!current()) return;
+      if (authError || !user) throw new Error('Sign in to load reports.');
 
       const { data: client } = await supabase
         .from('clients')
-        .select('id, company_name, subscription_tier, contact_name, email, phone, address, city, postcode, vat_number')
+        .select('id, company_name, subscription_tier, contact_name, email, phone, address:address_line1, city, postcode, vat_number')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (!client) return;
+      if (!current()) return;
+      if (!client) throw new Error('Client reports could not be loaded.');
       setClientId(client.id);
       setCompanyName(client.company_name || 'Client');
       setSubscriptionTier(client.subscription_tier || 'Free');
@@ -133,17 +144,7 @@ export default function ClientReportsPage() {
         .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
-      const { data: transactions } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('client_id', client.id)
-        .order('created_at', { ascending: false });
-
-      const { data: subscriptionPayments } = await supabase
-        .from('subscription_payments')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      const { transactions, subscriptionPayments } = await loadClientFinanceRecords(supabase, client.id, user.id);
 
       const { data: complaints } = await supabase
         .from('complaints')
@@ -162,6 +163,7 @@ export default function ClientReportsPage() {
         .select('id, full_name, sia_licence_number, sia_expiry_date, sia_verified, licence_types, rating, total_reviews, years_experience, is_active, verification_status')
         .in('id', [...new Set((assignments || []).map(a => a.guard_id).filter(Boolean))]);
 
+      if (!current()) return;
       setReportData({
         jobs: jobs || [],
         transactions: transactions || [],
@@ -172,17 +174,19 @@ export default function ClientReportsPage() {
         client,
       });
     } catch (e: unknown) {
-      setLoadError(e instanceof Error ? e.message : 'Failed to load reports');
+      if (current()) setLoadError(e instanceof Error ? e.message : 'Failed to load reports');
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    reportMounted.current = true;
     const to = new Date().toISOString().split('T')[0];
     const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     setReportRange({ from, to });
     loadData();
+    return () => { reportMounted.current = false; };
   }, [loadData]);
 
   useEffect(() => {
@@ -199,13 +203,8 @@ export default function ClientReportsPage() {
     return true;
   });
 
-  const filteredTransactions = reportData.transactions.filter(t => {
-    if (!reportRange.from && !reportRange.to) return true;
-    const d = t.created_at?.slice(0, 10);
-    if (reportRange.from && d < reportRange.from) return false;
-    if (reportRange.to && d > reportRange.to) return false;
-    return true;
-  });
+  const filteredTransactions = paymentsInRange(reportData.transactions, reportRange);
+  const filteredSubscriptionPayments = paymentsInRange(reportData.subscriptionPayments, reportRange);
 
   const filteredComplaints = reportData.complaints.filter(c => {
     if (!reportRange.from && !reportRange.to) return true;
@@ -218,8 +217,6 @@ export default function ClientReportsPage() {
   const stats = {
     totalJobs: reportData.jobs.length,
     completedJobs: reportData.jobs.filter(j => j.status === 'completed').length,
-    totalSpent: reportData.transactions.filter(t => t.status === 'completed').reduce((s, t) => s + (Number(t.amount) || 0), 0),
-    totalSubscriptionSpent: reportData.subscriptionPayments.filter(p => p.status === 'succeeded').reduce((s, p) => s + (Number(p.amount) || 0), 0),
     openComplaints: reportData.complaints.filter(c => c.status === 'open').length,
     compliantGuards: reportData.guards.filter(g => g.sia_verified && g.sia_expiry_date && new Date(g.sia_expiry_date) > new Date()).length,
     expiringGuards: reportData.guards.filter(g => {
@@ -381,17 +378,15 @@ export default function ClientReportsPage() {
         </header>
 
         <main className="flex-1 px-6 lg:px-8 py-8">
+          <ClientSpendingSummary subscriptions range={reportRange} />
           {/* Stats overview */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {[
               { label: 'Total Jobs', value: stats.totalJobs, icon: 'ri-briefcase-4-line', color: 'text-teal-400' },
               { label: 'Completed', value: stats.completedJobs, icon: 'ri-checkbox-circle-line', color: 'text-emerald-400' },
-              { label: 'Job Spend', value: `£${stats.totalSpent.toFixed(2)}`, icon: 'ri-bill-line', color: 'text-violet-400' },
-              { label: 'Subscription', value: `£${stats.totalSubscriptionSpent.toFixed(2)}`, icon: 'ri-vip-crown-line', color: 'text-blue-400' },
               { label: 'Open Disputes', value: stats.openComplaints, icon: 'ri-error-warning-line', color: 'text-orange-400' },
               { label: 'Compliant Guards', value: stats.compliantGuards, icon: 'ri-shield-check-line', color: 'text-emerald-400' },
               { label: 'SIA Expiring', value: stats.expiringGuards, icon: 'ri-timer-flash-line', color: 'text-amber-400' },
-              { label: 'Grand Total', value: `£${(stats.totalSpent + stats.totalSubscriptionSpent).toFixed(2)}`, icon: 'ri-money-pound-circle-line', color: 'text-teal-400' },
             ].map((s) => (
               <div key={s.label} className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4 flex items-center gap-3">
                 <div className="w-10 h-10 bg-[#162036] rounded-lg flex items-center justify-center flex-shrink-0">
@@ -521,7 +516,7 @@ export default function ClientReportsPage() {
               {activeReport === 'finance' && (
                 <FinanceReport
                   transactions={filteredTransactions}
-                  subscriptionPayments={reportData.subscriptionPayments}
+                  subscriptionPayments={filteredSubscriptionPayments}
                   client={reportData.client}
                   reportRange={reportRange}
                   onToast={setToast}

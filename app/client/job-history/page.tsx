@@ -1,5 +1,7 @@
 'use client';
 
+import ClientSpendingSummary from '../components/ClientSpendingSummary';
+import { clientJobPaymentLabel } from '@/lib/client-finance';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -346,19 +348,8 @@ export default function ClientJobHistoryClient() {
   };
 
   const getPaymentBadge = (job: HistoryJob) => {
-    if (job.refund_amount || job.refunded_at || job.transactions.some((t) => t.status === 'refunded')) {
-      return { label: 'Refunded', class: 'bg-red-500/15 text-red-400 border border-red-500/25' };
-    }
-    if (job.payment_status === 'funded') {
-      return { label: 'Funded', class: 'bg-teal-500/15 text-teal-400 border border-teal-500/25' };
-    }
-    if (job.payment_status === 'paid') {
-      return { label: 'Paid', class: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' };
-    }
-    if (job.payment_status === 'pending') {
-      return { label: 'Pending', class: 'bg-amber-500/15 text-amber-400 border border-amber-500/25' };
-    }
-    return { label: 'Unpaid', class: 'bg-slate-500/15 text-slate-400 border border-slate-500/25' };
+    const label = clientJobPaymentLabel(job);
+    return { label, class: label === 'Paid' || label === 'Funded' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' : label.includes('Refunded') ? 'bg-violet-500/15 text-violet-400 border border-violet-500/25' : 'bg-slate-500/15 text-slate-400 border border-slate-500/25' };
   };
 
   if (authLoading || !allowed || checking) {
@@ -457,38 +448,8 @@ export default function ClientJobHistoryClient() {
             </div>
           )}
 
-          {/* Spend Summary */}
-          {stats && !error && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              <div className="bg-white dark:bg-[#111d35] rounded-xl border border-slate-200 dark:border-[#1e2d4d] p-4 flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-500/10 rounded-lg flex items-center justify-center">
-                  <i className="ri-money-pound-circle-line text-xl text-emerald-400"></i>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Total Spent</p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">£{Number(stats.total_spent).toFixed(2)}</p>
-                </div>
-              </div>
-              <div className="bg-white dark:bg-[#111d35] rounded-xl border border-slate-200 dark:border-[#1e2d4d] p-4 flex items-center gap-4">
-                <div className="w-12 h-12 bg-teal-500/10 rounded-lg flex items-center justify-center">
-                  <i className="ri-wallet-3-line text-xl text-teal-400"></i>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Funded Jobs</p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.funded}</p>
-                </div>
-              </div>
-              <div className="bg-white dark:bg-[#111d35] rounded-xl border border-slate-200 dark:border-[#1e2d4d] p-4 flex items-center gap-4">
-                <div className="w-12 h-12 bg-red-500/10 rounded-lg flex items-center justify-center">
-                  <i className="ri-refund-line text-xl text-red-400"></i>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Refunded</p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.refunded}</p>
-                </div>
-              </div>
-            </div>
-          )}
+          <ClientSpendingSummary />
+          <p className="text-xs text-slate-500 mb-4">Payment totals above cover all retained records and are independent of the job-list filters and page.</p>
 
           {/* Filters */}
           <div className="bg-white dark:bg-[#111d35] rounded-xl border border-slate-200 dark:border-[#1e2d4d] p-4 mb-6">
