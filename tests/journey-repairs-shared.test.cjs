@@ -221,9 +221,11 @@ test('unauthorised promo calls are rejected before any privileged work', async (
 
 // ---------- Finding 10: support routing ----------
 test('ordinary, complaint, refund-review and replacement tickets all use the Command Centre bridge', () => {
-  for (const f of ['app/client/support/CreateTicketModal.tsx', 'app/client/jobs/[id]/ComplaintModal.tsx', 'app/client/jobs/RefundRequestModal.tsx', 'app/client/jobs/[id]/ReplacementRequestModal.tsx']) {
+  for (const f of ['app/client/support/CreateTicketModal.tsx', 'app/client/jobs/[id]/ComplaintModal.tsx', 'app/client/jobs/RefundRequestModal.tsx']) {
     assert.match(fs.readFileSync(f, 'utf8'), /routeTicketToCommandCentre\(/, f);
   }
+  assert.match(fs.readFileSync('supabase/functions/submit-replacement-request/index.ts','utf8'), /dfp-support-ticket-bridge/);
+  assert.match(fs.readFileSync('app/client/jobs/[id]/ReplacementRequestModal.tsx','utf8'), /submitReplacementRequest\(/);
   const bridge = fs.readFileSync('supabase/functions/dfp-support-ticket-bridge/index.ts', 'utf8');
   assert.match(bridge, /'x-idempotency-key': `quickguard-ticket:\$\{ticketId\}`/);
   assert.match(bridge, /retryUnsynced/);

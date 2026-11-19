@@ -68,3 +68,7 @@ verify_jwt = false
 [functions.client-attendance-issue]
 # Validates the bearer token, open account, client/job ownership and assignment.
 verify_jwt = false
+
+[functions.submit-replacement-request]
+# Validates the bearer token; a service-only transaction checks ownership and closure.
+verify_jwt = false

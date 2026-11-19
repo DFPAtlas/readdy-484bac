@@ -1,7 +1,7 @@
 'use client';
 
-import { routeTicketToCommandCentre } from '@/lib/support-routing';
-import { useState } from 'react';
+import { submitReplacementRequest, type ReplacementSubmission, type ReplacementReceipt } from '@/lib/replacement-submission';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 interface ReplacementRequestModalProps {
@@ -36,7 +36,6 @@ export default function ReplacementRequestModal({
   jobTitle,
   assignmentId,
   guardName,
-  guardId,
   clientId,
   preferredGuard,
   assignmentOptions,
@@ -57,105 +56,60 @@ export default function ReplacementRequestModal({
 
   const selectedAssignment = assignmentOptions?.find(a => a.id === selectedAssignmentId);
   const currentGuardName = selectedAssignment?.guardName || guardName;
-  const currentGuardId = selectedAssignment?.guardId || guardId;
   const requestNotes = [
     preferredGuard ? `Preferred replacement: ${preferredGuard.fullName} (guard ID: ${preferredGuard.id}). Availability and booking need confirmation.` : null,
     notes.trim() || null,
   ].filter(Boolean).join('\n\n');
 
+  const [receipt, setReceipt] = useState<ReplacementReceipt | null>(null);
+  const [attempted, setAttempted] = useState(false);
+  const active = useRef(true);
+  const busy = useRef(false);
+  const confirmed = useRef(false);
+  const finished = useRef(false);
+  const payload = useRef<ReplacementSubmission | null>(null);
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; };
+  }, []);
+
+  const finish = () => {
+    if (!active.current || busy.current || finished.current) return;
+    finished.current = true;
+    if (confirmed.current) onSuccess(); else onClose();
+  };
+
   const handleSubmit = async () => {
+    if (!active.current || busy.current || confirmed.current) return;
     setError('');
-    if (preferredGuard && !selectedAssignment) { setError('Please select the guard who needs replacing.'); return; }
-    if (!reason) { setError('Please select a reason.'); return; }
-    if (!requiredArrivalTime) { setError('Please specify when the replacement guard is needed.'); return; }
-    if (urgency === 'emergency' && !contactPhone) { setError('Please provide a contact phone for emergency cover.'); return; }
-
+    if (!payload.current) {
+      if (!clientId || !jobId) { setError('Reload the job before requesting a replacement.'); return; }
+      if (!selectedAssignmentId || (assignmentOptions && !selectedAssignment)) { setError('Please select the guard who needs replacing.'); return; }
+      if (!REASON_OPTIONS.some(option => option.value === reason) || !URGENCY_OPTIONS.some(option => option.value === urgency)) { setError('Please select a reason and urgency.'); return; }
+      if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(requiredArrivalTime)) { setError('Please specify when the replacement guard is needed.'); return; }
+      if (urgency === 'emergency' && !contactPhone.trim()) { setError('Please provide a contact phone for emergency cover.'); return; }
+      payload.current = {requestId: crypto.randomUUID(), clientId, jobId, assignmentId: selectedAssignmentId,
+        reason, urgency, arrival: requiredArrivalTime, notes: requestNotes, phone: contactPhone.trim(), createTicket};
+    }
+    busy.current = true;
     setSubmitting(true);
+    setAttempted(true);
     try {
-      // Insert replacement request
-      const { data: requestData, error: reqError } = await supabase
-        .from('replacement_requests')
-        .insert({
-          client_id: clientId,
-          job_id: jobId,
-          assignment_id: selectedAssignmentId || null,
-          guard_id: currentGuardId || null,
-          reason,
-          urgency,
-          required_arrival_time: requiredArrivalTime,
-          notes: requestNotes || null,
-          contact_phone: contactPhone.trim() || null,
-          status: 'requested',
-        })
-        .select('id')
-        .single();
-
-      if (reqError) throw reqError;
-
-      // If urgent or emergency, create a support ticket
-      if (createTicket && (urgency === 'urgent' || urgency === 'emergency')) {
-        const { data: ticketData, error: ticketError } = await supabase
-          .from('support_tickets')
-          .insert({
-            client_id: clientId,
-            related_job_id: jobId,
-            category: 'guard_no_show',
-            subject: `Replacement Request: ${currentGuardName || 'Guard'} - ${urgency === 'emergency' ? 'Emergency Cover' : 'Urgent Cover'}`,
-            description: `Replacement request submitted for job "${jobTitle}".\n\nReason: ${REASON_OPTIONS.find(r => r.value === reason)?.label}\nUrgency: ${URGENCY_OPTIONS.find(u => u.value === urgency)?.label}\nRequired by: ${requiredArrivalTime}\nNotes: ${requestNotes || 'None'}\nContact: ${contactPhone || 'Not provided'}`,
-            priority: urgency === 'emergency' ? 'urgent' : 'high',
-            status: 'open',
-            contact_preference: 'phone',
-          })
-          .select('id')
-          .single();
-
-        if (ticketError || !ticketData) {
-          console.error('[ReplacementRequestModal] Support ticket was not created', ticketError);
-        }
-        if (!ticketError && ticketData) {
-          // Same Command Centre hand-over as ordinary support tickets.
-          const routed = await routeTicketToCommandCentre(ticketData.id);
-          if (!routed.ok) console.warn('[ReplacementRequestModal] Command Centre sync pending for ticket', ticketData.id);
-          // Update the replacement request with the ticket link
-          await supabase
-            .from('replacement_requests')
-            .update({ support_ticket_id: ticketData.id })
-            .eq('id', requestData.id);
-        }
-      }
-
-      // Create notification for client
-      await supabase.from('notifications').insert({
-        user_id: (await supabase.auth.getUser()).data.user?.id,
-        user_type: 'client',
-        type: 'replacement_requested',
-        title: 'Replacement Request Submitted',
-        message: `Your request for a replacement guard for "${jobTitle}" has been received. We are working on finding a suitable replacement.`,
-        link: `/client/jobs/detail?id=${encodeURIComponent(jobId)}`,
-        is_read: false,
-      });
-
-      // If assignment exists, update it to mark replacement requested
-      if (selectedAssignmentId) {
-        await supabase
-          .from('job_assignments')
-          .update({
-            replacement_requested: true,
-            issue_reported: true,
-            issue_type: 'replacement_needed',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', selectedAssignmentId);
-      }
-
+      const saved = await submitReplacementRequest(supabase, payload.current, () => active.current);
+      if (!active.current) return;
+      confirmed.current = true;
+      setReceipt(saved);
       setSuccess(true);
-      setTimeout(() => {
-        onSuccess();
-      }, 2000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit replacement request. Please try again.');
+    } catch (error) {
+      if (active.current) {
+        const canEdit = error instanceof Error && 'canEdit' in error && error.canEdit === true;
+        if (canEdit) { payload.current = null; setAttempted(false); }
+        setError(canEdit ? 'The request was not accepted. Check the job and arrival details, then try again.' :
+          'We could not confirm the request. Retry to check the same request. Check this job before starting another request.');
+      }
     } finally {
-      setSubmitting(false);
+      busy.current = false;
+      if (active.current) setSubmitting(false);
     }
   };
 
@@ -175,7 +129,7 @@ export default function ReplacementRequestModal({
               <p className="text-xs text-slate-500">{jobTitle}</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#162036] transition-colors cursor-pointer">
+          <button onClick={finish} disabled={submitting} aria-label="Close replacement request" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#162036] transition-colors cursor-pointer">
             <i className="ri-close-line text-slate-500 text-xl"></i>
           </button>
         </div>
@@ -183,16 +137,18 @@ export default function ReplacementRequestModal({
         {/* Content */}
         <div className="p-6 space-y-5">
           {error && (
-            <div className="bg-red-500/10 border border-red-500/25 rounded-xl px-4 py-3 flex items-center gap-2">
+            <div role="alert" className="bg-red-500/10 border border-red-500/25 rounded-xl px-4 py-3 flex items-center gap-2">
               <i className="ri-error-warning-line text-red-400"></i>
               <p className="text-sm text-red-400">{error}</p>
             </div>
           )}
 
           {success && (
-            <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl px-4 py-3 flex items-center gap-2">
-              <i className="ri-checkbox-circle-fill text-emerald-400 text-lg"></i>
-              <p className="text-sm text-emerald-400 font-medium">Replacement request submitted successfully. QuickGuard is working on it.</p>
+            <div className="space-y-3">
+              <p role="status" className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl px-4 py-3 text-sm text-emerald-400">Replacement request recorded. Cover and booking require confirmation.</p>
+              <p className="text-xs text-slate-400 break-all">Request reference: {receipt?.requestId}</p>
+              {receipt?.supportSyncPending && <p role="alert" className="text-sm text-amber-400">Your request and support ticket were saved. Central support synchronisation is pending; your QuickGuard ticket remains available.</p>}
+              <button onClick={finish} className="bg-teal-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold">Done</button>
             </div>
           )}
 
@@ -215,7 +171,7 @@ export default function ReplacementRequestModal({
                   {assignmentOptions && assignmentOptions.length > 1 && (
                     <div>
                       <label htmlFor="replacement-assignment" className="block text-sm font-semibold text-slate-300 mb-2">Guard to replace</label>
-                      <select id="replacement-assignment" value={selectedAssignmentId} onChange={e => setSelectedAssignmentId(e.target.value)} className="w-full bg-[#162036] text-slate-200 border border-[#1e2d4d] rounded-xl p-3">
+                      <select disabled={submitting || attempted} id="replacement-assignment" value={selectedAssignmentId} onChange={e => setSelectedAssignmentId(e.target.value)} className="w-full bg-[#162036] text-slate-200 border border-[#1e2d4d] rounded-xl p-3">
                         <option value="">Select assigned guard</option>
                         {assignmentOptions.map(a => <option key={a.id} value={a.id}>{a.guardName}</option>)}
                       </select>
@@ -244,6 +200,7 @@ export default function ReplacementRequestModal({
                         <button
                           key={r.value}
                           onClick={() => setReason(r.value)}
+                          disabled={submitting || attempted}
                           className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all cursor-pointer text-left ${
                             reason === r.value
                               ? 'border-teal-500 bg-teal-500/10'
@@ -272,6 +229,7 @@ export default function ReplacementRequestModal({
                         <button
                           key={u.value}
                           onClick={() => setUrgency(u.value)}
+                          disabled={submitting || attempted}
                           className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all cursor-pointer text-left ${
                             urgency === u.value
                               ? 'border-teal-500 bg-teal-500/10'
@@ -284,9 +242,9 @@ export default function ReplacementRequestModal({
                           <div className="flex-1">
                             <span className="text-sm font-medium text-slate-200">{u.label}</span>
                             <p className="text-xs text-slate-500">
-                              {u.value === 'normal' && 'Standard replacement within 24 hours'}
-                              {u.value === 'urgent' && 'Replacement needed within 2-4 hours'}
-                              {u.value === 'emergency' && 'Immediate cover required — our team will call you'}
+                              {u.value === 'normal' && 'Cover needed later; availability needs confirmation'}
+                              {u.value === 'urgent' && 'Urgent cover requested; response time depends on availability'}
+                              {u.value === 'emergency' && 'Immediate cover requested; contact support for an update. Cover is not guaranteed'}
                             </p>
                           </div>
                           {urgency === u.value && (
@@ -317,11 +275,12 @@ export default function ReplacementRequestModal({
                     </label>
                     <input
                       type="datetime-local"
+                      disabled={submitting || attempted}
                       value={requiredArrivalTime}
                       onChange={(e) => setRequiredArrivalTime(e.target.value)}
                       className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl text-white text-sm focus:ring-2 focus:ring-teal-500"
                     />
-                    <p className="text-xs text-slate-500 mt-1">Specify the exact time the guard must be on site</p>
+                    <p className="text-xs text-slate-500 mt-1">Choose a future arrival in UK time (Europe/London). Availability still needs confirmation.</p>
                   </div>
 
                   {/* Contact phone */}
@@ -331,6 +290,8 @@ export default function ReplacementRequestModal({
                     </label>
                     <input
                       type="tel"
+                      maxLength={60}
+                      disabled={submitting || attempted}
                       value={contactPhone}
                       onChange={(e) => setContactPhone(e.target.value)}
                       className="w-full px-4 py-3 bg-[#162036] border border-[#1e2d4d] rounded-xl text-white text-sm focus:ring-2 focus:ring-teal-500"
@@ -345,6 +306,7 @@ export default function ReplacementRequestModal({
                       Notes for QuickGuard
                     </label>
                     <textarea
+                      disabled={submitting || attempted}
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       placeholder="Any special instructions, access details, or context about the site..."
@@ -366,6 +328,9 @@ export default function ReplacementRequestModal({
                       </div>
                       <button
                         onClick={() => setCreateTicket(!createTicket)}
+                        disabled={submitting || attempted}
+                        aria-label="Create support ticket"
+                        aria-pressed={createTicket}
                         className={`w-10 h-6 rounded-full transition-colors relative ${createTicket ? 'bg-teal-500' : 'bg-[#162036] border border-[#1e2d4d]'}`}
                       >
                         <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${createTicket ? 'left-5' : 'left-1'}`}></span>
@@ -405,6 +370,7 @@ export default function ReplacementRequestModal({
                   <div className="flex items-center gap-3 pt-2">
                     <button
                       onClick={() => setStep(1)}
+                      disabled={submitting || attempted}
                       className="px-4 py-2.5 border border-[#1e2d4d] text-slate-400 rounded-xl text-sm font-semibold hover:bg-[#162036] transition-colors cursor-pointer whitespace-nowrap"
                     >
                       <i className="ri-arrow-left-line mr-1"></i> Back
@@ -419,7 +385,7 @@ export default function ReplacementRequestModal({
                       ) : (
                         <i className="ri-refresh-line"></i>
                       )}
-                      {submitting ? 'Submitting…' : 'Request Replacement'}
+                      {submitting ? 'Submitting…' : attempted ? 'Retry request' : 'Request Replacement'}
                     </button>
                   </div>
                 </>
