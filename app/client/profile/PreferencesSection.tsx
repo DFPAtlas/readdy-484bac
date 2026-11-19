@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { ClientPaymentMethodState, paymentMethodView } from '@/lib/client-payment-method';
+import PaymentMethodStatus from './PaymentMethodStatus';
 
 interface NotificationPrefs {
   new_applicants: boolean;
@@ -19,7 +21,6 @@ interface HealthData {
   profileComplete: boolean;
   billingAdded: boolean;
   firstJobPosted: boolean;
-  paymentMethodAdded: boolean;
   notificationsSet: boolean;
   documentsUploaded: boolean;
 }
@@ -33,6 +34,8 @@ interface Props {
   profile: Profile;
   notifPrefs: NotificationPrefs | null;
   healthData: HealthData;
+  paymentMethodState: ClientPaymentMethodState;
+  onRefreshPaymentMethod: () => void;
   onRefreshPrefs: () => void;
   onMessage: (type: "success" | "error", text: string) => void;
 }
@@ -55,7 +58,7 @@ const HEALTH_ITEMS = [
   { key: "documentsUploaded", label: "Documents uploaded", icon: "ri-folder-3-line" },
 ];
 
-export default function PreferencesSection({ profile, notifPrefs, healthData, onRefreshPrefs, onMessage }: Props) {
+export default function PreferencesSection({ profile, notifPrefs, healthData, paymentMethodState, onRefreshPaymentMethod, onRefreshPrefs, onMessage }: Props) {
   const [prefs, setPrefs] = useState<NotificationPrefs>(
     notifPrefs || {
       new_applicants: true,
@@ -140,8 +143,9 @@ export default function PreferencesSection({ profile, notifPrefs, healthData, on
     onMessage("success", "Password reset link sent to your email.");
   };
 
-  const completedCount = Object.values(healthData).filter(Boolean).length;
-  const totalCount = Object.values(healthData).length;
+  const effectiveHealth = { ...healthData, paymentMethodAdded: paymentMethodView(paymentMethodState).complete };
+  const completedCount = Object.values(effectiveHealth).filter(Boolean).length;
+  const totalCount = Object.values(effectiveHealth).length;
   const progress = Math.round((completedCount / totalCount) * 100);
 
   return (
@@ -349,7 +353,7 @@ export default function PreferencesSection({ profile, notifPrefs, healthData, on
 
         <div className="space-y-2">
           {HEALTH_ITEMS.map((item) => {
-            const done = healthData[item.key as keyof HealthData];
+            const done = effectiveHealth[item.key as keyof typeof effectiveHealth];
             return (
               <div
                 key={item.key}
@@ -368,13 +372,16 @@ export default function PreferencesSection({ profile, notifPrefs, healthData, on
                 >
                   <i className={`${done ? "ri-check-line" : item.icon} text-sm`}></i>
                 </div>
-                <p
-                  className={`text-sm font-medium ${
-                    done ? "text-emerald-700 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"
-                  }`}
-                >
-                  {item.label}
-                </p>
+                <div>
+                  <p
+                    className={`text-sm font-medium ${
+                      done ? "text-emerald-700 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    {item.label}
+                  </p>
+                  {item.key === 'paymentMethodAdded' && <PaymentMethodStatus state={paymentMethodState} onRefresh={onRefreshPaymentMethod} />}
+                </div>
                 {done && (
                   <span className="ml-auto text-xs font-semibold text-emerald-500">Complete</span>
                 )}
