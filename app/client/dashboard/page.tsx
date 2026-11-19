@@ -223,7 +223,7 @@ export default function ClientDashboardPage() {
       ]);
 
       const [statsResult, topGuardsResult] = await Promise.all([
-        getClientDashboardStats(cid, user.id).catch(() => { warnings.push('Dashboard stats failed to load'); return { stats: null, actionData: {} as Partial<DashboardData>, error: null }; }),
+        getClientDashboardStats(cid, user.id).catch(() => ({ stats: null, actionData: {} as Partial<DashboardData>, error: 'Dashboard stats could not be loaded. Please retry.' })),
         getRecommendedGuards(5).catch(() => { warnings.push('Recommended guards failed to load'); return { guards: [], error: null }; }),
       ]);
 
@@ -260,6 +260,7 @@ export default function ClientDashboardPage() {
       if (subRes.data) setSubscription(subRes.data as SubscriptionInfo);
 
       const { stats, actionData: dashActionData, error: statsError } = statsResult;
+      if (statsError || !stats) throw new Error(statsError || 'Dashboard stats could not be loaded. Please retry.');
       if (!statsError) {
         setStats(stats);
         if (dashActionData.actionData) setActionData(dashActionData.actionData as ActionData);
@@ -697,7 +698,7 @@ export default function ClientDashboardPage() {
             </div>
           )}
 
-          <NextActions jobs={recentJobs} />
+          {!dashboardError && <NextActions jobs={recentJobs} />}
 
           {/* Onboarding Section */}
           {!onboardingComplete && showOnboarding && !onboardingDismissed && (
@@ -770,6 +771,7 @@ export default function ClientDashboardPage() {
             />
           )}
 
+          {!dashboardError && <>
           <ActionRequired
             guardsAwaitingReview={actionData.guardsAwaitingReview}
             jobsAwaitingPayment={actionData.jobsAwaitingPayment}
@@ -873,7 +875,7 @@ export default function ClientDashboardPage() {
                 iconColor="text-emerald-400"
                 value={actionData.guardsNotCheckedIn + actionData.lateGuards + actionData.noShows}
                 label="Attendance Issues"
-                sub={actionData.guardsNotCheckedIn > 0 ? `${actionData.guardsNotCheckedIn} not checked in` : actionData.lateGuards > 0 ? `${actionData.lateGuards} late` : actionData.noShows > 0 ? `${actionData.noShows} no-show` : 'All good'}
+                sub={actionData.guardsNotCheckedIn > 0 ? `${actionData.guardsNotCheckedIn} not checked in` : actionData.lateGuards > 0 ? `${actionData.lateGuards} late` : actionData.noShows > 0 ? `${actionData.noShows} no-show` : 'No current shift alerts'}
                 subColor="text-emerald-400"
                 href="/client/jobs/tracker"
               />
@@ -949,6 +951,7 @@ export default function ClientDashboardPage() {
               <ClientInfoCard client={client} />
             </div>
           </div>
+          </>}
         </div>
       </main>
       {/* Upgrade Required Modal */}
