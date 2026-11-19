@@ -1,30 +1,33 @@
 'use client';
 
+import { trackerLifecycle, trackerHasLiveAttendance } from '@/lib/client-job-tracker';
+
 interface TrackerStatsBarProps {
   jobs: any[];
 }
 
 export default function TrackerStatsBar({ jobs }: TrackerStatsBarProps) {
   const total = jobs.length;
-  const awaitingSelection = jobs.filter(j => j.status === 'awaiting_guard_selection').length;
+  const awaitingSelection = jobs.filter(j => ['open', 'awaiting_guard_selection'].includes(j.status)).length;
   const awaitingPayment = jobs.filter(j => j.status === 'awaiting_payment').length;
-  const inProgress = jobs.filter(j => j.status === 'in_progress').length;
-  const completed = jobs.filter(j => j.status === 'completed').length;
+  const inProgress = jobs.filter(j => trackerHasLiveAttendance(j.status)).length;
+  const completed = jobs.filter(j => trackerLifecycle(j.status).group === 'completed').length;
 
-  // Attendance stats across active jobs
-  const checkedIn = jobs.reduce((sum, j) => sum + (j.checked_in_count || 0), 0);
-  const late = jobs.reduce((sum, j) => sum + (j.late_count || 0), 0);
-  const noShow = jobs.reduce((sum, j) => sum + (j.no_show_count || 0), 0);
-  const issues = jobs.reduce((sum, j) => sum + (j.issue_count || 0), 0);
+  const activeJobs = jobs.filter(j => trackerHasLiveAttendance(j.status));
+  // Current attendance excludes terminal jobs and historical shifts.
+  const checkedIn = activeJobs.reduce((sum, j) => sum + (j.checked_in_count || 0), 0);
+  const late = activeJobs.reduce((sum, j) => sum + (j.late_count || 0), 0);
+  const noShow = activeJobs.reduce((sum, j) => sum + (j.no_show_count || 0), 0);
+  const issues = activeJobs.reduce((sum, j) => sum + (j.issue_count || 0), 0);
 
-  const replacementNeeded = jobs.reduce((sum, j) => sum + (j.replacement_needed_count || 0), 0);
-  const replacementOpen = jobs.reduce((sum, j) => sum + (j.replacement_open_count || 0), 0);
+  const replacementNeeded = activeJobs.reduce((sum, j) => sum + (j.replacement_needed_count || 0), 0);
+  const replacementOpen = activeJobs.reduce((sum, j) => sum + (j.replacement_open_count || 0), 0);
 
   const stats = [
-    { label: 'Total Jobs', value: total, icon: 'ri-briefcase-4-line', bg: 'bg-[#162036]', color: 'text-teal-400', border: 'border-[#1e2d4d]' },
+    { label: 'Loaded Jobs', value: total, icon: 'ri-briefcase-4-line', bg: 'bg-[#162036]', color: 'text-teal-400', border: 'border-[#1e2d4d]' },
     { label: 'Awaiting Guards', value: awaitingSelection, icon: 'ri-user-search-line', bg: 'bg-[#162036]', color: 'text-amber-400', border: 'border-[#1e2d4d]' },
     { label: 'Awaiting Payment', value: awaitingPayment, icon: 'ri-secure-payment-line', bg: 'bg-[#162036]', color: 'text-orange-400', border: 'border-[#1e2d4d]' },
-    { label: 'In Progress', value: inProgress, icon: 'ri-pulse-line', bg: 'bg-[#162036]', color: 'text-violet-400', border: 'border-[#1e2d4d]' },
+    { label: 'Confirmed / Active', value: inProgress, icon: 'ri-pulse-line', bg: 'bg-[#162036]', color: 'text-violet-400', border: 'border-[#1e2d4d]' },
     { label: 'Completed', value: completed, icon: 'ri-checkbox-circle-line', bg: 'bg-[#162036]', color: 'text-emerald-400', border: 'border-[#1e2d4d]' },
   ];
 
@@ -42,6 +45,7 @@ export default function TrackerStatsBar({ jobs }: TrackerStatsBarProps) {
 
   return (
     <div className="space-y-3">
+      <p className="text-xs text-slate-500">Counts cover the loaded jobs in the selected tab.</p>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
         {stats.map(s => (
           <div key={s.label} className={`bg-[#111d35] rounded-xl md:rounded-2xl border ${s.border} shadow-sm p-3 md:p-4 flex items-center gap-2 md:gap-3`}>

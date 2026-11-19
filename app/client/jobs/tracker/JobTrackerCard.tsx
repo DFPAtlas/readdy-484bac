@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { formatDateOnly } from '@/lib/date-only';
+import { trackerLifecycle, trackerStepState, trackerHasLiveAttendance } from '@/lib/client-job-tracker';
+import { nextJobAction } from '@/lib/client-journey';
 
 interface JobTrackerCardProps {
   job: any;
@@ -9,37 +11,28 @@ interface JobTrackerCardProps {
 }
 
 const STEPS = [
-  { key: 'posted', label: 'Job Posted', icon: 'ri-file-add-line', activeStatuses: ['pending', 'awaiting_guard_selection', 'awaiting_payment', 'in_progress', 'completed'] },
-  { key: 'applications', label: 'Applications', icon: 'ri-user-received-line', activeStatuses: ['awaiting_guard_selection', 'awaiting_payment', 'in_progress', 'completed'] },
-  { key: 'guards_selected', label: 'Guards Selected', icon: 'ri-user-follow-line', activeStatuses: ['awaiting_payment', 'in_progress', 'completed'] },
-  { key: 'payment', label: 'Payment', icon: 'ri-secure-payment-line', activeStatuses: ['in_progress', 'completed'] },
-  { key: 'complete', label: 'Complete', icon: 'ri-trophy-line', activeStatuses: ['completed'] },
+  { key: 'posted', label: 'Job Posted', icon: 'ri-file-add-line' },
+  { key: 'applications', label: 'Applications', icon: 'ri-user-received-line' },
+  { key: 'guards_selected', label: 'Guards Selected', icon: 'ri-user-follow-line' },
+  { key: 'payment', label: 'Payment', icon: 'ri-secure-payment-line' },
+  { key: 'complete', label: 'Complete', icon: 'ri-trophy-line' },
 ];
 
-function getStepState(step: typeof STEPS[0], jobStatus: string): 'done' | 'active' | 'pending' {
-  if (jobStatus === 'cancelled') return 'pending';
-  const order = ['pending', 'awaiting_guard_selection', 'awaiting_payment', 'in_progress', 'completed'];
-  const currentIdx = order.indexOf(jobStatus);
-  const stepActiveIdx = order.indexOf(step.activeStatuses[0]);
-  if (currentIdx > stepActiveIdx) return 'done';
-  if (step.activeStatuses.includes(jobStatus)) return 'active';
-  return 'pending';
-}
-
 function getStatusConfig(status: string) {
-  const map: Record<string, { bg: string; text: string; border: string; label: string; dot: string }> = {
-    pending: { bg: 'bg-[#162036]', text: 'text-slate-400', border: 'border-[#1e2d4d]', label: 'Pending Review', dot: 'bg-slate-500' },
-    awaiting_guard_selection: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/25', label: 'Awaiting Guard Selection', dot: 'bg-amber-400' },
-    awaiting_payment: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/25', label: 'Awaiting Payment', dot: 'bg-orange-400' },
-    in_progress: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/25', label: 'In Progress', dot: 'bg-blue-500' },
-    completed: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/25', label: 'Completed', dot: 'bg-emerald-500' },
-    cancelled: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/25', label: 'Cancelled', dot: 'bg-red-500' },
+  const lifecycle = trackerLifecycle(status);
+  const tones = {
+    slate: { bg: 'bg-[#162036]', text: 'text-slate-400', border: 'border-[#1e2d4d]', dot: 'bg-slate-500' },
+    amber: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/25', dot: 'bg-amber-400' },
+    orange: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/25', dot: 'bg-orange-400' },
+    blue: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/25', dot: 'bg-blue-500' },
+    emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/25', dot: 'bg-emerald-500' },
+    red: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/25', dot: 'bg-red-500' },
   };
-  return map[status] || map.pending;
+  return { ...tones[lifecycle.tone], label: lifecycle.label };
 }
 
 function getActionBanner(job: any) {
-  if (job.status === 'awaiting_guard_selection' && job.applications_count > 0) {
+  if (['open', 'pending', 'awaiting_guard_selection'].includes(job.status) && job.applications_count > 0) {
     return {
       bg: 'bg-amber-50 border-amber-200',
       icon: 'ri-user-search-line',
@@ -48,7 +41,7 @@ function getActionBanner(job: any) {
       cta: { label: 'Select Guards', href: `/client/jobs/applicants?id=${encodeURIComponent(job.id)}`, color: 'bg-amber-500 hover:bg-amber-600 text-white' },
     };
   }
-  if (job.status === 'awaiting_payment') {
+  if (job.status === 'awaiting_payment' && nextJobAction(job).attention) {
     return {
       bg: 'bg-orange-50 border-orange-200',
       icon: 'ri-secure-payment-line',
@@ -57,7 +50,7 @@ function getActionBanner(job: any) {
       cta: { label: 'Pay Now', href: `/client/jobs/payment?id=${encodeURIComponent(job.id)}`, color: 'bg-orange-500 hover:bg-orange-600 text-white' },
     };
   }
-  if (job.status === 'awaiting_guard_selection' && job.applications_count === 0) {
+  if (['open', 'awaiting_guard_selection'].includes(job.status) && job.applications_count === 0) {
     return {
       bg: 'bg-blue-50 border-blue-200',
       icon: 'ri-time-line',
@@ -66,14 +59,20 @@ function getActionBanner(job: any) {
       cta: null,
     };
   }
+  if (['awaiting_client_confirmation', 'awaiting_client_approval'].includes(job.status)) {
+    const action = nextJobAction(job);
+    return { bg: 'bg-amber-50 border-amber-200', icon: 'ri-checkbox-circle-line', iconColor: 'text-amber-600', text: action.label, cta: { ...action, color: 'bg-amber-500 hover:bg-amber-600 text-white' } };
+  }
   return null;
 }
 
 export default function JobTrackerCard({ job }: JobTrackerCardProps) {
   const statusConfig = getStatusConfig(job.status);
   const actionBanner = getActionBanner(job);
+  const lifecycle = trackerLifecycle(job.status);
+  const liveAttendance = trackerHasLiveAttendance(job.status);
   const isCancelled = job.status === 'cancelled';
-  const hasReplacementIssue = job.no_show_count > 0 || job.late_count > 0 || job.issue_count > 0;
+  const hasReplacementIssue = liveAttendance && (job.no_show_count > 0 || job.late_count > 0 || job.issue_count > 0 || job.replacement_needed_count > 0);
 
   return (
     <div className={`bg-[#111d35] rounded-2xl border shadow-sm overflow-hidden transition-shadow hover:shadow-md ${isCancelled ? 'border-red-500/25 opacity-75' : hasReplacementIssue ? 'border-amber-500/25' : 'border-[#1e2d4d]'}`}>
@@ -93,7 +92,7 @@ export default function JobTrackerCard({ job }: JobTrackerCardProps) {
                 {hasReplacementIssue && (
                   <span className="bg-red-500/10 text-red-400 border border-red-500/25 text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
                     <i className="ri-error-warning-line"></i>
-                    Needs Replacement
+                    Attendance Issue
                   </span>
                 )}
               </div>
@@ -116,7 +115,7 @@ export default function JobTrackerCard({ job }: JobTrackerCardProps) {
                     {job.start_time} – {job.end_time}
                   </span>
                 )}
-                {job.status === 'in_progress' && (job.checked_in_count > 0 || job.late_count > 0 || job.no_show_count > 0) && (
+                {liveAttendance && (job.checked_in_count > 0 || job.late_count > 0 || job.no_show_count > 0) && (
                   <span className="flex items-center gap-1">
                     <i className="ri-pulse-line text-slate-600 text-xs"></i>
                     <span className="flex items-center gap-1.5">
@@ -141,17 +140,17 @@ export default function JobTrackerCard({ job }: JobTrackerCardProps) {
           </div>
         </div>
 
-        {!isCancelled && (
+        {lifecycle.stage != null && (
           <div className="mb-5">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Progress</p>
               <p className="text-xs text-slate-500">
-                Step {Math.min(STEPS.findIndex(s => s.activeStatuses.includes(job.status)) + 1 || 1, STEPS.length)} of {STEPS.length}
+                Step {lifecycle.stage} of {STEPS.length}
               </p>
             </div>
             <div className="flex items-center w-full">
               {STEPS.map((step, index) => {
-                const state = getStepState(step, job.status);
+                const state = trackerStepState(job.status, index + 1);
                 const isLast = index === STEPS.length - 1;
                 return (
                   <div key={step.key} className="flex items-center flex-1 last:flex-none">
@@ -206,13 +205,13 @@ export default function JobTrackerCard({ job }: JobTrackerCardProps) {
         )}
 
         {/* Replacement action banner */}
-        {hasReplacementIssue && job.status === 'in_progress' && (
+        {hasReplacementIssue && liveAttendance && (
           <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl border bg-red-500/5 border-red-500/15 mb-4">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                 <i className="ri-refresh-line text-base text-red-400"></i>
               </div>
-              <p className="text-sm font-medium text-red-400">Guard attendance issue — request a replacement</p>
+              <p className="text-sm font-medium text-red-400">Check guard attendance and replacement options</p>
             </div>
             <Link href={`/client/jobs/detail?id=${encodeURIComponent(job.id)}`}>
               <button className="bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap">
@@ -239,7 +238,7 @@ export default function JobTrackerCard({ job }: JobTrackerCardProps) {
                 {job.assigned_guards} assigned
               </span>
             )}
-            {job.status === 'in_progress' && (job.checked_in_count > 0 || job.late_count > 0 || job.no_show_count > 0) && (
+            {liveAttendance && (job.checked_in_count > 0 || job.late_count > 0 || job.no_show_count > 0) && (
               <span className="flex items-center gap-1.5 text-slate-500 text-xs">
                 <div className="w-4 h-4 flex items-center justify-center">
                   <i className="ri-pulse-line text-xs"></i>

@@ -12,6 +12,8 @@ import { useClientGuard } from '@/hooks/useClientGuard';
 import { useClientAuth } from '@/lib/ClientAuthContext';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import ContextualHelpCard from '@/app/client/help/ContextualHelpCard';
+import { TRACKER_FILTER_STATUSES, trackerAttendance } from '@/lib/client-job-tracker';
+import { nextJobAction } from '@/lib/client-journey';
 
 const PAGE_SIZE = 8;
 const REALTIME_DEBOUNCE_MS = 500;
@@ -21,13 +23,6 @@ function getInitials(name: string): string {
   if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
   return name.slice(0, 2).toUpperCase();
 }
-
-const FILTER_STATUSES: Record<string, string[]> = {
-  active: ['pending', 'awaiting_guard_selection', 'awaiting_payment', 'in_progress'],
-  completed: ['completed'],
-  cancelled: ['cancelled'],
-  all: [],
-};
 
 export default function JobTrackerClient() {
   const { checking, blocked } = useRouteGuard();
@@ -44,6 +39,7 @@ export default function JobTrackerClient() {
   const [refreshing, setRefreshing] = useState(false);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [hasMore, setHasMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
   const [liveStatus, setLiveStatus] = useState<'connected' | 'reconnecting' | 'disconnected' | 'error'>('connected');
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +48,15 @@ export default function JobTrackerClient() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelsRef = useRef<any[]>([]);
   const mountedRef = useRef(true);
+  const requestSequence = useRef(0);
+  const clientRef = useRef(clientId);
+  const eligibleRef = useRef(false);
+  clientRef.current = clientId;
+  eligibleRef.current = !!clientId && allowed && !authLoading && !checking && !blocked;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; requestSequence.current += 1; };
+  }, []);
   const loadJobsRef = useRef<(silent?: boolean) => Promise<void>>(async () => {});
 
   useEffect(() => {
@@ -69,106 +74,77 @@ export default function JobTrackerClient() {
   }, [contextCompanyName, contextSubscriptionTier]);
 
   const loadJobs = useCallback(async (silent = false) => {
+    if (!mountedRef.current || clientRef.current !== clientId || !eligibleRef.current || !clientId) return;
+    const request = ++requestSequence.current;
+    const isCurrent = () => mountedRef.current && eligibleRef.current && clientRef.current === clientId && requestSequence.current === request;
     if (!silent) setLoading(true);
     else setRefreshing(true);
     setError(null);
     try {
-      const resolvedClientId = clientId;
-      if (!resolvedClientId) {
-        if (!silent) setLoading(false);
-        setRefreshing(false);
-        return;
-      }
-
-      const currentFilter = filterRef.current;
       const currentDisplayCount = displayCountRef.current;
-      const statuses = FILTER_STATUSES[currentFilter] || [];
-
+      const statuses = TRACKER_FILTER_STATUSES[filterRef.current] || [];
       let query = supabase
         .from('jobs')
-        .select('*, job_applications(count), job_assignments(count)', { count: 'exact' })
-        .eq('client_id', resolvedClientId)
+        .select('*, job_applications(count)', { count: 'exact' })
+        .eq('client_id', clientId)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .range(0, currentDisplayCount - 1);
-
-      if (statuses.length > 0) {
-        query = query.in('status', statuses);
-      }
-
+      if (statuses.length > 0) query = query.in('status', statuses);
       const { data, count, error: jobsError } = await query;
-
-      if (jobsError) {
-        setError('Failed to load jobs. Please try refreshing.');
-        if (!silent) setLoading(false);
-        setRefreshing(false);
-        return;
-      }
-
-      const totalCount = count || 0;
-      setHasMore(totalCount > currentDisplayCount);
-
-      const jobIds = (data || []).map(j => j.id);
-
+      if (!isCurrent()) return;
+      if (jobsError || !Array.isArray(data) || typeof count !== 'number' || !Number.isInteger(count) || count < 0) throw new Error('Invalid jobs response');
+      const jobIds = data.map(job => job.id);
       let assignmentsData: any[] = [];
-      if (jobIds.length > 0) {
-        const { data: aData } = await supabase
-          .from('job_assignments')
-          .select('job_id, attendance_status, check_in_time, issue_reported, replacement_requested')
-          .in('job_id', jobIds);
-        assignmentsData = aData || [];
-      }
-
       let replacementData: any[] = [];
       if (jobIds.length > 0) {
-        try {
-          const { data: rData } = await supabase
-            .from('replacement_requests')
-            .select('job_id, status')
-            .in('job_id', jobIds)
-            .in('status', ['requested', 'searching', 'replacement_offered', 'awaiting_client_approval']);
-          replacementData = rData || [];
-        } catch {
-          replacementData = [];
-        }
+        const { data: assignments, error: assignmentsError } = await supabase
+          .from('job_assignments')
+          .select('job_id, status, attendance_status, check_in_time, check_out_time, issue_reported, replacement_requested')
+          .in('job_id', jobIds);
+        if (!isCurrent()) return;
+        if (assignmentsError || !Array.isArray(assignments)) throw new Error('Invalid attendance response');
+        assignmentsData = assignments;
+        const { data: replacements, error: replacementsError } = await supabase
+          .from('replacement_requests')
+          .select('job_id, status')
+          .eq('client_id', clientId)
+          .in('job_id', jobIds)
+          .in('status', ['requested', 'searching', 'replacement_offered', 'awaiting_client_approval']);
+        if (!isCurrent()) return;
+        if (replacementsError || !Array.isArray(replacements)) throw new Error('Invalid replacement response');
+        replacementData = replacements;
       }
-
-      const attendanceMap: Record<string, { checkedIn: number; late: number; noShow: number; issues: number; replacements: number }> = {};
-      assignmentsData.filter(a => a && a.job_id).forEach(a => {
-        if (!attendanceMap[a.job_id]) attendanceMap[a.job_id] = { checkedIn: 0, late: 0, noShow: 0, issues: 0, replacements: 0 };
-        if (a.attendance_status === 'checked_in' || a.attendance_status === 'checked_out' || a.attendance_status === 'completed') attendanceMap[a.job_id].checkedIn++;
-        if (a.attendance_status === 'late') attendanceMap[a.job_id].late++;
-        if (a.attendance_status === 'no_show') attendanceMap[a.job_id].noShow++;
-        if (a.issue_reported) attendanceMap[a.job_id].issues++;
-        if (a.replacement_requested) attendanceMap[a.job_id].replacements++;
+      const formatted = data.map(job => {
+        const assignments = assignmentsData.filter(assignment => assignment.job_id === job.id);
+        const attendance = trackerAttendance(assignments, job.status);
+        return {
+          ...job,
+          applications_count: job.job_applications?.[0]?.count || 0,
+          assigned_guards: assignments.filter(assignment => assignment.status !== 'cancelled').length,
+          checked_in_count: attendance.checkedIn,
+          late_count: attendance.late,
+          no_show_count: attendance.noShow,
+          issue_count: attendance.issues,
+          replacement_needed_count: attendance.replacements,
+          replacement_open_count: ['funded', 'confirmed', 'in_progress'].includes(job.status)
+            ? replacementData.filter(replacement => replacement.job_id === job.id && ['requested', 'searching'].includes(replacement.status)).length : 0,
+        };
       });
-
-      const replacementMap: Record<string, { needed: number; open: number }> = {};
-      replacementData.forEach(r => {
-        if (!replacementMap[r.job_id]) replacementMap[r.job_id] = { needed: 0, open: 0 };
-        replacementMap[r.job_id].needed++;
-        if (['requested', 'searching'].includes(r.status)) replacementMap[r.job_id].open++;
-      });
-
-      const formatted = (data || []).map(job => ({
-        ...job,
-        applications_count: (job.job_applications?.[0] as any)?.count || 0,
-        assigned_guards: (job.job_assignments?.[0] as any)?.count || 0,
-        checked_in_count: attendanceMap[job.id]?.checkedIn || 0,
-        late_count: attendanceMap[job.id]?.late || 0,
-        no_show_count: attendanceMap[job.id]?.noShow || 0,
-        issue_count: attendanceMap[job.id]?.issues || 0,
-        replacement_needed_count: attendanceMap[job.id]?.replacements || 0,
-        replacement_open_count: replacementMap[job.id]?.open || 0,
-      }));
-
       setJobs(formatted);
+      setTotalCount(count);
+      setHasMore(count > currentDisplayCount);
       setLastUpdated(new Date());
-      setError(null);
-    } catch (err: any) {
-      setError(err?.message || 'Something went wrong loading jobs. Please try refreshing.');
+    } catch {
+      if (isCurrent()) {
+        setJobs([]);
+        setHasMore(false);
+        setTotalCount(0);
+        setError('Unable to load current job tracking and attendance. Please retry.');
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isCurrent()) { setLoading(false); setRefreshing(false); }
     }
   }, [clientId]);
 
@@ -184,54 +160,67 @@ export default function JobTrackerClient() {
   }, []);
 
   useEffect(() => {
-    if (!clientId) return;
-    loadJobs();
-  }, [clientId, loadJobs]);
+    setJobs([]);
+    setHasMore(false);
+    setTotalCount(0);
+    setError(null);
+    setDisplayCount(PAGE_SIZE);
+    displayCountRef.current = PAGE_SIZE;
+    if (eligibleRef.current) void loadJobs();
+    else { setLoading(false); setRefreshing(false); }
+    return () => { requestSequence.current += 1; };
+  }, [clientId, allowed, authLoading, checking, blocked, loadJobs]);
 
   useEffect(() => {
-    mountedRef.current = true;
+    if (!eligibleRef.current || !clientId) return;
+    const refresh = () => {
+      if (mountedRef.current && eligibleRef.current && clientRef.current === clientId) debouncedRealtimeRefresh();
+    };
 
     const jobsChannel = supabase
-      .channel('tracker-jobs')
-      .on('postgres_changes', { event: '*', schema: 'app', table: 'jobs' }, () => {
-        debouncedRealtimeRefresh();
+      .channel(`tracker-jobs-${clientId}`)
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'jobs', filter: `client_id=eq.${clientId}` }, () => {
+        refresh();
       })
       .subscribe((status) => {
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || clientRef.current !== clientId || !eligibleRef.current) return;
         if (status === 'SUBSCRIBED') setLiveStatus('connected');
         else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setLiveStatus('error');
         else if (status === 'CLOSED') setLiveStatus('disconnected');
       });
 
     const appsChannel = supabase
-      .channel('tracker-apps')
+      .channel(`tracker-apps-${clientId}`)
       .on('postgres_changes', { event: '*', schema: 'app', table: 'job_applications' }, () => {
-        debouncedRealtimeRefresh();
+        refresh();
       })
       .subscribe((status) => {
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || clientRef.current !== clientId || !eligibleRef.current) return;
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setLiveStatus('error');
       });
 
     const assignmentsChannel = supabase
-      .channel('tracker-assignments')
+      .channel(`tracker-assignments-${clientId}`)
       .on('postgres_changes', { event: '*', schema: 'app', table: 'job_assignments' }, () => {
-        debouncedRealtimeRefresh();
+        refresh();
       })
       .subscribe((status) => {
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || clientRef.current !== clientId || !eligibleRef.current) return;
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setLiveStatus('error');
       });
 
-    channelsRef.current = [jobsChannel, appsChannel, assignmentsChannel];
+    const replacementsChannel = supabase
+      .channel(`tracker-replacements-${clientId}`)
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'replacement_requests', filter: `client_id=eq.${clientId}` }, refresh)
+      .subscribe();
+    channelsRef.current = [jobsChannel, appsChannel, assignmentsChannel, replacementsChannel];
 
     return () => {
-      mountedRef.current = false;
       if (debounceRef.current) clearTimeout(debounceRef.current);
       channelsRef.current.forEach(ch => supabase.removeChannel(ch));
       channelsRef.current = [];
     };
-  }, [debouncedRealtimeRefresh]);
+  }, [clientId, allowed, authLoading, checking, blocked, debouncedRealtimeRefresh]);
 
   const handleFilterChange = (newFilter: string) => {
     setFilter(newFilter);
@@ -249,7 +238,7 @@ export default function JobTrackerClient() {
     loadJobs(true);
   };
 
-  const needsActionCount = jobs.filter(j => ['awaiting_guard_selection', 'awaiting_payment'].includes(j.status)).length;
+  const needsActionCount = jobs.filter(job => nextJobAction(job).attention).length;
 
   const filters = [
     { key: 'active', label: 'Active Jobs', icon: 'ri-pulse-line' },
@@ -258,7 +247,7 @@ export default function JobTrackerClient() {
     { key: 'all', label: 'All Jobs', icon: 'ri-list-check-2' },
   ];
 
-  if (loading || authLoading || !allowed || checking) {
+  if (loading || authLoading || !allowed || checking || !clientId) {
     return (
       <div className="min-h-screen bg-[#0B1933] flex flex-col lg:flex-row">
         <PortalSidebar
@@ -394,7 +383,7 @@ export default function JobTrackerClient() {
 
         <main className="flex-1 px-8 py-8">
           {error && (
-            <div className="mb-6 bg-red-500/10 border border-red-500/25 rounded-xl px-5 py-4 flex items-center justify-between gap-4">
+            <div role="alert" className="mb-6 bg-red-500/10 border border-red-500/25 rounded-xl px-5 py-4 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
                   <i className="ri-error-warning-line text-red-400 text-lg"></i>
@@ -411,7 +400,7 @@ export default function JobTrackerClient() {
             </div>
           )}
 
-          <TrackerStatsBar jobs={jobs} />
+          {!error && <TrackerStatsBar jobs={jobs} />}
 
           <div className="flex items-center gap-2 mb-6 mt-6">
             {filters.map(f => (
@@ -443,13 +432,13 @@ export default function JobTrackerClient() {
             </div>
           )}
 
-          {jobs.length === 0 && !loading ? (
+          {jobs.length === 0 && !loading && !error ? (
             <div className="bg-[#111d35] rounded-2xl border border-[#1e2d4d] shadow-sm p-16 text-center">
               <div className="w-16 h-16 bg-[#162036] rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <i className="ri-radar-line text-3xl text-slate-600"></i>
               </div>
-              <h3 className="text-lg font-semibold text-slate-200 mb-2">No jobs to track</h3>
-              <p className="text-slate-500 text-sm mb-6">Post a job to start tracking its progress in real time</p>
+              <h3 className="text-lg font-semibold text-slate-200 mb-2">No {filter === 'all' ? '' : filter + ' '}jobs to track</h3>
+              <p className="text-slate-500 text-sm mb-6">{filter === 'active' ? 'Check Completed or All Jobs for finished, cancelled or draft bookings.' : 'No bookings match this tab.'}</p>
               <Link
                 href="/client/post-job"
                 className="inline-flex items-center gap-2 bg-teal-500 text-white text-sm font-semibold px-6 py-3 rounded-xl hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap"
@@ -460,6 +449,7 @@ export default function JobTrackerClient() {
             </div>
           ) : (
             <>
+              {!error && <p className="text-sm text-slate-500 mb-4">Showing {jobs.length} of {totalCount} jobs in this tab</p>}
               <div className="space-y-5">
                 {jobs.map(job => (
                   <JobTrackerCard key={job.id} job={job} onRefresh={() => loadJobs(true)} />
@@ -470,6 +460,7 @@ export default function JobTrackerClient() {
                 <div className="mt-6 text-center">
                   <button
                     onClick={handleLoadMore}
+                    disabled={refreshing}
                     className="inline-flex items-center gap-2 bg-[#162036] text-slate-300 text-sm font-semibold px-6 py-3 rounded-xl hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap border border-[#1e2d4d]"
                   >
                     <i className="ri-arrow-down-line"></i>
