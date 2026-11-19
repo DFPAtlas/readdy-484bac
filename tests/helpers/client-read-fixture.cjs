@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const ts = require('typescript');
 const schema = require('../fixtures/client-history-schema.json');
+const relations = require('../fixtures/client-history-relations.json');
 
 function loadEndpoint(slug, db) {
   let handler;
@@ -53,6 +54,12 @@ function databaseFixture(rows, { failTable, failSelect, signedOut = false } = {}
         then(resolve, reject) {
           const run = () => {
             if (table === failTable || failSelect?.(call)) return { data: null, error: { message: 'simulated database failure' } };
+            // PostgREST validates embedded relationships even when the table
+            // has no rows. This must precede row filtering/projection.
+            const embedded = [...call.fields.matchAll(/\b(\w+)(?:!inner)?\s*\(/g)].map(match => match[1]);
+            for (const relation of embedded) {
+              if (!relations[table]?.includes(relation)) return { data: null, error: { code: 'PGRST200', message: `Missing relationship: ${table} -> ${relation}` } };
+            }
             const columns = call.fields.replace(/guards(?:!inner)?\s*\([^)]*\)/g, '').split(',').map(value => value.trim()).filter(Boolean);
             for (const field of columns) {
               if (field !== '*' && !schema[table]?.includes(field.split(':').at(-1))) return { data: null, error: { message: `Unknown ${table} field ${field}` } };
