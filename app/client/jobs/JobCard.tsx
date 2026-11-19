@@ -1,5 +1,7 @@
 'use client';
 
+import { canClientCancelJob } from '@/lib/client-job-actions';
+
 import Link from 'next/link';
 import { nextJobAction, paymentLabel } from '@/lib/client-journey';
 import { useRouter } from 'next/navigation';
@@ -336,7 +338,7 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
                     <i className="ri-check-double-line"></i>Refunded
                   </div>
                 )}
-                {!isCancelled && !isCompleted && !isDisputed && (
+                {canClientCancelJob(job) && (
                   <button
                     onClick={() => onCancel(job)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-500/25 text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer whitespace-nowrap"
@@ -518,7 +520,7 @@ export default function JobCard({ job, paymentStatus, markingCompleteId, clientI
               <i className="ri-check-double-line"></i>Refunded
             </div>
           )}
-          {!isCancelled && !isCompleted && !isDisputed && (
+          {canClientCancelJob(job) && (
             <button
               onClick={() => onCancel(job)}
               className="flex-1 min-w-[80px] flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold border border-red-500/25 text-red-400 cursor-pointer whitespace-nowrap"

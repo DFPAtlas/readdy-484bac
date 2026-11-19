@@ -1,5 +1,6 @@
 'use client';
 
+import { canClientReviewAssignment } from '@/lib/client-job-actions';
 import QuickGuardImage from '@/components/QuickGuardImage';
 
 import { useState, useEffect } from 'react';
@@ -37,6 +38,7 @@ interface Assignment {
   guards: Guard;
   created_at: string;
   status?: string;
+  payment_status?: string | null;
   attendance_status?: string | null;
   check_in_time?: string | null;
   check_out_time?: string | null;
@@ -64,6 +66,7 @@ interface AssignedGuardsSectionProps {
   guards: Assignment[];
   isCompleted?: boolean;
   isReviewable?: boolean;
+  jobStatus?: string;
   jobId?: string;
   onLeaveReview?: (guardId: string, guardName: string) => void;
   onMessageGuard?: (guardId: string, guardName: string, guardUserId: string) => void;
@@ -74,6 +77,7 @@ export default function AssignedGuardsSection({
   guards,
   isCompleted = false,
   isReviewable = false,
+  jobStatus,
   jobId,
   onLeaveReview,
   onMessageGuard,
@@ -135,8 +139,7 @@ export default function AssignedGuardsSection({
     );
   }
 
-  const unreviewedCount = guards.filter((a) => !guardReviews[a.guards?.id]).length;
-  const reviewedCount = guards.filter((a) => guardReviews[a.guards?.id]).length;
+  const unreviewedCount = guards.filter((a) => a.guards?.id && canClientReviewAssignment({ status: jobStatus }, a) && !guardReviews[a.guards.id]).length;
 
   // Attendance stats
   const checkedInCount = guards.filter(a => a.attendance_status === 'checked_in' || a.attendance_status === 'checked_out' || a.attendance_status === 'completed').length;
@@ -154,7 +157,7 @@ export default function AssignedGuardsSection({
           Assigned Guards
           <span className="ml-1 bg-teal-500/15 text-teal-400 text-xs font-bold px-2 py-0.5 rounded-full">{guards.length}</span>
         </h2>
-        {isReviewable && !loadingReviews && !reviewsError && reviewedCount < guards.length && (
+        {isReviewable && !loadingReviews && !reviewsError && unreviewedCount > 0 && (
           <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full whitespace-nowrap">
             {unreviewedCount} awaiting review
           </span>
@@ -170,7 +173,7 @@ export default function AssignedGuardsSection({
         )}
       </div>
 
-      {isReviewable && !loadingReviews && !reviewsError && reviewedCount < guards.length && (
+      {isReviewable && !loadingReviews && !reviewsError && unreviewedCount > 0 && (
         <div className="mb-4 bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-3 flex items-center gap-3">
           <div className="w-8 h-8 flex items-center justify-center bg-amber-500/15 rounded-lg shrink-0">
             <i className="ri-star-line text-amber-400 text-lg"></i>
@@ -425,7 +428,7 @@ export default function AssignedGuardsSection({
                     />
                   </div>
                 )}
-                {isReviewable && !loadingReviews && !reviewsError && g?.id && !review && (
+                {isReviewable && canClientReviewAssignment({ status: jobStatus }, assignment) && !loadingReviews && !reviewsError && g?.id && !review && (
                   <button
                     onClick={() => onLeaveReview?.(g.id, guardName)}
                     className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap ml-auto"

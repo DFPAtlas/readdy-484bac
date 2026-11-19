@@ -12,47 +12,13 @@ import ReviewStatusBadge, { ReviewStars } from '@/components/reviews/ReviewStatu
 import RateGuardModal from '@/components/reviews/RateGuardModal';
 import { formatDateOnly } from '@/lib/date-only';
 
-interface ReviewItem {
-  id: string;
-  job_id: string;
-  guard_id: string;
-  rating: number;
-  review_text?: string;
-  review_status: string;
-  issue_reported: boolean;
-  issue_category?: string;
-  punctuality?: number | null;
-  professionalism?: number | null;
-  communication?: number | null;
-  appearance?: number | null;
-  reliability?: number | null;
-  would_hire_again?: boolean | null;
-  attendance_status?: string | null;
-  site_instructions_followed?: boolean | null;
-  created_at: string;
-  guards: {
-    full_name: string;
-    profile_photo_url?: string;
-  } | null;
-  jobs: {
-    job_title: string;
-    start_date: string;
-  } | null;
-}
-
-interface PendingReview {
-  job_id: string;
-  job_title: string;
-  start_date: string;
-  guard_id: string;
-  guard_name: string;
-  profile_photo_url?: string;
-}
+import { loadClientReviews, type ReviewItem, type PendingReview } from '@/lib/client-reviews';
 
 export default function ClientReviewsPage() {
   const router = useRouter();
-  const { loading: authLoading, allowed } = useClientGuard();
+  const { loading: authLoading, allowed, userId } = useClientGuard();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
   const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
@@ -67,23 +33,36 @@ export default function ClientReviewsPage() {
 
   const mountedRef = useRef(false);
   const requestRef = useRef(0);
+  const userRef = useRef(userId);
+  userRef.current = userId;
+  const eligibleRef = useRef(false);
+  eligibleRef.current = !authLoading && allowed;
   const loadReviews = useCallback(async () => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || !eligibleRef.current) return;
+    const identity = userRef.current;
     const request = ++requestRef.current;
-    const isCurrent = () => mountedRef.current && request === requestRef.current;
+    const isCurrent = () => mountedRef.current && eligibleRef.current && identity === userRef.current && request === requestRef.current;
     setLoading(true);
+    setLoadError(null);
+    setReviews([]);
+    setPendingReviews([]);
+    setReviewModalOpen(false);
+    setReviewTarget(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (!isCurrent()) return;
+      if (authError) throw authError;
       if (!user) { router.push('/client/login'); return; }
+      if (user.id !== identity) throw new Error('Account changed. Please reload reviews.');
 
-      const { data: client } = await supabase
+      const { data: client, error: clientError } = await supabase
         .from('clients')
         .select('id, company_name')
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (!isCurrent()) return;
+      if (clientError) throw clientError;
       if (!client) { router.push('/client/login'); return; }
 
       if (client?.company_name) {
@@ -92,96 +71,12 @@ export default function ClientReviewsPage() {
         setInitials(parts.length >= 2 ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase() : client.company_name.slice(0, 2).toUpperCase());
       }
 
-      // Security: scope all job queries to the authenticated client's ID
-      const { data: jobsData } = await supabase
-        .from('jobs')
-        .select('id, job_title, start_date')
-        .eq('client_id', client.id)
-        .eq('status', 'completed');
-
+      const result = await loadClientReviews(supabase, client.id);
       if (!isCurrent()) return;
-      const jobIds = (jobsData || []).map(j => j.id);
-
-      if (jobIds.length > 0) {
-        const { data: assignments } = await supabase
-          .from('job_assignments')
-          .select('job_id, guard_id')
-          .in('job_id', jobIds);
-
-        if (!isCurrent()) return;
-        // Security: scope reviews to current user as client (not auth.uid() as client_id)
-        const { data: reviewsData } = await supabase
-          .from('reviews')
-          .select('*, jobs(job_title, start_date)')
-          .eq('client_id', client.id)
-          .in('job_id', jobIds)
-          .order('created_at', { ascending: false });
-
-        if (!isCurrent()) return;
-        const guardIds = [...new Set([
-          ...(assignments || []).map((a: any) => a.guard_id),
-          ...(reviewsData || []).map((r: any) => r.guard_id),
-        ].filter(Boolean))];
-
-        const guardMap: Record<string, any> = {};
-        if (guardIds.length > 0) {
-          const { data: guardProfiles } = await supabase
-            .from('guard_public_profiles')
-            .select('id, full_name, profile_photo_url:profile_image_url')
-            .in('id', guardIds);
-
-          (guardProfiles || []).forEach((g: any) => {
-            guardMap[g.id] = g;
-          });
-        }
-
-        const typedReviews: ReviewItem[] = (reviewsData || []).map((r: any) => ({
-          id: r.id,
-          job_id: r.job_id,
-          guard_id: r.guard_id,
-          rating: r.rating,
-          review_text: r.review_text,
-          review_status: r.review_status || 'reviewed',
-          issue_reported: r.issue_reported || false,
-          issue_category: r.issue_category,
-          punctuality: r.punctuality,
-          professionalism: r.professionalism,
-          communication: r.communication,
-          appearance: r.appearance,
-          reliability: r.reliability,
-          would_hire_again: r.would_hire_again,
-          attendance_status: r.attendance_status,
-          site_instructions_followed: r.site_instructions_followed,
-          created_at: r.created_at,
-          guards: guardMap[r.guard_id] || null,
-          jobs: r.jobs,
-        }));
-
-        if (!isCurrent()) return;
-        setReviews(typedReviews);
-
-        // Calculate pending reviews
-        const reviewedGuardJobPairs = new Set((reviewsData || []).map((r: any) => `${r.job_id}-${r.guard_id}`));
-        const pending: PendingReview[] = [];
-        (assignments || []).forEach((a: any) => {
-          const pairKey = `${a.job_id}-${a.guard_id}`;
-          if (!reviewedGuardJobPairs.has(pairKey)) {
-            const job = jobsData?.find(j => j.id === a.job_id);
-            pending.push({
-              job_id: a.job_id,
-              job_title: job?.job_title || 'Unknown Job',
-              start_date: job?.start_date || '',
-              guard_id: a.guard_id,
-              guard_name: guardMap[a.guard_id]?.full_name || 'Unknown Guard',
-              profile_photo_url: guardMap[a.guard_id]?.profile_photo_url,
-            });
-          }
-        });
-        setPendingReviews(pending);
-      } else {
-        setReviews([]);
-        setPendingReviews([]);
-      }
+      setReviews(result.reviews);
+      setPendingReviews(result.pendingReviews);
+    } catch {
+      if (isCurrent()) setLoadError('Reviews and assigned guard details could not be loaded. Please retry.');
     } finally {
       if (isCurrent()) setLoading(false);
     }
@@ -189,11 +84,12 @@ export default function ClientReviewsPage() {
 
   useEffect(() => {
     mountedRef.current = true;
-    loadReviews();
-    return () => { mountedRef.current = false; };
-  }, [loadReviews]);
+    if (allowed && !authLoading) void loadReviews();
+    return () => { mountedRef.current = false; requestRef.current += 1; };
+  }, [loadReviews, allowed, authLoading, userId]);
 
   const handleOpenReview = (pending: PendingReview) => {
+    if (loadError || loading || !eligibleRef.current) return;
     setReviewTarget({
       jobId: pending.job_id,
       guardId: pending.guard_id,
@@ -281,6 +177,16 @@ export default function ClientReviewsPage() {
       </div>
     );
   }
+
+  if (loadError) return (
+    <div className="min-h-screen bg-[#0B1933] text-slate-200 flex items-center justify-center p-6">
+      <div role="alert" className="max-w-lg text-center space-y-4">
+        <p>{loadError}</p>
+        <button onClick={() => { void loadReviews(); }} className="bg-teal-500 text-white px-6 py-3 rounded-xl">Retry reviews</button>
+        <Link href="/client/jobs" className="block text-teal-400">Back to My Jobs</Link>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-[#0B1933] flex flex-col lg:flex-row">
@@ -454,7 +360,7 @@ export default function ClientReviewsPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <p className="text-sm font-bold text-white">{review.guards?.full_name || 'Unknown Guard'}</p>
+                          <p className="text-sm font-bold text-white">{review.guards?.full_name || 'Guard profile unavailable'}</p>
                           <ReviewStatusBadge
                             status={review.review_status || 'reviewed'}
                             rating={review.rating}
