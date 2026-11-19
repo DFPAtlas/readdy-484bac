@@ -28,10 +28,11 @@ test('client monthly spending recomputes the month on refetch without remounting
  let now='2026-10-31T12:00:00Z';
  class Clock extends Date{constructor(...args){super(...(args.length?args:[now]))}}
  const tx=[{id:'oct',amount:10,status:'paid',created_at:'2026-10-20T12:00:00Z'},{id:'nov',amount:20,status:'paid',created_at:'2026-11-01T12:00:00Z'}];
- const db={auth:{getUser:async()=>({data:{user:{id:'user'}}})},from:table=>{const data=table==='clients'?{id:'client'}:table==='transactions'?tx:[];const q={select:()=>q,eq:()=>q,order:()=>q,in:()=>q,range:()=>q,maybeSingle:async()=>({data}),then:resolve=>Promise.resolve({data}).then(resolve)};return q}};
+ const db={auth:{getUser:async()=>({data:{user:{id:'user'}}}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})},from:table=>{const data=table==='clients'?{id:'client'}:table==='transactions'?tx:[];const q={select:()=>q,eq:()=>q,order:()=>q,in:()=>q,range:()=>q,maybeSingle:async()=>({data}),then:resolve=>Promise.resolve({data}).then(resolve)};return q}};
  const load=(path,mocks={})=>{const mod={exports:{}};new Function('module','exports','require','Date',compile(path))(mod,mod.exports,name=>mocks[name]??require(name),Clock);return mod.exports};
  const finance=load('lib/client-finance.ts',{'./client-job-list':{readAllClientRows:async make=>{const {data,error}=await make().range(0,199);if(error)throw error;return data}},'./financeAmounts':load('lib/financeAmounts.ts')});
- const r=runner('hooks/useClientPaymentCentre.ts',{'@/lib/supabase':{supabase:db},'@/lib/client-finance':finance,'@/lib/client-journey':{planLabel:()=> 'Free'}},{Date:Clock});
+ const documents=load('lib/client-payment-documents.ts',{'../supabase/functions/_shared/payment-document-links':load('supabase/functions/_shared/payment-document-links.ts')});
+ const r=runner('hooks/useClientPaymentCentre.ts',{'@/lib/client-payment-documents':documents,'@/lib/supabase':{supabase:db},'@/lib/client-finance':finance,'@/lib/client-journey':{planLabel:()=> 'Free'}},{Date:Clock});
  let hook=r.render('useClientPaymentCentre');await r.effects();hook=r.render('useClientPaymentCentre');assert.equal(hook.spendingSummary.thisMonthSpend,10);
  now='2026-11-02T12:00:00Z';await hook.refetch();hook=r.render('useClientPaymentCentre');assert.equal(hook.spendingSummary.thisMonthSpend,20);
 });

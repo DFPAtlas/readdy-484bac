@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { clientSpendingSummary, loadClientFinanceRecords, paymentRefundLabel } from '@/lib/client-finance';
 import { planLabel } from '@/lib/client-journey';
+import { paymentDocumentLink, paymentDocumentMode } from '@/lib/client-payment-documents';
 
 interface SpendingSummary {
   thisMonthSpend: number;
@@ -34,6 +35,7 @@ export interface JobPayment {
   refundStatus: string;
   receiptUrl: string | null;
   invoiceUrl: string | null;
+  documentMode: 'live' | 'test' | 'unknown';
   jobId: string;
 }
 
@@ -63,12 +65,15 @@ export function useClientPaymentCentre() {
 
   const mounted = useRef(false);
   const request = useRef(0);
+  const invalidate = useCallback(() => { request.current++; }, []);
   const fetchAll = useCallback(async () => {
     const id = ++request.current;
     const current = () => mounted.current && request.current === id;
     if (!current()) return;
 
     setLoading(true);
+    setClientId(null);
+    setJobPayments([]);
     setError(null);
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -144,8 +149,9 @@ export function useClientPaymentCentre() {
         releaseStatus: jobsMap[t.job_id]?.payment_status || t.status,
         jobStatus: jobsMap[t.job_id]?.status || '',
         refundStatus: paymentRefundLabel(t) !== '—' ? paymentRefundLabel(t) : refundMap[t.job_id] === 'pending' ? 'Refund requested' : refundMap[t.job_id] === 'approved' ? 'Refund processing' : refundMap[t.job_id] === 'rejected' ? 'Refund declined' : '—',
-        receiptUrl: t.receipt_url || null,
-        invoiceUrl: t.invoice_url || null,
+        receiptUrl: paymentDocumentLink(t.receipt_url, 'receipt'),
+        invoiceUrl: paymentDocumentLink(t.invoice_url, 'invoice'),
+        documentMode: paymentDocumentMode(t.stripe_session_id),
         jobId: t.job_id,
       }));
 
@@ -159,7 +165,22 @@ export function useClientPaymentCentre() {
     }
   }, []);
 
-  useEffect(() => { mounted.current = true; fetchAll(); return () => { mounted.current = false; }; }, [fetchAll]);
+  useEffect(() => {
+    mounted.current = true;
+    void fetchAll();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
+        request.current++;
+        setClientId(null);
+        setJobPayments([]);
+        setLoading(true);
+        // Start outside the auth callback to avoid awaiting another auth call
+        // while the Supabase auth lock is held.
+        setTimeout(() => { if (mounted.current) void fetchAll(); }, 0);
+      }
+    });
+    return () => { mounted.current = false; invalidate(); subscription.unsubscribe(); };
+  }, [fetchAll, invalidate]);
 
   const handleBillingPortal = useCallback(async (): Promise<string | null> => {
     setPortalLoading(true);
