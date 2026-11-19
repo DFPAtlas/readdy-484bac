@@ -1,0 +1,8 @@
+[
+  "id", "ticket_reference", "client_id", "guard_id", "related_job_id", "category",
+  "subject", "description", "priority", "status", "contact_preference", "evidence_url",
+  "payment_amount", "requested_refund_amount", "refund_reason", "admin_notes",
+  "resolution_notes", "resolved_at", "is_deleted", "created_at", "updated_at",
+  "dfp_ticket_number", "dfp_sync_status", "dfp_synced_at", "dfp_sync_last_attempt_at",
+  "dfp_sync_error", "inbound_support_email_id"
+]

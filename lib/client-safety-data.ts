@@ -12,7 +12,7 @@ export async function loadClientSafetyData(db: any) {
       .order('created_at', { ascending: false }).order('id', { ascending: true })),
     readAllClientRows(() => db.from('job_safety_checks').select('*').eq('client_id', client.id).order('id', { ascending: true })),
     readAllClientRows(() => db.from('support_tickets')
-      .select('id, ticket_reference, job_id, category, subject, priority, status, created_at, resolved_at, description')
+      .select('id, ticket_reference, job_id:related_job_id, category, subject, priority, status, created_at, resolved_at, description')
       .eq('client_id', client.id).eq('is_deleted', false).order('created_at', { ascending: false }).order('id', { ascending: true })),
   ]);
   const checks = new Map(safety.map(check => [check.job_id, check]));
