@@ -2,7 +2,7 @@
 
 import QuickGuardImage from '@/components/QuickGuardImage';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -21,40 +21,26 @@ interface MatchedGuard {
   hourly_rate: number | null;
   years_experience: number | null;
   sia_verified: boolean;
-  sia_expiry_date: string | null;
-  sia_licence_number: string | null;
   licence_types: string[] | null;
-  specializations: string[] | null;
   location: string | null;
-  postcode: string | null;
+  city: string | null;
+  postcode_area: string | null;
   bio: string | null;
   has_transport: boolean | null;
   availability_status: string | null;
-  languages: string[] | null;
   match_score: number;
-  user_id: string | null;
   verification_status: string | null;
 }
 
-const securityTypeLabels: Record<string, string> = {
-  'door-supervisor': 'Door Supervisor',
-  'event-security': 'Event Security',
-  'retail-security': 'Retail Security',
-  'close-protection': 'Close Protection',
-  'cctv-operator': 'CCTV Operator',
-  'security-guard': 'Security Guard',
-  'mobile-patrol': 'Mobile Patrol',
-  'key-holding': 'Key Holding',
-};
-
 const specialityOptions = [
-  { value: 'all', label: 'All Specialities' },
+  { value: 'all', label: 'All Licence Types' },
   { value: 'door-supervisor', label: 'Door Supervisor' },
-  { value: 'event-security', label: 'Event Security' },
-  { value: 'retail-security', label: 'Retail Security' },
+  { value: 'security-guard', label: 'Security Guard' },
   { value: 'close-protection', label: 'Close Protection' },
   { value: 'cctv-operator', label: 'CCTV Operator' },
-  { value: 'mobile-patrol', label: 'Mobile Patrol' },
+  { value: 'key-holding', label: 'Key Holding' },
+  { value: 'cash-valuables-in-transit', label: 'Cash & Valuables in Transit' },
+  { value: 'dog-handler', label: 'Dog Handler' },
 ];
 
 const experienceOptions = [
@@ -102,7 +88,7 @@ function computeMatchScore(guard: any, preferences: { speciality: string; experi
 
   if (preferences.speciality !== 'all' && guard.licence_types) {
     const hasMatch = guard.licence_types.some((lt: string) =>
-      lt.toLowerCase().includes(preferences.speciality.toLowerCase())
+      normalizeLicence(lt) === normalizeLicence(preferences.speciality)
     );
     if (hasMatch) score += 10;
   }
@@ -122,9 +108,15 @@ function computeMatchScore(guard: any, preferences: { speciality: string; experi
   }
 
   if (guard.has_transport) score += 3;
-  if (guard.languages && guard.languages.length > 1) score += 2;
-
   return Math.min(100, score);
+}
+
+function normalizeLicence(value: string): string {
+  return value.toLowerCase().replace(/&/g, '').replace(/[^a-z0-9]+/g, '');
+}
+
+function getLicenceLabel(value: string): string {
+  return specialityOptions.find(option => normalizeLicence(option.value) === normalizeLicence(value))?.label || value;
 }
 
 function getMatchLabel(score: number): { label: string; color: string; bg: string } {
@@ -155,6 +147,7 @@ export default function AdvancedMatchingPage() {
   const [selectedGuard, setSelectedGuard] = useState<MatchedGuard | null>(null);
   const [invitingGuard, setInvitingGuard] = useState<string | null>(null);
   const [savedGuardIds, setSavedGuardIds] = useState<Set<string>>(new Set());
+  const [invitedPairs, setInvitedPairs] = useState<Set<string>>(new Set());
   const [clientId, setClientId] = useState<string | null>(null);
   const [clientJobs, setClientJobs] = useState<any[]>([]);
   const [inviteJobId, setInviteJobId] = useState<string | null>(null);
@@ -163,18 +156,39 @@ export default function AdvancedMatchingPage() {
   const preferences = useMemo(() => ({ speciality: specialityFilter, experience: experienceFilter, rate: rateFilter }), [specialityFilter, experienceFilter, rateFilter]);
   const guards = useMemo(() => rawGuards.map(g => ({ ...g, match_score: computeMatchScore(g, preferences) })), [rawGuards, preferences]);
 
+  const active = useRef(true);
+  const requestSequence = useRef(0);
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; requestSequence.current += 1; };
+  }, []);
+
   const loadData = useCallback(async () => {
+    if (!active.current) return;
+    const request = ++requestSequence.current;
+    const isCurrent = () => active.current && requestSequence.current === request;
+    setLoading(true);
     setLoadError(false);
+    setRawGuards([]);
+    setSelectedGuard(null);
+    setClientJobs([]);
+    setClientId(null);
+    setSavedGuardIds(new Set());
+    setInvitedPairs(new Set());
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (!isCurrent()) return;
+      if (authError) throw authError;
       if (!user) { router.push('/client/login'); return; }
 
-      const { data: client } = await supabase
+      const { data: client, error: clientError } = await supabase
         .from('clients')
         .select('id, company_name, subscription_tier')
         .eq('user_id', user.id)
         .maybeSingle();
 
+      if (!isCurrent()) return;
+      if (clientError) throw clientError;
       if (!client) { router.push('/client/login'); return; }
 
       setClientId(client.id);
@@ -182,7 +196,7 @@ export default function AdvancedMatchingPage() {
       setSubscriptionTier(client.subscription_tier || 'Free');
       setInitials((client.company_name || 'Client').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase());
 
-      const { data: activeJobs } = await supabase
+      const { data: activeJobs, error: jobsError } = await supabase
         .from('jobs')
         .select('id, job_title, status')
         .eq('client_id', client.id)
@@ -190,35 +204,42 @@ export default function AdvancedMatchingPage() {
         .in('status', ['open', 'awaiting_guard_selection', 'pending'])
         .order('created_at', { ascending: false });
 
-      setClientJobs(activeJobs || []);
+      if (!isCurrent()) return;
+      if (jobsError || !Array.isArray(activeJobs)) throw jobsError || new Error('Invalid jobs');
+      setClientJobs(activeJobs);
 
-      const { data: verifiedGuards } = await supabase
-        .from('guards')
-        .select('id, user_id, full_name, profile_image_url, rating, total_reviews, total_jobs_completed, hourly_rate, years_experience, sia_verified, sia_expiry_date, sia_licence_number, licence_types, specializations, location, postcode, bio, has_transport, availability_status, languages, verification_status')
-        .in('verification_status', ['approved', 'verified'])
-        .eq('is_active', true)
-        .order('rating', { ascending: false });
+      // The public view already restricts rows to active, approved/verified guards.
+      // Keep private contact, full postcode and raw SIA details out of this client catalogue.
+      const { data: verifiedGuards, error: guardsError } = await supabase
+        .from('guard_public_profiles')
+        .select('id, full_name, profile_image_url, rating, total_reviews, total_jobs_completed, hourly_rate, years_experience, sia_verified, licence_types, location, city, postcode_area, bio, has_transport, availability_status, verification_status')
+        .eq('sia_verified', true)
+        .order('rating', { ascending: false, nullsFirst: false });
 
-      if (verifiedGuards) {
-        const scored = verifiedGuards.map((g: any) => ({
-          ...g,
-          match_score: 0,
-        }));
-        setRawGuards(scored);
+      if (!isCurrent()) return;
+      if (guardsError || !Array.isArray(verifiedGuards)) throw guardsError || new Error('Invalid guard profiles');
+
+      if (activeJobs.length > 0) {
+        const { data: invites, error: invitesError } = await supabase
+          .from('job_invites')
+          .select('guard_id, job_id')
+          .eq('client_id', client.id)
+          .in('job_id', activeJobs.map(j => j.id));
+        if (!isCurrent()) return;
+        if (invitesError || !Array.isArray(invites)) throw invitesError || new Error('Invalid invitations');
+        setInvitedPairs(new Set(invites.map(inv => `${inv.job_id}:${inv.guard_id}`)));
       }
 
-      const { data: invites } = await supabase
-        .from('job_invites')
-        .select('guard_id, job_id')
-        .in('job_id', (activeJobs || []).map(j => j.id));
-
-      const savedSet = new Set<string>();
-      (invites || []).forEach((inv: any) => savedSet.add(inv.guard_id));
-      setSavedGuardIds(savedSet);
+      const { data: favorites, error: favoritesError } = await supabase
+        .from('client_favorites').select('guard_id').eq('client_id', client.id);
+      if (!isCurrent()) return;
+      if (favoritesError || !Array.isArray(favorites)) throw favoritesError || new Error('Invalid saved guards');
+      setSavedGuardIds(new Set(favorites.map(favorite => favorite.guard_id)));
+      setRawGuards(verifiedGuards.map(g => ({ ...g, full_name: g.full_name || 'Guard', match_score: 0 })));
     } catch {
-      setLoadError(true);
+      if (isCurrent()) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [router]);
 
@@ -231,20 +252,23 @@ export default function AdvancedMatchingPage() {
   }, [toast]);
 
   const handleInvite = async (guard: MatchedGuard) => {
-    if (!inviteJobId || !clientId) {
+    if (!inviteJobId || !clientId || !clientJobs.some(job => job.id === inviteJobId)) {
       setToast('Please select a job to invite this guard to');
       return;
     }
     setInvitingGuard(guard.id);
     try {
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from('job_invites')
         .select('id')
         .eq('job_id', inviteJobId)
         .eq('guard_id', guard.id)
+        .eq('client_id', clientId)
         .maybeSingle();
 
+      if (existingError) throw existingError;
       if (existing) {
+        setInvitedPairs(prev => new Set(prev).add(`${inviteJobId}:${guard.id}`));
         setToast('This guard has already been invited to this job');
         setInvitingGuard(null);
         setInviteJobId(null);
@@ -262,20 +286,10 @@ export default function AdvancedMatchingPage() {
 
       if (error) throw error;
 
-      if (guard.user_id) {
-        await supabase.from('notifications').insert({
-          user_id: guard.user_id,
-          user_type: 'guard',
-          type: 'job_invite',
-          title: 'New Job Invite!',
-          message: `A client has invited you to apply for a job. Check your invites to respond.`,
-          link: '/guard/job-invites',
-          is_read: false,
-        });
-      }
-
-      setSavedGuardIds(prev => new Set(prev).add(guard.id));
-      setToast(`Invite sent to ${guard.full_name}`);
+      // Guards read these records in Job Invites. Separate notifications must be
+      // delivered server-side; client catalogue profiles do not expose user IDs.
+      setInvitedPairs(prev => new Set(prev).add(`${inviteJobId}:${guard.id}`));
+      setToast(`Invitation added to ${guard.full_name}'s Job Invites`);
       setInviteJobId(null);
       setInviteMessage('');
     } catch {
@@ -288,15 +302,17 @@ export default function AdvancedMatchingPage() {
   const saveGuard = async (guardId: string) => {
     if (!clientId) return;
     try {
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from('client_favorites')
         .select('id')
         .eq('client_id', clientId)
         .eq('guard_id', guardId)
         .maybeSingle();
 
+      if (existingError) throw existingError;
       if (existing) {
-        await supabase.from('client_favorites').delete().eq('id', existing.id);
+        const { error } = await supabase.from('client_favorites').delete().eq('id', existing.id).eq('client_id', clientId);
+        if (error) throw error;
         setSavedGuardIds(prev => {
           const next = new Set(prev);
           next.delete(guardId);
@@ -304,7 +320,8 @@ export default function AdvancedMatchingPage() {
         });
         setToast('Removed from saved');
       } else {
-        await supabase.from('client_favorites').insert({ client_id: clientId, guard_id: guardId });
+        const { error } = await supabase.from('client_favorites').insert({ client_id: clientId, guard_id: guardId });
+        if (error) throw error;
         setSavedGuardIds(prev => new Set(prev).add(guardId));
         setToast('Guard saved');
       }
@@ -317,18 +334,17 @@ export default function AdvancedMatchingPage() {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const matchesName = g.full_name.toLowerCase().includes(q);
-      const matchesLocation = (g.location || '').toLowerCase().includes(q);
-      const matchesPostcode = (g.postcode || '').toLowerCase().includes(q);
-      const matchesLicence = (g.licence_types || []).some(l => l.toLowerCase().includes(q));
-      const matchesSpecialization = (g.specializations || []).some(s => s.toLowerCase().includes(q));
-      if (!matchesName && !matchesLocation && !matchesPostcode && !matchesLicence && !matchesSpecialization) return false;
+      const matchesLocation = [g.location, g.city, g.postcode_area].some(value => (value || '').toLowerCase().includes(q));
+      const licenceQuery = normalizeLicence(q);
+      const matchesLicence = !!licenceQuery && (g.licence_types || []).some(l => normalizeLicence(l).includes(licenceQuery));
+      if (!matchesName && !matchesLocation && !matchesLicence) return false;
     }
     if (specialityFilter !== 'all') {
-      const hasMatch = (g.licence_types || []).some(l => l.toLowerCase().includes(specialityFilter.toLowerCase())) ||
-        (g.specializations || []).some(s => s.toLowerCase().includes(specialityFilter.toLowerCase()));
+      const hasMatch = (g.licence_types || []).some(l => normalizeLicence(l) === normalizeLicence(specialityFilter));
       if (!hasMatch) return false;
     }
     if (experienceFilter !== 'all') {
+      if (g.years_experience == null) return false;
       if (experienceFilter === 'entry') {
         if ((g.years_experience || 0) >= 1) return false;
       } else {
@@ -337,6 +353,7 @@ export default function AdvancedMatchingPage() {
       }
     }
     if (rateFilter !== 'all') {
+      if (g.hourly_rate == null) return false;
       if (rateFilter === 'premium') {
         if ((g.hourly_rate || 0) < 30) return false;
       } else {
@@ -349,8 +366,8 @@ export default function AdvancedMatchingPage() {
     if (sortBy === 'match') return b.match_score - a.match_score;
     if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
     if (sortBy === 'experience') return (b.years_experience || 0) - (a.years_experience || 0);
-    if (sortBy === 'rate_low') return (a.hourly_rate || 0) - (b.hourly_rate || 0);
-    if (sortBy === 'rate_high') return (b.hourly_rate || 0) - (a.hourly_rate || 0);
+    if (sortBy === 'rate_low') return (a.hourly_rate ?? Infinity) - (b.hourly_rate ?? Infinity);
+    if (sortBy === 'rate_high') return (b.hourly_rate ?? -Infinity) - (a.hourly_rate ?? -Infinity);
     if (sortBy === 'reviews') return (b.total_reviews || 0) - (a.total_reviews || 0);
     return 0;
   });
@@ -416,13 +433,13 @@ export default function AdvancedMatchingPage() {
               <div>
                 <h1 className="text-3xl font-bold mb-2 text-white">Advanced Matching</h1>
                 <p className="text-slate-400 max-w-xl">
-                  Our AI analyses guard profiles, ratings, experience, and licence types to recommend the best security professionals for your requirements.
+                  Compare verified guard profiles by ratings, experience, rates and licence types. Match scores update with your selected filters.
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="bg-teal-500/15 border border-teal-500/25 rounded-xl px-4 py-2 flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></div>
-                  <span className="text-teal-300 text-sm font-semibold">{stats.available} guards available now</span>
+                  <span className="text-teal-300 text-sm font-semibold">{loadError ? 'Guard availability unavailable' : `${stats.available} guards marked available`}</span>
                 </div>
               </div>
             </div>
@@ -433,7 +450,7 @@ export default function AdvancedMatchingPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
             {[
               { label: 'Verified Guards', value: stats.total, icon: 'ri-shield-user-line', color: 'text-teal-400' },
-              { label: 'Available Now', value: stats.available, icon: 'ri-user-follow-line', color: 'text-emerald-400' },
+              { label: 'Marked Available', value: stats.available, icon: 'ri-user-follow-line', color: 'text-emerald-400' },
               { label: 'Top Rated (4.5+)', value: stats.topRated, icon: 'ri-star-line', color: 'text-amber-400' },
               { label: 'SIA Verified', value: stats.siaVerified, icon: 'ri-shield-check-line', color: 'text-blue-400' },
             ].map((s) => (
@@ -442,7 +459,7 @@ export default function AdvancedMatchingPage() {
                   <i className={`${s.icon} text-lg ${s.color}`}></i>
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-slate-200">{s.value}</p>
+                  <p className="text-xl font-bold text-slate-200">{loadError ? '—' : s.value}</p>
                   <p className="text-[10px] text-slate-500 font-medium">{s.label}</p>
                 </div>
               </div>
@@ -457,7 +474,7 @@ export default function AdvancedMatchingPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search guards by name, location, postcode, licence type..."
+                  placeholder="Search guards by name, city, postcode area, licence type..."
                   className="w-full pl-10 pr-4 py-2.5 bg-[#162036] border border-[#1e2d4d] rounded-xl text-white text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 placeholder:text-slate-500"
                 />
                 {searchQuery && (
@@ -541,7 +558,7 @@ export default function AdvancedMatchingPage() {
           </div>
 
           {loadError ? (
-            <div className="bg-[#111d35] rounded-2xl border border-red-500/20 shadow-sm p-16 text-center">
+            <div role="alert" className="bg-[#111d35] rounded-2xl border border-red-500/20 shadow-sm p-16 text-center">
               <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-500/20">
                 <i className="ri-error-warning-line text-4xl text-red-400"></i>
               </div>
@@ -584,6 +601,7 @@ export default function AdvancedMatchingPage() {
                 {filteredGuards.map((guard) => {
                   const matchInfo = getMatchLabel(guard.match_score);
                   const isSaved = savedGuardIds.has(guard.id);
+                  const isInvited = !!inviteJobId && invitedPairs.has(`${inviteJobId}:${guard.id}`);
                   return (
                     <div
                       key={guard.id}
@@ -623,15 +641,15 @@ export default function AdvancedMatchingPage() {
                         </div>
 
                         <div className="space-y-1.5 mb-4">
-                          {guard.location && (
+                          {(guard.location || guard.city || guard.postcode_area) && (
                             <p className="text-xs text-slate-400 flex items-center gap-1.5">
                               <i className="ri-map-pin-line text-slate-600"></i>
-                              {guard.location}{guard.postcode ? `, ${guard.postcode}` : ''}
+                              {[guard.city || guard.location, guard.postcode_area].filter(Boolean).join(', ')}
                             </p>
                           )}
                           <p className="text-xs text-slate-400 flex items-center gap-1.5">
                             <i className="ri-briefcase-line text-slate-600"></i>
-                            {guard.years_experience || 0} years experience · {guard.total_jobs_completed || 0} jobs completed
+                            {guard.years_experience == null ? 'Experience not provided' : `${guard.years_experience} years experience`} · {guard.total_jobs_completed == null ? 'Job count unavailable' : `${guard.total_jobs_completed} jobs completed`}
                           </p>
                           {guard.hourly_rate && (
                             <p className="text-xs text-slate-400 flex items-center gap-1.5">
@@ -642,7 +660,7 @@ export default function AdvancedMatchingPage() {
                           {(guard.licence_types && guard.licence_types.length > 0) && (
                             <p className="text-xs text-slate-400 flex items-center gap-1.5">
                               <i className="ri-shield-line text-slate-600"></i>
-                              {guard.licence_types.slice(0, 3).map(l => securityTypeLabels[l] || l).join(', ')}
+                              {[...new Set(guard.licence_types.map(getLicenceLabel))].slice(0, 3).join(', ')}
                               {guard.licence_types.length > 3 && '...'}
                             </p>
                           )}
@@ -659,7 +677,7 @@ export default function AdvancedMatchingPage() {
                         )}
 
                         <div className="flex items-center gap-2 pt-3 border-t border-[#1e2d4d]">
-                          {clientJobs.length > 0 && !isSaved ? (
+                          {clientJobs.length > 0 ? (
                             <div className="flex-1 flex items-center gap-2">
                               <select
                                 value={inviteJobId || ''}
@@ -673,13 +691,13 @@ export default function AdvancedMatchingPage() {
                               </select>
                               <button
                                 onClick={() => handleInvite(guard)}
-                                disabled={invitingGuard === guard.id || !inviteJobId}
+                                disabled={invitingGuard !== null || !inviteJobId || isInvited}
                                 className="px-3 py-1.5 bg-teal-500 text-white rounded-lg text-xs font-semibold hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 {invitingGuard === guard.id ? (
                                   <i className="ri-loader-4-line animate-spin"></i>
                                 ) : (
-                                  'Invite'
+                                  isInvited ? 'Invited' : 'Invite'
                                 )}
                               </button>
                             </div>
@@ -693,6 +711,7 @@ export default function AdvancedMatchingPage() {
                           )}
                           <button
                             onClick={() => saveGuard(guard.id)}
+                            aria-label={isSaved ? `Unsave ${guard.full_name}` : `Save ${guard.full_name}`}
                             className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${isSaved ? 'bg-teal-500/20 text-teal-400 border border-teal-500/25' : 'bg-[#162036] text-slate-500 hover:text-teal-400 border border-[#1e2d4d]'}`}
                           >
                             <i className={`${isSaved ? 'ri-bookmark-fill' : 'ri-bookmark-line'} text-sm`}></i>
@@ -752,8 +771,8 @@ export default function AdvancedMatchingPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Experience', value: `${selectedGuard.years_experience || 0} yrs` },
-                  { label: 'Jobs Completed', value: selectedGuard.total_jobs_completed || 0 },
+                  { label: 'Experience', value: selectedGuard.years_experience == null ? 'Not provided' : `${selectedGuard.years_experience} yrs` },
+                  { label: 'Jobs Completed', value: selectedGuard.total_jobs_completed ?? 'Not available' },
                   { label: 'Hourly Rate', value: selectedGuard.hourly_rate ? `£${selectedGuard.hourly_rate}/hr` : 'N/A' },
                   { label: 'Match Score', value: `${selectedGuard.match_score}%` },
                 ].map((item) => (
@@ -775,35 +794,9 @@ export default function AdvancedMatchingPage() {
                 <div>
                   <p className="text-xs text-slate-500 font-medium uppercase mb-2">Licence Types</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {selectedGuard.licence_types.map((lt) => (
+                    {[...new Set(selectedGuard.licence_types.map(getLicenceLabel))].map((lt) => (
                       <span key={lt} className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                        {securityTypeLabels[lt] || lt}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(selectedGuard.specializations && selectedGuard.specializations.length > 0) && (
-                <div>
-                  <p className="text-xs text-slate-500 font-medium uppercase mb-2">Specializations</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedGuard.specializations.map((s) => (
-                      <span key={s} className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20">
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(selectedGuard.languages && selectedGuard.languages.length > 0) && (
-                <div>
-                  <p className="text-xs text-slate-500 font-medium uppercase mb-2">Languages</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedGuard.languages.map((l) => (
-                      <span key={l} className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {l}
+                        {lt}
                       </span>
                     ))}
                   </div>
@@ -814,12 +807,6 @@ export default function AdvancedMatchingPage() {
                 {selectedGuard.has_transport && (
                   <span className="text-xs text-slate-400 flex items-center gap-1">
                     <i className="ri-car-line text-teal-400"></i> Has Transport
-                  </span>
-                )}
-                {selectedGuard.sia_expiry_date && (
-                  <span className="text-xs text-slate-400 flex items-center gap-1">
-                    <i className="ri-calendar-check-line text-teal-400"></i>
-                    SIA expires {new Date(selectedGuard.sia_expiry_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </span>
                 )}
               </div>
