@@ -63,6 +63,38 @@ test('read errors and malformed results never become empty inboxes or missing-pr
   const empty=database();empty.rows=[];assert.deepEqual((await loadClientNotificationInbox(empty,filters)).notifications,[]);
 });
 
+test('an inbox load cannot replace the expected screen with another authenticated owner', async () => {
+  const db=database();db.signedIn='other';
+  await assert.rejects(loadClientNotificationInbox(db,filters,'owner'),/notification owner/);
+  assert.equal(db.calls.length,0);
+});
+
+test('account changes during profile and inbox reads discard rows and missing-profile redirects', async () => {
+  for (const boundary of ['profile','inbox']) {
+    for (const nextOwner of ['other',null,'auth-error']) {
+      const db=database();let calls=0;
+      db.auth.getUser=async()=>{
+        const current=calls++ < (boundary==='profile'?1:2) ? 'owner' : nextOwner;
+        return current==='auth-error'?{error:{message:'private detail'}}:{data:{user:current?{id:current}:null}};
+      };
+      if(boundary==='profile')db.fault='clients-null';
+      await assert.rejects(loadClientNotificationInbox(db,filters,'owner'),/notification owner/);
+      assert.equal(db.calls.length,boundary==='profile'?1:2);
+    }
+  }
+});
+
+test('late read and delete acknowledgements are not reported to a different or signed-out account', async () => {
+  for(const action of ['mark_read','mark_unread','delete']) {
+    for(const nextOwner of ['other',null]) {
+      const db=database();let calls=0;
+      db.auth.getUser=async()=>({data:{user:calls++===0?{id:'owner'}:nextOwner?{id:nextOwner}:null}});
+      await assert.rejects(changeClientNotifications(db,'owner',['a'],action),/notification owner/);
+      assert.deepEqual(db.calls[0].filters,[['eq','user_id','owner'],['in','id',['a']]]);
+    }
+  }
+});
+
 test('all writes verify current identity, scope to user and IDs, and confirm read flags or deleted rows', async () => {
   for (const action of ['mark_read','mark_unread','delete']) {
     const db=database();const result=await changeClientNotifications(db,'owner',['a','a'],action);
@@ -88,8 +120,35 @@ test('returned, thrown, zero-row, wrong-owner and mismatched writes cannot confi
 });
 
 const source=fs.readFileSync('app/client/notifications/page.tsx','utf8');
+test('auth events immediately replace the inbox identity and wait for the matching guard; refreshes keep the same inbox',()=>{
+  let observed=null,notify,cleanup,active=true,updates=0;
+  const guard={loading:false,allowed:true,userId:'owner'};
+  const page={exports:{}};
+  const hooks={...React,useRef:()=>({current:'owner'}),useState:()=>[observed,value=>{observed=typeof value==='function'?value(observed):value;updates++;}],useEffect:fn=>{if(active){cleanup=fn();active=false;}}};
+  const db={auth:{onAuthStateChange(callback){notify=callback;return{data:{subscription:{unsubscribe(){}}}};}}};
+  new Function('require','exports',compile(source))(name=>{
+    if(name==='react')return hooks;if(name==='@/lib/supabase')return{supabase:db};
+    if(name==='@/hooks/useClientGuard')return{useClientGuard:()=>guard};
+    if(name==='@/lib/client-notification-inbox')return mod.exports;
+    if(name==='next/navigation')return{};
+    if(name==='next/link'||name.startsWith('@/components/')||name.startsWith('./')||name.startsWith('../components/'))return{__esModule:true,default:()=>null};
+    return require(name);
+  },page.exports);
+  const render=()=>page.exports.default();
+  assert.equal(render().key,'owner:0');
+  notify('SIGNED_IN',{user:{id:'other'}});
+  let screen=render();assert.equal(screen.key,'other:1');assert.equal(screen.props.allowed,false);
+  guard.userId='other';screen=render();assert.equal(screen.props.allowed,true);
+  notify('TOKEN_REFRESHED',{user:{id:'other'}});assert.equal(render().key,'other:1');
+  notify('SIGNED_OUT',null);screen=render();assert.equal(screen.key,'signed-out:2');assert.equal(screen.props.expectedUserId,null);assert.equal(screen.props.allowed,false);
+  notify('SIGNED_IN',{user:{id:'other'}});const beforeBatched=render().key;
+  notify('SIGNED_OUT',null);notify('SIGNED_IN',{user:{id:'other'}});
+  assert.notEqual(render().key,beforeBatched,'batched sign-out/sign-in must still retire the original inbox');
+  cleanup();const before=updates;notify('SIGNED_IN',{user:{id:'owner'}});assert.equal(updates,before);
+});
+
 function harness(readFn=async()=>snapshot(),writeFn=async(_db,_user,ids)=>({confirmedIds:ids,complete:true})) {
-  const body=source.slice(source.indexOf('  const router'),source.indexOf('  if (authLoading || !allowed)'));
+  const body='const {loading:authLoading,allowed,userId:expectedUserId}=useClientGuard();\n'+source.slice(source.indexOf('  const router'),source.indexOf('  if (authLoading || !allowed ||'));
   const slots=[],effects=[],pending=[],redirects=[],subscriptions=[];let cursor=0,writes=0;
   const same=(a,b)=>a&&b&&a.length===b.length&&a.every((v,n)=>Object.is(v,b[n]));
   const hooks={
@@ -101,7 +160,7 @@ function harness(readFn=async()=>snapshot(),writeFn=async(_db,_user,ids)=>({conf
   const router={replace:path=>redirects.push(path)};
   const channel={on(_event,filter,callback){subscriptions.push({filter,callback});return channel;},subscribe(){return channel;}};
   const db={channel:()=>channel,removeChannel(){}};
-  const guard={loading:false,allowed:true};
+  const guard={loading:false,allowed:true,userId:'owner'};
   const env={...hooks,supabase:db,useRouter:()=>router,useClientGuard:()=>guard,loadClientNotificationInbox:readFn,changeClientNotifications:writeFn};
   const component=new Function(...Object.keys(env),compile(`return function(){${body}\nreturn {notifications,filtered,loading,loadError,userId,actionError,actionPending,markingAll,bulkMode,bulkProcessing,bulkAction,selectedNotifIds,setBulkMode,setActiveCategory,setActiveStatus,loadNotifications,markOneRead,deleteOne,markAllRead,toggleNotifSelection,runNotificationAction,selectAllNotifs,clearNotifSelection,handleNotifBulkAction};}`))(...Object.values(env));
   return{redirects,subscriptions,guard,get writes(){return writes;},render(){cursor=0;return component();},async effects(){pending.splice(0).forEach(fn=>fn());await flush();},unmount(){effects.forEach(e=>e?.cleanup?.());}};
@@ -168,10 +227,10 @@ test('loads wait for the client guard and realtime subscriptions use the app sch
 
 test('rendered load errors have retry, never show the empty inbox message, and pending cards disable writes',()=>{
   let index=0;
-  const hooks={...React,useState(initial){const state=React.useState(initial),n=index++;return n===1?[false,()=>{}]:n===2?[true,()=>{}]:state;}};
+  const hooks={...React,useState(initial){const state=React.useState(initial),n=index++;return n===2?[false,()=>{}]:n===3?[true,()=>{}]:state;}};
   const page={exports:{}};new Function('require','exports',compile(source))(name=>{
     if(name==='react')return hooks;if(name==='@/lib/supabase')return{supabase:{}};if(name==='@/lib/client-notification-inbox')return mod.exports;
-    if(name==='next/navigation')return{useRouter:()=>({replace(){}})};if(name==='@/hooks/useClientGuard')return{useClientGuard:()=>({loading:false,allowed:true})};
+    if(name==='next/navigation')return{useRouter:()=>({replace(){}})};if(name==='@/hooks/useClientGuard')return{useClientGuard:()=>({loading:false,allowed:true,userId:'owner'})};
     if(name==='next/link'||name.startsWith('@/components/')||name.startsWith('./')||name.startsWith('../components/'))return{__esModule:true,default:()=>null};return require(name);
   },page.exports);
   const html=renderToStaticMarkup(React.createElement(page.exports.default));assert.match(html,/role="alert"/);assert.match(html,/Failed to load notifications/);assert.match(html,/>Retry</);assert.doesNotMatch(html,/You are all caught up/);
