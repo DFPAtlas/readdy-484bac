@@ -15,6 +15,7 @@ The page renders 25 notifications at a time. Matching/unread/priority counts and
 - Page-only reads, bulk selection, hidden-ID rejection, locked navigation, filter/sort reset and deletion of the final page are exercised through the actual page logic.
 - Rendered cards, range/total, disabled navigation, page selection count and “Mark Page Read” wording are checked.
 - The 405-record regression fails against the previous helper's 100-row limit.
+- Three existing document/payment test loaders now resolve the browser helper imports introduced on latest main. They exercise the actual browser rules, while endpoint tests continue to use their separate server rules; no product document or payment behavior is changed here.
 
 ## Published acceptance
 
