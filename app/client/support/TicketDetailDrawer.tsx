@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { withRequestDeadline } from '@/lib/request-deadline';
 import { supabase } from '@/lib/supabase';
+import { routeTicketToCommandCentre } from '@/lib/support-routing';
 import { saveSupportReply } from '@/lib/support-conversation';
 import StatusBadge from './StatusBadge';
 import PriorityBadge from './PriorityBadge';
@@ -14,6 +16,7 @@ interface TicketMessage {
   message_text: string;
   created_at: string;
   is_internal: boolean;
+  dfp_sync_status?: string | null;
 }
 
 interface Ticket {
@@ -139,6 +142,20 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
     setTicketStatus(ticket.status);
   }, [ticket.id, ticket.status]);
 
+  const retryClosureSync = async () => {
+    if (sendingRef.current || activeTicketRef.current !== ticket.id) return;
+    const lifetime = lifetimeRef.current;
+    const current = () => activeTicketRef.current === ticket.id && lifetimeRef.current === lifetime;
+    const pending = messages.filter(message => message.sender_type === 'client' && message.message_text.startsWith('The client closed this request in QuickGuard.') && message.dfp_sync_status !== 'synced');
+    sendingRef.current = true; setSending(true);
+    try {
+      const intake = await routeTicketToCommandCentre(ticket.id);
+      if (!intake.ok) throw new Error('Ticket handoff is pending');
+      const results = await Promise.all(pending.map(message => withRequestDeadline(supabase.functions.invoke('dfp-support-message-bridge', { body: { messageId: message.id } }))));
+      if (current()) { setWarning(results.some(result => result.error || result.data?.success !== true) ? 'Central support has not confirmed the closure notice. Retry synchronization.' : ''); void loadMessages(); }
+    } catch { if (current()) setWarning('Central support has not confirmed the closure notice. Retry synchronization.'); }
+    finally { if (current()) { sendingRef.current = false; setSending(false); } }
+  };
   const handleSendReply = async () => {
     if (activeTicketRef.current !== ticket.id || !replyText.trim() || sendingRef.current || loading || loadError || ticketStatus === 'resolved' || ticketStatus === 'closed') return;
     sendingRef.current = true;
@@ -183,6 +200,8 @@ export default function TicketDetailDrawer({ ticket, clientId, onClose, onUpdate
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
+      {ticketStatus === 'closed' && messages.some(message => message.sender_type === 'client' && message.message_text.startsWith('The client closed this request in QuickGuard.') && message.dfp_sync_status !== 'synced') && <div role="status" className="bg-amber-950 text-amber-100 p-4"><p>Closure is saved in QuickGuard. Central support has not confirmed its closure notice.</p><button disabled={sending} onClick={() => void retryClosureSync()} className="underline">Retry support synchronization</button></div>}
+
       <div className="absolute inset-0 bg-black/40" onClick={onClose}></div>
       <div className="relative w-full max-w-xl bg-[#111d35] h-full overflow-y-auto border-l border-[#1e2d4d] shadow-2xl flex flex-col">
         {/* Header */}

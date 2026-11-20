@@ -128,6 +128,8 @@ for (const role of ['guard', 'client']) {
     const mod = { exports: {} };
     new Function('require', 'exports', compile(fs.readFileSync(`app/${role}/support/TicketDetailDrawer.tsx`, 'utf8')))(name => {
       if (name === 'react') return hooks;
+      if (name === '@/lib/request-deadline') return { withRequestDeadline: value => value };
+      if (name === '@/lib/support-routing') return {};
       if (name === '@/lib/supabase') return { supabase: {} };
       if (name === '@/lib/support-conversation') return helper.exports;
       if (name.startsWith('./')) return { __esModule: true, default: () => null };

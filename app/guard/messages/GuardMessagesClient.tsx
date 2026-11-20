@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { withRequestDeadline } from '@/lib/request-deadline';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
+import { readMessageRows, readMessagePartners, sendJobMessage, changeJobMessages } from '@/lib/job-messages';
+import { useMessageOwner } from '@/hooks/useMessageOwner';
 import PortalSidebar from '@/components/PortalSidebar';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
 import Link from 'next/link';
-import { canSendJobMessage } from '@/lib/message-permissions';
 import { formatDateOnly } from '@/lib/date-only';
 
 interface ClientInfo {
@@ -86,7 +87,12 @@ function formatDate(dateStr: string): string {
 }
 
 export default function GuardMessagesClient() {
-  const router = useRouter();
+  const actor = useMessageOwner();
+  if (!actor.ready) return <div role="status" className="p-8">Loading your message account…</div>;
+  if (actor.error || !actor.id) return <div role="alert" className="p-8 space-y-4"><p>Your message account could not be verified.</p><button onClick={actor.retry}>Retry</button><a href="/guard/login">Sign in</a></div>;
+  return <GuardMessageInbox key={`${actor.id}:${actor.revision}`} expectedOwner={actor.id} />;
+}
+function GuardMessageInbox({ expectedOwner }: { expectedOwner: string }) {
   const { loading: authLoading, allowed } = useGuardGuard();
 
   const [loading, setLoading] = useState(true);
@@ -109,41 +115,27 @@ export default function GuardMessagesClient() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
+  const conversationRequestRef = useRef(0);
+  const sendLockRef = useRef(false);
+  const latestActiveLoadRef = useRef<() => Promise<void>>(async () => {});
+  const sendOperationRef = useRef<{ key: string; text: string; id: string } | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [messageError, setMessageError] = useState('');
 
   const loadConversations = useCallback(async () => {
+    const request = ++conversationRequestRef.current;
+    const current = () => mountedRef.current && conversationRequestRef.current === request;
+    setLoadError(false);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/guard/login'); return; }
-      setGuardUserId(user.id);
-
-      const { data: guard } = await supabase
-        .from('guards')
-        .select('full_name, profile_image_url')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      const name = guard?.full_name || 'Guard';
-      setGuardName(name);
-      setGuardInitials(getInitials(name));
-
-      const savedArchived = localStorage.getItem(`quickguard_archived_guard_${user.id}`);
-      if (savedArchived) {
-        try {
-          setArchivedConvIds(new Set(JSON.parse(savedArchived)));
-        } catch {}
-      }
-
-      const { data: messages } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: false });
-
-      if (!messages || messages.length === 0) {
-        if (mountedRef.current) setLoading(false);
-        return;
-      }
-
+      const user = { id: expectedOwner };
+      const profile = await withRequestDeadline(supabase.from('guards').select('full_name, profile_image_url').eq('user_id', expectedOwner).maybeSingle());
+      if (!current()) return;
+      if (profile.error || !profile.data) throw new Error('Guard profile unavailable');
+      const name = profile.data.full_name || 'Guard';
+      setGuardUserId(expectedOwner); setGuardName(name); setGuardInitials(getInitials(name));
+      const archived = localStorage.getItem(`quickguard_archived_guard_${expectedOwner}`);
+      try { setArchivedConvIds(new Set(archived ? JSON.parse(archived) : [])); } catch { setArchivedConvIds(new Set()); }
+      const messages = await readMessageRows(supabase, expectedOwner, undefined, current);
       const grouped: Record<string, { messages: Message[]; job_id: string | null; other_user_id: string }> = {};
       for (const msg of messages) {
         const otherId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
@@ -157,17 +149,13 @@ export default function GuardMessagesClient() {
       const otherUserIds = [...new Set(Object.values(grouped).map(g => g.other_user_id))];
       const jobIds = [...new Set(Object.values(grouped).map(g => g.job_id).filter(Boolean))];
 
-      const { data: clients } = await supabase
-        .from('clients')
-        .select('id, user_id, company_name, contact_name')
-        .in('user_id', otherUserIds);
-
-      const { data: jobs } = jobIds.length > 0
-        ? await supabase.from('jobs').select('id, job_title, venue_city, status, start_date, start_time').in('id', jobIds)
-        : { data: [] };
-
-      const clientMap: Record<string, ClientInfo> = {};
-      (clients || []).forEach(c => { if (c.user_id) clientMap[c.user_id] = c; });
+      const partners = await readMessagePartners(supabase, expectedOwner, otherUserIds, current);
+      const jobResult = jobIds.length ? await withRequestDeadline(supabase.from('jobs').select('id, job_title, venue_city, status, start_date, start_time').in('id', jobIds as string[])) : { data: [], error: null };
+      if (!current()) return;
+      if (jobResult.error) throw jobResult.error;
+      const jobs = jobResult.data;
+      const clientMap: Record<string, { company_name: string; contact_name: string }> = {};
+      partners.forEach(profile => { clientMap[profile.user_id] = { company_name: profile.full_name, contact_name: profile.full_name }; });
 
       const jobMap: Record<string, JobInfo> = {};
       (jobs || []).forEach(j => { jobMap[j.id] = j; });
@@ -200,15 +188,15 @@ export default function GuardMessagesClient() {
 
       convs.sort((a, b) => new Date(b.last_time).getTime() - new Date(a.last_time).getTime());
 
-      if (mountedRef.current) {
+      if (current()) {
         setConversations(convs);
         setTotalUnread(convs.reduce((sum, c) => sum + c.unread_count, 0));
         setLoading(false);
       }
     } catch {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, [router]);
+      if (current()) setLoadError(true);
+    } finally { if (current()) setLoading(false); }
+  }, [expectedOwner]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -218,24 +206,21 @@ export default function GuardMessagesClient() {
 
   useEffect(() => {
     if (!guardUserId) return;
-    const channel = supabase
-      .channel(`guard-messages-${guardUserId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'app', table: 'messages', filter: `receiver_id=eq.${guardUserId}` }, (payload) => {
+    const refresh = () => {
+      if (!mountedRef.current) return;
+      void loadConversations();
+      void latestActiveLoadRef.current();
+    };
+    const channel = supabase.channel(`guard-messages-${guardUserId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'app', table: 'messages', filter: `receiver_id=eq.${guardUserId}` }, refresh)
+      .on('postgres_changes', { event: 'INSERT', schema: 'app', table: 'messages', filter: `sender_id=eq.${guardUserId}` }, refresh)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'app', table: 'messages', filter: `sender_id=eq.${guardUserId}` }, payload => {
         if (!mountedRef.current) return;
-        const newMsg = payload.new as Message;
-        loadConversations();
-        setActiveMessages(prev => {
-          if (prev.length === 0) return prev;
-          const first = prev[0];
-          const otherId = newMsg.sender_id === guardUserId ? newMsg.receiver_id : newMsg.sender_id;
-          const firstOther = first.sender_id === guardUserId ? first.receiver_id : first.sender_id;
-          if (firstOther !== otherId) return prev;
-          if (newMsg.job_id && first.job_id !== newMsg.job_id) return prev;
-          if (prev.find(m => m.id === newMsg.id)) return prev;
-          return [...prev, newMsg];
-        });
+        const updated = payload.new as Message;
+        setActiveMessages(previous => previous.map(row => row.id === updated.id ? updated : row));
+        void loadConversations();
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'app', table: 'messages', filter: `receiver_id=eq.${guardUserId}` }, () => loadConversations())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'app', table: 'messages', filter: `receiver_id=eq.${guardUserId}` }, () => { if (mountedRef.current) void loadConversations(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [guardUserId, loadConversations]);
@@ -262,61 +247,35 @@ export default function GuardMessagesClient() {
     const request = ++messageRequestRef.current;
     const isCurrent = () => messageLifetimeRef.current === lifetime && messageRequestRef.current === request;
 
-    let query = supabase
-      .from('messages')
-      .select('*')
-      .or(`sender_id.eq.${guardUserId},receiver_id.eq.${guardUserId}`)
-      .order('created_at', { ascending: true });
-
-    if (activeJobId) {
-      query = query.eq('job_id', activeJobId);
-    } else {
-      query = query.is('job_id', null);
-    }
-
-    const { data } = await query;
-    if (!isCurrent()) return;
-    const filtered = (data || []).filter(m => {
-      const otherId = m.sender_id === guardUserId ? m.receiver_id : m.sender_id;
-      return otherId === activeOtherUserId;
-    });
-
-    setActiveMessages(filtered);
-    setTimeout(() => { if (isCurrent()) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 50);
-
-    if (activeJobId) {
-      const { data: jobData } = await supabase
-        .from('jobs')
-        .select('id, job_title, venue_city, status, start_date, start_time')
-        .eq('id', activeJobId)
-        .maybeSingle();
+    try {
+      setMessageError('');
+      const rows = await readMessageRows(supabase, guardUserId, { other: activeOtherUserId, job: activeJobId }, isCurrent);
       if (!isCurrent()) return;
-      setActiveJob(jobData ?? null);
-    } else {
-      setActiveJob(null);
-    }
+      setActiveMessages([...rows].reverse());
+      if (activeJobId) {
+        const result = await withRequestDeadline(supabase.from('jobs').select('id, job_title, venue_city, status, start_date, start_time').eq('id', activeJobId).maybeSingle());
+        if (!isCurrent()) return; if (result.error) throw result.error; setActiveJob(result.data);
+      } else setActiveJob(null);
+      setActiveClient(null);
+      const unread = rows.filter(row => row.receiver_id === guardUserId && !row.read).map(row => row.id);
+      if (unread.length) {
+        const result = await changeJobMessages(supabase, guardUserId, unread, 'read', isCurrent);
+        if (!isCurrent()) return;
+        if (!result.complete) throw new Error('Read acknowledgement incomplete');
+        setActiveMessages(previous => previous.map(row => result.confirmedIds.includes(row.id) ? { ...row, read: true } : row));
+        await loadConversations();
+      }
+    } catch { if (isCurrent()) setMessageError('This conversation could not be loaded or its read state confirmed. Reload to retry.'); }
 
-    const { data: clientData } = await supabase
-      .from('clients')
-      .select('id, company_name, contact_name, user_id')
-      .eq('user_id', activeOtherUserId)
-      .maybeSingle();
-    if (!isCurrent()) return;
-    setActiveClient(clientData ?? null);
+  }, [activeJobId, activeOtherUserId, activeConversationId, guardUserId, messageContextKey, loadConversations]);
 
-    const unreadIds = filtered.filter(m => m.receiver_id === guardUserId && !m.read).map(m => m.id);
-    if (unreadIds.length > 0) {
-      await supabase.from('messages').update({ read: true }).in('id', unreadIds);
-      if (!isCurrent()) return;
-      setConversations(prev => prev.map(c => c.id === activeConversationId ? { ...c, unread_count: 0 } : c));
-      setTotalUnread(prev => Math.max(0, prev - unreadIds.length));
-    }
-  }, [activeJobId, activeOtherUserId, activeConversationId, guardUserId, messageContextKey]);
+  useEffect(() => { latestActiveLoadRef.current = loadActiveMessages; }, [loadActiveMessages]);
 
   useEffect(() => {
     const lifetime = { key: messageContextKey };
     messageLifetimeRef.current = lifetime;
     setActiveMessages([]);
+    setInput(''); sendOperationRef.current = null; sendLockRef.current = false; setSending(false);
     setActiveJob(null);
     setActiveClient(null);
     if (activeConversationId) void loadActiveMessages();
@@ -324,57 +283,21 @@ export default function GuardMessagesClient() {
   }, [activeConversationId, loadActiveMessages, messageContextKey]);
 
   const handleSend = async () => {
-    if (!activeConversation || !guardUserId || !input.trim()) return;
-    setSending(true);
+    const lifetime = messageLifetimeRef.current;
+    const current = () => mountedRef.current && messageLifetimeRef.current === lifetime;
+    const text = input.trim();
+    if (!activeConversation || !guardUserId || !text || text.length > 1000 || sendLockRef.current || loadError || messageError) return;
+    const key = messageContextKey;
+    if (!sendOperationRef.current || sendOperationRef.current.key !== key || sendOperationRef.current.text !== text) sendOperationRef.current = { key, text, id: crypto.randomUUID() };
+    const operation = sendOperationRef.current;
+    sendLockRef.current = true; setSending(true);
     try {
-      if (activeConversation.job_id) {
-        const perm = await canSendJobMessage({
-          currentUserId: guardUserId,
-          currentUserType: 'guard',
-          jobId: activeConversation.job_id,
-          otherUserId: activeConversation.other_user_id,
-          otherUserType: 'client',
-        });
-        if (!perm.allowed) {
-          setToast(perm.error || 'You do not have permission to message this client for this job.');
-          setTimeout(() => setToast(''), 4000);
-          setSending(false);
-          return;
-        }
-      }
-      const { error } = await supabase.from('messages').insert({
-        sender_id: guardUserId,
-        sender_type: 'guard',
-        receiver_id: activeConversation.other_user_id,
-        receiver_type: activeConversation.is_support ? 'support' : 'client',
-        message_text: input.trim(),
-        job_id: activeConversation.job_id,
-        read: false,
-      });
-      if (error) throw error;
-      try {
-        const jobTitle = activeConversation.job_title;
-        await supabase.from('notifications').insert({
-          user_id: activeConversation.other_user_id,
-          user_type: 'client',
-          type: 'message',
-          title: 'New message',
-          message: `New message from guard${jobTitle ? ` for "${jobTitle}"` : ''}`,
-          link: '/client/messages',
-          is_read: false,
-        });
-      } catch (notifyErr) {
-        console.error('Failed to create notification:', notifyErr);
-      }
-      setInput('');
-      await loadActiveMessages();
-      await loadConversations();
-    } catch {
-      setToast('Failed to send message. Please try again.');
-      setTimeout(() => setToast(''), 4000);
-    } finally {
-      setSending(false);
-    }
+      await sendJobMessage(supabase, { id: operation.id, owner: guardUserId, other: activeConversation.other_user_id, job: activeConversation.job_id, text }, current);
+      if (!current()) return;
+      setInput(previous => previous.trim() === text ? '' : previous); sendOperationRef.current = null;
+      void loadActiveMessages();
+    } catch { if (current()) setToast('Message save could not be confirmed. Your draft is retained; retry the same message.'); }
+    finally { if (current()) { sendLockRef.current = false; setSending(false); } }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -417,6 +340,7 @@ export default function GuardMessagesClient() {
 
   return (
     <div className="min-h-screen bg-[#0B1933] flex flex-col lg:flex-row">
+      {(loadError || messageError) && <div role="alert" className="fixed top-3 left-1/2 z-50 bg-red-950 text-white p-4 rounded-xl"><p>{messageError || 'Message inbox could not be loaded.'}</p><button className="underline" onClick={() => { void loadConversations(); if (activeConversationId) void loadActiveMessages(); }}>Retry messages</button></div>}
       <PortalSidebar role="guard" displayName={guardName} subtitle="Guard" initials={guardInitials} accentColor="emerald" />
 
       <div className="flex-1 lg:ml-72 min-h-screen flex flex-col lg:flex-row pb-20 lg:pb-0">
@@ -682,7 +606,7 @@ export default function GuardMessagesClient() {
                   </div>
                   <button
                     onClick={handleSend}
-                    disabled={sending || !input.trim()}
+                    disabled={sending || loadError || !!messageError || !input.trim()}
                     className="w-10 h-10 flex items-center justify-center bg-teal-500 text-white rounded-xl hover:bg-teal-600 transition-colors cursor-pointer disabled:opacity-50 flex-shrink-0"
                   >
                     {sending ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <i className="ri-send-plane-fill text-base"></i>}

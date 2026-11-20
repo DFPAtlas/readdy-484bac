@@ -1,3 +1,4 @@
+import { persistUserNotifications } from '../_shared/user-notifications.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
@@ -23,7 +24,7 @@ serve(async (req) => {
     });
   }
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
 
   try {
     const { cancellation_id } = await req.json();
@@ -133,7 +134,7 @@ serve(async (req) => {
     }
 
     if (notifications.length > 0) {
-      await supabase.from('notifications').insert(notifications);
+      await persistUserNotifications(supabase, `cancellation:${cancellation_id}`, notifications);
     }
 
     return new Response(JSON.stringify({ success: true, cancellation_id, results }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

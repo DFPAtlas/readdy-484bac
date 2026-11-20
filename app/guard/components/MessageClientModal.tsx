@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { canSendJobMessage } from '@/lib/message-permissions';
+import { sendJobMessage, readMessageRows } from '@/lib/job-messages';
 
 interface MessageClientModalProps {
   isOpen: boolean;
@@ -39,75 +39,31 @@ export default function MessageClientModal({
     setError('');
   }, []);
 
+  const scope = useRef<symbol | null>(null), lock = useRef(false);
+  const operation = useRef<{text:string;id:string;key:string}|null>(null);
   useEffect(() => {
-    if (!isOpen) {
-      reset();
-      return;
-    }
+    const lifetime = Symbol('guard-message'); scope.current = lifetime; lock.current = false;
+    const current = () => scope.current === lifetime;
+    if (!isOpen) { reset(); return () => { scope.current = null; }; }
     setChecking(true);
-    supabase
-      .from('messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('job_id', jobId)
-      .or(`sender_id.eq.${guardUserId},receiver_id.eq.${guardUserId}`)
-      .then(({ count }) => {
-        setExistingCount(count || 0);
-        setChecking(false);
-      });
-  }, [isOpen, jobId, guardUserId, reset]);
-
+    void readMessageRows(supabase,guardUserId,{other:clientUserId,job:jobId},current).then(rows => {
+      if (current()) setExistingCount(rows.length);
+    }).catch(() => { if (current()) { setExistingCount(-1); setError('Conversation could not be checked. Close and reopen to retry.'); } })
+      .finally(() => { if (current()) setChecking(false); });
+    return () => { scope.current = null; };
+  }, [isOpen,jobId,guardUserId,clientUserId,reset]);
   const handleSend = async () => {
     const text = message.trim();
-    if (!text) return;
-    if (text.length > 1000) {
-      setError('Message must be 1000 characters or less.');
-      return;
-    }
-    setSending(true);
-    setError('');
+    if (!scope.current || lock.current || checking || existingCount < 0 || !text || text.length>1000) return;
+    const lifetime = scope.current, current = () => scope.current === lifetime;
+    const key=JSON.stringify([guardUserId,clientUserId,jobId]);
+    if (!operation.current || operation.current.text!==text || operation.current.key!==key) operation.current={text,id:crypto.randomUUID(),key};
+    lock.current=true;setSending(true);setError('');
     try {
-      const perm = await canSendJobMessage({
-        currentUserId: guardUserId,
-        currentUserType: 'guard',
-        jobId: jobId,
-        otherUserId: clientUserId,
-        otherUserType: 'client',
-      });
-      if (!perm.allowed) {
-        setError(perm.error || 'You do not have permission to message this client for this job.');
-        setSending(false);
-        return;
-      }
-      const { error: insertError } = await supabase.from('messages').insert({
-        sender_id: guardUserId,
-        sender_type: 'guard',
-        receiver_id: clientUserId,
-        receiver_type: 'client',
-        message_text: text,
-        job_id: jobId,
-        read: false,
-      });
-      if (insertError) throw insertError;
-      try {
-        await supabase.from('notifications').insert({
-          user_id: clientUserId,
-          user_type: 'client',
-          type: 'message',
-          title: 'New message',
-          message: `New message from guard${jobTitle ? ` for "${jobTitle}"` : ''}`,
-          link: '/client/messages',
-          is_read: false,
-        });
-      } catch (notifyErr) {
-        console.error('Failed to create notification:', notifyErr);
-      }
-      onClose();
-      router.push('/guard/messages');
-    } catch (e: any) {
-      setError(e.message || 'Failed to send message. Please try again.');
-    } finally {
-      setSending(false);
-    }
+      await sendJobMessage(supabase,{id:operation.current.id,owner:guardUserId,other:clientUserId,job:jobId,text},current);
+      if(current()){operation.current=null;onClose();router.push('/guard/messages');}
+    }catch{if(current())setError('Message save could not be confirmed. Your draft is retained; retry the same message.');}
+    finally{if(current()){lock.current=false;setSending(false);}}
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -164,6 +120,7 @@ export default function MessageClientModal({
         ) : (
           <>
             <textarea
+              disabled={sending || existingCount < 0}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -179,7 +136,7 @@ export default function MessageClientModal({
             <div className="flex gap-3">
               <button
                 onClick={handleSend}
-                disabled={sending || !message.trim()}
+                disabled={sending || existingCount < 0 || !message.trim()}
                 className="flex-1 bg-teal-500 hover:bg-teal-400 text-white py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
               >
                 {sending ? (

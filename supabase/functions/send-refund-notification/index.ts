@@ -1,3 +1,4 @@
+import { persistUserNotifications } from '../_shared/user-notifications.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
@@ -21,7 +22,7 @@ serve(async (req) => {
     });
   }
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
 
   try {
     const { refund_request_id } = await req.json();
@@ -83,7 +84,7 @@ serve(async (req) => {
     const notifications = [];
     if (clientData?.user_id) notifications.push({ user_id: clientData.user_id, user_type: 'client', type: 'refund_request', title: `Refund ${statusLabel}`, message: `£${amount} refund for ${job?.job_title || 'job'} is ${statusLabel.toLowerCase()}.`, link: '/client/dashboard#notifications', is_read: false, created_at: new Date().toISOString(), related_id: refund.job_id });
     if (guardData?.user_id) notifications.push({ user_id: guardData.user_id, user_type: 'guard', type: 'refund_request', title: `Refund ${statusLabel}`, message: `A refund for ${job?.job_title || 'job'} is ${statusLabel.toLowerCase()}.`, link: '/guard/dashboard#notifications', is_read: false, created_at: new Date().toISOString(), related_id: refund.job_id });
-    if (notifications.length > 0) await supabase.from('notifications').insert(notifications);
+    if (notifications.length > 0) await persistUserNotifications(supabase, `refund-request:${refund_request_id}:${refund.status}`, notifications);
 
     return new Response(JSON.stringify({ success: true, refund_request_id, results }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e: any) {

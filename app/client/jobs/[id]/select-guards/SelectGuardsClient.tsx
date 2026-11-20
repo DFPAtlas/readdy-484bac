@@ -1,7 +1,7 @@
 "use client";
 
 import { scheduledHoursPerGuard, grossGuardPence } from "@/lib/shift-hours";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -26,7 +26,9 @@ import { computeComplianceInfo, GuardComplianceData } from "../compliance/useCom
 import CompareGuardsModal from "./CompareGuardsModal";
 import CompareSelectionBar from "./CompareSelectionBar";
 import ContextualHelpCard from "@/app/client/help/ContextualHelpCard";
-import { canSendJobMessage } from '@/lib/message-permissions';
+import { sendJobMessage } from '@/lib/job-messages';
+import { runGuardActionBatch } from '@/lib/client-guard-actions';
+import { useMessageOwner } from '@/hooks/useMessageOwner';
 
 interface Guard {
   id: string;
@@ -233,6 +235,12 @@ const GUARD_FILTER_CONFIGS = [
 ];
 
 export default function SelectGuardsClient({ jobId }: { jobId: string }) {
+  const actor = useMessageOwner();
+  if (!actor.ready) return <div role="status" className="p-8">Loading your account…</div>;
+  if (actor.error || !actor.id) return <div role="alert" className="p-8"><p>Your account could not be verified.</p><button onClick={actor.retry}>Retry</button></div>;
+  return <OwnedSelectGuards key={`${actor.id}:${actor.revision}:${jobId}`} expectedOwner={actor.id} jobId={jobId} />;
+}
+function OwnedSelectGuards({ jobId, expectedOwner }: { jobId: string; expectedOwner: string }) {
   const router = useRouter();
   const { loading: authLoading, allowed } = useClientGuard();
   const { checking, blocked } = useRouteGuard();
@@ -269,6 +277,9 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
   const [, setClientId] = useState<string>("");
 
   const [toast, setToast] = useState("");
+  const actionActive = useRef(false), actionLock = useRef(false);
+  const actionOperations = useRef(new Map<string, string>());
+  useEffect(() => { actionActive.current = true; return () => { actionActive.current = false; }; }, []);
 
   function getInitials(name: string): string {
     const parts = name.trim().split(" ");
@@ -486,71 +497,17 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
     }
   };
 
-  const handleMessage = async (guardId: string, guardUserId: string, message: string, jobId?: string) => {
-    setSendingMessage(true);
+  const handleMessage = async (guardUserId: string, text: string) => {
+    if (actionLock.current || loading || loadError || !allowed) return;
+    actionLock.current = true; setSendingMessage(true);
+    const current = () => actionActive.current;
+    const key = JSON.stringify([expectedOwner, jobId, guardUserId, text.trim()]);
+    if (!actionOperations.current.has(key)) actionOperations.current.set(key, crypto.randomUUID());
     try {
-      const guard = allGuards.find((g) => g.id === guardId);
-      if (!guard || !guardUserId) {
-        setToast("Cannot message this guard");
-        setTimeout(() => setToast(""), 3000);
-        return;
-      }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const targetJobId = jobId || null;
-      if (targetJobId) {
-        const perm = await canSendJobMessage({
-          currentUserId: user.id,
-          currentUserType: 'client',
-          jobId: targetJobId,
-          otherUserId: guardUserId,
-          otherUserType: 'guard',
-        });
-        if (!perm.allowed) {
-          setToast(perm.error || 'You do not have permission to message this guard.');
-          setTimeout(() => setToast(""), 3000);
-          return;
-        }
-      }
-
-      const { error } = await supabase.from("messages").insert({
-        sender_id: user.id,
-        sender_type: "client",
-        receiver_id: guardUserId,
-        receiver_type: "guard",
-        message_text: message,
-        job_id: targetJobId,
-        read: false,
-      });
-
-      if (error) throw error;
-
-      try {
-        await supabase.from('notifications').insert({
-          user_id: guardUserId,
-          user_type: 'guard',
-          type: 'message',
-          title: 'New message',
-          message: `New message from client${job?.job_title ? ` for "${job.job_title}"` : ''}`,
-          link: '/guard/messages',
-          is_read: false,
-        });
-      } catch (notifyErr) {
-        console.error('Failed to create notification:', notifyErr);
-      }
-
-      setToast("Message sent!");
-      setTimeout(() => setToast(""), 3000);
-      setMessageGuard(null);
-    } catch (e) {
-      console.error("Failed to send message:", e);
-      setToast("Failed to send message");
-      setTimeout(() => setToast(""), 3000);
-    } finally {
-      setSendingMessage(false);
-    }
+      await sendJobMessage(supabase, { id: actionOperations.current.get(key)!, owner: expectedOwner, other: guardUserId, job: jobId, text }, current);
+      if (current()) { setToast('Message saved.'); setMessageGuard(null); }
+    } catch { if (current()) setToast('Message save could not be confirmed. Keep the same message and retry.'); }
+    finally { if (current()) { actionLock.current = false; setSendingMessage(false); } }
   };
 
   const handleBulkShortlist = async () => {
@@ -622,78 +579,22 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
     setTimeout(() => setToast(""), 3000);
   };
 
-  const handleBulkMessage = async () => {
-    setBulkProcessing(true);
-    const ids = Array.from(checkedIds);
-    let count = 0;
-    for (const gid of ids) {
-      const guard = allGuards.find(g => g.id === gid);
-      if (!guard?.user_id) continue;
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) continue;
-
-        const perm = await canSendJobMessage({
-          currentUserId: user.id,
-          currentUserType: 'client',
-          jobId: jobId,
-          otherUserId: guard.user_id,
-          otherUserType: 'guard',
-        });
-        if (!perm.allowed) continue;
-
-        await supabase.from("messages").insert({
-          sender_id: user.id,
-          sender_type: "client",
-          receiver_id: guard.user_id,
-          receiver_type: "guard",
-          message_text: "You have been shortlisted for our job. We will be in touch soon with next steps.",
-          job_id: jobId,
-          read: false,
-        });
-        try {
-          await supabase.from("notifications").insert({
-            user_id: guard.user_id,
-            user_type: 'guard',
-            type: 'message',
-            title: 'New message',
-            message: `New message from client${job?.job_title ? ` for "${job.job_title}"` : ''}`,
-            link: '/guard/messages',
-            is_read: false,
-          });
-        } catch (notifyErr) {
-          console.error('Failed to create notification:', notifyErr);
-        }
-        count++;
-      } catch {
-        // skip
-      }
-    }
-    setBulkProcessing(false);
-    setCheckedIds(new Set());
-    setToast(`${count} message${count !== 1 ? "s" : ""} sent`);
-    setTimeout(() => setToast(""), 3000);
+  const runSelectedGuardAction = async (action: 'invite' | 'message') => {
+    if (actionLock.current || loading || loadError || !allowed) return;
+    actionLock.current = true; setBulkProcessing(true);
+    const current = () => actionActive.current;
+    const targets = allGuards.filter(guard => checkedIds.has(guard.id));
+    try {
+      const result = await runGuardActionBatch(supabase, expectedOwner, jobId, targets, action, actionOperations.current, current);
+      if (!current()) return;
+      const confirmed = new Set(result.confirmedIds);
+      setCheckedIds(previous => new Set([...previous].filter(id => !confirmed.has(id))));
+      setToast(`${result.confirmedIds.length} ${action === 'invite' ? 'invitation' : 'message'}${result.confirmedIds.length === 1 ? '' : 's'} confirmed.${result.failedIds.length ? ` ${result.failedIds.length} not confirmed; selection retained for retry.` : ''}`);
+    } catch { if (current()) setToast('Your account changed or the request could not be verified. Reload before retrying.'); }
+    finally { if (current()) { actionLock.current = false; setBulkProcessing(false); } }
   };
-
-  const handleBulkInvite = async () => {
-    setBulkProcessing(true);
-    const ids = Array.from(checkedIds);
-    let count = 0;
-    for (const gid of ids) {
-      const guard = allGuards.find(g => g.id === gid);
-      if (!guard || guard.applied_at) continue;
-      try {
-        // TODO: backend invite endpoint — safe to skip if not available
-        count++;
-      } catch {
-        // skip
-      }
-    }
-    setBulkProcessing(false);
-    setCheckedIds(new Set());
-    setToast(`${count} invite${count !== 1 ? "s" : ""} sent`);
-    setTimeout(() => setToast(""), 3000);
-  };
+  const handleBulkMessage = () => runSelectedGuardAction('message');
+  const handleBulkInvite = () => runSelectedGuardAction('invite');
 
   const handleBulkExport = () => {
     const selectedGuards = allGuards.filter(g => checkedIds.has(g.id));
@@ -774,16 +675,6 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
         if (!guard?.user_id) continue;
 
         try {
-          await supabase.from('notifications').insert({
-            user_id: guard.user_id,
-            user_type: 'guard',
-            type: 'job_selected',
-            title: "You've Been Selected!",
-            message: `A client has provisionally selected you for "${job.job_title}" at ${job.venue_city}. Your booking will be confirmed once the client completes payment.`,
-            link: `/guard/dashboard`,
-            is_read: false,
-          });
-
           await sendPushToUser(guard.user_id, "guard", {
             title: "You've Been Selected!",
             body: `You've been provisionally selected for "${job.job_title}" at ${job.venue_city}. Booking confirms after client payment.`,
@@ -1483,7 +1374,7 @@ export default function SelectGuardsClient({ jobId }: { jobId: string }) {
           guardUserId={messageGuard.user_id || ''}
           jobId={jobId}
           onClose={() => setMessageGuard(null)}
-          onSend={(msg, guardUserId, jobId) => handleMessage(messageGuard.id, guardUserId, msg, jobId)}
+          onSend={(msg, guardUserId) => handleMessage(guardUserId, msg)}
           sending={sendingMessage}
         />
       )}

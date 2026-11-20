@@ -37,7 +37,7 @@ export default function MessageGuardModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => { if (!sending) onClose(); }}>
       <div
         className="bg-[#111d35] rounded-2xl max-w-md w-full border border-[#1e2d4d]"
         onClick={(e) => e.stopPropagation()}
@@ -47,13 +47,14 @@ export default function MessageGuardModal({
             <i className="ri-message-3-line mr-2 text-teal-400"></i>
             Message {guardName}
           </h3>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer">
+          <button onClick={() => { if (!sending) onClose(); }} className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer">
             <i className="ri-close-line text-xl"></i>
           </button>
         </div>
         <div className="p-5">
           <textarea
             value={message}
+            disabled={sending}
             onChange={(e) => {
               setMessage(e.target.value);
               setError("");
@@ -73,7 +74,7 @@ export default function MessageGuardModal({
           </div>
           <div className="flex gap-3 mt-4">
             <button
-              onClick={onClose}
+              onClick={() => { if (!sending) onClose(); }}
               className="flex-1 bg-[#162036] text-slate-300 py-2.5 rounded-xl hover:bg-[#1a2642] transition-colors text-sm font-medium cursor-pointer whitespace-nowrap border border-[#1e2d4d]"
             >
               Cancel

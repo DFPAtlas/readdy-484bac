@@ -1,3 +1,4 @@
+import { persistUserNotifications } from '../_shared/user-notifications.ts';
 async function requireAudit(write: PromiseLike<{error: unknown}>) {const result=await write;if(result.error) throw result.error;return result;}
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
@@ -171,9 +172,6 @@ async function finalizeJobPayment(appSupabase: any, supabaseUrl: string, supabas
     throw new Error(`Failed to finalize transaction: ${txUpdateError.message}`);
   }
 
-  if (transaction.client_id) {
-    await appSupabase.from('notifications').insert([{ user_id: transaction.client_id, title: 'Payment Received — Job Funded', message: `Your payment of £${Number(transaction.amount || 0).toFixed(2)} has been processed. Guards have been notified and can now check in.`, type: 'success', related_id: jobId, is_read: false }]);
-  }
 
   const assignments = fundedAssignments;
   const { data: job } = await appSupabase.from('jobs').select('job_title, venue_name, venue_city, start_date, start_time, end_time, hourly_rate, client_id').eq('id', jobId).maybeSingle();
@@ -186,9 +184,6 @@ async function finalizeJobPayment(appSupabase: any, supabaseUrl: string, supabas
   if (assignments && assignments.length > 0) {
     for (const assignment of assignments) {
       const { data: guard } = await appSupabase.from('guards').select('user_id, email, full_name').eq('id', assignment.guard_id).maybeSingle();
-      if (guard?.user_id) {
-        await appSupabase.from('notifications').insert([{ user_id: guard.user_id, user_type: 'guard', title: 'Booking Funded', message: `Your booking for "${job?.job_title || 'Job'}" at ${job?.venue_city || 'location'} has been funded. Payout becomes eligible after job completion and client approval.`, type: 'booking_confirmed', related_id: jobId, link: '/guard/dashboard', is_read: false }]);
-      }
       if (guard?.email) {
         try {
           await fetch(`${supabaseUrl}/functions/v1/send-guard-booking-confirmation`, {
@@ -240,16 +235,6 @@ async function failJobPayment(appSupabase: any, supabaseUrl: string, supabaseSer
     updated_at: now,
   }).eq('job_id', transaction.job_id).in('status', ['selected', 'awaiting_payment']));
 
-  if (transaction.client_id) {
-    await requireAudit(appSupabase.from('notifications').insert([{
-      user_id: transaction.client_id,
-      title: 'Payment Failed',
-      message: `Your payment of £${Number(transaction.amount || 0).toFixed(2)} failed. Please try again or contact support.`,
-      type: 'error',
-      related_id: transaction.job_id,
-      is_read: false,
-    }]));
-  }
 
   try {
     await fetch(`${supabaseUrl}/functions/v1/send-failed-payment-email`, {
@@ -307,7 +292,7 @@ async function notifyGuardPayout(appSupabase: any, guardId: string, jobId: strin
     const { data: job } = await appSupabase.from('jobs').select('job_title').eq('id', jobId).maybeSingle();
     if (job?.job_title) jobTitle = job.job_title;
   }
-  await appSupabase.from('notifications').insert({
+  await persistUserNotifications(appSupabase, `payout:${assignmentId}:${transferId}`, [{
     user_id: guard.user_id,
     user_type: 'guard',
     title: 'Payout Sent',
@@ -317,7 +302,7 @@ async function notifyGuardPayout(appSupabase: any, guardId: string, jobId: strin
     link: '/guard/dashboard#earnings',
     data: { job_id: jobId, assignment_id: assignmentId, transfer_id: transferId },
     created_at: new Date().toISOString(),
-  }).then(({error}) => { if (error) console.error('[EnhancedWebhook] Guard payout notification failed:', error.message); }, error => { console.error('[EnhancedWebhook] Guard payout notification failed:', error); });
+  }]);
 }
 
 serve(async (req) => {
@@ -501,7 +486,7 @@ serve(async (req) => {
             await logPlanChange(appSupabase, userId, oldSub.plan_slug, planSlug, oldSub.plan_name, planName, accountType, 'webhook', false, stripeSubId);
             await sendAdminAlert(supabaseUrl, supabaseKey, userId, oldSub.plan_slug, planSlug, oldSub.plan_name, planName, accountType, 'webhook', false);
           }
-          await appSupabase.from('notifications').insert([{ user_id: userId, title: 'Subscription Activated', message: `Your ${planName} subscription is now active. Welcome aboard!`, type: 'success', is_read: false }]);
+          await persistUserNotifications(appSupabase, `subscription-activated:${event.id}`, [{ user_id: userId, title: 'Subscription Activated', message: `Your ${planName} subscription is now active. Welcome aboard!`, type: 'subscription', category: 'subscription', link: '/client/profile' }]);
         }
         break;
       }
@@ -616,11 +601,11 @@ serve(async (req) => {
       case 'payment_intent.payment_failed': {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         const failureReason = (paymentIntent as any).last_payment_error?.message || 'Payment declined by bank';
-        const { data: transaction } = await appSupabase.from('transactions').select('client_id, job_id, id, retry_count, amount').eq('stripe_payment_intent', paymentIntent.id).maybeSingle();
+        const { data: transaction, error: failureReadError } = await appSupabase.from('transactions').select('client_id, job_id, id, retry_count, amount').eq('stripe_payment_intent', paymentIntent.id).maybeSingle();
+        if (failureReadError) throw failureReadError;
         if (transaction) {
           const newRetryCount = (transaction.retry_count || 0) + 1;
-          await appSupabase.from('transactions').update({ status: 'failed', failure_reason: failureReason, retry_count: newRetryCount, updated_at: new Date().toISOString() }).eq('id', transaction.id);
-          await appSupabase.from('notifications').insert([{ user_id: transaction.client_id, title: 'Payment Failed', message: `Your payment of £${transaction.amount} failed: ${failureReason}. Please retry or contact support.`, type: 'error', related_id: transaction.job_id, is_read: false }]);
+          await requireWrite(appSupabase.from('transactions').update({ status: 'failed', failure_reason: failureReason, retry_count: newRetryCount, updated_at: new Date().toISOString() }).eq('id', transaction.id).select('id'), 'Failed payment and notification', { minRows: 1 });
           try { await fetch(`${supabaseUrl}/functions/v1/send-failed-payment-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseKey}` }, body: JSON.stringify({ transaction_id: transaction.id, client_id: transaction.client_id, job_id: transaction.job_id, failure_reason: failureReason, retry_count: newRetryCount, amount: transaction.amount, stripe_payment_intent: paymentIntent.id }) }); } catch (e: any) { console.error('Failed to send failed payment email:', e); }
         }
         break;
@@ -634,7 +619,7 @@ serve(async (req) => {
           const table = sub.account_type === 'client' ? 'clients' : 'guards';
           await requireAudit(appSupabase.from(table).update({ subscription_status: 'cancelled', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id).eq('stripe_subscription_id', subscription.id));
           await requireAudit(appSupabase.from('user_entitlements').update({ subscription_status: 'cancelled', updated_at: new Date().toISOString() }).eq('user_id', sub.user_id).eq('stripe_subscription_id', subscription.id));
-          await appSupabase.from('notifications').insert([{ user_id: sub.user_id, title: 'Subscription Cancelled', message: 'Your subscription has been cancelled. You can resubscribe anytime.', type: 'info', is_read: false }]);
+          await persistUserNotifications(appSupabase, `subscription-cancelled:${event.id}`, [{ user_id: sub.user_id, title: 'Subscription Cancelled', message: 'Your subscription has been cancelled. You can resubscribe anytime.', type: 'subscription', category: 'subscription' }]);
         }
         break;
       }
@@ -921,7 +906,6 @@ serve(async (req) => {
         if (processedError) throw processedError;
 
         if (transaction.client_id) {
-          await appSupabase.from('notifications').insert([{ user_id: transaction.client_id, title: 'Payment Refunded', message: `A refund of £${refundAmount.toFixed(2)} has been processed for your job payment.`, type: 'warning', related_id: transaction.job_id || undefined, is_read: false }]);
         }
 
         try {
