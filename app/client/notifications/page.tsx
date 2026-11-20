@@ -69,8 +69,35 @@ const NOTIFICATION_FILTER_CONFIGS = [
 ];
 
 export default function ClientNotificationsPage() {
+  const guard = useClientGuard();
+  const initialOwnerRef = useRef(guard.userId);
+  const [observedAuth, setObservedAuth] = useState<{ userId: string | null; revision: number } | null>(null);
+  useEffect(() => {
+    let active = true;
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Retire the old screen immediately, while the shared profile guard catches up.
+      if (active) {
+        const userId = session?.user?.id || null;
+        setObservedAuth(previous => ({
+          userId,
+          revision: (previous?.revision || 0) + (userId !== (previous ? previous.userId : initialOwnerRef.current) ? 1 : 0),
+        }));
+      }
+    });
+    return () => { active = false; data.subscription.unsubscribe(); };
+  }, []);
+  const expectedUserId = observedAuth ? observedAuth.userId : guard.userId;
+  const allowed = guard.allowed && guard.userId === expectedUserId;
+  // Retire all rows, drafts, subscriptions and pending callbacks on an account change.
+  return <ClientNotificationsInbox key={`${expectedUserId || 'signed-out'}:${observedAuth?.revision || 0}`} expectedUserId={expectedUserId} authLoading={guard.loading} allowed={allowed} />;
+}
+
+function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
+  expectedUserId: string | null;
+  authLoading: boolean;
+  allowed: boolean;
+}) {
   const router = useRouter();
-  const { loading: authLoading, allowed } = useClientGuard();
   const [notifications, setNotifications] = useState<ClientNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -103,7 +130,7 @@ export default function ClientNotificationsPage() {
   const latestLoadRef = useRef<() => Promise<void>>(async () => {});
 
   const loadNotifications = useCallback(async () => {
-    if (!mountedRef.current || mutationRef.current || authLoading || !allowed) return;
+    if (!mountedRef.current || mutationRef.current || authLoading || !allowed || !expectedUserId) return;
     const request = ++requestRef.current;
     const current = () => mountedRef.current && requestRef.current === request;
     loadedUserRef.current = null;
@@ -112,7 +139,7 @@ export default function ClientNotificationsPage() {
     try {
       const snapshot = await loadClientNotificationInbox(supabase, {
         category: activeCategory, priority: activePriority, status: activeStatus, search, dateFrom, dateTo,
-      });
+      }, expectedUserId);
       if (!current()) return;
       if ('redirect' in snapshot) {
         setLoadError(true);
@@ -133,7 +160,7 @@ export default function ClientNotificationsPage() {
     } finally {
       if (current()) setLoading(false);
     }
-  }, [router, activeCategory, activePriority, activeStatus, search, dateFrom, dateTo, authLoading, allowed]);
+  }, [router, activeCategory, activePriority, activeStatus, search, dateFrom, dateTo, authLoading, allowed, expectedUserId]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -174,7 +201,7 @@ export default function ClientNotificationsPage() {
 
   const runNotificationAction = async (action: InboxAction, ids: string[], bulk = false, all = false) => {
     if (!mountedRef.current || mutationRef.current || loading || loadError || authLoading || !allowed ||
-        !userId || loadedUserRef.current !== userId || ids.length === 0) return;
+        !userId || userId !== expectedUserId || loadedUserRef.current !== userId || ids.length === 0) return;
     mutationRef.current = true;
     requestRef.current += 1;
     const lifetime = lifetimeRef.current;
@@ -258,7 +285,7 @@ export default function ClientNotificationsPage() {
 
   const filtered = sortedNotifications.filter(n => activeStatus === 'all' || n.is_read === (activeStatus === 'read'));
 
-  if (authLoading || !allowed) {
+  if (authLoading || !allowed || !expectedUserId) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-[#0B1933] flex items-center justify-center">
         <div className="animate-spin rounded-full h-10 w-10 border-2 border-teal-500 border-t-transparent" />

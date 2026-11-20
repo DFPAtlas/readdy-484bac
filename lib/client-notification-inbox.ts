@@ -23,7 +23,12 @@ export interface InboxFilters {
 
 export type InboxAction = 'mark_read' | 'mark_unread' | 'delete';
 
-export async function loadClientNotificationInbox(db: any, filters: InboxFilters): Promise<
+async function verifyNotificationOwner(db: any, userId: string) {
+  const auth = await db.auth.getUser();
+  if (auth.error || auth.data?.user?.id !== userId) throw new Error('Unable to verify the notification owner.');
+}
+
+export async function loadClientNotificationInbox(db: any, filters: InboxFilters, expectedUserId?: string): Promise<
   { redirect: string } |
   { userId: string; clientId: string; companyName: string; notifications: ClientNotification[] }
 > {
@@ -31,8 +36,10 @@ export async function loadClientNotificationInbox(db: any, filters: InboxFilters
   if (auth.error) throw new Error('Unable to verify your account.');
   const userId = auth.data?.user?.id;
   if (!userId) return { redirect: '/client/login' } as const;
+  if (expectedUserId && expectedUserId !== userId) throw new Error('Unable to verify the notification owner.');
 
   const client = await db.from('clients').select('id, company_name').eq('user_id', userId).maybeSingle();
+  await verifyNotificationOwner(db, userId);
   if (client.error) throw new Error('Unable to load your client profile.');
   if (client.data === null) return { redirect: '/client/complete-profile-wizard' } as const;
   if (!client.data?.id) throw new Error('Unable to load your client profile.');
@@ -50,6 +57,7 @@ export async function loadClientNotificationInbox(db: any, filters: InboxFilters
   if (filters.dateTo) query = query.lte('created_at', filters.dateTo + 'T23:59:59.999');
   const result = await query.limit(100);
   if (result.error || !Array.isArray(result.data)) throw new Error('Unable to load notifications.');
+  await verifyNotificationOwner(db, userId);
   return {
     userId,
     clientId: client.data.id as string,
@@ -61,13 +69,13 @@ export async function loadClientNotificationInbox(db: any, filters: InboxFilters
 export async function changeClientNotifications(db: any, userId: string, ids: string[], action: InboxAction) {
   const requested = [...new Set(ids)];
   if (!userId || requested.length === 0) throw new Error('No notifications selected.');
-  const auth = await db.auth.getUser();
-  if (auth.error || auth.data?.user?.id !== userId) throw new Error('Unable to verify the notification owner.');
+  await verifyNotificationOwner(db, userId);
   const table = db.from('notifications');
   const isRead = action === 'mark_read';
   const query = action === 'delete' ? table.delete() : table.update({ is_read: isRead, read: isRead });
   const result = await query.eq('user_id', userId).in('id', requested).select('id, user_id, is_read, read');
   if (result.error || !Array.isArray(result.data)) throw new Error('Notification changes could not be confirmed.');
+  await verifyNotificationOwner(db, userId);
   const confirmedIds = result.data.filter((row: any) =>
     row.user_id === userId && requested.includes(row.id) &&
     (action === 'delete' || (row.is_read === isRead && row.read === isRead)),
