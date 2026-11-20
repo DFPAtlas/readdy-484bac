@@ -1,0 +1,4 @@
+{
+  "notification_preferences": ["id", "user_id", "job_matches", "application_updates", "payment_notifications", "messages", "sia_reminders", "email_frequency", "created_at", "updated_at", "new_applicants", "guard_confirmations", "job_reminders", "support_tickets", "payment_updates", "in_app_alerts", "sms_notifications", "last_digest_sent_at", "last_weekly_digest_sent_at"],
+  "clients": ["id", "user_id", "is_active"]
+}

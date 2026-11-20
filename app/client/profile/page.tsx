@@ -70,18 +70,6 @@ interface ClientDocument {
   created_at: string;
 }
 
-interface NotificationPrefs {
-  new_applicants: boolean;
-  guard_confirmations: boolean;
-  payment_updates: boolean;
-  job_reminders: boolean;
-  support_tickets: boolean;
-  messages: boolean;
-  in_app_alerts: boolean;
-  sms_notifications: boolean;
-  email_frequency: string;
-}
-
 interface SubscriptionInfo {
   plan_name: string;
   status: string;
@@ -114,7 +102,6 @@ function ClientProfileInner() {
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const { state: paymentMethodState, refresh: refreshPaymentMethod } = useClientPaymentMethod(profile?.id || null);
   const [documents, setDocuments] = useState<ClientDocument[]>([]);
-  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [healthData, setHealthData] = useState({
     profileComplete: false,
@@ -160,28 +147,6 @@ function ClientProfileInner() {
         .order("created_at", { ascending: false });
       setDocuments(docsData || []);
 
-      const { data: prefsData } = await supabase
-        .from("notification_preferences")
-        .select("*")
-        .eq("user_id", session.user.id)
-        .maybeSingle();
-
-      if (prefsData) {
-        setNotifPrefs(prefsData as NotificationPrefs);
-      } else {
-        setNotifPrefs({
-          new_applicants: true,
-          guard_confirmations: true,
-          payment_updates: true,
-          job_reminders: true,
-          support_tickets: true,
-          messages: true,
-          in_app_alerts: true,
-          sms_notifications: false,
-          email_frequency: "immediate",
-        });
-      }
-
       const { data: subData } = await supabase
         .from("subscriptions")
         .select("*")
@@ -198,7 +163,7 @@ function ClientProfileInner() {
         profileComplete: !!(clientData.company_name && clientData.phone && clientData.address_line1),
         billingAdded: !!(clientData.billing_email || clientData.vat_number || clientData.billing_address_line1),
         firstJobPosted: (jobsCount || 0) > 0,
-        notificationsSet: !!prefsData,
+        notificationsSet: false,
         documentsUploaded: (docsData || []).length > 0,
       });
 
@@ -222,19 +187,6 @@ function ClientProfileInner() {
       .order("created_at", { ascending: false });
     setDocuments(data || []);
     setHealthData((h) => ({ ...h, documentsUploaded: (data || []).length > 0 }));
-  };
-
-  const refreshPrefs = async () => {
-    if (!profile) return;
-    const { data } = await supabase
-      .from("notification_preferences")
-      .select("*")
-      .eq("user_id", profile.user_id)
-      .maybeSingle();
-    if (data) {
-      setNotifPrefs(data as NotificationPrefs);
-      setHealthData((h) => ({ ...h, notificationsSet: true }));
-    }
   };
 
   if (authLoading || !allowed) {
@@ -468,12 +420,11 @@ function ClientProfileInner() {
               )}
               {activeTab === "preferences" && (
                 <PreferencesSection
+                  key={`${profile.id}:${profile.user_id}`}
                   paymentMethodState={paymentMethodState}
                   onRefreshPaymentMethod={refreshPaymentMethod}
                   profile={profile}
-                  notifPrefs={notifPrefs}
                   healthData={healthData}
-                  onRefreshPrefs={refreshPrefs}
                   onMessage={(type, text) => showMessage(type, text)}
                 />
               )}
