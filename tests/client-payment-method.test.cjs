@@ -101,7 +101,7 @@ test('client loader calls only the owned read function and rejects returned/thro
 
 function renderSections(state) {
   const status = load('app/client/profile/PaymentMethodStatus.tsx', { 'next/link': { default: props => React.createElement('a', { href: props.href }, props.children), __esModule: true }, '@/lib/client-payment-method': client }).default;
-  const mock = { '@/lib/client-payment-method': client, './PaymentMethodStatus': { default: status, __esModule: true }, '@/lib/supabase': { supabase: {} }, 'next/link': { default: props => React.createElement('a', { href: props.href }, props.children), __esModule: true }, '../components/ClientSpendingSummary': { default: () => null, __esModule: true } };
+  const mock = { '@/lib/client-notification-preferences': load('lib/client-notification-preferences.ts'), '@/lib/client-payment-method': client, './PaymentMethodStatus': { default: status, __esModule: true }, '@/lib/supabase': { supabase: {} }, 'next/link': { default: props => React.createElement('a', { href: props.href }, props.children), __esModule: true }, '../components/ClientSpendingSummary': { default: () => null, __esModule: true } };
   const Billing = load('app/client/profile/BillingSection.tsx', mock).default;
   const Preferences = load('app/client/profile/PreferencesSection.tsx', mock).default;
   const props = { profile: { stripe_customer_id: 'cus_Exists', client_promo_jobs_remaining: 0 }, paymentMethodState: state, onRefreshPaymentMethod() {}, onMessage() {} };
