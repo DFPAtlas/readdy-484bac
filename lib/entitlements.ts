@@ -94,6 +94,35 @@ function normalisePlanSlug(value: string | null | undefined): string | null {
 const entitlementCache = new Map<string, { data: Entitlement | null; ts: number }>();
 const CACHE_TTL = 60_000;
 
+// Team rights come from the caller-bound database function, never a cached
+// owner's private entitlement. Check context again after asynchronous work.
+async function sessionContextFor(userId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    const session = data.session;
+    if (error || session?.user.id !== userId || !session.access_token) return null;
+    // session_id survives normal token refresh but changes on a new sign-in.
+    // This is a browser lifetime check, not JWT authorization (the RPC does that).
+    try {
+      const base64 = session.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const claim = JSON.parse(atob(base64 + '='.repeat((4 - base64.length % 4) % 4)));
+      if (typeof claim.session_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(claim.session_id)) {
+        return `${userId}:${claim.session_id}`;
+      }
+    } catch { /* Legacy/malformed claims use the full token as the context. */ }
+    return session.access_token;
+  } catch { return null; }
+}
+
+async function readMyTeamFeatures(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase.schema('app').rpc('get_my_team_features');
+    if (error || !Array.isArray(data)) return [];
+    return [...new Set(data.filter((key): key is ClientFeatureKey =>
+      typeof key === 'string' && CLIENT_FEATURE_KEYS.includes(key as ClientFeatureKey)))];
+  } catch { return []; }
+}
+
 export function clearEntitlementCache(userId?: string) {
   if (userId) {
     entitlementCache.delete(userId);
@@ -126,10 +155,12 @@ export async function getUserEntitlements(userId: string): Promise<Entitlement |
 
 export async function hasFeature(userId: string, featureKey: FeatureKey): Promise<boolean> {
   if (!userId) return false;
+  const token = await sessionContextFor(userId);
+  if (!token) return false;
 
   const ent = await getUserEntitlements(userId);
   let features: string[] = [];
-  if (ent && ent.is_active) {
+  if (ent?.user_id === userId && ent.is_active) {
     features = normaliseFeatures(ent.features);
   }
 
@@ -155,29 +186,10 @@ export async function hasFeature(userId: string, featureKey: FeatureKey): Promis
     } catch {}
   }
 
-  if (features.includes(featureKey)) return true;
-
-  const { data: teamConfig } = await supabase
-    .schema('app')
-    .from('team_member_configs')
-    .select('admin_user_id, enabled_features')
-    .eq('member_user_id', userId)
-    .maybeSingle();
-
-  if (teamConfig?.enabled_features && Array.isArray(teamConfig.enabled_features)) {
-    if (teamConfig.enabled_features.includes(featureKey)) {
-      const adminId = teamConfig.admin_user_id;
-      if (adminId) {
-        const adminEnt = await getUserEntitlements(adminId);
-        if (adminEnt && adminEnt.is_active) {
-          const adminFeatures: string[] = adminEnt.features || [];
-          if (adminFeatures.includes(featureKey)) return true;
-        }
-      }
-    }
-  }
-
-  return false;
+  const own = features.includes(featureKey);
+  const delegated = !own && featureKey.startsWith('client.')
+    && (await readMyTeamFeatures()).includes(featureKey);
+  return token === await sessionContextFor(userId) && (own || delegated);
 }
 
 export async function requireFeature(userId: string, featureKey: FeatureKey): Promise<void> {
@@ -264,14 +276,15 @@ export async function getAllClientFeaturesFromEntitlement(
   ent: Entitlement | null
 ): Promise<Record<string, boolean>> {
   const flags: Record<string, boolean> = {};
-  if (!userId) {
+  const token = userId ? await sessionContextFor(userId) : null;
+  if (!token) {
     for (const key of CLIENT_FEATURE_KEYS) flags[key] = false;
     return flags;
   }
 
   let entFeatures: string[] = [];
 
-  if (ent && ent.is_active) {
+  if (ent?.user_id === userId && ent.is_active) {
     entFeatures = normaliseFeatures(ent.features);
   }
 
@@ -297,28 +310,13 @@ export async function getAllClientFeaturesFromEntitlement(
     } catch {}
   }
 
-  let teamFeatures: string[] = [];
-  try {
-    const { data: teamConfig } = await supabase
-      .schema('app')
-      .from('team_member_configs')
-      .select('admin_user_id, enabled_features')
-      .eq('member_user_id', userId)
-      .maybeSingle();
-
-    if (teamConfig?.enabled_features && Array.isArray(teamConfig.enabled_features)) {
-      const adminId = teamConfig.admin_user_id;
-      if (adminId) {
-        const adminEnt = await getUserEntitlements(adminId);
-        if (adminEnt && adminEnt.is_active) {
-          teamFeatures = normaliseFeatures(adminEnt.features);
-        }
-      }
-    }
-  } catch {}
+  const teamFeatures = await readMyTeamFeatures();
+  const current = token === await sessionContextFor(userId);
 
   for (const key of CLIENT_FEATURE_KEYS) {
-    if (entFeatures.includes(key)) {
+    if (!current) {
+      flags[key] = false;
+    } else if (entFeatures.includes(key)) {
       flags[key] = true;
     } else if (teamFeatures.includes(key)) {
       flags[key] = true;
