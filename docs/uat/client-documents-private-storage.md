@@ -30,3 +30,7 @@ The workspace became unavailable before the Git tree was captured. Frontend/help
 ## Controlled acceptance
 
 After green current-head checks/review, merge/import latest main into Readdy and publish. No further backend/secret/dependency setup is required. Test all supported types, save/reopen/download byte parity, errors/lost replies/Retry, untouched Cancel, explicit uncertain Discard, delete/replay, foreign/closed/direct-Storage denial, account switching, Health/export/admin metadata and retention/admin cleanup with labelled synthetic fixtures. Replace a file by uploading a new copy then removing the old one. Published positive lifecycle, malware scanning, broader account-deletion hardening/metadata retention and full booking/guard/payment/communication acceptance remain open. Public launch remains on hold.
+
+## Subsequent admin deletion alignment
+
+The v34 compatibility deployment above is historical. The follow-up in `docs/uat/admin-account-deletion-recovery.md` replaces it with checked identity, retention, audit and absence verification. Refer to that repair's deployed readback and PR for current runtime status. This does not establish controlled production erasure or publication acceptance.
