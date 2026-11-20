@@ -64,12 +64,12 @@ test('all three inboxes ignore old/closed-screen results and expose silent-refre
     const start = source.indexOf(`  const ${name} = useCallback`), end = source.indexOf('\n  useEffect(',start), block = source.slice(start,end);
     const writes = [], redirects = [], reads = [deferred(),deferred(),deferred(),deferred(),deferred()]; let next=0;
     const env = { useCallback: fn=>fn, mountedRef: {current:true}, requestRef: {current:0},
-      supabase: {}, selectTicket: () => writes.push({key:'setSelected',value:null}), loadOwnedSupportInbox: ()=>reads[next++].promise, loadAdminSupportInbox: ()=>reads[next++].promise,
+      supabase: {}, expectedOwner: 'owner', withRequestDeadline: value => value, selectTicket: () => writes.push({key:'setSelected',value:null}), loadOwnedSupportInbox: ()=>reads[next++].promise, loadAdminSupportInbox: ()=>reads[next++].promise,
       router: {replace: path=>redirects.push(path)}, getInitials: ()=> 'EX', capitalize: s=>s,
       ...Object.fromEntries([...new Set([...block.matchAll(/\b(set[A-Z]\w*)\(/g)].map(m=>m[1]))].map(key=>[key,value=>writes.push({key,value})])),
     };
     const load = new Function(...Object.keys(env), compile(block+`\nreturn ${name};`))(...Object.values(env));
-    const snapshot = kind === 'admin' ? [{id:'new'}] : {profile:{id:kind,full_name:'Example',company_name:'Example'},jobs:[],tickets:[{id:'new'}]};
+    const snapshot = kind === 'admin' ? [{id:'new'}] : {userId:'owner',profile:{id:kind,full_name:'Example',company_name:'Example'},jobs:[],tickets:[{id:'new'}]};
     const first = load(), second = load(true); reads[1].resolve(snapshot); await second;
     const count = writes.length; reads[0].reject(Error('older failure')); await first; assert.equal(writes.length,count);
     const third = load(true); reads[2].reject(Error('refresh failed')); await third;
@@ -88,7 +88,10 @@ test('error UI renders retry instead of an apparently empty inbox across all rol
     const page={exports:{}};
     new Function('require','exports',compile(fs.readFileSync(path,'utf8')))(name=>{
       if(name==='react')return hooks;
-      if(name==='@/lib/admin-support-ticket-writes')return {};
+      if(name==='@/lib/admin-support-ticket-writes'||name==='@/lib/client-support-writes')return {};
+      if(name==='@/hooks/useMessageOwner')return {useMessageOwner:()=>({id:'owner',ready:true,revision:0})};
+      if(name==='@/lib/support-routing')return {};
+      if(name==='@/lib/request-deadline')return {withRequestDeadline:value=>value};
       if(name==='@/lib/supabase')return {supabase:{}};
       if(name==='@/lib/support-inbox-reads')return helpers.exports;
       if(name==='next/navigation')return {useRouter:()=>({replace(){}}),useSearchParams:()=>new URLSearchParams()};

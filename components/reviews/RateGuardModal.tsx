@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { withRequestDeadline } from '@/lib/request-deadline'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 
@@ -120,76 +121,37 @@ export default function RateGuardModal({
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
-  if (!isOpen) return null
-
+  const lifetime = useRef<symbol | null>(null), submitLock = useRef(false);
+  const pending = useRef<{ id: string; body: string } | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    lifetime.current = isOpen ? Symbol('review') : null; submitLock.current = false; pending.current = null; setLoading(false); setSuccess(false);
+    return () => { lifetime.current = null; if (timer.current) clearTimeout(timer.current); };
+  }, [isOpen, jobId, guardId]);
+  if (!isOpen) return null;
   const handleSubmit = async () => {
-    if (overall === 0) {
-      setError('Please give an overall star rating.')
-      return
-    }
-    if (reportIssue && !issueCategory) {
-      setError('Please select an issue category or turn off Report Issue.')
-      return
-    }
-    setLoading(true)
-    setError('')
-
-    const { data: userData, error: userError } = await supabase.auth.getUser()
-    if (userError || !userData?.user) {
-      setError('Unable to verify your session. Please log in again.')
-      setLoading(false)
-      return
-    }
-
-    const { data, error: invokeError } = await supabase.functions.invoke('create-review', {
-      body: {
-        jobId,
-        guardId,
-        rating: overall,
-        reviewText: reviewText.trim() || null,
-        privateNote: privateNote.trim() || null,
-        punctuality: punctuality || null,
-        professionalism: professionalism || null,
-        communication: communication || null,
-        appearance: appearance || null,
-        reliability: reliability || null,
-        wouldHireAgain,
-        siteInstructionsFollowed,
-        attendanceStatus,
-        issueReported: reportIssue,
-        issueCategory: reportIssue ? issueCategory : null,
-        issueDescription: reportIssue ? issueDescription.trim() || null : null,
-      },
-    })
-
-    if (invokeError || (data && data.error)) {
-      let message = 'Something went wrong. Please try again.'
-      try {
-        const context = (invokeError as any)?.context
-        if (context) {
-          const parsed = typeof context === 'string' ? JSON.parse(context) : context
-          if (parsed?.error) message = parsed.error
-        } else if (data?.error) {
-          message = data.error
-        }
-      } catch {}
-      setError(
-        message.toLowerCase().includes('already reviewed')
-          ? "You've already reviewed this guard for this job."
-          : message
-      )
-      setLoading(false)
-      return
-    }
-
-    setLoading(false)
-    setSuccess(true)
-    setTimeout(() => {
-      setSuccess(false)
-      onSuccess()
-      onClose()
-    }, 1500)
-  }
+    if (submitLock.current || !lifetime.current) return;
+    if (!overall || (reportIssue && !issueCategory)) { setError('Give a rating and select an issue category when reporting an issue.'); return; }
+    const scope = lifetime.current, current = () => lifetime.current === scope;
+    const payload = { jobId, guardId, rating: overall, reviewText: reviewText.trim() || null, privateNote: privateNote.trim() || null,
+      punctuality: punctuality || null, professionalism: professionalism || null, communication: communication || null, appearance: appearance || null, reliability: reliability || null,
+      wouldHireAgain, siteInstructionsFollowed, attendanceStatus, issueReported: reportIssue, issueCategory: reportIssue ? issueCategory : null, issueDescription: reportIssue ? issueDescription.trim() || null : null };
+    const body = JSON.stringify(payload);
+    if (!pending.current || pending.current.body !== body) pending.current = { id: crypto.randomUUID(), body };
+    submitLock.current = true; setLoading(true); setError('');
+    try {
+      const before = await withRequestDeadline(supabase.auth.getUser());
+      if (!current()) return;
+      if (before.error || !before.data.user) throw new Error('Session unavailable');
+      const { data, error } = await withRequestDeadline(supabase.functions.invoke('create-review', { body: { ...payload, operationId: pending.current.id } }));
+      const after = await withRequestDeadline(supabase.auth.getUser());
+      if (!current()) return;
+      if (after.error || after.data.user?.id !== before.data.user.id || error || data?.success !== true || typeof data.review_id !== 'string' || !['closed','review_pending'].includes(data.job_status)) throw new Error('Review not confirmed');
+      setSuccess(true);
+      timer.current = setTimeout(() => { if (current()) { setSuccess(false); onSuccess(); onClose(); } }, 1500);
+    } catch { if (current()) setError('Your review could not be confirmed. Keep the same details and retry.'); }
+    finally { if (current()) { submitLock.current = false; setLoading(false); } }
+  };
 
   const handleClose = () => {
     if (!loading) {
@@ -245,7 +207,7 @@ export default function RateGuardModal({
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-6 max-h-[70vh] overflow-y-auto">
+        <fieldset disabled={loading || success} className="px-6 py-5 space-y-6 max-h-[70vh] overflow-y-auto">
           {success && (
             <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl px-4 py-3 flex items-center gap-3">
               <i className="ri-checkbox-circle-fill text-emerald-500 text-lg" />
@@ -446,7 +408,7 @@ export default function RateGuardModal({
               <span>{error}</span>
             </div>
           )}
-        </div>
+        </fieldset>
 
         <div className="sticky bottom-0 bg-[#111d35] rounded-b-2xl border-t border-[#1e2d4d] px-6 py-4 flex gap-3">
           <button

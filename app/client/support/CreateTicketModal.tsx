@@ -1,18 +1,20 @@
 'use client';
 
 import { routeTicketToCommandCentre } from '@/lib/support-routing';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createClientSupportTicket } from '@/lib/client-support-writes';
 import { supabase } from '@/lib/supabase';
 import { logClientActivity, ACTIVITY_TYPES, ACTIVITY_CATEGORIES } from '@/lib/client-activity';
 import { getSuggestedPriority } from './PriorityBadge';
 
 interface CreateTicketModalProps {
   clientId: string;
+  ownerUserId: string;
   jobs: any[];
   prefillJobId?: string;
   prefillCategory?: string;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (warning?: string) => void;
 }
 
 const CATEGORIES = [
@@ -39,7 +41,7 @@ const CONTACT_PREFS = [
   { value: 'phone', label: 'Phone', icon: 'ri-phone-line' },
 ];
 
-export default function CreateTicketModal({ clientId, jobs, prefillJobId, prefillCategory, onClose, onSuccess }: CreateTicketModalProps) {
+export default function CreateTicketModal({ clientId, ownerUserId, jobs, prefillJobId, prefillCategory, onClose, onSuccess }: CreateTicketModalProps) {
   const [category, setCategory] = useState(prefillCategory || '');
   const [relatedJobId, setRelatedJobId] = useState(prefillJobId || '');
   const [subject, setSubject] = useState('');
@@ -64,20 +66,28 @@ export default function CreateTicketModal({ clientId, jobs, prefillJobId, prefil
     }
   };
 
+  const lock = useRef(false);
+  const lifetime = useRef<symbol | null>(null);
+  const pending = useRef<{ id: string; body: string } | null>(null);
+  useEffect(() => { lifetime.current = Symbol('ticket-create'); lock.current = false; return () => { lifetime.current = null; }; }, [clientId, ownerUserId]);
   const handleSubmit = async () => {
+    if (lock.current || !lifetime.current) return;
+    const scope = lifetime.current;
+    const current = () => lifetime.current === scope;
     setError('');
     setBridgeWarning('');
     if (!category) { setError('Please select a category.'); return; }
     if (!subject.trim()) { setError('Please enter a subject.'); return; }
     if (!description.trim()) { setError('Please provide a description.'); return; }
 
+    if (['guard_no_show','late_arrival','poor_performance','refund_request','job_cancellation'].includes(category) && !jobs.some(job => job.id === relatedJobId)) { setError('Please select a related job.'); return; }
     if (category === 'refund_request') {
-      if (!requestedRefundAmount || parseFloat(requestedRefundAmount) <= 0) {
+      if (!/^[0-9]{1,10}(\.[0-9]{1,2})?$/.test(requestedRefundAmount) || !Number.isFinite(Number(requestedRefundAmount)) || Number(requestedRefundAmount) <= 0) {
         setError('Please enter a valid refund amount.'); return;
       }
     }
 
-    setSubmitting(true);
+    lock.current = true; setSubmitting(true);
     try {
       const insertData: any = {
         client_id: clientId,
@@ -96,16 +106,11 @@ export default function CreateTicketModal({ clientId, jobs, prefillJobId, prefil
         insertData.refund_reason = refundReason.trim() || null;
       }
 
-      const { data: createdTicket, error: insertError } = await supabase
-        .from('support_tickets')
-        .insert(insertData)
-        .select('id, ticket_reference')
-        .single();
-
-      if (insertError) throw insertError;
-      if (!createdTicket || !createdTicket.id) {
-        throw new Error('Failed to submit ticket. Please try again.');
-      }
+      const body = JSON.stringify(insertData);
+      if (pending.current && pending.current.body !== body) throw new Error('The previous save was uncertain. Restore its original details and retry, or reload your tickets before starting a different request.');
+      if (!pending.current) pending.current = { id: crypto.randomUUID(), body };
+      const createdTicket = await createClientSupportTicket(supabase, ownerUserId, clientId, pending.current.id, insertData, current);
+      if (!current()) return;
 
       const activityPayload: any = {
         action_type: ACTIVITY_TYPES.TICKET_CREATED,
@@ -118,7 +123,8 @@ export default function CreateTicketModal({ clientId, jobs, prefillJobId, prefil
 
       const { ok: bridgeOk } = await routeTicketToCommandCentre(createdTicket.id);
 
-      await logClientActivity(activityPayload);
+      void logClientActivity(activityPayload);
+      if (!current()) return;
 
       if (!bridgeOk) {
         setBridgeWarning(
@@ -126,16 +132,16 @@ export default function CreateTicketModal({ clientId, jobs, prefillJobId, prefil
         );
       }
 
-      onSuccess();
+      if (current()) onSuccess(bridgeOk ? undefined : 'Your ticket was saved. Central support synchronisation is pending.');
     } catch (err: any) {
-      setError(err.message || 'Failed to submit ticket. Please try again.');
+      if (current()) setError(err.message || 'Ticket save could not be confirmed. Retry the same request.');
     } finally {
-      setSubmitting(false);
+      if (current()) { lock.current = false; setSubmitting(false); }
     }
   };
 
   const isRefund = category === 'refund_request';
-  const isJobRelated = category === 'guard_no_show' || category === 'late_arrival' || category === 'poor_performance' || category === 'refund_request';
+  const isJobRelated = category === 'guard_no_show' || category === 'late_arrival' || category === 'poor_performance' || category === 'refund_request' || category === 'job_cancellation';
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

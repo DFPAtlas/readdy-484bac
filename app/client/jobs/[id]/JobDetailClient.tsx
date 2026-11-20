@@ -23,7 +23,8 @@ import CancellationRefundPanel from './CancellationRefundPanel';
 import RefundRequestModal from '../RefundRequestModal';
 import CancelJobModal from '../CancelJobModal';
 import BookingStatusBadge from '../BookingStatusBadge';
-import { canSendJobMessage } from '@/lib/message-permissions';
+import { withRequestDeadline } from '@/lib/request-deadline';
+import { sendJobMessage } from '@/lib/job-messages';
 import { loadClientJobAssignments } from '@/lib/client-job-assignments';
 
 interface GuardReview {
@@ -435,56 +436,25 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     setMessageGuard({ guardId, guardName, guardUserId });
   };
 
-  const handleSendMessage = async (message: string, guardUserId: string, jobIdParam?: string) => {
-    setSendingMessage(true);
+  const messageOperations = useRef(new Map<string, string>());
+  const messageLock = useRef(false);
+  const [messageError, setMessageError] = useState('');
+  const messageScope = useRef<symbol | null>(null);
+  useEffect(() => { messageScope.current = Symbol('job-message'); messageLock.current = false; setSendingMessage(false); return () => { messageScope.current = null; }; }, [jobId, clientId]);
+  const handleSendMessage = async (text: string, guardUserId: string) => {
+    if (messageLock.current || !messageScope.current) return;
+    const lifetime = messageScope.current, current = () => messageScope.current === lifetime;
+    messageLock.current = true; setSendingMessage(true); setMessageError('');
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const targetJobId = jobIdParam || jobId;
-      const perm = await canSendJobMessage({
-        currentUserId: user.id,
-        currentUserType: 'client',
-        jobId: targetJobId,
-        otherUserId: guardUserId,
-        otherUserType: 'guard',
-      });
-      if (!perm.allowed) {
-        console.error('Permission denied:', perm.error);
-        setSendingMessage(false);
-        return;
-      }
-
-      const { error } = await supabase.from('messages').insert({
-        sender_id: user.id,
-        sender_type: 'client',
-        receiver_id: guardUserId,
-        receiver_type: 'guard',
-        message_text: message,
-        job_id: targetJobId,
-        read: false,
-      });
-
-      if (error) throw error;
-      try {
-        await supabase.from('notifications').insert({
-          user_id: guardUserId,
-          user_type: 'guard',
-          type: 'message',
-          title: 'New message',
-          message: `New message from client${job?.job_title ? ` for "${job.job_title}"` : ''}`,
-          link: '/guard/messages',
-          is_read: false,
-        });
-      } catch (notifyErr) {
-        console.error('Failed to create notification:', notifyErr);
-      }
-      setMessageGuard(null);
-    } catch (e) {
-      console.error('Failed to send message:', e);
-    } finally {
-      setSendingMessage(false);
-    }
+      const auth = await withRequestDeadline(supabase.auth.getUser());
+      if (!current()) return;
+      if (auth.error || !auth.data.user) throw new Error('Session unavailable');
+      const owner = auth.data.user.id, key = JSON.stringify([owner,jobId,guardUserId,text.trim()]);
+      if (!messageOperations.current.has(key)) messageOperations.current.set(key,crypto.randomUUID());
+      await sendJobMessage(supabase,{id:messageOperations.current.get(key)!,owner,other:guardUserId,job:jobId,text},current);
+      if (current()) { messageOperations.current.delete(key); setMessageGuard(null); }
+    } catch { if (current()) setMessageError('Message save could not be confirmed. Your draft is retained; retry the same message.'); }
+    finally { if (current()) { messageLock.current = false; setSendingMessage(false); } }
   };
 
   const isClientOwner = job?.client_id === clientId;
@@ -559,6 +529,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
   return (
     <div className="min-h-screen bg-[#0B1933] flex flex-col lg:flex-row">
+      {messageError && <div role="alert" className="fixed top-4 right-4 z-50 bg-red-950 text-white p-4">{messageError}</div>}
       <PortalSidebar
         role="client"
         displayName={companyName || 'Client'}
@@ -950,7 +921,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
           guardUserId={messageGuard.guardUserId}
           jobId={jobId}
           onClose={() => setMessageGuard(null)}
-          onSend={(msg, guardUserId, jobId) => handleSendMessage(msg, guardUserId, jobId)}
+          onSend={(msg, guardUserId) => handleSendMessage(msg, guardUserId)}
           sending={sendingMessage}
         />
       )}

@@ -130,33 +130,8 @@ export default function GuardApplyClient({ jobId }: { jobId: string }) {
         throw new Error(result.error);
       }
 
-      try {
-        const { data: clientRow } = await supabase
-          .from('jobs')
-          .select('client_id')
-          .eq('id', jobId)
-          .maybeSingle();
+      // The application and its recipient-checked bell commit together in PostgreSQL.
 
-        if (clientRow?.client_id) {
-          const { data: cl } = await supabase
-            .from('clients')
-            .select('user_id')
-            .eq('id', clientRow.client_id)
-            .maybeSingle();
-
-          if (cl?.user_id) {
-            await supabase.from('notifications').insert({
-              user_id: cl.user_id,
-              user_type: 'client',
-              type: 'job_application',
-              title: 'New Application Received',
-              message: `${guardProfile?.full_name || 'A guard'} applied for "${job.job_title}".`,
-              link: `/client/jobs/applicants?id=${encodeURIComponent(jobId)}`,
-              is_read: false,
-            });
-          }
-        }
-      } catch { /* non-blocking */ }
 
       showToast('Application submitted successfully!', 'success');
       setTimeout(() => router.push(`/guard/jobs/detail?id=${jobId}`), 1500);

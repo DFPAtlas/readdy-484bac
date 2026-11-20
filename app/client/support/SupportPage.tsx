@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { withRequestDeadline } from '@/lib/request-deadline';
 import { supabase } from '@/lib/supabase';
+import { closeClientSupportTickets } from '@/lib/client-support-writes';
+import { routeTicketToCommandCentre } from '@/lib/support-routing';
+import { useMessageOwner } from '@/hooks/useMessageOwner';
 import { loadOwnedSupportInbox } from '@/lib/support-inbox-reads';
 import SupportInboxError from '@/components/SupportInboxError';
 import Link from 'next/link';
@@ -108,7 +112,13 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-export default function SupportPage() {
+export default function SupportAccountPage() {
+  const actor = useMessageOwner();
+  if (!actor.ready) return <div role="status" className="p-8">Loading your support account…</div>;
+  if (actor.error || !actor.id) return <div role="alert" className="p-8"><p>Your support account could not be verified.</p><button onClick={actor.retry}>Retry</button></div>;
+  return <SupportPage key={`${actor.id}:${actor.revision}`} expectedOwner={actor.id} />;
+}
+function SupportPage({ expectedOwner }: { expectedOwner: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { loading: authLoading, allowed } = useClientGuard();
@@ -145,6 +155,7 @@ export default function SupportPage() {
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [bulkActionKey, setBulkActionKey] = useState('');
 
+  const closeLock = useRef(false);
   const mountedRef = useRef(false);
   const requestRef = useRef(0);
   const loadTickets = useCallback(async (silent = false) => {
@@ -154,9 +165,10 @@ export default function SupportPage() {
     if (!silent) setLoading(true);
     setRefreshing(silent);
     try {
-      const snapshot = await loadOwnedSupportInbox(supabase, 'client');
+      const snapshot = await withRequestDeadline(loadOwnedSupportInbox(supabase, 'client'));
       if (!current()) return;
       if (!snapshot) { router.replace('/client/login'); return; }
+      if (snapshot.userId !== expectedOwner) throw new Error('Support account changed');
       const profile = snapshot.profile;
       setClientId(profile.id);
       setCompanyName(profile.company_name || 'Client');
@@ -176,7 +188,7 @@ export default function SupportPage() {
     } finally {
       if (current()) { setLoading(false); setRefreshing(false); }
     }
-  }, [router]);
+  }, [router, expectedOwner]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -404,24 +416,28 @@ export default function SupportPage() {
   };
 
   const handleBulkMarkResolved = async () => {
-    if (loadError) return;
-    const resolvable = filteredTickets.filter(t => selectedTicketIds.has(t.id) && !['resolved', 'closed'].includes(t.status)).map(t => t.id);
-    if (resolvable.length === 0) { setToast('No tickets that can be resolved'); return; }
-    setBulkProcessing(true);
-    setBulkActionKey('resolve');
-    // NOTE: clients cannot directly resolve tickets — only request closure
-    // We'll mark as awaiting_client action with a note
-    // TODO: If backend supports client-requested resolution, wire this up
-    await supabase
-      .from('support_tickets')
-      .update({ status: 'closed', updated_at: new Date().toISOString() })
-      .in('id', resolvable);
-    setTickets(prev => prev.map(t => resolvable.includes(t.id) ? { ...t, status: 'closed' } : t));
-    setBulkProcessing(false);
-    setBulkActionKey('');
-    setSelectedTicketIds(new Set());
-    setBulkMode(false);
-    setToast(`${resolvable.length} ticket${resolvable.length !== 1 ? 's' : ''} closed`);
+    if (loadError || loading || closeLock.current || !clientId) return;
+    const ids = filteredTickets.filter(t => selectedTicketIds.has(t.id) && !['resolved','closed'].includes(t.status)).map(t => t.id);
+    if (!ids.length) { setToast('No eligible tickets selected.'); return; }
+    closeLock.current = true; setBulkProcessing(true); setBulkActionKey('resolve');
+    const current = () => mountedRef.current;
+    try {
+      const result = await closeClientSupportTickets(supabase, expectedOwner, clientId, ids, current);
+      if (!current()) return;
+      const confirmed = new Set(result.confirmedIds);
+      setTickets(previous => previous.map(ticket => confirmed.has(ticket.id) ? { ...ticket, status: 'closed' } : ticket));
+      setSelectedTicketIds(previous => new Set([...previous].filter(id => !confirmed.has(id))));
+      const sync = await Promise.all(result.confirmedIds.map(id => routeTicketToCommandCentre(id)));
+      if (sync.every(x => x.ok)) {
+        const notices = await Promise.all(result.closureMessageIds.map(messageId => withRequestDeadline(supabase.functions.invoke('dfp-support-message-bridge', { body: { messageId } }))));
+        if (notices.some(x => x.error || x.data?.success !== true)) sync.push({ok:false});
+      }
+      if (!current()) return;
+      setToast(`${result.confirmedIds.length} ticket closure${result.confirmedIds.length === 1 ? '' : 's'} confirmed.${!result.complete ? ' Some were not confirmed; reload before retrying.' : ''}${sync.some(x => !x.ok) ? ' Central support synchronisation is pending.' : ''}`);
+      if (result.complete) setBulkMode(false);
+      void loadTickets(true);
+    } catch { if (current()) setToast('Ticket closure could not be confirmed. Reload before retrying.'); }
+    finally { if (current()) { closeLock.current = false; setBulkProcessing(false); setBulkActionKey(''); } }
   };
 
   const handleTicketBulkAction = (actionKey: string) => {
@@ -777,7 +793,7 @@ export default function SupportPage() {
                 onClearSelection={() => setSelectedTicketIds(new Set())}
                 actions={[
                   { key: 'export', label: 'Export Selected', icon: 'ri-download-line', variant: 'secondary' },
-                  { key: 'resolve', label: 'Close Tickets', icon: 'ri-checkbox-circle-line', variant: 'primary', requiresConfirmation: true, confirmationTitle: 'Close Selected Tickets', confirmationMessage: 'This will mark the selected open tickets as closed. Only tickets that are not already resolved or closed will be affected.', confirmButtonText: 'Close Tickets', confirmButtonIcon: 'ri-checkbox-circle-line' },
+                  { key: 'resolve', label: 'Close Tickets', icon: 'ri-checkbox-circle-line', variant: 'primary', requiresConfirmation: true, confirmationTitle: 'Close Selected Tickets', confirmationMessage: 'Close these QuickGuard tickets and send a closure notice to central support. Central support manages its own ticket status.', confirmButtonText: 'Close Tickets', confirmButtonIcon: 'ri-checkbox-circle-line' },
                 ]}
                 onAction={handleTicketBulkAction}
                 processing={bulkProcessing}
@@ -810,6 +826,7 @@ export default function SupportPage() {
       {showCreateModal && (
         <CreateTicketModal
           clientId={clientId || ''}
+          ownerUserId={expectedOwner}
           jobs={jobs}
           prefillJobId={prefillJobId}
           prefillCategory={prefillCategory}
@@ -818,10 +835,10 @@ export default function SupportPage() {
             setPrefillJobId('');
             setPrefillCategory('');
           }}
-          onSuccess={() => {
+          onSuccess={(warning) => {
             loadTickets(true);
             setShowCreateModal(false);
-            setToast('Ticket created successfully');
+            setToast(warning || 'Ticket saved successfully');
           }}
         />
       )}

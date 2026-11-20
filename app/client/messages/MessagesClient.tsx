@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { withRequestDeadline } from '@/lib/request-deadline';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
 import PortalSidebar from '@/components/PortalSidebar';
 import { useClientGuard } from '@/hooks/useClientGuard';
 import { useRouteGuard } from '@/hooks/useRouteGuard';
@@ -11,7 +11,8 @@ import ConversationList from './ConversationList';
 import ChatPanel from './ChatPanel';
 import EmptyStates from './EmptyStates';
 import BulkActionBar from '../components/BulkActionBar';
-import { canSendJobMessage } from '@/lib/message-permissions';
+import { readMessageRows, readMessagePartners, messageHistoryPage, sendJobMessage, changeJobMessages } from '@/lib/job-messages';
+import { useMessageOwner } from '@/hooks/useMessageOwner';
 
 interface GuardInfo {
   id: string;
@@ -67,7 +68,6 @@ interface PartnerProfile {
   type: 'guard' | 'admin' | 'support' | 'unknown';
 }
 
-const CONV_PAGE_SIZE = 30;
 const MSG_PAGE_SIZE = 40;
 
 const MESSAGE_SORT_OPTIONS = [
@@ -105,7 +105,12 @@ function getInitials(name: string): string {
 }
 
 export default function MessagesClient() {
-  const router = useRouter();
+  const actor = useMessageOwner();
+  if (!actor.ready) return <div role="status" className="p-8">Loading your message account…</div>;
+  if (actor.error || !actor.id) return <div role="alert" className="p-8 space-y-4"><p>Your message account could not be verified.</p><button onClick={actor.retry}>Retry</button><a href="/client/login">Sign in</a></div>;
+  return <ClientMessageInbox key={`${actor.id}:${actor.revision}`} expectedOwner={actor.id} />;
+}
+function ClientMessageInbox({ expectedOwner }: { expectedOwner: string }) {
   const { loading: authLoading, allowed } = useClientGuard();
   const { checking, blocked } = useRouteGuard();
 
@@ -148,6 +153,11 @@ export default function MessagesClient() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
+  const conversationRequestRef = useRef(0);
+  const latestActiveLoadRef = useRef<() => Promise<void>>(async () => {});
+  const sendLockRef = useRef(false);
+  const bulkLockRef = useRef(false);
+  const [messageError, setMessageError] = useState('');
 
   // Resolve partner profile from guards, admin_users or users tables
   const resolvePartner = useCallback(async (
@@ -157,16 +167,12 @@ export default function MessagesClient() {
     const result: Record<string, PartnerProfile> = {};
     if (userIds.length === 0) return result;
 
-    const [guardRes, adminRes] = await Promise.all([
-      supabase.from('guards').select('user_id, full_name, profile_image_url, rating').in('user_id', userIds),
-      supabase.from('admin_users').select('user_id, full_name').in('user_id', userIds),
-    ]);
-
-    const guardMap: Record<string, { full_name: string; profile_image_url: string | null; rating: number | null }> = {};
-    (guardRes.data || []).forEach(g => { if (g.user_id) guardMap[g.user_id] = g; });
-
-    const adminMap: Record<string, { full_name: string }> = {};
-    (adminRes.data || []).forEach(a => { if (a.user_id) adminMap[a.user_id] = a; });
+    const profiles = await readMessagePartners(supabase, expectedOwner, userIds, () => mountedRef.current);
+    const guardMap: Record<string, any> = {}, adminMap: Record<string, any> = {};
+    for (const profile of profiles) {
+      if (profile.user_type === 'guard') guardMap[profile.user_id] = profile;
+      if (profile.user_type === 'admin' || profile.user_type === 'support') adminMap[profile.user_id] = profile;
+    }
 
     for (const uid of userIds) {
       const guard = guardMap[uid];
@@ -183,7 +189,7 @@ export default function MessagesClient() {
       }
     }
     return result;
-  }, []);
+  }, [expectedOwner]);
 
   const buildConversations = useCallback(async (
     messages: Message[],
@@ -214,10 +220,11 @@ export default function MessagesClient() {
     const [partnerMap, jobRes] = await Promise.all([
       resolvePartner(otherUserIds, senderTypeByUid),
       jobIds.length > 0
-        ? supabase.from('jobs').select('id, job_title, venue_city, status, start_date, start_time').in('id', jobIds)
-        : Promise.resolve({ data: [] as JobInfo[] }),
+        ? withRequestDeadline(supabase.from('jobs').select('id, job_title, venue_city, status, start_date, start_time').in('id', jobIds))
+        : Promise.resolve({ data: [] as JobInfo[], error: null }),
     ]);
 
+    if (jobRes.error) throw jobRes.error;
     const jobMap: Record<string, JobInfo> = {};
     (jobRes.data || []).forEach((j: JobInfo) => { jobMap[j.id] = j; });
 
@@ -253,144 +260,39 @@ export default function MessagesClient() {
     return convs;
   }, [resolvePartner]);
 
-  const loadConversations = useCallback(async (append = false) => {
-    setLoadError(false);
-    if (append) setConvLoadingMore(true);
+  const loadConversations = useCallback(async () => {
+    const request = ++conversationRequestRef.current;
+    const current = () => mountedRef.current && conversationRequestRef.current === request;
+    setLoadError(false); setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/client/login'); return; }
-      if (!mountedRef.current) return;
-      setClientUserId(user.id);
-
-      const { data: client } = await supabase
-        .from('clients')
-        .select('id, company_name, contact_name, subscription_tier')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!client) { router.push('/client/login'); return; }
-      if (!mountedRef.current) return;
-
-      setCompanyName(client.company_name || 'Client');
-      setSubscriptionTier(client.subscription_tier || 'Basic');
-      setInitials(getInitials(client.company_name || 'Client'));
-
-      const savedArchived = localStorage.getItem(`quickguard_archived_client_${user.id}`);
-      if (savedArchived) {
-        try {
-          setArchivedConvIds(new Set(JSON.parse(savedArchived)));
-        } catch {}
-      }
-
-      const offset = append ? convNextOffsetRef.current : 0;
-      const { data: messages } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: false })
-        .range(offset, offset + CONV_PAGE_SIZE * 5 - 1);
-
-      if (!mountedRef.current) return;
-
-      if (!messages || messages.length === 0) {
-        setLoading(false);
-        if (!append) setConversations([]);
-        return;
-      }
-
-      const convs = await buildConversations(messages as Message[], user.id);
-
-      if (!mountedRef.current) return;
-
-      if (append) {
-        setConversations(prev => {
-          const existingIds = new Set(prev.map(c => c.id));
-          const newOnes = convs.filter(c => !existingIds.has(c.id));
-          return [...prev, ...newOnes];
-        });
-      } else {
-        setConversations(convs);
-      }
-      setConvHasMore(messages.length >= CONV_PAGE_SIZE * 5);
-      if (messages.length > 0) convNextOffsetRef.current = offset + CONV_PAGE_SIZE * 5;
+      const auth = await withRequestDeadline(supabase.auth.getUser());
+      if (!current()) return;
+      if (auth.error || auth.data.user?.id !== expectedOwner) throw new Error('Account changed');
+      const profile = await withRequestDeadline(supabase.from('clients').select('id, company_name, contact_name, subscription_tier').eq('user_id', expectedOwner).maybeSingle());
+      if (!current()) return;
+      if (profile.error || !profile.data) throw new Error('Client profile unavailable');
+      const messages = await readMessageRows(supabase, expectedOwner, undefined, current);
+      const convs = await buildConversations(messages, expectedOwner);
+      if (!current()) return;
+      setClientUserId(expectedOwner); setCompanyName(profile.data.company_name || 'Client');
+      setSubscriptionTier(profile.data.subscription_tier || 'Basic'); setInitials(getInitials(profile.data.company_name || 'Client'));
+      const archived = localStorage.getItem(`quickguard_archived_client_${expectedOwner}`);
+      try { setArchivedConvIds(new Set(archived ? JSON.parse(archived) : [])); } catch { setArchivedConvIds(new Set()); }
+      setConversations(convs); setConvHasMore(false); convNextOffsetRef.current = messages.length;
       setTotalUnread(convs.reduce((sum, c) => sum + c.unread_count, 0));
-      setLoading(false);
-    } catch {
-      if (mountedRef.current) {
-        setLoadError(true);
-        setLoading(false);
-      }
-    } finally {
-      if (append && mountedRef.current) setConvLoadingMore(false);
-    }
-  }, [router, buildConversations]);
+    } catch { if (current()) setLoadError(true); }
+    finally { if (current()) { setLoading(false); setConvLoadingMore(false); } }
+  }, [expectedOwner, buildConversations]);
 
-  const refreshSingleConversation = useCallback(async (newMsg: Message, userId: string) => {
+  const refreshConversationsAndActive = useCallback(async () => {
     if (!mountedRef.current) return;
-
-    const otherId = newMsg.sender_id === userId ? newMsg.receiver_id : newMsg.sender_id;
-    const key = newMsg.job_id ? `${newMsg.job_id}_${otherId}` : `${otherId}`;
-
-    const senderTypeByUid: Record<string, string> = { [otherId]: newMsg.sender_type };
-    const partnerMap = await resolvePartner([otherId], senderTypeByUid);
-    const partner = partnerMap[otherId];
-
-    let jobInfo: JobInfo | null = null;
-    if (newMsg.job_id) {
-      const { data } = await supabase.from('jobs').select('id, job_title, venue_city, status, start_date, start_time').eq('id', newMsg.job_id).maybeSingle();
-      jobInfo = data || null;
-    }
-
-    const isSupport = partner?.type === 'admin' || newMsg.sender_type === 'admin' || newMsg.sender_type === 'support';
-    const name = partner?.full_name || 'Unknown';
-
-    if (!mountedRef.current) return;
-
-    setConversations(prev => {
-      const existing = prev.find(c => c.id === key);
-      const updated: Conversation = {
-        id: key,
-        job_id: newMsg.job_id,
-        other_user_id: otherId,
-        other_type: partner?.type || 'unknown',
-        other_name: name,
-        other_avatar: partner?.avatar || null,
-        other_initials: getInitials(name),
-        other_rating: partner?.rating || null,
-        job_title: jobInfo?.job_title || existing?.job_title || null,
-        job_city: jobInfo?.venue_city || existing?.job_city || null,
-        job_status: jobInfo?.status || existing?.job_status || null,
-        last_message: newMsg.message_text,
-        last_time: newMsg.created_at,
-        unread_count: (existing?.unread_count || 0) + (newMsg.receiver_id === userId && !newMsg.read ? 1 : 0),
-        status: 'Open',
-        is_support: isSupport,
-      };
-
-      const filtered = prev.filter(c => c.id !== key);
-      return [updated, ...filtered];
-    });
-
-    if (newMsg.receiver_id === userId && !newMsg.read) {
-      setTotalUnread(prev => prev + 1);
-    }
-
-    if (newMsg.sender_id === userId || (newMsg.receiver_id === userId)) {
-      setActiveMessages(prev => {
-        if (prev.length === 0) return prev;
-        const firstMsg = prev[0];
-        const firstOther = firstMsg.sender_id === userId ? firstMsg.receiver_id : firstMsg.sender_id;
-        if (firstOther !== otherId) return prev;
-        if (newMsg.job_id && firstMsg.job_id !== newMsg.job_id) return prev;
-        if (prev.find(m => m.id === newMsg.id)) return prev;
-        return [...prev, newMsg];
-      });
-    }
-  }, [resolvePartner]);
+    await loadConversations();
+    if (mountedRef.current) void latestActiveLoadRef.current();
+  }, [loadConversations]);
 
   useEffect(() => {
     mountedRef.current = true;
-    loadConversations(false);
+    loadConversations();
     return () => { mountedRef.current = false; };
   }, [loadConversations]);
 
@@ -404,18 +306,26 @@ export default function MessagesClient() {
         schema: 'app',
         table: 'messages',
         filter: `receiver_id=eq.${clientUserId}`,
-      }, (payload) => {
+      }, () => {
         if (!mountedRef.current) return;
-        refreshSingleConversation(payload.new as Message, clientUserId);
+        refreshConversationsAndActive();
       })
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'app',
         table: 'messages',
         filter: `sender_id=eq.${clientUserId}`,
-      }, (payload) => {
+      }, () => {
         if (!mountedRef.current) return;
-        refreshSingleConversation(payload.new as Message, clientUserId);
+        refreshConversationsAndActive();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'app', table: 'messages', filter: `sender_id=eq.${clientUserId}`,
+      }, payload => {
+        if (!mountedRef.current) return;
+        const updated = payload.new as Message;
+        setActiveMessages(previous => previous.map(row => row.id === updated.id ? updated : row));
+        void loadConversations();
       })
       .on('postgres_changes', {
         event: 'UPDATE',
@@ -426,6 +336,7 @@ export default function MessagesClient() {
         if (!mountedRef.current) return;
         const updated = payload.new as Message;
         setActiveMessages(prev => prev.map(m => m.id === updated.id ? updated : m));
+        void loadConversations();
       })
       .subscribe((status) => {
         if (!mountedRef.current) return;
@@ -435,7 +346,7 @@ export default function MessagesClient() {
       });
 
     return () => { supabase.removeChannel(channel); };
-  }, [clientUserId, refreshSingleConversation]);
+  }, [clientUserId, refreshConversationsAndActive, loadConversations]);
 
   // Older-page inserts must not scroll away from the history being read.
   const lastMessageId = activeMessages[activeMessages.length - 1]?.id;
@@ -471,83 +382,38 @@ export default function MessagesClient() {
     const isLoadMore = !!beforeCreatedAt;
     if (isLoadMore) setMsgLoadingOlder(true);
     try {
-      let query = supabase
-        .from('messages')
-        .select('*')
-        .or(`sender_id.eq.${clientUserId},receiver_id.eq.${clientUserId}`)
-        .order('created_at', { ascending: false })
-        .limit(MSG_PAGE_SIZE);
-
-      if (activeJobId) {
-        query = query.eq('job_id', activeJobId);
-      } else {
-        query = query.is('job_id', null);
-      }
-
-      if (beforeCreatedAt) {
-        query = query.lt('created_at', beforeCreatedAt);
-      }
-
-      const { data } = await query;
+      setMessageError('');
+      const rows = await readMessageRows(supabase, clientUserId, { other: activeOtherUserId, job: activeJobId }, isCurrent);
       if (!isCurrent()) return;
-
-      const filtered = ((data || []) as Message[]).filter(m => {
-        const otherId = m.sender_id === clientUserId ? m.receiver_id : m.sender_id;
-        return otherId === activeOtherUserId;
-      }).reverse();
-
-      if (!mountedRef.current) return;
-
-      if (isLoadMore) {
-        skipScrollRef.current = true;
-        setActiveMessages(prev => [...filtered, ...prev]);
-      } else {
-        setActiveMessages(filtered);
-        setTimeout(() => { if (isCurrent()) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 50);
+      const page = messageHistoryPage(rows, beforeCreatedAt, MSG_PAGE_SIZE);
+      if (isLoadMore) { skipScrollRef.current = true; setActiveMessages(previous => [...page.messages.filter(row => !previous.some(p => p.id === row.id)), ...previous]); }
+      else setActiveMessages(page.messages);
+      setMsgHasMore(page.hasMore); setMsgOldestCreatedAt(page.cursor);
+      if (!activeJobId) setActiveJob(null);
+      else if (!isLoadMore) {
+        const result = await withRequestDeadline(supabase.from('jobs').select('id, job_title, venue_city, status, start_date, start_time').eq('id', activeJobId).maybeSingle());
+        if (!isCurrent()) return; if (result.error) throw result.error; setActiveJob(result.data);
       }
-
-      setMsgHasMore(filtered.length >= MSG_PAGE_SIZE);
-      if (filtered.length > 0) {
-        setMsgOldestCreatedAt(filtered[0].created_at);
-      }
-
-      if (!activeJobId) {
-        setActiveJob(null);
-      } else if (!isLoadMore) {
-        const { data: jobData } = await supabase
-          .from('jobs')
-          .select('id, job_title, venue_city, status, start_date, start_time')
-          .eq('id', activeJobId)
-          .maybeSingle();
-        if (!isCurrent()) return;
-        setActiveJob(jobData ?? null);
-      }
-
+      setActiveGuard(null);
       if (!isLoadMore) {
-        const { data: guardData } = await supabase
-          .from('guards')
-          .select('id, full_name, profile_image_url, rating')
-          .eq('user_id', activeOtherUserId)
-          .maybeSingle();
-        if (!isCurrent()) return;
-        setActiveGuard(guardData ?? null);
-      }
-
-      if (!isLoadMore) {
-        const unreadIds = filtered.filter(m => m.receiver_id === clientUserId && !m.read).map(m => m.id);
-        if (unreadIds.length > 0) {
-          await supabase.from('messages').update({ read: true }).in('id', unreadIds);
+        const unread = page.messages.filter(row => row.receiver_id === clientUserId && !row.read).map(row => row.id);
+        if (unread.length) {
+          const result = await changeJobMessages(supabase, clientUserId, unread, 'read', isCurrent);
           if (!isCurrent()) return;
-          setConversations(prev => prev.map(c =>
-            c.id === activeConversationId ? { ...c, unread_count: 0 } : c
-          ));
-          setTotalUnread(prev => Math.max(0, prev - unreadIds.length));
+          if (!result.complete) throw new Error('Read acknowledgement incomplete');
+          setActiveMessages(previous => previous.map(row => result.confirmedIds.includes(row.id) ? { ...row, read: true } : row));
+          await loadConversations();
         }
       }
+    } catch {
+      if (isCurrent()) setMessageError('This conversation could not be loaded or its read state confirmed. Reload to retry.');
+
     } finally {
       if (isLoadMore && isCurrent()) setMsgLoadingOlder(false);
     }
-  }, [activeJobId, activeOtherUserId, activeConversationId, clientUserId, messageContextKey]);
+  }, [activeJobId, activeOtherUserId, activeConversationId, clientUserId, messageContextKey, loadConversations]);
+
+  useEffect(() => { latestActiveLoadRef.current = loadActiveMessages; }, [loadActiveMessages]);
 
   useEffect(() => {
     const lifetime = { key: messageContextKey };
@@ -566,246 +432,60 @@ export default function MessagesClient() {
     if (msgOldestCreatedAt) loadActiveMessages(msgOldestCreatedAt);
   };
 
-  const handleSend = async (text: string) => {
-    if (!activeConversation || !clientUserId || !text.trim()) return;
-    setSending(true);
+  const handleSend = async (text: string, operationId: string): Promise<boolean> => {
+    const lifetime = messageLifetimeRef.current;
+    const current = () => mountedRef.current && messageLifetimeRef.current === lifetime;
+    if (!activeConversation || !clientUserId || !text.trim() || sendLockRef.current || loadError || messageError) return false;
+    sendLockRef.current = true; setSending(true);
     try {
-      if (activeConversation.job_id) {
-        const perm = await canSendJobMessage({
-          currentUserId: clientUserId,
-          currentUserType: 'client',
-          jobId: activeConversation.job_id,
-          otherUserId: activeConversation.other_user_id,
-          otherUserType: activeConversation.other_type === 'client' || activeConversation.other_type === 'admin' || activeConversation.other_type === 'support' ? activeConversation.other_type : 'guard',
-        });
-        if (!perm.allowed) {
-          setToast(perm.error || 'You do not have permission to message this guard for this job.');
-          setTimeout(() => setToast(''), 4000);
-          setSending(false);
-          return;
-        }
-      }
-      const { error } = await supabase.from('messages').insert({
-        sender_id: clientUserId,
-        sender_type: 'client',
-        receiver_id: activeConversation.other_user_id,
-        receiver_type: activeConversation.other_type === 'guard' ? 'guard' : activeConversation.other_type || 'guard',
-        message_text: text.trim(),
-        job_id: activeConversation.job_id,
-        read: false,
-      });
-      if (error) throw error;
-      try {
-        const jobTitle = activeConversation.job_title;
-        await supabase.from('notifications').insert({
-          user_id: activeConversation.other_user_id,
-          user_type: activeConversation.other_type === 'guard' ? 'guard' : activeConversation.other_type || 'guard',
-          type: 'message',
-          title: 'New message',
-          message: `New message from client${jobTitle ? ` for "${jobTitle}"` : ''}`,
-          link: '/guard/messages',
-          is_read: false,
-        });
-      } catch (notifyErr) {
-        console.error('Failed to create notification:', notifyErr);
-      }
-      await loadActiveMessages();
-    } catch {
-      setToast('Failed to send message. Please check your connection and try again.');
-      setTimeout(() => setToast(''), 4000);
-    } finally {
-      setSending(false);
-    }
+      await sendJobMessage(supabase, { id: operationId, owner: clientUserId, other: activeConversation.other_user_id, job: activeConversation.job_id, text }, current);
+      if (!current()) return false;
+      void loadActiveMessages(); return true;
+    } catch { if (current()) setToast('Message save could not be confirmed. Your draft is retained; retry the same message.'); return false; }
+    finally { if (current()) { sendLockRef.current = false; setSending(false); } }
   };
 
-  const toggleConvSelection = (convId: string) => {
-    setSelectedConvIds(prev => {
-      const next = new Set(prev);
-      if (next.has(convId)) next.delete(convId);
-      else next.add(convId);
-      return next;
-    });
-  };
-
+  const toggleConvSelection = (id: string) => { if (bulkLockRef.current || loadError) return; setSelectedConvIds(previous => { const next = new Set(previous); if(next.has(id))next.delete(id);else next.add(id);return next; }); };
   const selectAllConvs = () => setSelectedConvIds(new Set(filteredConversations.map(c => c.id)));
   const clearConvSelection = () => setSelectedConvIds(new Set());
 
-  const handleBulkMarkRead = async () => {
-    setBulkProcessing(true);
-    setBulkAction('mark_read');
+  const runMessageBulk = async (action: 'read' | 'unread' | 'delete') => {
+    if (bulkLockRef.current || loadError || sending) return;
+    bulkLockRef.current = true; setBulkProcessing(true); setBulkAction(action === 'read' ? 'mark_read' : action === 'unread' ? 'mark_unread' : 'delete');
+    const current = () => mountedRef.current;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const selectedConvs = Array.from(selectedConvIds)
-        .map(id => conversations.find(c => c.id === id))
-        .filter(Boolean) as Conversation[];
-
-      const idArrays = await Promise.all(
-        selectedConvs.map(async (conv) => {
-          let query = supabase
-            .from('messages')
-            .select('id')
-            .eq('receiver_id', user.id)
-            .eq('read', false)
-            .eq('sender_id', conv.other_user_id);
-
-          if (conv.job_id) {
-            query = query.eq('job_id', conv.job_id);
-          } else {
-            query = query.is('job_id', null);
-          }
-
-          const { data } = await query;
-          return (data || []).map(m => m.id);
-        })
-      );
-
-      const unreadIds = idArrays.flat();
-      if (unreadIds.length > 0) {
-        await supabase.from('messages').update({ read: true }).in('id', unreadIds);
-      }
-
-      const selectedSet = new Set(selectedConvIds);
-      setConversations(prev => prev.map(c =>
-        selectedSet.has(c.id) ? { ...c, unread_count: 0 } : c
-      ));
-      setTotalUnread(prev => {
-        const markedCount = selectedConvs.reduce((sum, c) => sum + c.unread_count, 0);
-        return Math.max(0, prev - markedCount);
-      });
-    } finally {
-      setBulkProcessing(false);
-      setBulkAction('');
-      setSelectedConvIds(new Set());
-      setBulkMode(false);
-      setToast('Marked as read');
-      setTimeout(() => setToast(''), 3000);
-    }
+      const all = await readMessageRows(supabase, clientUserId, undefined, current);
+      const selected = conversations.filter(c => selectedConvIds.has(c.id));
+      const ids = all.filter(row => selected.some(c => c.job_id === row.job_id && (row.sender_id === clientUserId ? row.receiver_id : row.sender_id) === c.other_user_id))
+        .filter(row => action === 'delete' || row.receiver_id === clientUserId).map(row => row.id);
+      if (!ids.length) { setToast('No eligible messages selected.'); return; }
+      const result = await changeJobMessages(supabase, clientUserId, ids, action, current);
+      if (!current()) return;
+      if (result.complete) { setSelectedConvIds(new Set()); setBulkMode(false); setToast('Selected message changes confirmed.'); }
+      else setToast('Some message changes were not confirmed. Reload before retrying.');
+      await loadConversations();
+      if (activeConversationId) void latestActiveLoadRef.current();
+    } catch { if (current()) setToast('Message changes could not be confirmed. Reload before retrying.'); }
+    finally { if (current()) { bulkLockRef.current = false; setBulkProcessing(false); setBulkAction(''); } }
   };
+  const handleBulkMarkRead = () => runMessageBulk('read');
+  const handleBulkMarkUnread = () => runMessageBulk('unread');
 
-  const handleBulkMarkUnread = async () => {
-    setBulkProcessing(true);
-    setBulkAction('mark_unread');
+  const saveArchived = (next: Set<string>, message: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const selectedConvs = Array.from(selectedConvIds)
-        .map(id => conversations.find(c => c.id === id))
-        .filter(Boolean) as Conversation[];
-
-      const idArrays = await Promise.all(
-        selectedConvs.map(async (conv) => {
-          let query = supabase
-            .from('messages')
-            .select('id')
-            .eq('receiver_id', user.id)
-            .eq('sender_id', conv.other_user_id)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          if (conv.job_id) {
-            query = query.eq('job_id', conv.job_id);
-          } else {
-            query = query.is('job_id', null);
-          }
-
-          const { data } = await query;
-          return (data || []).map(m => m.id);
-        })
-      );
-
-      const latestIds = idArrays.flat();
-      if (latestIds.length > 0) {
-        await supabase.from('messages').update({ read: false }).in('id', latestIds);
-      }
-
-      setConversations(prev => prev.map(c =>
-        selectedConvIds.has(c.id) ? { ...c, unread_count: Math.max(c.unread_count, 1) } : c
-      ));
-      setTotalUnread(prev => prev + latestIds.length);
-    } finally {
-      setBulkProcessing(false);
-      setBulkAction('');
-      setSelectedConvIds(new Set());
-      setBulkMode(false);
-      setToast('Marked as unread');
-      setTimeout(() => setToast(''), 3000);
-    }
+      localStorage.setItem(`quickguard_archived_client_${clientUserId}`, JSON.stringify([...next]));
+      setArchivedConvIds(next); setToast(message); return true;
+    } catch { setToast('Archive changes could not be saved. Please retry.'); return false; }
+  };
+  const handleBulkArchive = () => {
+    const next = new Set(archivedConvIds); selectedConvIds.forEach(id => next.add(id));
+    if (saveArchived(next, 'Conversations archived')) { setSelectedConvIds(new Set()); setBulkMode(false); }
+  };
+  const handleUnarchive = (id: string) => {
+    const next = new Set(archivedConvIds); next.delete(id); saveArchived(next, 'Conversation unarchived');
   };
 
-  const handleBulkArchive = async () => {
-    setBulkProcessing(true);
-    setBulkAction('archive');
-    try {
-      const newArchived = new Set(archivedConvIds);
-      selectedConvIds.forEach(id => newArchived.add(id));
-      setArchivedConvIds(newArchived);
-      localStorage.setItem(`quickguard_archived_client_${clientUserId}`, JSON.stringify([...newArchived]));
-    } finally {
-      setBulkProcessing(false);
-      setBulkAction('');
-      setSelectedConvIds(new Set());
-      setBulkMode(false);
-      setToast('Conversations archived');
-      setTimeout(() => setToast(''), 3000);
-    }
-  };
-
-  const handleUnarchive = (convId: string) => {
-    const newArchived = new Set(archivedConvIds);
-    newArchived.delete(convId);
-    setArchivedConvIds(newArchived);
-    localStorage.setItem(`quickguard_archived_client_${clientUserId}`, JSON.stringify([...newArchived]));
-    setToast('Conversation unarchived');
-    setTimeout(() => setToast(''), 3000);
-  };
-
-  const handleBulkDelete = async () => {
-    setBulkProcessing(true);
-    setBulkAction('delete');
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const selectedConvs = Array.from(selectedConvIds)
-        .map(id => conversations.find(c => c.id === id))
-        .filter(Boolean) as Conversation[];
-
-      const deleteOps = selectedConvs.map(async (conv) => {
-        let query = supabase
-          .from('messages')
-          .delete()
-          .or(`and(sender_id.eq.${user.id},receiver_id.eq.${conv.other_user_id}),and(sender_id.eq.${conv.other_user_id},receiver_id.eq.${user.id})`);
-
-        if (conv.job_id) {
-          query = query.eq('job_id', conv.job_id);
-        } else {
-          query = query.is('job_id', null);
-        }
-
-        return query;
-      });
-
-      await Promise.all(deleteOps);
-
-      const deletedSet = new Set(selectedConvIds);
-      setConversations(prev => prev.filter(c => !deletedSet.has(c.id)));
-      if (activeConversationId && deletedSet.has(activeConversationId)) {
-        setActiveConversationId(null);
-        setActiveMessages([]);
-        setMobileChatOpen(false);
-      }
-    } finally {
-      setBulkProcessing(false);
-      setBulkAction('');
-      setSelectedConvIds(new Set());
-      setBulkMode(false);
-      setToast('Conversations deleted');
-      setTimeout(() => setToast(''), 3000);
-    }
-  };
+  const handleBulkDelete = () => runMessageBulk('delete');
 
   const handleMessageBulkAction = (actionKey: string) => {
     if (actionKey === 'mark_read') handleBulkMarkRead();
@@ -872,7 +552,8 @@ export default function MessagesClient() {
   if (blocked) {
     return (
       <div className="min-h-screen bg-[#0B1933] flex flex-col lg:flex-row">
-        <PortalSidebar role="client" displayName={companyName} subtitle={subscriptionTier} initials={initials} />
+        {messageError && <div role="alert" className="fixed top-3 left-1/2 z-50 bg-red-950 text-white p-4 rounded-xl"><p>{messageError}</p><button onClick={() => void loadActiveMessages()} className="underline">Reload conversation</button></div>}
+      <PortalSidebar role="client" displayName={companyName} subtitle={subscriptionTier} initials={initials} />
         <div className="flex-1 min-h-screen flex items-center justify-center px-6">
           <div className="w-full max-w-lg">
             <UpgradePrompt feature="client.direct_contact" />
@@ -885,7 +566,8 @@ export default function MessagesClient() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0B1933] flex flex-col lg:flex-row">
-        <PortalSidebar role="client" displayName={companyName} subtitle={subscriptionTier} initials={initials} />
+        {messageError && <div role="alert" className="fixed top-3 left-1/2 z-50 bg-red-950 text-white p-4 rounded-xl"><p>{messageError}</p><button onClick={() => void loadActiveMessages()} className="underline">Reload conversation</button></div>}
+      <PortalSidebar role="client" displayName={companyName} subtitle={subscriptionTier} initials={initials} />
         <div className="flex-1 min-h-screen flex flex-col lg:flex-row pb-20 lg:pb-0">
           <div className="w-full lg:w-[420px] flex-shrink-0 border-r border-[#1e2d4d] flex flex-col">
             <div className="px-4 sm:px-5 py-3 border-b border-[#1e2d4d] flex items-center justify-between animate-pulse">
@@ -947,6 +629,7 @@ export default function MessagesClient() {
 
   return (
     <div className="min-h-screen bg-[#0B1933] flex flex-col lg:flex-row">
+      {messageError && <div role="alert" className="fixed top-3 left-1/2 z-50 bg-red-950 text-white p-4 rounded-xl"><p>{messageError}</p><button onClick={() => void loadActiveMessages()} className="underline">Reload conversation</button></div>}
       <PortalSidebar role="client" displayName={companyName} subtitle={subscriptionTier} initials={initials} />
 
       <div className="flex-1 min-h-screen flex flex-col lg:flex-row pb-20 lg:pb-0">
@@ -995,7 +678,7 @@ export default function MessagesClient() {
 
           {loadError ? (
             <div className="flex-1 flex items-center justify-center p-4">
-              <EmptyStates type="error" onRetry={() => loadConversations(false)} />
+              <EmptyStates type="error" onRetry={() => loadConversations()} />
             </div>
           ) : conversations.length === 0 ? (
             <div className="flex-1 flex items-center justify-center p-4">
@@ -1041,7 +724,7 @@ export default function MessagesClient() {
                 onToggleSelect={toggleConvSelection}
                 hasMore={convHasMore}
                 loadingMore={convLoadingMore}
-                onLoadMore={() => loadConversations(true)}
+                onLoadMore={() => loadConversations()}
               />
             </>
           )}
@@ -1055,7 +738,8 @@ export default function MessagesClient() {
               job={activeJob}
               guard={activeGuard}
               clientUserId={clientUserId}
-              sending={sending}
+              sending={sending || !!messageError || loadError}
+              key={messageContextKey}
               onSend={handleSend}
               onBack={handleBackToList}
               messagesEndRef={messagesEndRef}
@@ -1066,10 +750,7 @@ export default function MessagesClient() {
               onArchive={() => {
                 const newArchived = new Set(archivedConvIds);
                 newArchived.add(activeConversation.id);
-                setArchivedConvIds(newArchived);
-                localStorage.setItem(`quickguard_archived_client_${clientUserId}`, JSON.stringify([...newArchived]));
-                setToast('Conversation archived');
-                setTimeout(() => setToast(''), 3000);
+                saveArchived(newArchived, 'Conversation archived');
               }}
               onUnarchive={() => handleUnarchive(activeConversation.id)}
             />

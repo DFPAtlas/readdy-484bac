@@ -1,3 +1,4 @@
+import { withRequestDeadline } from './request-deadline';
 import { supabase } from '@/lib/supabase';
 
 // Every client support ticket — ordinary, complaint, refund review and guard
@@ -12,7 +13,7 @@ export const COMMAND_CENTRE_PENDING_MESSAGE =
 
 export async function routeTicketToCommandCentre(ticketId: string): Promise<{ ok: boolean; ticketNumber?: string }> {
   try {
-    const { data, error } = await supabase.functions.invoke('dfp-support-ticket-bridge', { body: { ticketId } });
+    const { data, error } = await withRequestDeadline(supabase.functions.invoke('dfp-support-ticket-bridge', { body: { ticketId } }));
     if (error || data?.success !== true) return { ok: false };
     return { ok: true, ticketNumber: data.ticketNumber };
   } catch {

@@ -139,19 +139,18 @@ test('review read errors render Retry instead of zero counters and All Caught Up
   assert.doesNotMatch(html, /All Caught Up|Pending \(0\)|Reviews Given|Average Rating/);
 });
 
-test('the existing review service rejects ownership, lifecycle, assignment and duplicate violations', async () => {
+test('review endpoint delegates the authenticated actor to one checked atomic operation and maps rejection without false success', async () => {
   const JOB = '11111111-1111-4111-8111-111111111111', GUARD = '22222222-2222-4222-8222-222222222222';
-  async function run({ status = 'paid_out', assignmentStatus = 'completed', paymentStatus = 'paid_out', owner = 'client', token = 'test-token' } = {}) {
-    const rows = { clients: [{ id: 'client', user_id: 'user-client' }], jobs: [{ id: JOB, client_id: owner, status }], job_assignments: [{ id: 'assignment', job_id: JOB, guard_id: GUARD, status: assignmentStatus, payment_status: paymentStatus }], reviews: [{ id: 'existing', assignment_id: 'assignment' }] };
-    const db = databaseFixture(rows); let handler;
-    const compiled = compile(fs.readFileSync('supabase/functions/create-review/index.ts', 'utf8'));
-    new Function('require', 'Deno', 'exports', compiled)(() => ({ serve: fn => { handler = fn; }, createClient: () => db }), { env: { get: () => 'test' } }, {});
-    return handler(new Request('https://example.invalid', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId: JOB, guardId: GUARD, rating: 5 }) }));
+  async function run({ error, data = { success: true, review_id: 'saved-review', job_status: 'closed', replayed: false }, token = 'test-token' } = {}) {
+    const db = databaseFixture({}); let handler; const calls=[];
+    db.rpc = async (name,args) => { calls.push({name,args}); return {data,error}; };
+    db.from = () => { throw Error('Review endpoint must not split its transaction across Data API writes'); };
+    new Function('require', 'Deno', 'exports', compile(fs.readFileSync('supabase/functions/create-review/index.ts', 'utf8')))(() => ({ serve: fn => { handler = fn; }, createClient: () => db }), { env: { get: () => 'test' } }, {});
+    const response=await handler(new Request('https://example.invalid', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId: JOB, guardId: GUARD, rating: 5 }) }));
+    return {response,calls};
   }
-  assert.equal((await run({ token: 'invalid' })).status, 401);
-  assert.equal((await run({ owner: 'another-client' })).status, 403);
-  for (const status of ['completed', 'payout_approved', 'cancelled', 'closed']) assert.equal((await run({ status })).status, 400);
-  assert.equal((await run({ assignmentStatus: 'confirmed' })).status, 400);
-  assert.equal((await run({ paymentStatus: 'funded' })).status, 400);
-  for (const status of ['paid_out', 'review_pending']) assert.equal((await run({ status })).status, 409);
+  const invalid=await run({token:'invalid'}); assert.equal(invalid.response.status,401); assert.equal(invalid.calls.length,0);
+  for(const [code,status] of [['42501',403],['23505',409],['22023',400],['XX000',500]]) { const result=await run({error:{code}}); assert.equal(result.response.status,status); assert.equal((await result.response.json()).success,undefined); }
+  assert.equal((await run({data:{success:true,job_status:'closed'}})).response.status,500);
+  const saved=await run(); assert.equal(saved.response.status,200); assert.equal(saved.calls.length,1); assert.equal(saved.calls[0].name,'submit_client_review'); assert.equal(saved.calls[0].args.p_actor,'user-client'); assert.equal(saved.calls[0].args.p_request.rating,5);
 });

@@ -60,7 +60,7 @@ interface Props {
   guard: GuardInfo | null;
   clientUserId: string;
   sending: boolean;
-  onSend: (text: string) => void;
+  onSend: (text: string, operationId: string) => Promise<boolean>;
   onBack: () => void;
   messagesEndRef: any;
   hasOlderMessages?: boolean;
@@ -110,19 +110,24 @@ export default function ChatPanel({
 
   const isClient = (senderId: string) => senderId === clientUserId;
 
-  const handleSend = () => {
-    if (!input.trim()) {
-      setError('Please enter a message');
-      return;
-    }
-    if (input.length > 1000) {
-      setError('Message too long (max 1000 characters)');
-      return;
-    }
-    setError('');
-    onSend(input.trim());
-    setInput('');
-    setShowTemplates(false);
+  const sendLock = useRef(false);
+  const active = useRef(false);
+  const pending = useRef<{ text: string; id: string } | null>(null);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  const handleSend = async () => {
+    const text = input.trim();
+    if (sending || sendLock.current) return;
+    if (!text || text.length > 1000) { setError('Enter a message of 1–1000 characters.'); return; }
+    if (!pending.current || pending.current.text !== text) pending.current = { text, id: crypto.randomUUID() };
+    const operation = pending.current;
+    sendLock.current = true; setError('');
+    try {
+      const confirmed = await onSend(text, operation.id);
+      if (!active.current) return;
+      if (confirmed) { setInput(previous => previous.trim() === text ? '' : previous); pending.current = null; setShowTemplates(false); }
+      else setError('Your message was not confirmed. Your draft is retained; retry the same message.');
+    } catch { if (active.current) setError('Your message was not confirmed. Your draft is retained.'); }
+    finally { if (active.current) sendLock.current = false; }
   };
 
   const handleTemplateSelect = (text: string) => {
@@ -362,6 +367,7 @@ export default function ChatPanel({
               ref={inputRef}
               type="text"
               value={input}
+              disabled={sending}
               onChange={(e) => { setInput(e.target.value); setError(''); }}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."

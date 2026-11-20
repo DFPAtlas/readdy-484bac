@@ -85,117 +85,17 @@ serve(async (req: Request) => {
     ? String(body.attendanceStatus)
     : "present";
 
-  const { data: client } = await supabase
-    .from("clients")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!client) return json(403, { error: "Client account not found" });
-
-  const { data: job } = await supabase
-    .from("jobs")
-    .select("id, client_id, status")
-    .eq("id", jobId)
-    .maybeSingle();
-
-  if (!job) return json(400, { error: "Job not found" });
-  if (job.client_id !== client.id) return json(403, { error: "You are not authorised to review this job" });
-  if (job.status !== "paid_out" && job.status !== "review_pending") {
-    return json(400, { error: "This job is not eligible for review yet" });
-  }
-
-  const { data: assignment } = await supabase
-    .from("job_assignments")
-    .select("id, status, payment_status")
-    .eq("job_id", jobId)
-    .eq("guard_id", guardId)
-    .maybeSingle();
-
-  if (!assignment) return json(400, { error: "This guard was not assigned to this job" });
-  if (assignment.status !== "completed") return json(400, { error: "This guard has not completed the job yet" });
-  if (assignment.payment_status !== "paid_out") return json(400, { error: "This guard's payout has not completed yet" });
-
-  const { data: existing } = await supabase
-    .from("reviews")
-    .select("id")
-    .eq("assignment_id", assignment.id)
-    .maybeSingle();
-
-  if (existing) return json(409, { error: "You have already reviewed this guard for this job" });
-
-  const now = new Date().toISOString();
-  const { error: insertError } = await supabase.from("reviews").insert({
-    job_id: jobId,
-    guard_id: guardId,
-    client_id: client.id,
-    assignment_id: assignment.id,
-    rating,
-    review_text: reviewText,
-    private_note: privateNote,
-    punctuality,
-    professionalism,
-    communication,
-    appearance,
-    reliability,
-    would_hire_again: wouldHireAgain,
-    site_instructions_followed: siteInstructionsFollowed,
-    attendance_status: attendanceStatus,
-    issue_reported: issueReported,
-    issue_category: issueCategory,
-    issue_description: issueDescription,
-    status: "hidden",
-    review_status: issueReported ? "issue_reported" : "reviewed",
-    created_at: now,
+  const { data, error } = await supabase.rpc("submit_client_review", {
+    p_actor: user.id,
+    p_request: { jobId, guardId, rating, reviewText, privateNote, punctuality, professionalism,
+      communication, appearance, reliability, wouldHireAgain, siteInstructionsFollowed,
+      attendanceStatus, issueReported, issueCategory, issueDescription,
+      operationId: typeof body.operationId === "string" && UUID_RE.test(body.operationId) ? body.operationId : null },
   });
-
-  if (insertError) {
-    if (insertError.code === "23505") {
-      return json(409, { error: "You have already reviewed this guard for this job" });
-    }
-    console.error("create-review insert error", insertError.message);
-    return json(500, { error: "Unable to submit review" });
+  if (error) {
+    const code = error.code === "42501" ? 403 : error.code === "23505" ? 409 : error.code === "22023" || error.code === "22P02" ? 400 : 500;
+    return json(code, { error: code === 403 ? "This review is not permitted" : code === 409 ? "This guard has already been reviewed with different details" : "Review submission could not be confirmed. Retry the same review." });
   }
-
-  const { data: ratingRows } = await supabase
-    .from("reviews")
-    .select("rating")
-    .eq("guard_id", guardId)
-    .eq("status", "published");
-
-  const published = ratingRows || [];
-  const totalReviews = published.length;
-  const avgRating = totalReviews > 0
-    ? Math.round((published.reduce((s, r) => s + (r.rating || 0), 0) / totalReviews) * 10) / 10
-    : 0;
-
-  await supabase
-    .from("guards")
-    .update({ rating: avgRating, total_reviews: totalReviews, updated_at: now })
-    .eq("id", guardId);
-
-  const { data: allAssignments } = await supabase
-    .from("job_assignments")
-    .select("id, payment_status, status")
-    .eq("job_id", jobId);
-
-  const requiredIds = (allAssignments || [])
-    .filter((a) => a.payment_status === "paid_out" && a.status === "completed")
-    .map((a) => a.id);
-
-  const { data: jobReviews } = await supabase
-    .from("reviews")
-    .select("assignment_id")
-    .eq("job_id", jobId);
-
-  const reviewedIds = new Set((jobReviews || []).map((r) => r.assignment_id).filter(Boolean));
-  const allReviewed = requiredIds.length > 0 && requiredIds.every((id) => reviewedIds.has(id));
-
-  const nextStatus = allReviewed ? "closed" : "review_pending";
-  await supabase
-    .from("jobs")
-    .update({ status: nextStatus, updated_at: now })
-    .eq("id", jobId);
-
-  return json(200, { success: true, message: "Review submitted for moderation", job_status: nextStatus });
+  if (data?.success !== true || !data.review_id || !["closed", "review_pending"].includes(data.job_status)) return json(500, { error: "Review submission could not be confirmed" });
+  return json(200, data);
 });
