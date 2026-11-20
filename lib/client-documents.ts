@@ -1,4 +1,4 @@
-import { CLIENT_DOCUMENT_FIELDS, CLIENT_DOCUMENT_MAX_BYTES, CLIENT_DOCUMENT_TYPES, documentDetails, documentFileType } from '@/supabase/functions/_shared/client-document-rules';
+import { CLIENT_DOCUMENT_FIELDS, CLIENT_DOCUMENT_MAX_BYTES, CLIENT_DOCUMENT_TYPES, documentDetails, documentFileType } from './client-document-rules';
 export { CLIENT_DOCUMENT_MAX_BYTES, CLIENT_DOCUMENT_TYPES };
 export interface ClientDocument {
   id: string; client_id: string; document_type: string; file_name: string; file_size: number;

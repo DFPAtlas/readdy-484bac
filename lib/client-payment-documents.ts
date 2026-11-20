@@ -1,4 +1,4 @@
-import { paymentDocumentLink } from '../supabase/functions/_shared/payment-document-links';
+import { paymentDocumentLink } from './payment-document-links';
 export { paymentDocumentLink };
 
 export type PaymentDocumentResult = {

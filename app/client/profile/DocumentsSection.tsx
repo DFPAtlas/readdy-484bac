@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ClientDocument, ClientDocumentDraft, ClientDocumentError, CLIENT_DOCUMENT_MAX_BYTES, CLIENT_DOCUMENT_TYPES, saveClientDocument, deleteClientDocument, downloadClientDocument } from '@/lib/client-documents';
-import { documentFileType } from '@/supabase/functions/_shared/client-document-rules';
+import { documentFileType } from '@/lib/client-document-rules';
 import type { ClientDocumentsState } from '@/hooks/useClientDocuments';
 interface Props {
   clientId: string; userId: string; state: ClientDocumentsState; onReload: () => void;
