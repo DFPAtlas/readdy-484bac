@@ -11,7 +11,7 @@ function load(path, mocks = {}, globals = {}) {
   return module.exports;
 }
 const links = load('supabase/functions/_shared/payment-document-links.ts');
-const client = load('lib/client-payment-documents.ts', { '../supabase/functions/_shared/payment-document-links': links });
+const client = load('lib/client-payment-documents.ts', { './payment-document-links': load('lib/payment-document-links.ts') });
 const T = '00000000-0000-4000-8000-000000000001';
 const receipt = 'https://pay.stripe.com/receipts/payment/fixture';
 const invoiceURL = 'https://invoice.stripe.com/i/fixture';

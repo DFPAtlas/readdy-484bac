@@ -40,6 +40,8 @@ const NOTIFICATION_SORT_OPTIONS = [
   { value: 'urgent_first', label: 'Urgent First' },
 ];
 
+const INBOX_PAGE_SIZE = 25;
+
 const NOTIFICATION_FILTER_CONFIGS = [
   {
     key: 'status',
@@ -110,6 +112,7 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sortBy, setSortBy] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [markingAll, setMarkingAll] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [companyName, setCompanyName] = useState('Client');
@@ -139,7 +142,7 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
     try {
       const snapshot = await loadClientNotificationInbox(supabase, {
         category: activeCategory, priority: activePriority, status: activeStatus, search, dateFrom, dateTo,
-      }, expectedUserId);
+      }, expectedUserId, current);
       if (!current()) return;
       if ('redirect' in snapshot) {
         setLoadError(true);
@@ -177,9 +180,15 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
   useEffect(() => {
     latestLoadRef.current = loadNotifications;
     setSelectedNotifIds(new Set());
+    setCurrentPage(1);
     void loadNotifications();
     return () => { requestRef.current += 1; loadedUserRef.current = null; };
   }, [loadNotifications, authLoading, allowed]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedNotifIds(new Set());
+  }, [sortBy]);
 
   useEffect(() => {
     if (!userId || authLoading || !allowed) return;
@@ -200,8 +209,9 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
   }, [userId, authLoading, allowed]);
 
   const runNotificationAction = async (action: InboxAction, ids: string[], bulk = false, all = false) => {
+    const requestedIds = [...new Set(ids)].filter(id => pageNotifications.some(n => n.id === id));
     if (!mountedRef.current || mutationRef.current || loading || loadError || authLoading || !allowed ||
-        !userId || userId !== expectedUserId || loadedUserRef.current !== userId || ids.length === 0) return;
+        !userId || userId !== expectedUserId || loadedUserRef.current !== userId || requestedIds.length === 0) return;
     mutationRef.current = true;
     requestRef.current += 1;
     const lifetime = lifetimeRef.current;
@@ -211,7 +221,7 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
     if (bulk) { setBulkProcessing(true); setBulkAction(action); }
     if (all) setMarkingAll(true);
     try {
-      const result = await changeClientNotifications(supabase, userId, ids, action);
+      const result = await changeClientNotifications(supabase, userId, requestedIds, action);
       if (!current()) return;
       const confirmed = new Set(result.confirmedIds);
       // Commit only rows acknowledged by the database, even on a partial result.
@@ -244,10 +254,10 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
 
   const markOneRead = (id: string) => runNotificationAction('mark_read', [id]);
   const deleteOne = (id: string) => runNotificationAction('delete', [id]);
-  const markAllRead = () => runNotificationAction('mark_read', notifications.filter(n => !n.is_read).map(n => n.id), false, true);
+  const markAllRead = () => runNotificationAction('mark_read', pageNotifications.filter(n => !n.is_read).map(n => n.id), false, true);
 
   const toggleNotifSelection = (id: string) => {
-    if (mutationRef.current || loading || loadError) return;
+    if (mutationRef.current || loading || loadError || !pageNotifications.some(n => n.id === id)) return;
     setSelectedNotifIds(previous => {
       const next = new Set(previous);
       if (next.has(id)) next.delete(id);
@@ -256,7 +266,7 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
     });
   };
   const selectAllNotifs = () => {
-    if (!mutationRef.current && !loading && !loadError) setSelectedNotifIds(new Set(filtered.map(n => n.id)));
+    if (!mutationRef.current && !loading && !loadError) setSelectedNotifIds(new Set(pageNotifications.map(n => n.id)));
   };
   const clearNotifSelection = () => {
     if (!mutationRef.current) setSelectedNotifIds(new Set());
@@ -284,6 +294,15 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
   });
 
   const filtered = sortedNotifications.filter(n => activeStatus === 'all' || n.is_read === (activeStatus === 'read'));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / INBOX_PAGE_SIZE));
+  const page = Math.min(currentPage, totalPages);
+  const pageNotifications = filtered.slice((page - 1) * INBOX_PAGE_SIZE, page * INBOX_PAGE_SIZE);
+  const selectedPageIds = pageNotifications.filter(n => selectedNotifIds.has(n.id)).map(n => n.id);
+  const changePage = (nextPage: number) => {
+    if (mutationRef.current || loading || loadError) return;
+    setSelectedNotifIds(new Set());
+    setCurrentPage(Math.max(1, Math.min(nextPage, totalPages)));
+  };
 
   if (authLoading || !allowed || !expectedUserId) {
     return (
@@ -309,7 +328,7 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Stay on top of job, guard, and payment updates</p>
             </div>
             <div className="flex items-center gap-2">
-              {unreadCount > 0 && (
+              {pageNotifications.some(n => !n.is_read) && (
                 <button
                   onClick={markAllRead}
                   disabled={actionPending || loading || loadError}
@@ -320,7 +339,7 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
                   ) : (
                     <i className="ri-check-double-line"></i>
                   )}
-                  Mark All Read
+                  Mark Page Read
                 </button>
               )}
               <button
@@ -346,10 +365,11 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
           </div>
 
           {/* Stats bar */}
+          <p className="text-xs text-slate-500 mb-3">Counts reflect the current filters. Bulk actions apply to the displayed page.</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             <div className="bg-white dark:bg-[#111d35] rounded-xl border border-slate-200 dark:border-[#1e2d4d] p-4">
               <p className="text-2xl font-bold text-slate-900 dark:text-white">{loading || loadError ? '—' : notifications.length}</p>
-              <p className="text-xs text-slate-500">Total</p>
+              <p className="text-xs text-slate-500">Matching</p>
             </div>
             <div className="bg-white dark:bg-[#111d35] rounded-xl border border-slate-200 dark:border-[#1e2d4d] p-4">
               <p className="text-2xl font-bold text-slate-900 dark:text-white">{loading || loadError ? '—' : unreadCount}</p>
@@ -431,9 +451,9 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
 
           {/* BulkActionBar */}
           <BulkActionBar
-            selectedCount={selectedNotifIds.size}
-            totalCount={filtered.length}
-            allSelected={selectedNotifIds.size === filtered.length && filtered.length > 0}
+            selectedCount={selectedPageIds.length}
+            totalCount={pageNotifications.length}
+            allSelected={selectedPageIds.length === pageNotifications.length && pageNotifications.length > 0}
             onSelectAll={selectAllNotifs}
             onClearSelection={clearNotifSelection}
             actions={[
@@ -553,7 +573,7 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
                 )}
               </div>
             ) : (
-              filtered.map((n) => (
+              pageNotifications.map((n) => (
                 <NotificationCard
                   key={n.id}
                   id={n.id}
@@ -575,6 +595,15 @@ function ClientNotificationsInbox({ expectedUserId, authLoading, allowed }: {
               ))
             )}
           </div>
+          {!loading && !loadError && filtered.length > 0 && (
+            <nav aria-label="Notification pages" className="flex flex-wrap items-center justify-between gap-3 mt-6 text-sm text-slate-600 dark:text-slate-300">
+              <p aria-live="polite">Showing {(page - 1) * INBOX_PAGE_SIZE + 1}–{Math.min(page * INBOX_PAGE_SIZE, filtered.length)} of {filtered.length} · Page {page} of {totalPages}</p>
+              <div className="flex gap-3">
+                <button onClick={() => changePage(page - 1)} disabled={actionPending || page === 1} className="rounded-lg border px-3 py-2 disabled:opacity-50">Previous</button>
+                <button onClick={() => changePage(page + 1)} disabled={actionPending || page === totalPages} className="rounded-lg border px-3 py-2 disabled:opacity-50">Next</button>
+              </div>
+            </nav>
+          )}
         </div>
       </main>
     </div>
