@@ -27,6 +27,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
   const [confirmationText, setConfirmationText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [retentionReviewRequired, setRetentionReviewRequired] = useState(false);
+  const [reviewedUserId, setReviewedUserId] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
 
   const requiredPhrase = userType === 'guard' ? 'DELETE GUARD' : 'DELETE CLIENT';
@@ -34,6 +35,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
   const handleDryRun = async () => {
     if (!reason.trim()) return;
     setError(null);
+    setReviewedUserId(null);
     setStep('dryrun');
 
     try {
@@ -62,7 +64,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
       );
 
       const data = await res.json();
-      if (!res.ok || data.error) {
+      if (!res.ok || data.error || data.success !== true || data.dry_run !== true || !data.summary || typeof data.target_user_id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.target_user_id)) {
         setError(data.error || 'Dry run failed');
         setStep('error');
         return;
@@ -70,6 +72,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
 
       setSummary({ ...data.summary, retainedRecords: data.summary.retainedRecords ?? data.summary.financialRowsAnonymised ?? [] });
       setRetentionReviewRequired(data.retentionReviewRequired === true);
+      setReviewedUserId(data.target_user_id);
       setStep('confirm');
     } catch (e: any) {
       setError(e.message || 'Something went wrong');
@@ -78,7 +81,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
   };
 
   const handleDelete = async () => {
-    if (retentionReviewRequired || confirmationText !== requiredPhrase) return;
+    if (retentionReviewRequired || !reviewedUserId || confirmationText !== requiredPhrase) return;
     setError(null);
     setStep('deleting');
 
@@ -103,13 +106,16 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
             user_type: userType,
             reason: reason.trim(),
             dry_run: false,
+            confirmation: confirmationText,
+            expected_user_id: reviewedUserId,
           }),
         }
       );
 
       const data = await res.json();
       if (!res.ok || data.error || data.success !== true || data.status !== 'completed') {
-        setError(data.error || data.failed_items?.join('; ') || 'Deletion is incomplete. Review the audit before retrying.');
+        const message = data.error || data.failed_items?.join('; ') || 'Deletion is incomplete. Review the audit before retrying.';
+        setError(data.audit_id ? `${message} Audit: ${data.audit_id}` : message);
         setStep('error');
         return;
       }
@@ -151,6 +157,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
       consent_records: 'Consent Records',
       tax_disclaimers_accepted: 'Tax Disclaimers',
       user_entitlements: 'User Entitlements',
+      user_entitlements_data: 'User Entitlements',
       client_activity_log: 'Activity Logs',
       client_contacts: 'Contacts',
       client_documents: 'Documents',
@@ -198,7 +205,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
                   <div>
                     <p className="text-sm font-medium text-red-300 mb-1">This action is permanent</p>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      It will remove the user account, profile, documents, images, applications, assignments, notifications, and related records. Accounts with booking, financial or legal review records require a retention review before deletion. This cannot be undone.
+                      Eligible accounts can have their profile, owned files, preferences and personal records removed. Booking, support, financial and billing-provider links block deletion pending review. Check the impact first. Confirmed deletion cannot be undone.
                     </p>
                   </div>
                 </div>
@@ -255,7 +262,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
                 <div className="bg-[#111d35] border border-[#1a2b4a] rounded-xl p-3">
                   <div className="flex items-center gap-2">
                     <div className="w-5 h-5 flex items-center justify-center"><i className="ri-folder-close-line text-red-400 text-sm"></i></div>
-                    <span className="text-sm text-slate-300">{summary.totalFiles} storage file{summary.totalFiles !== 1 ? 's' : ''} will be deleted</span>
+                    <span className="text-sm text-slate-300">{summary.totalFiles} owned storage file{summary.totalFiles !== 1 ? 's' : ''} found</span>
                   </div>
                 </div>
               )}
@@ -294,7 +301,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
                     <i className="ri-close-circle-line text-red-400 text-xl"></i>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-red-300 mb-1">Deletion Failed</p>
+                    <p className="text-sm font-medium text-red-300 mb-1">Deletion not confirmed</p>
                     <p className="text-xs text-slate-400">{error}</p>
                   </div>
                 </div>
@@ -363,7 +370,7 @@ export default function DeleteUserModal({ userId, userName, userEmail, userType,
             {step === 'confirm' && (
               <button
                 onClick={handleDelete}
-                disabled={retentionReviewRequired || confirmationText !== requiredPhrase}
+                disabled={retentionReviewRequired || !reviewedUserId || confirmationText !== requiredPhrase}
                 className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors cursor-pointer text-sm font-medium whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center gap-2">
