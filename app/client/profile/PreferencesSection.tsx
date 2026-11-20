@@ -13,6 +13,7 @@ interface HealthData {
   firstJobPosted: boolean;
   notificationsSet: boolean;
   documentsUploaded: boolean;
+  documentsStatus?: "loading" | "error" | "ready";
 }
 
 interface Profile {
@@ -138,8 +139,8 @@ export default function PreferencesSection({ profile, healthData, paymentMethodS
     finally { if (current()) { passwordBusy.current = false; setPasswordLoading(false); } }
   };
   const effectiveHealth = { ...healthData, notificationsSet: !unavailable && snapshot?.exists === true, paymentMethodAdded: paymentMethodView(paymentMethodState).complete };
-  const completedCount = Object.values(effectiveHealth).filter(Boolean).length;
-  const totalCount = Object.values(effectiveHealth).length;
+  const completedCount = HEALTH_ITEMS.filter(item => effectiveHealth[item.key as keyof typeof effectiveHealth] === true).length;
+  const totalCount = HEALTH_ITEMS.length;
   const progress = Math.round((completedCount / totalCount) * 100);
 
   if (accountChanged) return <div role="alert">Your account changed. Reload your profile to manage preferences.<button type="button" onClick={() => void loadPreferences()} disabled={loading}>Retry loading preferences</button></div>;
@@ -390,6 +391,7 @@ export default function PreferencesSection({ profile, healthData, paymentMethodS
                     {item.label}
                   </p>
                   {item.key === 'notificationsSet' && <p className="text-xs text-slate-500">{loading ? 'Checking preferences…' : loadError ? 'Could not check preferences.' : snapshot?.exists ? 'Saved preferences confirmed.' : 'No saved preferences yet.'}</p>}
+                  {item.key === 'documentsUploaded' && healthData.documentsStatus !== undefined && <p className="text-xs text-slate-500">{healthData.documentsStatus === 'loading' ? 'Checking documents…' : healthData.documentsStatus === 'error' ? 'Could not check documents. Reload the Documents tab.' : healthData.documentsUploaded ? 'Saved documents confirmed.' : 'No saved documents yet.'}</p>}
                   {item.key === 'paymentMethodAdded' && <PaymentMethodStatus state={paymentMethodState} onRefresh={onRefreshPaymentMethod} />}
                 </div>
                 {done && (

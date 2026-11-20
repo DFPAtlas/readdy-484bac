@@ -84,3 +84,6 @@ verify_jwt = false
 [functions.get-client-payment-method-status]
 # Read only; also checks auth.getUser(), account closure and owned client bindings.
 verify_jwt = true
+[functions.manage-client-documents]
+# Auth.getUser verifies the bearer in-handler, supporting current signing keys.
+verify_jwt = false
