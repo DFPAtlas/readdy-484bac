@@ -10,7 +10,7 @@ test('combined finish migrations enforce confirmed writes, atomic recovery and c
   const retention=fs.readFileSync('supabase/migrations/20261013051710_account_closure_retention.sql','utf8');
   const retentionStart=retention.indexOf('create function app.finish_account_retention_task(');
   await db.exec(retention.slice(retentionStart,retention.indexOf('end $$;',retentionStart)+7));
-  for(const name of ['20261120170000_quickguard_finish_writes.sql','20261120170100_quickguard_team_closure.sql','20261120170200_quickguard_payment_notifications.sql'])await db.exec(fs.readFileSync('supabase/migrations/'+name,'utf8'));
+  for(const name of ['20261120170000_quickguard_finish_writes.sql','20261120170100_quickguard_team_closure.sql','20261120170200_quickguard_payment_notifications.sql','20261120183707_quickguard_profile_role_compatibility.sql'])await db.exec(fs.readFileSync('supabase/migrations/'+name,'utf8'));
   const root=async(sql,args=[])=>{await db.exec('reset role');if(args.length)return db.query(sql,args);const results=await db.exec(sql);return results.at(-1)||{rows:[]};};
   const user=async id=>{await root("select set_config('request.jwt.claim.sub',$1,false),set_config('request.jwt.claim.role','authenticated',false)",[id]);await db.exec('set role authenticated');};
   const call=async(name,body)=>{const r=await db.query(`select app.${name}($1::jsonb) as result`,[JSON.stringify(body)]);return r.rows[0].result;};
