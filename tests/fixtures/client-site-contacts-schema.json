@@ -1,0 +1,19 @@
+{
+  "client_contacts": [
+    "id",
+    "client_id",
+    "contact_type",
+    "name",
+    "role",
+    "email",
+    "phone",
+    "is_default",
+    "created_at",
+    "updated_at"
+  ],
+  "clients": [
+    "id",
+    "user_id",
+    "is_active"
+  ]
+}

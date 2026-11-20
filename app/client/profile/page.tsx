@@ -58,16 +58,6 @@ interface ClientProfile {
   client_lifetime_fee_discount: number;
 }
 
-interface ClientContact {
-  id: string;
-  contact_type: string;
-  name: string;
-  role: string;
-  email: string;
-  phone: string;
-  is_default: boolean;
-}
-
 interface ClientDocument {
   id: string;
   document_type: string;
@@ -123,7 +113,6 @@ function ClientProfileInner() {
   const [, setLoadError] = useState(false);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const { state: paymentMethodState, refresh: refreshPaymentMethod } = useClientPaymentMethod(profile?.id || null);
-  const [contacts, setContacts] = useState<ClientContact[]>([]);
   const [documents, setDocuments] = useState<ClientDocument[]>([]);
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
@@ -163,13 +152,6 @@ function ClientProfileInner() {
 
       const cid = clientData.id;
       setProfile(clientData as ClientProfile);
-
-      const { data: contactsData } = await supabase
-        .from("client_contacts")
-        .select("*")
-        .eq("client_id", cid)
-        .order("created_at", { ascending: true });
-      setContacts(contactsData || []);
 
       const { data: docsData } = await supabase
         .from("client_documents")
@@ -230,16 +212,6 @@ function ClientProfileInner() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
-
-  const refreshContacts = async () => {
-    if (!profile) return;
-    const { data } = await supabase
-      .from("client_contacts")
-      .select("*")
-      .eq("client_id", profile.id)
-      .order("created_at", { ascending: true });
-    setContacts(data || []);
-  };
 
   const refreshDocuments = async () => {
     if (!profile) return;
@@ -472,9 +444,8 @@ function ClientProfileInner() {
               )}
               {activeTab === "contacts" && (
                 <SiteContactsSection
+                  key={profile.id}
                   clientId={profile.id}
-                  contacts={contacts}
-                  onRefresh={refreshContacts}
                   onMessage={(type, text) => showMessage(type, text)}
                 />
               )}
