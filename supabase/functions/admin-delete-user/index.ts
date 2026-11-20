@@ -279,7 +279,7 @@ serve(async (req: Request) => {
 
     const storagePaths = [targetRecord.id, targetUserId];
     const buckets = user_type === "client"
-      ? ["avatars", "guard-documents", "guard-profiles", "ID-images", "sia-licences", "quickguard-email-assets"]
+      ? ["avatars", "guard-documents", "guard-profiles", "ID-images", "sia-licences", "quickguard-email-assets", "client-files"]
       : ["avatars", "guard-documents", "guard-profiles", "ID-images", "sia-licences"];
     summary.storageFiles = await listAccountStorageFiles(adminClient, buckets, storagePaths);
     summary.totalFiles = summary.storageFiles.length;

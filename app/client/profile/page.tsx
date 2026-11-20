@@ -10,6 +10,7 @@ import CompanyProfileSection from "./CompanyProfileSection";
 import SiteContactsSection from "./SiteContactsSection";
 import BillingSection from "./BillingSection";
 import DocumentsSection from "./DocumentsSection";
+import { useClientDocuments } from "@/hooks/useClientDocuments";
 import PreferencesSection from "./PreferencesSection";
 import DataPrivacySection from "./DataPrivacySection";
 import Link from "next/link";
@@ -58,18 +59,6 @@ interface ClientProfile {
   client_lifetime_fee_discount: number;
 }
 
-interface ClientDocument {
-  id: string;
-  document_type: string;
-  file_name: string;
-  file_url: string;
-  file_size: number;
-  mime_type: string;
-  description: string;
-  expiry_date: string;
-  created_at: string;
-}
-
 interface SubscriptionInfo {
   plan_name: string;
   status: string;
@@ -101,7 +90,7 @@ function ClientProfileInner() {
   const [, setLoadError] = useState(false);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const { state: paymentMethodState, refresh: refreshPaymentMethod } = useClientPaymentMethod(profile?.id || null);
-  const [documents, setDocuments] = useState<ClientDocument[]>([]);
+  const documents = useClientDocuments(profile?.id || null);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [healthData, setHealthData] = useState({
     profileComplete: false,
@@ -140,13 +129,6 @@ function ClientProfileInner() {
       const cid = clientData.id;
       setProfile(clientData as ClientProfile);
 
-      const { data: docsData } = await supabase
-        .from("client_documents")
-        .select("*")
-        .eq("client_id", cid)
-        .order("created_at", { ascending: false });
-      setDocuments(docsData || []);
-
       const { data: subData } = await supabase
         .from("subscriptions")
         .select("*")
@@ -164,7 +146,7 @@ function ClientProfileInner() {
         billingAdded: !!(clientData.billing_email || clientData.vat_number || clientData.billing_address_line1),
         firstJobPosted: (jobsCount || 0) > 0,
         notificationsSet: false,
-        documentsUploaded: (docsData || []).length > 0,
+        documentsUploaded: false,
       });
 
       setLoading(false);
@@ -178,16 +160,7 @@ function ClientProfileInner() {
     loadAll();
   }, [loadAll]);
 
-  const refreshDocuments = async () => {
-    if (!profile) return;
-    const { data } = await supabase
-      .from("client_documents")
-      .select("*")
-      .eq("client_id", profile.id)
-      .order("created_at", { ascending: false });
-    setDocuments(data || []);
-    setHealthData((h) => ({ ...h, documentsUploaded: (data || []).length > 0 }));
-  };
+
 
   if (authLoading || !allowed) {
     return (
@@ -412,9 +385,13 @@ function ClientProfileInner() {
               )}
               {activeTab === "documents" && (
                 <DocumentsSection
+                  key={`${profile.id}:${profile.user_id}`}
                   clientId={profile.id}
-                  documents={documents}
-                  onRefresh={refreshDocuments}
+                  userId={profile.user_id}
+                  state={documents.state}
+                  onReload={documents.refresh}
+                  onSaved={documents.saved}
+                  onDeleted={documents.deleted}
                   onMessage={(type, text) => showMessage(type, text)}
                 />
               )}
@@ -424,7 +401,7 @@ function ClientProfileInner() {
                   paymentMethodState={paymentMethodState}
                   onRefreshPaymentMethod={refreshPaymentMethod}
                   profile={profile}
-                  healthData={healthData}
+                  healthData={{ ...healthData, documentsUploaded: documents.state.status === "ready" && documents.state.documents.length > 0, documentsStatus: documents.state.status }}
                   onMessage={(type, text) => showMessage(type, text)}
                 />
               )}

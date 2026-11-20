@@ -27,6 +27,7 @@ serve(async (req: Request) => {
     };
     await check();
     const buckets = task.leased_stage === 'profile' ? ['avatars', 'guard-profiles'] : task.leased_stage === 'documents' ? ['sia-licences', 'guard-documents', 'ID-images'] : [];
+    if (task.leased_stage === 'documents' && task.profile_type === 'client') buckets.push('client-files');
     if (buckets.length) {
      const roots = [task.user_id, task.profile_id];
      const { data: profile, error: profileError } = await db.from(task.profile_type === 'guard' ? 'guards' : 'clients').select('*').eq('id', task.profile_id).maybeSingle();

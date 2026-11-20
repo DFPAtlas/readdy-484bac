@@ -105,7 +105,7 @@ interface MessageData {
 interface DocumentData {
   id: string;
   file_name: string;
-  file_type: string;
+  mime_type: string;
   created_at: string;
   document_type: string | null;
 }
@@ -205,7 +205,7 @@ export default function ClientMonitoringDetail({ client, onClose }: DetailProps)
     const fetchDocuments = async () => {
       const { data, error } = await supabase
         .from('client_documents')
-        .select('id, file_name, file_type, created_at, document_type')
+        .select('id, file_name, mime_type, created_at, document_type')
         .eq('client_id', client.id)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -709,7 +709,7 @@ export default function ClientMonitoringDetail({ client, onClose }: DetailProps)
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-medium text-slate-900">{doc.file_name}</p>
-                        <p className="text-xs text-slate-500">{doc.document_type || 'Document'} · {doc.file_type}</p>
+                        <p className="text-xs text-slate-500">{doc.document_type || 'Document'} · {doc.mime_type}</p>
                       </div>
                       <span className="text-xs text-slate-400">{new Date(doc.created_at).toLocaleDateString('en-GB')}</span>
                     </div>

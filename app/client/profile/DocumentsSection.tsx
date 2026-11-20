@@ -1,290 +1,106 @@
 "use client";
-
-import { useState } from "react";
-import { supabase } from "@/lib/supabase";
-
-interface ClientDocument {
-  id: string;
-  document_type: string;
-  file_name: string;
-  file_url: string;
-  file_size: number;
-  mime_type: string;
-  description: string;
-  expiry_date: string;
-  created_at: string;
-}
-
+import { useState, useRef, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { ClientDocument, ClientDocumentDraft, ClientDocumentError, CLIENT_DOCUMENT_MAX_BYTES, CLIENT_DOCUMENT_TYPES, saveClientDocument, deleteClientDocument, downloadClientDocument } from '@/lib/client-documents';
+import { documentFileType } from '@/supabase/functions/_shared/client-document-rules';
+import type { ClientDocumentsState } from '@/hooks/useClientDocuments';
 interface Props {
-  clientId: string;
-  documents: ClientDocument[];
-  onRefresh: () => void;
-  onMessage: (type: "success" | "error", text: string) => void;
+  clientId: string; userId: string; state: ClientDocumentsState; onReload: () => void;
+  onSaved: (document: ClientDocument) => void; onDeleted: (id: string) => void;
+  onMessage: (type: 'success' | 'error', text: string) => void;
 }
-
-const DOC_TYPES = [
-  { value: "insurance", label: "Insurance Document", icon: "ri-shield-check-line", color: "text-emerald-500" },
-  { value: "purchase_order", label: "Purchase Order", icon: "ri-file-list-3-line", color: "text-blue-500" },
-  { value: "site_instructions", label: "Site Instructions", icon: "ri-map-pin-line", color: "text-amber-500" },
-  { value: "authorisation_letter", label: "Authorisation Letter", icon: "ri-file-shield-line", color: "text-violet-500" },
-  { value: "contract", label: "Contract", icon: "ri-file-paper-line", color: "text-teal-500" },
-  { value: "other", label: "Other", icon: "ri-file-3-line", color: "text-slate-500" },
-];
-
-export default function DocumentsSection({ clientId, documents, onRefresh, onMessage }: Props) {
-  const [showForm, setShowForm] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [form, setForm] = useState({
-    document_type: "insurance",
-    file_name: "",
-    file_url: "",
-    description: "",
-    expiry_date: "",
-  });
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 10 * 1024 * 1024) {
-      onMessage("error", "File must be under 10MB");
-      return;
-    }
-
-    setUploading(true);
-
-    const fileExt = file.name.split(".").pop();
-    const filePath = `client-documents/${clientId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${fileExt}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("client-files")
-      .upload(filePath, file, { upsert: false });
-
-    if (uploadError) {
-      setUploading(false);
-      if (uploadError.message?.includes("bucket") || uploadError.message?.includes("not found")) {
-        onMessage("error", "File storage is not configured. Please contact support to upload documents.");
-      } else {
-        onMessage("error", "Upload failed. " + uploadError.message);
+const labels: Record<string,string> = { insurance: 'Insurance Document', purchase_order: 'Purchase Order', site_instructions: 'Site Instructions', authorisation_letter: 'Authorisation Letter', contract: 'Contract', other: 'Other' };
+const inputClass = 'w-full rounded-lg border border-slate-200 dark:border-[#1e2d4d] p-2 text-sm bg-white dark:bg-[#111d35]';
+export default function DocumentsSection({ clientId, userId, state, onReload, onSaved, onDeleted, onMessage }: Props) {
+  const [draft,setDraft] = useState<ClientDocumentDraft | null>(null);
+  const [showForm,setShowForm] = useState(false), [attempted,setAttempted] = useState(false);
+  const [details,setDetails] = useState({ document_type: 'insurance', description: '', expiry_date: '' });
+  const [action,setAction] = useState(''), [error,setError] = useState('');
+  const [retired,setRetired] = useState(false);
+  const mounted = useRef(false), lifetime = useRef(0), operation = useRef(0), busy = useRef(false), scope = useRef(clientId);
+  const urls = useRef(new Set<string>()); scope.current = clientId;
+  useEffect(() => {
+    mounted.current = true; busy.current = false;
+    setDraft(null); setShowForm(false); setAttempted(false); setError(''); setAction(''); setRetired(false);
+    const activeUrls = urls.current;
+    const retire = () => { lifetime.current++; operation.current++; busy.current = false; for (const url of activeUrls) URL.revokeObjectURL(url); activeUrls.clear(); };
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event,session) => {
+      if (event === 'SIGNED_OUT' || (event === 'SIGNED_IN' && session?.user?.id !== userId)) {
+        retire(); setRetired(true); setDraft(null); setShowForm(false); setAttempted(false); setError(''); setAction('');
       }
-      return;
-    }
-
-    const { data: urlData } = supabase.storage.from("client-files").getPublicUrl(filePath);
-
-    setForm((f) => ({
-      ...f,
-      file_name: file.name,
-      file_url: urlData.publicUrl,
-    }));
-    setUploading(false);
-    onMessage("success", "File uploaded. Fill in the details and save.");
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.file_url) {
-      onMessage("error", "Please upload a file first.");
-      return;
-    }
-
-    const { error } = await supabase.from("client_documents").insert({
-      client_id: clientId,
-      document_type: form.document_type,
-      file_name: form.file_name,
-      file_url: form.file_url,
-      file_size: 0,
-      description: form.description,
-      expiry_date: form.expiry_date || null,
     });
-
-    if (error) {
-      onMessage("error", "Failed to save document.");
-      return;
-    }
-
-    setForm({ document_type: "insurance", file_name: "", file_url: "", description: "", expiry_date: "" });
-    setShowForm(false);
-    onMessage("success", "Document saved successfully.");
-    onRefresh();
+    return () => { mounted.current = false; retire(); subscription.unsubscribe(); };
+  },[clientId,userId]);
+  const unavailable = retired || state.status !== 'ready' || state.documents.some(d => d.client_id !== clientId);
+  const start = (name: string) => {
+    if (busy.current || unavailable) return null;
+    busy.current = true; setAction(name); setError('');
+    const token = ++operation.current, epoch = lifetime.current;
+    return { token, current: () => mounted.current && lifetime.current === epoch && operation.current === token && scope.current === clientId };
   };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this document?")) return;
-    const { error } = await supabase.from("client_documents").delete().eq("id", id);
-    if (error) {
-      onMessage("error", "Failed to delete document.");
-      return;
-    }
-    onMessage("success", "Document deleted.");
-    onRefresh();
+  const finish = (run: { token: number }) => { if (operation.current === run.token) { busy.current = false; if (mounted.current && scope.current === clientId) setAction(''); } };
+  const fail = (e: unknown) => { const message = e instanceof ClientDocumentError ? e.message : 'The document request could not be confirmed. Keep your file and retry, or reload the list.'; setError(message); onMessage('error',message); };
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!draft) { setError('Choose a file first.'); return; }
+    const run = start('save'); if (!run) return;
+    setAttempted(true);
+    try {
+      const document = await saveClientDocument(supabase,clientId,{ ...draft,...details },run.current);
+      if (!run.current()) return;
+      onSaved(document); setDraft(null); setShowForm(false); setAttempted(false); onMessage('success','Document saved.');
+    } catch (e) { if (run.current()) fail(e); } finally { finish(run); }
   };
-
-  return (
-    <div>
-      <div className="bg-white dark:bg-[#111d35] rounded-2xl border border-slate-200 dark:border-[#1e2d4d] shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Documents</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-              Upload and manage your company documents
-            </p>
-          </div>
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-500 text-white text-sm font-semibold rounded-lg hover:bg-teal-600 transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <i className="ri-upload-cloud-line w-4 h-4 flex items-center justify-center"></i>
-            Upload
-          </button>
-        </div>
-
-        {showForm && (
-          <form onSubmit={handleSubmit} className="mb-6 p-4 bg-slate-50 dark:bg-[#162036] rounded-xl border border-slate-200 dark:border-[#1e2d4d]">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Upload Document</h3>
-
-            <div className="mb-3">
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">File</label>
-              <div className="relative">
-                <input
-                  type="file"
-                  onChange={handleFileChange}
-                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                  className="w-full text-sm text-slate-700 dark:text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-500 file:text-white hover:file:bg-teal-600"
-                />
-              </div>
-              {uploading && (
-                <p className="text-xs text-teal-500 mt-1 flex items-center gap-1">
-                  <i className="ri-loader-4-line animate-spin"></i>
-                  Uploading...
-                </p>
-              )}
-              {form.file_name && (
-                <p className="text-xs text-emerald-500 mt-1 flex items-center gap-1">
-                  <i className="ri-checkbox-circle-line"></i>
-                  {form.file_name}
-                </p>
-              )}
-              <p className="text-xs text-slate-400 mt-1">Max 10MB. PDF, Word, or images.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Document Type</label>
-                <select
-                  value={form.document_type}
-                  onChange={(e) => setForm((f) => ({ ...f, document_type: e.target.value }))}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-[#1e2d4d] rounded-lg text-sm bg-white dark:bg-[#111d35] text-slate-900 dark:text-white pr-8"
-                >
-                  {DOC_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Expiry Date (optional)</label>
-                <input
-                  type="date"
-                  value={form.expiry_date}
-                  onChange={(e) => setForm((f) => ({ ...f, expiry_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-[#1e2d4d] rounded-lg text-sm bg-white dark:bg-[#111d35] text-slate-900 dark:text-white"
-                />
-              </div>
-            </div>
-            <div className="mb-3">
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Description</label>
-              <input
-                type="text"
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 dark:border-[#1e2d4d] rounded-lg text-sm bg-white dark:bg-[#111d35] text-slate-900 dark:text-white"
-                placeholder="e.g. Public Liability Insurance 2025"
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="submit"
-                disabled={uploading || !form.file_url}
-                className="px-4 py-2 bg-teal-500 text-white text-sm font-semibold rounded-lg hover:bg-teal-600 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
-              >
-                Save Document
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForm(false);
-                  setForm({ document_type: "insurance", file_name: "", file_url: "", description: "", expiry_date: "" });
-                }}
-                className="px-4 py-2 bg-slate-100 dark:bg-[#162036] text-slate-700 dark:text-slate-300 text-sm font-semibold rounded-lg hover:bg-slate-200 transition-colors cursor-pointer whitespace-nowrap border border-slate-200 dark:border-[#1e2d4d]"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
-
-        {documents.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-14 h-14 bg-slate-100 dark:bg-[#162036] rounded-2xl flex items-center justify-center mx-auto mb-3">
-              <i className="ri-folder-3-line text-2xl text-slate-400 dark:text-slate-600"></i>
-            </div>
-            <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">No documents uploaded</p>
-            <p className="text-xs text-slate-400 mt-1">Upload insurance, contracts, or site instructions</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {documents.map((doc) => {
-              const typeInfo = DOC_TYPES.find((t) => t.value === doc.document_type) || DOC_TYPES[5];
-              return (
-                <div
-                  key={doc.id}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-[#162036] border border-slate-200 dark:border-[#1e2d4d] hover:shadow-sm transition-all"
-                >
-                  <div className="w-10 h-10 bg-white dark:bg-[#111d35] rounded-lg flex items-center justify-center flex-shrink-0 border border-slate-200 dark:border-[#1e2d4d]">
-                    <i className={`${typeInfo.icon} ${typeInfo.color} text-lg`}></i>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{doc.file_name}</p>
-                      <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-[#1e2d4d] text-slate-600 dark:text-slate-400">
-                        {typeInfo.label}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
-                      {doc.description && <span className="truncate">{doc.description}</span>}
-                      {doc.expiry_date && (
-                        <span className={`${new Date(doc.expiry_date) < new Date() ? "text-red-500" : ""}`}>
-                          Expires: {new Date(doc.expiry_date).toLocaleDateString("en-GB")}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <a
-                      href={doc.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-teal-500 hover:bg-teal-500/10 transition-colors cursor-pointer"
-                      title="Open"
-                    >
-                      <i className="ri-external-link-line text-sm"></i>
-                    </a>
-                    <button
-                      onClick={() => handleDelete(doc.id)}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                      title="Delete"
-                    >
-                      <i className="ri-delete-bin-line text-sm"></i>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  const discard = async () => {
+    if (busy.current) return;
+    if (!attempted || !draft) { setShowForm(false); setDraft(null); setError(''); return; }
+    if (!confirm('Discard this upload and delete any copy saved by the previous attempt?')) return;
+    const run = start('discard'); if (!run) return;
+    try { await deleteClientDocument(supabase,clientId,draft.id,run.current); if (run.current()) { onDeleted(draft.id); setDraft(null); setShowForm(false); setAttempted(false); } }
+    catch (e) { if (run.current()) fail(e); } finally { finish(run); }
+  };
+  const remove = async (id: string) => {
+    if (busy.current || unavailable || !state.documents.some(d => d.id === id && d.client_id === clientId) || !confirm('Delete this document and its stored file?')) return;
+    const run = start('delete:'+id); if (!run) return;
+    try { await deleteClientDocument(supabase,clientId,id,run.current); if (run.current()) { onDeleted(id); if (draft?.id === id) { setDraft(null); setShowForm(false); setAttempted(false); } onMessage('success','Document and stored file deleted.'); } }
+    catch (e) { if (run.current()) fail(e); } finally { finish(run); }
+  };
+  const download = async (document: ClientDocument) => {
+    const run = start('download:'+document.id); if (!run) return;
+    try {
+      const blob = await downloadClientDocument(supabase,clientId,document.id,run.current); if (!run.current()) return;
+      const url = URL.createObjectURL(blob); urls.current.add(url);
+      const link = window.document.createElement('a'); link.href = url; link.download = document.file_name; window.document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => { URL.revokeObjectURL(url); urls.current.delete(url); },1000);
+    } catch (e) { if (run.current()) fail(e); } finally { finish(run); }
+  };
+  if (retired) return <div role="alert">Your account changed. Reload your profile to manage documents.</div>;
+  return <section className="bg-white dark:bg-[#111d35] rounded-2xl border border-slate-200 dark:border-[#1e2d4d] shadow-sm p-6">
+    <div className="flex items-center justify-between gap-3 mb-4"><div><h2 className="text-lg font-bold">Documents</h2><p className="text-sm text-slate-500">Private company documents. Downloads require your signed-in account.</p></div>
+      <button type="button" disabled={!!action || unavailable || showForm} onClick={() => { if (busy.current || unavailable || showForm) return; setDetails({ document_type: 'insurance', description: '', expiry_date: '' }); setAttempted(false); setDraft(null); setError(''); setShowForm(true); }} className="rounded-lg bg-teal-500 px-4 py-2 text-white disabled:opacity-50">Upload</button></div>
+    <button type="button" disabled={!!action || state.status === 'loading'} className="mb-4 text-teal-500 underline disabled:opacity-50" onClick={() => { if (!busy.current) onReload(); }}>Reload documents</button>
+    {state.status === 'loading' && <p role="status">Loading documents…</p>}
+    {state.status === 'error' && <div role="alert">Documents could not be loaded.<button type="button" className="ml-3 underline" onClick={onReload}>Retry loading documents</button></div>}
+    {error && <p role="alert" className="mb-4 text-red-500">{error}</p>}
+    {showForm && <form onSubmit={submit} className="mb-6 p-4 rounded-xl bg-slate-50 dark:bg-[#162036]">
+      <h3 className="font-semibold mb-3">Upload Document</h3>
+      <fieldset disabled={!!action || attempted || unavailable} className="space-y-3">
+        <div><label htmlFor="client-document-file">File</label><input id="client-document-file" type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" className={inputClass} onChange={e => {
+          if (busy.current || attempted || unavailable) return;
+          const file = e.target.files?.[0]; if (!file) return;
+          try { documentFileType(file.name,file.type); if (!file.size || file.size > CLIENT_DOCUMENT_MAX_BYTES) throw new Error('Choose a file up to 10MB.'); setDraft({ id: crypto.randomUUID(), file,...details }); setError(''); }
+          catch (e) { setError(e instanceof Error ? e.message : 'Choose a supported file.'); }
+        }} /><p className="text-xs text-slate-500">Up to 10MB. PDF, Word, PNG or JPEG. The file uploads when you save.</p></div>
+        <div><label htmlFor="client-document-type">Document Type</label><select id="client-document-type" className={inputClass} value={details.document_type} onChange={e => setDetails(old => ({ ...old, document_type: e.target.value }))}>{CLIENT_DOCUMENT_TYPES.map(type => <option key={type} value={type}>{labels[type]}</option>)}</select></div>
+        <div><label htmlFor="client-document-expiry">Expiry Date (optional)</label><input id="client-document-expiry" type="date" className={inputClass} value={details.expiry_date} onChange={e => setDetails(old => ({ ...old, expiry_date: e.target.value }))} /></div>
+        <div><label htmlFor="client-document-description">Description (optional)</label><input id="client-document-description" className={inputClass} maxLength={4000} value={details.description} onChange={e => setDetails(old => ({ ...old, description: e.target.value }))} /></div>
+      </fieldset>
+      {draft && <p className="my-3 text-sm">Selected: {draft.file.name} ({draft.file.size.toLocaleString('en-GB')} bytes)</p>}
+      {attempted && <p className="my-3 text-sm">Keep this file and these details for Retry. Discard upload removes any copy saved by this attempt.</p>}
+      <div className="flex gap-3 mt-4"><button type="submit" disabled={!!action || unavailable || !draft} className="rounded-lg bg-teal-500 text-white px-4 py-2 disabled:opacity-50">{action === 'save' ? 'Saving…' : attempted ? 'Retry save' : 'Save Document'}</button><button type="button" onClick={() => void discard()} disabled={!!action} className="underline">{attempted ? 'Discard upload' : 'Cancel'}</button></div>
+    </form>}
+    {!unavailable && (state.documents.length === 0 ? <p className="py-8 text-center text-slate-500">No documents uploaded</p> : <ul className="space-y-3">{state.documents.map(document => <li key={document.id} className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-[#162036]">
+      <div><p className="font-semibold break-all">{document.file_name}</p><p className="text-xs text-slate-500">{labels[document.document_type]} · {document.file_size.toLocaleString('en-GB')} bytes</p>{document.description && <p className="text-sm">{document.description}</p>}{document.expiry_date && <p className="text-xs">Expires: {document.expiry_date}</p>}</div>
+      <div className="flex gap-3"><button type="button" disabled={!!action} onClick={() => void download(document)} className="text-teal-500 underline">{action === 'download:'+document.id ? 'Downloading…' : 'Download'}</button><button type="button" disabled={!!action} onClick={() => void remove(document.id)} className="text-red-500 underline">{action === 'delete:'+document.id ? 'Deleting…' : 'Delete'}</button></div>
+    </li>)}</ul>)}
+  </section>;
 }
