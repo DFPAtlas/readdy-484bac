@@ -16,9 +16,7 @@ interface SpendingSummary {
 
 interface BillingInfo {
   stripeCustomerId: string | null;
-  stripeCustomerStatus: 'active' | 'not_set_up';
   billingPortalLastOpened: string | null;
-  defaultPaymentMethod: string | null;
   subscriptionStatus: string;
   planName: string;
 }
@@ -53,9 +51,7 @@ export function useClientPaymentCentre() {
   });
   const [billingInfo, setBillingInfo] = useState<BillingInfo>({
     stripeCustomerId: null,
-    stripeCustomerStatus: 'not_set_up',
     billingPortalLastOpened: null,
-    defaultPaymentMethod: null,
     subscriptionStatus: 'Free',
     planName: 'Free',
   });
@@ -92,9 +88,7 @@ export function useClientPaymentCentre() {
 
       setBillingInfo({
         stripeCustomerId: client.stripe_customer_id || null,
-        stripeCustomerStatus: client.stripe_customer_id ? 'active' : 'not_set_up',
         billingPortalLastOpened: client.stripe_billing_portal_last_opened_at || null,
-        defaultPaymentMethod: client.stripe_customer_id ? 'Card on file' : null,
         subscriptionStatus: client.subscription_status || 'Free',
         planName: planLabel(client.plan_name || client.subscription_tier),
       });

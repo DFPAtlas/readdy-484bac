@@ -135,3 +135,75 @@ test('actual hook supports error/Retry, portal-return refresh, superseded reques
   assert.equal(render('other-client').state.status, 'loading');
   const last = render('client').refresh(); const tail = pending.shift(); cleanup(); tail.resolve({ data: checked('saved').result, error: null }); await last; assert.equal(states[0].state.status, 'loading'); assert.equal(listeners.has('focus'), false);
 });
+
+function paymentCentre(state, { portalLoading = false } = {}) {
+  const calls = { portal: 0, refresh: 0, opened: [], clientIds: [] };
+  const PaymentMethodStatus = load('app/client/profile/PaymentMethodStatus.tsx', {
+    'next/link': { default: props => React.createElement('a', { href: props.href }, props.children), __esModule: true },
+    '@/lib/client-payment-method': client,
+  }).default;
+  const noopComponent = { default: () => null, __esModule: true };
+  const Page = load('app/client/payment-centre/page.tsx', {
+    react: { ...React, useState: initial => [initial, () => {}], useEffect() {}, useMemo: fn => fn(), useCallback: fn => fn },
+    'next/link': { default: props => React.createElement('a', { href: props.href }, props.children), __esModule: true },
+    '@/lib/client-journey': { paymentLabel: value => value, planLabel: value => value },
+    '@/lib/financeAmounts': { isCollected: () => false },
+    '@/lib/supabase': { supabase: {} },
+    '@/components/PortalSidebar': noopComponent,
+    '@/components/LiveIndicator': noopComponent,
+    './PaymentDocuments': noopComponent,
+    '../profile/PaymentMethodStatus': { default: PaymentMethodStatus, __esModule: true },
+    '@/hooks/useClientGuard': { useClientGuard: () => ({ loading: false, allowed: true }) },
+    '@/lib/client-payment-method': client,
+    '@/hooks/useClientPaymentMethod': { useClientPaymentMethod: id => { calls.clientIds.push(id); return { state, refresh() { calls.refresh++; } }; } },
+    '@/hooks/useClientPaymentCentre': { useClientPaymentCentre: () => ({
+      loading: false, error: null, clientId: 'owned-client', refetch() {}, exportCsv() {},
+      spendingSummary: { thisMonthSpend: 0, totalSpend: 0, jobsPaid: 0, outstandingAmount: 0, outstandingUnknownJobs: 0, refundsTotal: 0, netSpend: 0 },
+      billingInfo: { stripeCustomerId: 'cus_Exists', planName: 'Client Starter' }, jobPayments: [], portalLoading,
+      async handleBillingPortal() { calls.portal++; return 'https://billing.stripe.com/p/session/fixture'; },
+    }) },
+  }, { window: { open: (...args) => calls.opened.push(args) } }).default;
+  const tree = Page();
+  const elements = [];
+  function visit(node) {
+    if (Array.isArray(node)) return node.forEach(visit);
+    if (!React.isValidElement(node)) return;
+    elements.push(node); visit(node.props.children);
+  }
+  visit(tree);
+  const text = node => Array.isArray(node) ? node.map(text).join('') : React.isValidElement(node) ? text(node.props.children) : typeof node === 'string' ? node : '';
+  const action = elements.find(node => node.type === 'button' && /^(?:(?:Add|Manage) Payment Method|Loading\.\.\.)$/.test(text(node)));
+  return { calls, action, status: elements.find(node => node.type === PaymentMethodStatus), html: renderToStaticMarkup(tree) };
+}
+
+test('actual Payment Centre never treats a customer ID as a verified card and blocks unsafe portal actions', async () => {
+  for (const state of [{ status: 'loading' }, { status: 'error' }, checked('unverified', 'needs_review'), checked('saved', 'needs_review')]) {
+    const page = paymentCentre(state);
+    assert.deepEqual(page.calls.clientIds, ['owned-client']);
+    assert.doesNotMatch(page.html, /Card on file/);
+    assert.equal(page.action.props.disabled, true);
+    await page.action.props.onClick();
+    assert.equal(page.calls.portal, 0); assert.deepEqual(page.calls.opened, []);
+    if (state.status === 'loading') assert.match(page.html, /Checking payment method/);
+    if (state.status === 'error') {
+      assert.match(page.html, /Payment method status unavailable/);
+      assert.match(page.html, /Retry payment method check/);
+      page.status.props.onRefresh(); assert.equal(page.calls.refresh, 1);
+    }
+    if (state.status === 'checked') assert.match(page.html, /Billing link needs checking/);
+  }
+});
+
+test('actual Payment Centre preserves add/manage actions for verified none/saved and guards a busy portal', async () => {
+  for (const [state, label] of [[checked('none'), 'Add Payment Method'], [checked('none', 'not_linked'), 'Add Payment Method'], [checked('saved'), 'Manage Payment Method']]) {
+    const page = paymentCentre(state);
+    assert.equal(page.action.props.disabled, false); assert.match(page.html, new RegExp(label));
+    assert.match(page.html, state.result.status === 'saved' ? /Saved payment method/ : /No saved payment method/);
+    await page.action.props.onClick(); assert.equal(page.calls.portal, 1);
+    assert.deepEqual(page.calls.opened, [['https://billing.stripe.com/p/session/fixture', '_blank']]);
+  }
+  const busy = paymentCentre(checked('saved'), { portalLoading: true });
+  assert.equal(busy.action.props.disabled, true);
+  await busy.action.props.onClick();
+  assert.equal(busy.calls.portal, 0);
+});

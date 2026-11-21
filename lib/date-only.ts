@@ -2,6 +2,14 @@ export type DateOnlyFormatOptions = Intl.DateTimeFormatOptions;
 
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
+/** The UK calendar day for database DATE comparisons, regardless of browser timezone. */
+export function londonCalendarDate(now = new Date()): string {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now).map(part => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 /** Parses a database DATE at UTC midnight without applying the browser timezone. */
 export function dateOnlyToUtcDate(value: string | null | undefined): Date | null {
   if (!value) return null;

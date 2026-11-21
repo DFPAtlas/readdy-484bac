@@ -11,7 +11,7 @@ import BackToTop from '@/components/BackToTop';
 import ShareJobButton from '@/components/ShareJobButton';
 import JobsNearMeFilter from '@/components/JobsNearMeFilter';
 import ClientBadge from '@/components/ClientBadge';
-import { formatDateOnly } from '@/lib/date-only';
+import { formatDateOnly, londonCalendarDate } from '@/lib/date-only';
 
 interface Job {
   id: string;
@@ -162,7 +162,7 @@ export default function JobsClient() {
         .limit(50);
 
       if (!showExpired) {
-        query = query.eq('status', 'open');
+        query = query.eq('status', 'open').gte('start_date', londonCalendarDate());
       }
 
       const { data, error } = await query;
