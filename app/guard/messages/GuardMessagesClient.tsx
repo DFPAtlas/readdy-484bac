@@ -86,13 +86,14 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function GuardMessagesClient() {
+interface GuardMessagesProps { embedded?: boolean; onUnreadChange?: (count: number) => void; }
+export default function GuardMessagesClient({ embedded = false, onUnreadChange }: GuardMessagesProps = {}) {
   const actor = useMessageOwner();
   if (!actor.ready) return <div role="status" className="p-8">Loading your message account…</div>;
   if (actor.error || !actor.id) return <div role="alert" className="p-8 space-y-4"><p>Your message account could not be verified.</p><button onClick={actor.retry}>Retry</button><a href="/guard/login">Sign in</a></div>;
-  return <GuardMessageInbox key={`${actor.id}:${actor.revision}`} expectedOwner={actor.id} />;
+  return <GuardMessageInbox key={`${actor.id}:${actor.revision}`} expectedOwner={actor.id} embedded={embedded} onUnreadChange={onUnreadChange} />;
 }
-function GuardMessageInbox({ expectedOwner }: { expectedOwner: string }) {
+function GuardMessageInbox({ expectedOwner, embedded, onUnreadChange }: { expectedOwner: string } & GuardMessagesProps) {
   const { loading: authLoading, allowed } = useGuardGuard();
 
   const [loading, setLoading] = useState(true);
@@ -121,6 +122,7 @@ function GuardMessageInbox({ expectedOwner }: { expectedOwner: string }) {
   const sendOperationRef = useRef<{ key: string; text: string; id: string } | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [messageError, setMessageError] = useState('');
+  useEffect(() => { if (!loading && !loadError) onUnreadChange?.(totalUnread); }, [totalUnread, loading, loadError, onUnreadChange]);
 
   const loadConversations = useCallback(async () => {
     const request = ++conversationRequestRef.current;
@@ -339,11 +341,11 @@ function GuardMessageInbox({ expectedOwner }: { expectedOwner: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B1933] flex flex-col lg:flex-row">
+    <div className={`${embedded ? 'min-h-[60vh]' : 'min-h-screen'} bg-[#0B1933] flex flex-col lg:flex-row`}>
       {(loadError || messageError) && <div role="alert" className="fixed top-3 left-1/2 z-50 bg-red-950 text-white p-4 rounded-xl"><p>{messageError || 'Message inbox could not be loaded.'}</p><button className="underline" onClick={() => { void loadConversations(); if (activeConversationId) void loadActiveMessages(); }}>Retry messages</button></div>}
-      <PortalSidebar role="guard" displayName={guardName} subtitle="Guard" initials={guardInitials} accentColor="emerald" />
+      {!embedded && <PortalSidebar role="guard" displayName={guardName} subtitle="Guard" initials={guardInitials} accentColor="emerald" />}
 
-      <div className="flex-1 lg:ml-72 min-h-screen flex flex-col lg:flex-row pb-20 lg:pb-0">
+      <div className={`flex-1 ${embedded ? 'min-h-[60vh]' : 'lg:ml-72 min-h-screen'} flex flex-col lg:flex-row pb-20 lg:pb-0`}>
         {toast && (
           <div className="fixed top-4 right-4 z-50 bg-[#111d35] border border-[#1e2d4d] rounded-xl px-4 py-3 shadow-lg flex items-center gap-2">
             <i className="ri-information-line text-teal-400"></i>
