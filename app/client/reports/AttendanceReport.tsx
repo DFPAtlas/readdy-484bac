@@ -1,5 +1,7 @@
 'use client';
 
+import ReportPdfButton from './ReportPdfButton';
+
 import { useState, useMemo } from 'react';
 
 function getStatusColor(status: string) {
@@ -55,6 +57,31 @@ export default function AttendanceReport({
   const jobMap = useMemo(() => {
     return Object.fromEntries(jobs.map(j => [j.id, j]));
   }, [jobs]);
+
+  function pdfReport() {
+      const headers = [
+        'Guard Name', 'Job Title', 'Shift Date', 'Scheduled Start', 'Scheduled End',
+        'Check-in Time', 'Check-out Time', 'Assigned Status', 'Payment Status', 'Payment Amount',
+      ];
+      const rows: import('@/lib/report-pdf').PdfCell[][] = [];
+      for (const a of filtered) {
+        const job = jobMap[a.job_id];
+        const row = [
+          a.guards?.full_name || 'Guard',
+          job?.job_title || 'N/A',
+          job?.start_date || 'N/A',
+          job?.start_time || 'N/A',
+          job?.end_time || 'N/A',
+          a.assigned_at ? new Date(a.assigned_at).toLocaleString('en-GB') : 'N/A',
+          a.completed_at ? new Date(a.completed_at).toLocaleString('en-GB') : 'N/A',
+          a.status,
+          a.payment_status || 'N/A',
+          a.payment_amount || 'N/A',
+        ];
+        rows.push(row);
+      }
+    return { title: 'Attendance report', columns: headers, rows };
+  }
 
   function handleExportCsv() {
     if (filtered.length === 0) {
@@ -170,6 +197,7 @@ export default function AttendanceReport({
             <i className={`ri-download-line ${exporting ? 'animate-pulse' : ''}`}></i>
             CSV
           </button>
+          <ReportPdfButton report={pdfReport} filename="quickguard-attendancereport" disabled={exporting || !filtered.length} onToast={onToast} />
           <button
             onClick={handlePrint}
             className="flex items-center gap-2 bg-[#162036] text-slate-400 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap border border-[#1e2d4d]"

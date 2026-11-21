@@ -45,6 +45,7 @@ const CLIENT_NAV: NavItem[] = [
   { href: '/client/jobs/tracker', icon: 'ri-radar-line', label: 'Job Tracker', featureRequired: 'client.job_tracker' },
   { href: '/client/templates', icon: 'ri-file-copy-line', label: 'Templates', featureRequired: 'client.job_templates' },
   { href: '/client/advanced-matching', icon: 'ri-user-search-line', label: 'Advanced Matching', featureRequired: 'client.advanced_matching' },
+  { href: '/client/api-access', icon: 'ri-code-s-slash-line', label: 'API Access', featureRequired: 'client.api_access' },
   { href: '/client/team-access', icon: 'ri-team-line', label: 'Team Access', featureRequired: 'client.team_access' },
   { href: '/client/sites', icon: 'ri-building-line', label: 'Saved Sites', featureRequired: 'client.multi_site' },
   { href: '/client/bulk-posting', icon: 'ri-stack-line', label: 'Bulk Posting', featureRequired: 'client.bulk_posting' },

@@ -1,5 +1,7 @@
 'use client';
 
+import ReportPdfButton from './ReportPdfButton';
+
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { filterSupportReport, supportReportSummary, supportReportCsv, SUPPORT_SOURCE_LABELS, SUPPORT_STATUS_LABELS, type SupportReportRecord } from '@/lib/client-support-report';
@@ -56,6 +58,7 @@ export default function SupportReport({ records, reportRange, onToast }: { recor
       <button type="button" aria-label="Show support cards" aria-pressed={viewMode === 'cards'} onClick={() => setViewMode('cards')} className={selectClass}>Cards</button>
       <button type="button" aria-label="Show support table" aria-pressed={viewMode === 'table'} onClick={() => setViewMode('table')} className={selectClass}>Table</button>
       <button type="button" aria-label="Export support records CSV" disabled={exporting || !filtered.length} onClick={exportCsv} className="px-4 py-2 rounded-lg bg-teal-500 text-white text-sm font-semibold disabled:opacity-50">CSV</button>
+      <ReportPdfButton filename="quickguard-support" disabled={exporting || !filtered.length} onToast={onToast} report={() => ({ title: 'Support and disputes', columns: ['Source', 'Reference', 'Subject', 'Priority', 'Status', 'Created (UK)', 'Resolved (UK)', 'Job'], rows: filtered.map(row => [SUPPORT_SOURCE_LABELS[row.source], row.reference, row.subject, row.priority, SUPPORT_STATUS_LABELS[row.status] || row.status, formatDate(row.createdAt), formatDate(row.resolvedAt), row.jobId]) })} />
       <button type="button" onClick={() => window.print()} className={selectClass}>Print</button>
       <Link href="/client/support" className="text-sm text-teal-400 underline">Open Support Centre</Link>
     </div>

@@ -1,5 +1,7 @@
 'use client';
 
+import JobContractPanel from '@/components/JobContractPanel';
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -450,6 +452,7 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
             </div>
           </div>
 
+          <JobContractPanel key={jobId} jobId={jobId} />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-[#111d35] rounded-2xl border border-[#1e2d4d] p-6">

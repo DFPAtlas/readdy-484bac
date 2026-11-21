@@ -7,7 +7,7 @@ const { renderToStaticMarkup } = require('react-dom/server');
 function load(path, mocks = {}, globals = {}) {
   const module = { exports: {} };
   const code = ts.transpileModule(fs.readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-  new Function('module', 'exports', 'require', ...Object.keys(globals), code)(module, module.exports, name => name in mocks ? mocks[name] : require(name), ...Object.values(globals));
+  new Function('module', 'exports', 'require', ...Object.keys(globals), code)(module, module.exports, name => name === './ReportPdfButton' ? require('./helpers/enterprise-module.cjs').load('app/client/reports/ReportPdfButton.tsx') : name in mocks ? mocks[name] : require(name), ...Object.values(globals));
   return module.exports;
 }
 const listing = load('lib/client-job-list.ts', { './client-job-tracker': { TRACKER_FILTER_STATUSES: {} } });

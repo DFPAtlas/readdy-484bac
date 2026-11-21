@@ -9,6 +9,7 @@ import { useClientGuard } from "@/hooks/useClientGuard";
 import CompanyProfileSection from "./CompanyProfileSection";
 import SiteContactsSection from "./SiteContactsSection";
 import BillingSection from "./BillingSection";
+import ClientContractSettings from "./ClientContractSettings";
 import DocumentsSection from "./DocumentsSection";
 import { useClientDocuments } from "@/hooks/useClientDocuments";
 import PreferencesSection from "./PreferencesSection";
@@ -384,7 +385,7 @@ function ClientProfileInner() {
                 />
               )}
               {activeTab === "documents" && (
-                <DocumentsSection
+                <><DocumentsSection
                   key={`${profile.id}:${profile.user_id}`}
                   clientId={profile.id}
                   userId={profile.user_id}
@@ -393,7 +394,7 @@ function ClientProfileInner() {
                   onSaved={documents.saved}
                   onDeleted={documents.deleted}
                   onMessage={(type, text) => showMessage(type, text)}
-                />
+                /><ClientContractSettings key={`contracts:${profile.id}:${profile.user_id}`} userId={profile.user_id} clientId={profile.id} /></>
               )}
               {activeTab === "preferences" && (
                 <PreferencesSection

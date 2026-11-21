@@ -1,5 +1,7 @@
 'use client';
 
+import ReportPdfButton from './ReportPdfButton';
+
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { isCompletedClientJobStatus } from '@/lib/client-job-completion';
@@ -80,6 +82,42 @@ export default function JobHistoryReport({ jobs, reportRange, onToast }: { jobs:
     let h = (eh + em / 60) - (sh + sm / 60);
     if (h < 0) h += 24;
     return h;
+  }
+
+  function pdfReport() {
+      const headers = [
+        'Job ID', 'Job Title', 'Status', 'Venue', 'City', 'Postcode',
+        'Start Date', 'End Date', 'Start Time', 'End Time',
+        'Guards Required', 'Guards Selected', 'Hourly Rate', 'Estimated Total',
+        'Site Instructions', 'Created At',
+      ];
+      const rows: import('@/lib/report-pdf').PdfCell[][] = [];
+      for (const job of filtered) {
+        const assigned = job.job_assignments?.length || 0;
+        const rate = Number(job.hourly_rate) || 0;
+        const hours = job.start_time && job.end_time ? estimateHours(job.start_time, job.end_time) : 0;
+        const est = hours * rate * assigned;
+        const row = [
+          job.id,
+          job.job_title,
+          STATUS_LABELS[job.status] || job.status,
+          job.venue_name,
+          job.venue_city,
+          job.venue_postcode,
+          job.start_date,
+          job.end_date || job.start_date,
+          job.start_time,
+          job.end_time,
+          job.number_of_guards,
+          assigned,
+          `£${rate.toFixed(2)}`,
+          `£${est.toFixed(2)}`,
+          job.site_instructions,
+          job.created_at,
+        ];
+        rows.push(row);
+      }
+    return { title: 'JobHistory report', columns: headers, rows };
   }
 
   function handleExportCsv() {
@@ -217,15 +255,7 @@ export default function JobHistoryReport({ jobs, reportRange, onToast }: { jobs:
             <i className="ri-printer-line"></i>
             Print
           </button>
-          {/* TODO: PDF export */}
-          <button
-            disabled
-            className="hidden lg:flex items-center gap-2 bg-[#162036] text-slate-600 text-sm font-semibold px-4 py-2 rounded-lg cursor-not-allowed whitespace-nowrap border border-[#1e2d4d]"
-            title="PDF export coming soon"
-          >
-            <i className="ri-file-pdf-line"></i>
-            PDF
-          </button>
+          <ReportPdfButton report={pdfReport} filename="quickguard-jobhistoryreport" disabled={exporting || !filtered.length} onToast={onToast} />
         </div>
       </div>
 

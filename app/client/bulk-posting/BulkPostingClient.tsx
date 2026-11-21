@@ -1,5 +1,7 @@
 'use client';
 
+import BulkCsvImport from './BulkCsvImport';
+import { BULK_JOB_CSV_COLUMNS } from '@/lib/bulk-job-csv';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -534,6 +536,11 @@ export default function BulkPostingClient() {
             </div>
           )}
 
+          <BulkCsvImport key={clientId} disabled={submitting || !clientId} onImport={imported => setRows(previous => {
+            const blank = createEmptyRow();
+            const existing = previous.filter(row => row.savedSiteId || BULK_JOB_CSV_COLUMNS.some(key => row[key] !== blank[key]));
+            return [...existing, ...imported.map(row => ({ ...createEmptyRow(), ...row }))];
+          })} />
           <div className="bg-[#111d35] rounded-2xl border border-[#1e2d4d] p-5 sm:p-6">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-9 h-9 bg-teal-500/15 rounded-xl border border-teal-400/20 flex items-center justify-center">

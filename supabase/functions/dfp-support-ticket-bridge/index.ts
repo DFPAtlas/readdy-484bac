@@ -149,7 +149,7 @@ async function syncTicket(supabase: any, ticketId: string, ownerUserId: string |
 
   let ticketQuery = supabase
     .from('support_tickets')
-    .select('id, ticket_reference, client_id, related_job_id, category, subject, description, priority, contact_preference, requested_refund_amount, refund_reason, evidence_url, dfp_ticket_number, dfp_sync_status')
+    .select('id, ticket_reference, client_id, related_job_id, category, subject, description, priority, support_tier, contact_preference, requested_refund_amount, refund_reason, evidence_url, dfp_ticket_number, dfp_sync_status')
     .eq('id', ticketId)
     .eq('is_deleted', false);
   if (client) ticketQuery = ticketQuery.eq('client_id', client.id);
@@ -177,7 +177,7 @@ async function syncTicket(supabase: any, ticketId: string, ownerUserId: string |
   const mappedCategory = CATEGORY_MAP[originalCategory] || 'other';
 
   const originalPriority = typeof ticket.priority === 'string' ? ticket.priority : '';
-  const mappedPriority = PRIORITY_MAP[originalPriority] || 'normal';
+  const mappedPriority = originalPriority === 'urgent' ? 'urgent' : ticket.support_tier === 'priority' ? 'high' : PRIORITY_MAP[originalPriority] || 'normal';
 
   const customerName = (typeof client.contact_name === 'string' && client.contact_name.trim())
     ? client.contact_name
@@ -203,6 +203,7 @@ async function syncTicket(supabase: any, ticketId: string, ownerUserId: string |
     context: {
       quickguard_ticket_id: ticketId,
       quickguard_local_category: originalCategory,
+      quickguard_support_tier: ticket.support_tier || 'standard',
       quickguard_client_id: client.id,
       has_evidence: !!ticket.evidence_url,
     },

@@ -1,4 +1,6 @@
 "use client";
+
+import JobContractPanel from '@/components/JobContractPanel';
 import { canClientCancelJob, canClientReviewAssignment } from '@/lib/client-job-actions';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -734,6 +736,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
+                  <JobContractPanel key={jobId} jobId={jobId} />
                   <JobInfoSection job={job} />
                 </div>
                 <div className="lg:col-span-1">

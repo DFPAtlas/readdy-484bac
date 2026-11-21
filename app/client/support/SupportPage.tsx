@@ -1,5 +1,7 @@
 'use client';
 
+import SupportAvailability from '@/components/SupportAvailability';
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { withRequestDeadline } from '@/lib/request-deadline';
@@ -692,7 +694,8 @@ function SupportPage({ expectedOwner }: { expectedOwner: string }) {
 
           {/* Search & Filters — replaced with SearchFilterBar */}
           <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-4 mb-6">
-            <SearchFilterBar
+            <SupportAvailability />
+        <SearchFilterBar
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               searchPlaceholder="Search by reference, subject, or category..."
