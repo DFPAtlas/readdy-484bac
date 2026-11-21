@@ -1,5 +1,7 @@
 'use client';
 
+import JobContractPanel from '@/components/JobContractPanel';
+
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -200,6 +202,7 @@ export default function GuardApplyClient({ jobId }: { jobId: string }) {
             <h1 className="text-2xl font-bold text-white">Apply for Job</h1>
           </div>
 
+          <JobContractPanel key={jobId} jobId={jobId} />
           <div className="bg-[#111d35] rounded-2xl border border-[#1e2d4d] p-6 mb-6">
             <h2 className="text-lg font-semibold text-white mb-3">{job.job_title}</h2>
             <div className="flex flex-wrap gap-4 text-sm text-slate-400">

@@ -107,7 +107,7 @@ test('admin enrichment identifies guard requesters without relabelling client co
   const calls = [];
   const values = { support_tickets: tickets, clients: [{ id: id(13), contact_name: 'Client contact', email: 'client@example.test' }], guards: [{ id: id(11), full_name: 'Guard contact', email: 'guard@example.test' }] };
   const supabase = { from(table) { const q = { select(fields) { calls.push({ table, fields }); return q; }, eq() { return q; }, order() { return q; }, in() { return q; }, then(resolve, reject) { return Promise.resolve({ data: values[table] || [], error: null }).then(resolve, reject); } }; return q; } };
-  const helpers = { exports: {} }; new Function('exports', compile(fs.readFileSync('lib/support-inbox-reads.ts','utf8')))(helpers.exports);
+  const helpers = { exports: require('./helpers/enterprise-module.cjs').load('lib/support-inbox-reads.ts') };
   const rows = await helpers.exports.loadAdminSupportInbox(supabase);
   assert.equal(rows[0].requester_name, 'Guard contact'); assert.equal(rows[0].requester_email, 'guard@example.test');
   assert.equal(rows[1].requester_name, 'Client contact'); assert.equal(rows[1].requester_email, 'client@example.test');

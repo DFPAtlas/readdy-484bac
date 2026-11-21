@@ -1,3 +1,4 @@
+import { sortSupportQueue } from './priority-support';
 function rows(result: any, message: string): any[] {
   if (result.error || !Array.isArray(result.data)) throw new Error(message);
   return result.data;
@@ -39,7 +40,7 @@ export async function loadAdminSupportInbox(db: any): Promise<any[]> {
   const clients = new Map(rows(clientResult, 'Ticket requesters could not be loaded.').map(row => [row.id, row]));
   const guards = new Map(rows(guardResult, 'Ticket requesters could not be loaded.').map(row => [row.id, row]));
   const jobs = new Map(rows(jobResult, 'Related support jobs could not be loaded.').map(row => [row.id, row]));
-  return tickets.map(ticket => {
+  return sortSupportQueue(tickets.map(ticket => {
     const client = clients.get(ticket.client_id), guard = guards.get(ticket.guard_id);
     return { ...ticket,
       client_name: client?.company_name || client?.contact_name || 'Unknown client', client_email: client?.email || '',
@@ -48,5 +49,5 @@ export async function loadAdminSupportInbox(db: any): Promise<any[]> {
       requester_email: ticket.client_id ? client?.email || '' : guard?.email || '',
       job_title: jobs.get(ticket.related_job_id)?.job_title || null,
     };
-  });
+  }));
 }

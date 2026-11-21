@@ -122,12 +122,11 @@ const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { 
   },
   'client.priority_support': {
     title: 'Why upgrade to Priority Support?',
-    desc: 'Our AI assistant is available 24/7 to help with platform questions and common issues. Priority support adds a human fast-track for issues that need review during business hours.',
+    desc: 'Our AI assistant is available 24/7 to help with platform questions and common issues. Priority support adds a human priority review Monday–Friday, 08:00–17:00 UK time. Tickets remain available outside those hours; a response time is not guaranteed.',
     points: [
-      { icon: 'ri-customer-service-2-line', label: 'Dedicated Support Line', detail: 'A named point of contact who knows your account and your venues.' },
-      { icon: 'ri-timer-flash-line', label: 'Fast-Track Resolution', detail: 'Priority tickets are reviewed ahead of standard requests during business hours.' },
-      { icon: 'ri-phone-line', label: 'Phone Support', detail: 'Call us directly for urgent issues like no-show guards or payment problems.' },
-      { icon: 'ri-shield-user-line', label: 'Emergency Guard Replacement', detail: 'Priority access to replacement guards if someone does not show up.' },
+      { icon: 'ri-customer-service-2-line', label: 'Priority Queue', detail: 'Eligible requests are marked by your plan and reviewed ahead of standard tickets at the same urgency.' },
+      { icon: 'ri-timer-flash-line', label: 'Human Support Hours', detail: 'Our team handles human reviews Monday–Friday, 08:00–17:00 UK time. Urgent safety issues stay first.' },
+      { icon: 'ri-message-3-line', label: '24/7 AI Assistance', detail: 'AI assistance is available around the clock; unresolved issues can be escalated to a tracked support ticket.' },
     ],
   },
   'client.multi_site': {
@@ -154,7 +153,7 @@ const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { 
     desc: 'Need 30 guards for a festival or 10 for a weekend event? Post them all at once, not one by one.',
     points: [
       { icon: 'ri-stack-line', label: 'Multi-Job Upload', detail: 'Upload a CSV or fill a grid to create dozens of jobs in seconds.' },
-      { icon: 'ri-calendar-check-line', label: 'Date Range Expansion', detail: 'Set a start date, end date, and shift pattern — the system generates all the individual posts.' },
+      { icon: 'ri-calendar-check-line', label: 'Multi-Day Jobs', detail: 'Set the start date and number of days for each job, then review every row before posting.' },
       { icon: 'ri-dashboard-line', label: 'Bulk Management', detail: 'Approve, edit, or cancel multiple jobs from a single screen.' },
     ],
   },
@@ -171,9 +170,9 @@ const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { 
     title: 'Why upgrade to Custom Contracts?',
     desc: 'Standard terms do not fit every business. Attach your own contract terms to job postings.',
     points: [
-      { icon: 'ri-file-text-line', label: 'Custom Terms', detail: 'Upload your own contract template once — it attaches automatically to every job you post.' },
+      { icon: 'ri-file-text-line', label: 'Custom Terms', detail: 'Upload a plain-text contract or paste your terms, save a version, and use it automatically for new jobs.' },
       { icon: 'ri-check-double-line', label: 'Digital Acceptance', detail: 'Guards must accept your terms before they can be assigned to your jobs.' },
-      { icon: 'ri-shield-check-line', label: 'Legal Compliance', detail: 'Ensure all engagements meet your insurance and liability requirements.' },
+      { icon: 'ri-shield-check-line', label: 'Acceptance Records', detail: 'Keep the exact job terms and a timestamped record of each guard’s acceptance.' },
     ],
   },
   'client.api_access': {
@@ -183,7 +182,7 @@ const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { 
     {
       "icon": "ri-customer-service-line",
       "label": "Contact support",
-      "detail": "Describe your integration requirements so the team can confirm availability and scope before you rely on them."
+      "detail": "Open API Access in your client portal to submit requirements and track the support request. Credentials and integration scope are provisioned by our team."
     }
   ]
 },

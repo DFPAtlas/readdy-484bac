@@ -16,6 +16,7 @@ interface SupportTicket {
   subject: string;
   description: string;
   priority: string;
+  support_tier?: string;
   status: string;
   contact_preference: string | null;
   admin_notes: string | null;
@@ -326,7 +327,7 @@ export default function AdminSupportTicketsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${priorityColors[ticket.priority] || 'bg-slate-50 text-slate-600 ring-slate-100'}`}>
-                            {ticket.priority}
+                            {ticket.priority}{ticket.support_tier === 'priority' && ' · Priority plan'}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -384,7 +385,7 @@ export default function AdminSupportTicketsPage() {
                 <div className="bg-[#0a1628] rounded-xl p-3">
                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Priority</p>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ring-1 ${priorityColors[selected.priority] || ''}`}>
-                    {selected.priority}
+                    {selected.priority}{selected.support_tier === 'priority' && ' · Priority plan'}
                   </span>
                 </div>
                 <div className="bg-[#0a1628] rounded-xl p-3">

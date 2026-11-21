@@ -1,5 +1,7 @@
 'use client';
 
+import ReportPdfButton from './ReportPdfButton';
+
 import { useState, useMemo } from 'react';
 
 function getSiaStatus(expiryDate: string | null) {
@@ -70,6 +72,32 @@ export default function ComplianceReport({
     const unverified = jobGuards.filter(({ guard }) => !guard.sia_verified).length;
     return { total, verified, expiring, missing, unverified };
   }, [jobGuards]);
+
+  function pdfReport() {
+      const headers = [
+        'Guard Name', 'SIA Licence', 'SIA Expiry', 'SIA Status', 'Verified',
+        'Licence Types', 'Job', 'Job Licence Required', 'Compliance Score', 'Compliance %',
+      ];
+      const rows: import('@/lib/report-pdf').PdfCell[][] = [];
+      for (const { guard, job } of filtered) {
+        const status = getSiaStatus(guard.sia_expiry_date);
+        const score = getComplianceScore(guard);
+        const row = [
+          guard.full_name,
+          guard.sia_licence_number || 'N/A',
+          guard.sia_expiry_date || 'N/A',
+          status.label,
+          guard.sia_verified ? 'Yes' : 'No',
+          (guard.licence_types || []).join('; '),
+          job?.job_title || 'N/A',
+          (job?.required_licence_types || []).join('; '),
+          score,
+          `${score}%`,
+        ];
+        rows.push(row);
+      }
+    return { title: 'Compliance report', columns: headers, rows };
+  }
 
   function handleExportCsv() {
     if (filtered.length === 0) {
@@ -185,6 +213,7 @@ export default function ComplianceReport({
             <i className={`ri-download-line ${exporting ? 'animate-pulse' : ''}`}></i>
             CSV
           </button>
+          <ReportPdfButton report={pdfReport} filename="quickguard-compliancereport" disabled={exporting || !filtered.length} onToast={onToast} />
           <button
             onClick={handlePrint}
             className="flex items-center gap-2 bg-[#162036] text-slate-400 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#1a2642] transition-colors cursor-pointer whitespace-nowrap border border-[#1e2d4d]"

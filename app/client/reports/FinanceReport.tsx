@@ -1,5 +1,7 @@
 'use client';
 
+import ReportPdfButton from './ReportPdfButton';
+
 import { useState, useMemo } from 'react';
 import { paymentTotals, paymentAmounts } from '@/lib/financeAmounts';
 
@@ -98,6 +100,39 @@ export default function FinanceReport({
   const refundedTotal = totals.refunded;
   const netTotal = totals.remaining;
   const failedTotal = filtered.filter((i: any) => i.status === 'failed').reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+
+  function pdfReport() {
+      const headers = tab === 'job'
+        ? ['Transaction ID', 'Description', 'Amount', 'Status', 'Payment Status', 'Currency', 'Created At', 'Completed At']
+        : ['Payment ID', 'Invoice ID', 'Billing Reason', 'Amount', 'Status', 'Currency', 'Period Start', 'Period End', 'Created At'];
+      const rows: import('@/lib/report-pdf').PdfCell[][] = [];
+      for (const item of filtered) {
+        const row = tab === 'job'
+          ? [
+              item.id,
+              item.description,
+              item.amount,
+              item.status,
+              item.payment_status,
+              item.currency,
+              item.created_at,
+              item.completed_at,
+            ]
+          : [
+              item.id,
+              item.stripe_invoice_id,
+              item.billing_reason,
+              item.amount,
+              item.status,
+              item.currency,
+              item.period_start,
+              item.period_end,
+              item.created_at,
+            ];
+        rows.push(row);
+      }
+    return { title: 'Finance report', columns: headers, rows };
+  }
 
   function handleExportCsv() {
     if (filtered.length === 0) {
@@ -235,14 +270,7 @@ export default function FinanceReport({
             <i className="ri-printer-line"></i>
             Print
           </button>
-          <button
-            disabled
-            className="hidden lg:flex items-center gap-2 bg-[#162036] text-slate-600 text-sm font-semibold px-4 py-2 rounded-lg cursor-not-allowed whitespace-nowrap border border-[#1e2d4d]"
-            title="PDF export coming soon"
-          >
-            <i className="ri-file-pdf-line"></i>
-            PDF
-          </button>
+          <ReportPdfButton report={pdfReport} filename="quickguard-financereport" disabled={exporting || !filtered.length} onToast={onToast} />
         </div>
       </div>
 

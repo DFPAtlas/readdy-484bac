@@ -6,6 +6,6 @@ export const CANCELLATION_ACKNOWLEDGEMENT = 'I understand that cancellation and 
 export const CANCELLATION_AVAILABILITY = 'Draft, open, awaiting-selection, awaiting-payment, funded, confirmed and in-progress jobs can be submitted for cancellation. The platform checks ownership, job status and any payment or payout already started. If cancellation is blocked, contact support.';
 export const OVERRUN_GUIDANCE = 'If a shift may run beyond the agreed hours, agree the proposed change with the client and contact QuickGuard support before working additional hours. Support will review any additional payment and applicable service fee. Extra hours do not automatically create a top-up charge or increase a payout.';
 export const PAYMENT_RELEASE_GUIDANCE = 'Guard payouts follow shift completion and the applicable confirmation, dispute and Stripe account checks. Bank arrival times can vary.';
-export const HUMAN_SUPPORT_HOURS = 'Mon–Fri 9AM–6PM';
+export const HUMAN_SUPPORT_HOURS = 'Monday–Friday, 08:00–17:00 UK time (Europe/London)';
 export const REWARDS_REDEMPTION_NOTICE = 'Token redemption is planned and is not available at checkout yet. Eligible rewards can be recorded and linked to your account; subscription and booking payments currently use their normal prices. We will publish eligible charges and redemption limits before redemption opens.';
 export const CLIENT_CANCELLABLE_STATUSES = ['draft', 'open', 'pending', 'awaiting_guard_selection', 'awaiting_payment', 'funded', 'confirmed', 'in_progress'] as const;

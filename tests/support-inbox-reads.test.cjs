@@ -5,7 +5,7 @@ const ts = require('typescript');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const compile = source => ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText;
-const helpers = { exports: {} }; new Function('exports', compile(fs.readFileSync('lib/support-inbox-reads.ts', 'utf8')))(helpers.exports);
+const helpers = { exports: require('./helpers/enterprise-module.cjs').load('lib/support-inbox-reads.ts') };
 
 function mockDb(fault = '', malformed = false) {
   const calls = [];

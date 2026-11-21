@@ -15,6 +15,7 @@ const ROUTE_FEATURES: Record<string, FeatureKey> = {
   '/client/messages': 'client.direct_contact',
   '/client/job-history': 'client.job_history',
   '/client/bulk-posting': 'client.bulk_posting',
+  '/client/api-access': 'client.api_access',
   '/client/team-access': 'client.team_access',
 };
 

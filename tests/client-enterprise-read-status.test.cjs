@@ -10,6 +10,7 @@ function load(file, mocks = {}, globals = {}) {
   const mod = { exports: {} };
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const resolve = name => {
+    if (name === './ReportPdfButton') return require('./helpers/enterprise-module.cjs').load('app/client/reports/ReportPdfButton.tsx');
     if (name in mocks) return mocks[name];
     if (name.startsWith('@/lib/')) return load(name.replace('@/', '') + '.ts', mocks, globals);
     if (name.startsWith('.')) {

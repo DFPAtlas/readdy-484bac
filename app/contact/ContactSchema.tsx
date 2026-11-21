@@ -37,21 +37,15 @@ export default function ContactSchema() {
       {
         '@type': 'OpeningHoursSpecification',
         dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-        opens: '09:00',
-        closes: '18:00',
-      },
-      {
-        '@type': 'OpeningHoursSpecification',
-        dayOfWeek: ['Saturday', 'Sunday'],
-        opens: '10:00',
-        closes: '16:00',
+        opens: '08:00',
+        closes: '17:00',
       },
     ],
     contactPoint: [
       {
         '@type': 'ContactPoint',
         telephone: '',
-        contactType: 'customer support',
+        contactType: 'AI platform assistance',
         areaServed: 'GB',
         availableLanguage: 'English',
         hoursAvailable: {

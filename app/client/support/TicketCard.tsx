@@ -10,6 +10,7 @@ interface Ticket {
   category: string;
   subject: string;
   priority: string;
+  support_tier?: string;
   status: string;
   related_job_id?: string;
   job_title?: string;
@@ -93,7 +94,7 @@ export default function TicketCard({ ticket, onOpen, selectable, selected, onTog
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <h3 className="text-base font-bold text-slate-200 truncate">{ticket.subject}</h3>
                   <StatusBadge status={ticket.status} compact />
-                  <PriorityBadge priority={ticket.priority} compact />
+                  <PriorityBadge priority={ticket.priority} compact />{ticket.support_tier === 'priority' && <span className="text-xs text-teal-400">Priority plan queue</span>}
                 </div>
                 <div className="flex flex-wrap gap-3 text-sm text-slate-500">
                   <span className="flex items-center gap-1">
@@ -178,7 +179,7 @@ export default function TicketCard({ ticket, onOpen, selectable, selected, onTog
             <h3 className="text-sm font-bold text-slate-200 truncate">{ticket.subject}</h3>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <StatusBadge status={ticket.status} compact />
-              <PriorityBadge priority={ticket.priority} compact />
+              <PriorityBadge priority={ticket.priority} compact />{ticket.support_tier === 'priority' && <span className="text-xs text-teal-400">Priority plan queue</span>}
             </div>
           </div>
         </div>
