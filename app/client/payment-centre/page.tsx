@@ -8,8 +8,11 @@ import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
 import { useClientPaymentCentre } from '@/hooks/useClientPaymentCentre';
+import { useClientPaymentMethod } from '@/hooks/useClientPaymentMethod';
+import { paymentMethodView } from '@/lib/client-payment-method';
 import type { JobPayment } from '@/hooks/useClientPaymentCentre';
 import { useClientGuard } from '@/hooks/useClientGuard';
+import PaymentMethodStatus from '../profile/PaymentMethodStatus';
 import PaymentDocuments from './PaymentDocuments';
 
 type TabKey = 'overview' | 'history' | 'receipts';
@@ -21,12 +24,15 @@ export default function ClientPaymentCentrePage() {
     error,
     refetch,
     spendingSummary,
+    clientId,
     billingInfo,
     jobPayments,
     portalLoading,
     handleBillingPortal,
     exportCsv,
   } = useClientPaymentCentre();
+  const { state: paymentMethodState, refresh: refreshPaymentMethod } = useClientPaymentMethod(clientId);
+  const paymentMethod = paymentMethodView(paymentMethodState);
 
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [jobFilter, setJobFilter] = useState('');
@@ -76,13 +82,14 @@ export default function ClientPaymentCentrePage() {
   }, [jobPayments, searchTerm, statusFilter, jobFilter]);
 
   const handleOpenBillingPortal = useCallback(async () => {
+    if (!paymentMethod.canOpenPortal || portalLoading) return;
     try {
       const url = await handleBillingPortal();
       if (url) window.open(url, '_blank');
     } catch (err: unknown) {
       setToast({ message: err instanceof Error ? err.message : 'Failed to open billing portal', type: 'error' });
     }
-  }, [handleBillingPortal]);
+  }, [handleBillingPortal, paymentMethod.canOpenPortal, portalLoading]);
 
   const statusBadge = (status: string) => {
     const map: Record<string, string> = {
@@ -237,12 +244,12 @@ export default function ClientPaymentCentrePage() {
                     </div>
                   </div>
                   <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${
-                    billingInfo.stripeCustomerStatus === 'active'
+                    paymentMethod.complete
                       ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                       : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
                   }`}>
-                    <div className="w-3 h-3 flex items-center justify-center"><i className={`${billingInfo.stripeCustomerStatus === 'active' ? 'ri-check-line' : 'ri-add-line'}`}></i></div>
-                    {billingInfo.stripeCustomerStatus === 'active' ? 'Active' : 'Not Set Up'}
+                    <div className="w-3 h-3 flex items-center justify-center"><i className={`${paymentMethod.complete ? 'ri-check-line' : 'ri-add-line'}`}></i></div>
+                    {paymentMethod.badge}
                   </span>
                 </div>
 
@@ -257,7 +264,7 @@ export default function ClientPaymentCentrePage() {
                   </div>
                   <div className="bg-[#0B1933] rounded-lg p-3 border border-[#1e2d4d]">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Payment Method</p>
-                    <p className="text-xs text-slate-300">{billingInfo.defaultPaymentMethod || 'Not added'}</p>
+                    <PaymentMethodStatus state={paymentMethodState} onRefresh={refreshPaymentMethod} />
                   </div>
                   <div className="bg-[#0B1933] rounded-lg p-3 border border-[#1e2d4d]">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Plan</p>
@@ -265,10 +272,10 @@ export default function ClientPaymentCentrePage() {
                   </div>
                 </div>
 
-                <button onClick={handleOpenBillingPortal} disabled={portalLoading}
+                <button onClick={handleOpenBillingPortal} disabled={portalLoading || !paymentMethod.canOpenPortal}
                   className="flex items-center gap-2 px-5 py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-500 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap">
                   <div className="w-4 h-4 flex items-center justify-center"><i className="ri-bank-card-line"></i></div>
-                  {portalLoading ? 'Loading...' : billingInfo.stripeCustomerId ? 'Manage Payment Method' : 'Add Payment Method'}
+                  {portalLoading ? 'Loading...' : paymentMethod.complete ? 'Manage Payment Method' : 'Add Payment Method'}
                 </button>
                 <p className="text-xs text-slate-500 mt-3">Opens the secure Stripe Billing Portal. No card data is stored on our servers.</p>
               </div>

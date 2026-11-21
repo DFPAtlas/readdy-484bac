@@ -9,7 +9,18 @@ const compiled = ts.transpileModule(fs.readFileSync('lib/date-only.ts', 'utf8'),
 }).outputText;
 const mod = { exports: {} };
 new Function('module', 'exports', compiled)(mod, mod.exports);
-const { formatDateOnly, inclusiveDateOnlyDays } = mod.exports;
+const { formatDateOnly, inclusiveDateOnlyDays, londonCalendarDate } = mod.exports;
+
+test('public job cutoff follows the UK calendar through midnight and daylight saving', () => {
+  for (const [instant, day] of [
+    ['2026-11-21T23:30:00Z', '2026-11-21'],
+    ['2026-07-01T23:30:00Z', '2026-07-02'],
+    ['2026-03-29T23:00:00Z', '2026-03-30'],
+    ['2026-10-25T23:30:00Z', '2026-10-25'],
+    ['2026-12-31T23:59:59Z', '2026-12-31'],
+    ['2027-01-01T00:00:00Z', '2027-01-01'],
+  ]) assert.equal(londonCalendarDate(new Date(instant)), day);
+});
 
 test('database dates stay on the same calendar day', () => {
   assert.equal(formatDateOnly('2026-10-08', { day: 'numeric', month: 'short' }), '8 Oct');
