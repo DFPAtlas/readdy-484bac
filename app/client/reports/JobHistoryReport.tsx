@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { isCompletedClientJobStatus } from '@/lib/client-job-completion';
 
 const STATUS_LABELS: Record<string, string> = {
   open: 'Posted',
@@ -10,11 +11,16 @@ const STATUS_LABELS: Record<string, string> = {
   awaiting_payment: 'Awaiting Payment',
   in_progress: 'Active',
   completed: 'Completed',
+  payout_approved: 'Payout Pending',
+  paid_out: 'Paid Out',
+  review_pending: 'Review Pending',
+  closed: 'Closed',
   cancelled: 'Cancelled',
   draft: 'Draft',
 };
 
 function getStatusColor(status: string) {
+  if (isCompletedClientJobStatus(status)) return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25';
   switch (status) {
     case 'completed': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25';
     case 'in_progress': return 'bg-blue-500/10 text-blue-400 border-blue-500/25';
@@ -47,7 +53,7 @@ export default function JobHistoryReport({ jobs, reportRange, onToast }: { jobs:
 
   const filtered = useMemo(() => {
     return jobs.filter(job => {
-      if (statusFilter !== 'all' && job.status !== statusFilter) return false;
+      if (statusFilter !== 'all' && !(statusFilter === 'completed' ? isCompletedClientJobStatus(job.status) : job.status === statusFilter)) return false;
       if (locationFilter && job.venue_city !== locationFilter) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
@@ -164,6 +170,7 @@ export default function JobHistoryReport({ jobs, reportRange, onToast }: { jobs:
               <option value="awaiting_payment">Awaiting Payment</option>
               <option value="in_progress">Active</option>
               <option value="completed">Completed</option>
+              <option value="closed">Closed</option>
               <option value="cancelled">Cancelled</option>
             </select>
           </div>

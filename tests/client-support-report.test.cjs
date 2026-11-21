@@ -110,7 +110,7 @@ test('report source errors render Retry without zero support counters or an empt
   const names = [...source.matchAll(/const \[([^\]]*)\] = useState/g)].map(match => match[1].split(',')[0].trim());
   const childMocks = Object.fromEntries([...source.matchAll(/from ['"]([^'"]+)['"]/g)].map(match => match[1]).filter(name => name.startsWith('./') || name.startsWith('../') || name.startsWith('@/components/')).map(name => [name, { __esModule: true, default: () => null }]));
   const Page = load('app/client/reports/page.tsx', { ...childMocks, react: { ...React, useState(initial) { const name = names[slot++]; return [name === 'loadError' ? 'Read failed' : initial, () => {}]; } },
-    'next/link': { __esModule: true, default: props => React.createElement('a', props, props.children) }, '@/lib/supabase': { supabase: {} }, '@/hooks/useClientGuard': { useClientGuard: () => ({ loading: false, allowed: true }) }, '@/hooks/useRouteGuard': { useRouteGuard: () => ({ checking: false, blocked: false }) }, '@/lib/client-finance': finance, '@/lib/client-support-report': report,
+    'next/link': { __esModule: true, default: props => React.createElement('a', props, props.children) }, '@/lib/supabase': { supabase: {} }, '@/hooks/useClientGuard': { useClientGuard: () => ({ loading: false, allowed: true }) }, '@/hooks/useRouteGuard': { useRouteGuard: () => ({ checking: false, blocked: false }) }, '@/lib/client-job-completion': load('lib/client-job-completion.ts'), '@/lib/client-finance': finance, '@/lib/client-support-report': report,
   }).default;
   const html = renderToStaticMarkup(React.createElement(Page));
   assert.match(html, /Failed to load reports/); assert.match(html, /Retry/); assert.doesNotMatch(html, /No support records|Open Support Tickets|0 records/);

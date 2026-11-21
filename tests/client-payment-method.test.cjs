@@ -147,6 +147,7 @@ function paymentCentre(state, { portalLoading = false } = {}) {
     react: { ...React, useState: initial => [initial, () => {}], useEffect() {}, useMemo: fn => fn(), useCallback: fn => fn },
     'next/link': { default: props => React.createElement('a', { href: props.href }, props.children), __esModule: true },
     '@/lib/client-journey': { paymentLabel: value => value, planLabel: value => value },
+    '@/lib/client-payment-timeline': load('lib/client-payment-timeline.ts', { './financeAmounts': load('lib/financeAmounts.ts'), './client-job-completion': load('lib/client-job-completion.ts') }),
     '@/lib/financeAmounts': { isCollected: () => false },
     '@/lib/supabase': { supabase: {} },
     '@/components/PortalSidebar': noopComponent,

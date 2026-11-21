@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { CLIENT_COMPLETED_JOB_STATUSES, isCompletedClientJobStatus } from '../../../lib/client-job-completion.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -81,9 +82,10 @@ Deno.serve(async (req) => {
         else if (statusFilter === 'funded') q = q.in('payment_status', ['funded', 'paid']);
         else if (statusFilter === 'in_progress') q = q.in('status', ['in_progress', 'active']);
         else if (statusFilter === 'awaiting_approval') q = q.in('status', ['awaiting_client_approval', 'awaiting_approval']);
-        else if (statusFilter === 'completed') q = q.eq('status', 'completed');
+        else if (statusFilter === 'completed') q = q.in('status', CLIENT_COMPLETED_JOB_STATUSES);
         else if (statusFilter === 'disputed') q = q.eq('disputed', true);
         else if (statusFilter === 'refunded') q = q.eq('payment_status', 'refunded');
+        else if (statusFilter === 'closed') q = q.eq('status', 'closed');
         else if (statusFilter === 'cancelled') q = q.eq('status', 'cancelled');
       }
       if (paymentFilter !== 'all') {
@@ -117,9 +119,10 @@ Deno.serve(async (req) => {
         else if (statusFilter === 'funded') q = q.in('payment_status', ['funded', 'paid']);
         else if (statusFilter === 'in_progress') q = q.in('status', ['in_progress', 'active']);
         else if (statusFilter === 'awaiting_approval') q = q.in('status', ['awaiting_client_approval', 'awaiting_approval']);
-        else if (statusFilter === 'completed') q = q.eq('status', 'completed');
+        else if (statusFilter === 'completed') q = q.in('status', CLIENT_COMPLETED_JOB_STATUSES);
         else if (statusFilter === 'disputed') q = q.eq('disputed', true);
         else if (statusFilter === 'refunded') q = q.eq('payment_status', 'refunded');
+        else if (statusFilter === 'closed') q = q.eq('status', 'closed');
         else if (statusFilter === 'cancelled') q = q.eq('status', 'cancelled');
       }
       if (paymentFilter !== 'all') q = q.eq('payment_status', paymentFilter);
@@ -375,7 +378,7 @@ Deno.serve(async (req) => {
           disputed: jobs.filter((j: any) => j.disputed || j.disputes.some((d: any) => d.status === 'open' || d.status === 'under_review')).length,
           refunded: jobs.filter((j: any) => j.refund_amount || j.refunded_at || j.transactions.some((t: any) => t.status === 'refunded')).length,
           total_spent: jobs.reduce((sum: number, j: any) => sum + (j.agreed_amount || j.transactions.reduce((s: number, t: any) => s + (t.amount || 0), 0)), 0),
-          completed: jobs.filter((j: any) => j.job_status === 'completed').length,
+          completed: jobs.filter((j: any) => isCompletedClientJobStatus(j.job_status)).length,
           cancelled: jobs.filter((j: any) => j.job_status === 'cancelled').length,
         },
       }),

@@ -1,5 +1,8 @@
 'use client';
 
+import { isCompletedClientJobStatus } from '@/lib/client-job-completion';
+import { bookingLabels } from '@/lib/client-journey';
+
 import ClientSpendingSummary from '../components/ClientSpendingSummary';
 import { clientJobPaymentLabel } from '@/lib/client-finance';
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -157,6 +160,7 @@ const STATUS_OPTIONS = [
   { value: 'in_progress', label: 'In Progress' },
   { value: 'awaiting_approval', label: 'Awaiting Approval' },
   { value: 'completed', label: 'Completed' },
+  { value: 'closed', label: 'Closed' },
   { value: 'disputed', label: 'Disputed' },
   { value: 'refunded', label: 'Refunded' },
   { value: 'cancelled', label: 'Cancelled' },
@@ -329,8 +333,11 @@ export default function ClientJobHistoryClient() {
     if (job.job_status === 'cancelled') {
       return { label: 'Cancelled', class: 'bg-slate-500/15 text-slate-400 border border-slate-500/25' };
     }
-    if (job.job_status === 'completed') {
-      return { label: 'Completed', class: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' };
+    if (job.job_status === 'closed') {
+      return { label: 'Closed', class: 'bg-slate-500/15 text-slate-400 border border-slate-500/25' };
+    }
+    if (isCompletedClientJobStatus(job.job_status)) {
+      return { label: bookingLabels[job.job_status], class: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' };
     }
     if (job.job_status === 'in_progress' || job.job_status === 'active') {
       return { label: 'In Progress', class: 'bg-blue-500/15 text-blue-400 border border-blue-500/25' };
@@ -344,7 +351,7 @@ export default function ClientJobHistoryClient() {
     if (job.job_status === 'open') {
       return { label: 'Posted', class: 'bg-blue-500/15 text-blue-400 border border-blue-500/25' };
     }
-    return { label: job.job_status || 'Unknown', class: 'bg-slate-500/15 text-slate-400 border border-slate-500/25' };
+    return { label: bookingLabels[job.job_status] || job.job_status || 'Unknown', class: 'bg-slate-500/15 text-slate-400 border border-slate-500/25' };
   };
 
   const getPaymentBadge = (job: HistoryJob) => {

@@ -1,6 +1,6 @@
 'use client';
 
-'use client';
+import { isCompletedClientJobStatus } from '@/lib/client-job-completion';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
@@ -207,7 +207,7 @@ export default function ClientReportsPage() {
 
   const stats = {
     totalJobs: reportData.jobs.length,
-    completedJobs: reportData.jobs.filter(j => j.status === 'completed').length,
+    completedJobs: reportData.jobs.filter(j => isCompletedClientJobStatus(j.status)).length,
     compliantGuards: reportData.guards.filter(g => g.sia_verified && g.sia_expiry_date && new Date(g.sia_expiry_date) > new Date()).length,
     expiringGuards: reportData.guards.filter(g => {
       if (!g.sia_expiry_date) return false;
