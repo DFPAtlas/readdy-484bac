@@ -2,6 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
+const { installTeamProfileCompatibility } = require('./helpers/team-profile-compat.cjs');
 const { PGlite } = require('@electric-sql/pglite');
 const MEMBER = '11111111-1111-4111-8111-111111111111';
 const OWNER = '22222222-2222-4222-8222-222222222222';
@@ -102,8 +103,11 @@ test('database enforces caller-only intersections and private owner entitlements
     await db.exec(`create role anon; create role authenticated; create role service_role;
       create schema auth; create schema app;
       create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+      create table auth.users(id uuid primary key,email_confirmed_at timestamptz,deleted_at timestamptz,banned_until timestamptz);
+      create table app.guards(id uuid primary key,user_id uuid,is_active boolean);
+      create table app.admin_users(user_id uuid primary key,is_active boolean);
       create table app.users(id uuid primary key,user_type text);
-      create table app.clients(id uuid primary key,user_id uuid,is_active boolean);
+      create table app.clients(id uuid primary key,user_id uuid,is_active boolean,is_suspended boolean default false);
       create table app.account_closures(user_id uuid primary key);
       create table app.user_entitlements_data(user_id uuid primary key,is_active boolean,audience text,features jsonb);
       create table public.team_member_configs(id uuid primary key,admin_user_id uuid,member_user_id uuid,enabled_features jsonb,created_at timestamptz,unique(admin_user_id,member_user_id));
@@ -114,13 +118,15 @@ test('database enforces caller-only intersections and private owner entitlements
       create policy own_ent on app.user_entitlements_data for select to authenticated using(user_id=auth.uid());
       grant usage on schema app,auth to anon,authenticated,service_role;
       grant select on public.team_member_configs,app.team_member_configs,app.user_entitlements_data to authenticated;
+      insert into auth.users values('${MEMBER}',now(),null,null),('${OWNER}',now(),null,null),('${OTHER}',now(),null,null);
       insert into app.users values('${MEMBER}','client'),('${OWNER}','client'),('${OTHER}','client');
-      insert into app.clients values('${MEMBER}','${MEMBER}',true),('${OWNER}','${OWNER}',true),('${OTHER}','${OTHER}',true);
+      insert into app.clients(id,user_id,is_active) values('${MEMBER}','${MEMBER}',true),('${OWNER}','${OWNER}',true),('${OTHER}','${OTHER}',true);
       insert into app.user_entitlements_data values('${OWNER}',true,'client','["${TEAM}","${ANALYTICS}","${API}"]');
       insert into public.team_member_configs values('${MEMBER}','${OWNER}','${MEMBER}','["${ANALYTICS}","${POST}","client.unknown","guard.apply_job",5,"${ANALYTICS}"]',now()),
         ('44444444-4444-4444-8444-444444444444','${OTHER}','${OWNER}','[]',now());`);
     const path=fs.readdirSync('supabase/migrations').find(n=>n.endsWith('_team_feature_permissions.sql'));
     await db.exec(fs.readFileSync('supabase/migrations/'+path,'utf8'));
+    await installTeamProfileCompatibility(db);
     async function asMember(user=MEMBER) {
       await db.exec(`reset role; set role authenticated; select set_config('request.jwt.claim.sub','${user}',false);`);
       return (await db.query('select app.get_my_team_features() as features')).rows[0].features;
@@ -132,6 +138,24 @@ test('database enforces caller-only intersections and private owner entitlements
       assert.equal((await db.query(`select * from app.team_member_configs where admin_user_id='${OTHER}'`)).rows.length,0);
       assert.deepEqual(await asMember(OTHER),[]);
       assert.deepEqual(await asMember(''),[]);
+    });
+    await t.test('profile-only delegation survives mirror removal but invalid owner or member removes access',async()=>{
+      await change('delete from app.users;');assert.deepEqual(await asMember(),[ANALYTICS]);
+      for(const user of [MEMBER,OWNER]) {
+        for(const [invalid,restore] of [
+          [`insert into app.users values('${user}','guard')`,`delete from app.users where id='${user}'`],
+          [`insert into app.guards values(gen_random_uuid(),'${user}',true)`,'delete from app.guards'],
+          [`insert into app.clients values(gen_random_uuid(),'${user}',false,false)`,`delete from app.clients where user_id='${user}' and is_active=false`],
+          [`update app.clients set is_suspended=true where user_id='${user}'`,`update app.clients set is_suspended=false where user_id='${user}'`],
+          [`update auth.users set email_confirmed_at=null where id='${user}'`,`update auth.users set email_confirmed_at=now() where id='${user}'`],
+          [`update auth.users set banned_until=now()+interval '1 day' where id='${user}'`,`update auth.users set banned_until=null where id='${user}'`],
+          [`update auth.users set deleted_at=now() where id='${user}'`,`update auth.users set deleted_at=null where id='${user}'`],
+          [`insert into app.account_closures values('${user}')`,'delete from app.account_closures'],
+        ]) {
+          await change(invalid);assert.deepEqual(await asMember(),[]);await change(restore);assert.deepEqual(await asMember(),[ANALYTICS]);
+        }
+      }
+      await change(`insert into app.users values('${MEMBER}','client'),('${OWNER}','client'),('${OTHER}','client');`);
     });
     await t.test('revocation, malformed selections and owner plan loss remove delegation',async()=>{
       for(const features of ['[]','null','{}','"legacy string"']) {

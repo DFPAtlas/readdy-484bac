@@ -12,7 +12,16 @@ function loadEndpoint(slug, db) {
     if (options?.db?.schema !== 'app') throw new Error('Application reads must explicitly select app schema');
     return db;
   };
-  new Function('require', 'Deno', 'exports', compiled)(() => ({ createClient }), {
+  new Function('require', 'Deno', 'exports', compiled)(name => {
+    if (name.startsWith('https://')) return { createClient };
+    if (name === '../../../lib/client-job-completion.ts') {
+      const mod = { exports: {} };
+      const source = ts.transpileModule(fs.readFileSync('lib/client-job-completion.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+      new Function('module', 'exports', source)(mod, mod.exports);
+      return mod.exports;
+    }
+    throw new Error('Unexpected endpoint import: ' + name);
+  }, {
     serve: fn => { handler = fn; }, env: { get: () => 'test-placeholder' },
   }, {});
   return async (body = {}, token = 'test-token', method = 'POST') => {

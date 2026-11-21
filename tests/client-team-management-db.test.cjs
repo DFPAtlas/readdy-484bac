@@ -2,6 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { randomUUID } = require('node:crypto');
+const { installTeamProfileCompatibility } = require('./helpers/team-profile-compat.cjs');
 const { PGlite } = require('@electric-sql/pglite');
 const A='11111111-1111-4111-8111-111111111111', B='22222222-2222-4222-8222-222222222222', C='33333333-3333-4333-8333-333333333333', D='44444444-4444-4444-8444-444444444444';
 const CA='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', CB='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', CC='cccccccc-cccc-4ccc-8ccc-cccccccccccc', CD='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
@@ -15,6 +16,8 @@ test('team management SQL authorizes, confirms and replays only owned changes',a
       create schema auth;create schema app;
       create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
       create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,deleted_at timestamptz,banned_until timestamptz);
+      create table app.guards(id uuid primary key,user_id uuid,is_active boolean);
+      create table app.admin_users(user_id uuid primary key,is_active boolean);
       create table app.users(id uuid primary key,email text,full_name text,user_type text);
       create table app.clients(id uuid primary key,user_id uuid,company_name text,subscription_tier text,is_active boolean,is_suspended boolean);
       create table app.user_entitlements_data(user_id uuid primary key,features jsonb,is_active boolean,audience text);
@@ -34,10 +37,11 @@ test('team management SQL authorizes, confirms and replays only owned changes',a
       const file=fs.readdirSync('supabase/migrations').find(f=>f.endsWith(suffix));
       await db.exec(fs.readFileSync('supabase/migrations/'+file,'utf8'));
     }
+    await installTeamProfileCompatibility(db, { management: true });
     async function root(sql,values=[]) { await db.exec('reset role;');return db.query(sql,values); }
     async function ddl(sql) { await db.exec('reset role;'+sql); }
     async function seed() {
-      await root('truncate app.client_team_operations,app.client_team_state,public.team_member_configs,app.account_closures,app.user_entitlements_data,app.clients,app.users,auth.users');
+      await root('truncate app.guards,app.admin_users,app.client_team_operations,app.client_team_state,public.team_member_configs,app.account_closures,app.user_entitlements_data,app.clients,app.users,auth.users');
       for(const [i,id] of [A,B,C,D].entries()) {
         await root('insert into auth.users values($1,$2,now(),null,null)',[id,email(id)]);
         await root('insert into app.users values($1,$2,$3,$4)',[id,'editable-'+email(id),'Synthetic '+i,'client']);
@@ -55,6 +59,40 @@ test('team management SQL authorizes, confirms and replays only owned changes',a
     async function add(member=B,who=A) {const op=await operation('add',member,{},who);return {op,result:await call('add',op,who)};}
     async function effective(who) {await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${who}',false);`);return(await db.query('select app.get_my_team_features() as f')).rows[0].f;}
 
+    await t.test('profile-only owner and member can list, search, add, delegate, replay and remove without legacy mirrors',async()=>{
+      await seed();await root('delete from app.users where id in ($1,$2)',[A,B]);
+      assert.deepEqual((await call('list')).members,[]);
+      assert.equal((await call('search',{email:email(B)})).candidates[0].member_user_id,B);
+      const {op,result}=await add();
+      assert.equal((await call('list')).members[0].member_available,true);
+      assert.equal((await call('add',op)).replayed,true);
+      await call('update',await operation('update',B,{config_id:result.config_id,expected_features:[],enabled_features:[API]}));
+      assert.deepEqual(await effective(B),[API]);
+      await call('remove',await operation('remove',B,{config_id:result.config_id}));
+      assert.deepEqual(await effective(B),[]);assert.deepEqual(await rows(),[]);
+      assert.equal((await root('select count(*)::int n from app.users where id in ($1,$2)',[A,B])).rows[0].n,0);
+    });
+    await t.test('profile-only identities with ambiguous, conflicting or invalid server records fail closed',async()=>{
+      for(const who of [A,B]) {
+        for(const sql of [
+          `insert into app.guards values(gen_random_uuid(),'${who}',true)`,
+          `insert into app.admin_users values('${who}',true)`,
+          `insert into app.clients values(gen_random_uuid(),'${who}','Duplicate','Enterprise',false,false)`,
+          `update auth.users set email_confirmed_at=null where id='${who}'`,
+          `update auth.users set banned_until=now()+interval '1 day' where id='${who}'`,
+          `update auth.users set deleted_at=now() where id='${who}'`,
+          `update app.clients set is_active=false where user_id='${who}'`,
+          `update app.clients set is_suspended=true where user_id='${who}'`,
+          `insert into app.account_closures values('${who}')`,
+          `insert into app.users values('${who}','conflict@example.test','Conflict','guard')`,
+        ]) {
+          await seed();await root('delete from app.users where id in ($1,$2)',[A,B]);await root(sql);
+          if(who===A) await assert.rejects(()=>call('list'),/active owned/);
+          else {assert.deepEqual((await call('search',{email:email(B)})).candidates,[]);await assert.rejects(()=>add(),/Member account/);}
+          assert.deepEqual(await rows(),[]);
+        }
+      }
+    });
     await t.test('owned list uses verified Auth email and never exposes foreign members or private owner rows',async()=>{
       await seed();const one=await add();await add(D,C);
       const data=await call('list');assert.equal(data.members.length,1);assert.equal(data.members[0].member_user_id,B);assert.equal(data.members[0].email,email(B));assert.equal(data.team_revision,1);

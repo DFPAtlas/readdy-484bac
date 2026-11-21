@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { paymentLabel, planLabel } from '@/lib/client-journey';
+import { clientPaymentTimeline } from '@/lib/client-payment-timeline';
 import { isCollected } from '@/lib/financeAmounts';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
@@ -102,20 +103,6 @@ export default function ClientPaymentCentrePage() {
       processing: 'bg-blue-500/10 text-blue-400 border-blue-500/25',
     };
     return map[status] || 'bg-slate-500/10 text-slate-400 border-slate-500/25';
-  };
-
-  const getTimeline = (payment: JobPayment) => {
-    const steps = [
-      { label: 'Job Posted', done: true, icon: 'ri-file-list-3-line' },
-      { label: 'Guard Selected', done: payment.paymentStatus !== 'pending_payment', icon: 'ri-user-star-line' },
-      { label: 'Client Paid', done: isCollected(payment.paymentStatus), icon: 'ri-money-pound-circle-line' },
-      { label: 'Funds Held', done: payment.releaseStatus === 'funded' || payment.releaseStatus === 'completed' || payment.releaseStatus === 'released', icon: 'ri-safe-line' },
-      { label: 'Guard Completed', done: ['payout_approved', 'completed'].includes(payment.jobStatus) || payment.releaseStatus === 'completed' || payment.releaseStatus === 'released', icon: 'ri-check-double-line' },
-      { label: 'Funds Released', done: payment.releaseStatus === 'released', icon: 'ri-send-plane-line' },
-      { label: 'Transfer Paid', done: payment.releaseStatus === 'released', icon: 'ri-bank-card-line' },
-    ];
-    if (payment.refundStatus !== '—') steps.push({label:payment.refundStatus, done:payment.paymentStatus === 'refunded' || payment.paymentStatus === 'partially_refunded',icon:'ri-refund-line'});
-    return steps;
   };
 
   const tabs: { key: TabKey; label: string; icon: string }[] = [
@@ -483,7 +470,7 @@ export default function ClientPaymentCentrePage() {
             </div>
             <p className="text-sm text-slate-400 mb-4">{selectedPayment.jobTitle} — £{selectedPayment.amountPaid.toFixed(2)}</p>
             <div className="space-y-0">
-              {getTimeline(selectedPayment).map((step, i) => (
+              {clientPaymentTimeline(selectedPayment).map((step, i) => (
                 <div key={i} className="flex gap-3">
                   <div className="flex flex-col items-center">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
