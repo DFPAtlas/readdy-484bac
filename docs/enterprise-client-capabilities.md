@@ -14,7 +14,8 @@ remain closed.
   future publications only. The existing private PDF/Word document store remains
   available separately. Guards review the job snapshot and explicitly accept it
   from Job Details or Apply. Assignment is blocked in the database until the
-  exact snapshot is accepted. Existing jobs are not retroactively modified.
+  exact snapshot is accepted. Company owners can read guard acceptance names and
+  timestamps on the job; a guard sees only their own acceptance. Existing jobs are not retroactively modified.
 - **Bulk CSV:** Download the template, import up to 100 rows / 1MB, review the
   existing grid and shared settings, then choose Post All. The import is local
   and creates no job. Quoted fields, escaped quotes, CRLF and multiline text are

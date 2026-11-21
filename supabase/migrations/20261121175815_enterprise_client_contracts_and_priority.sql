@@ -125,7 +125,7 @@ create trigger attach_default_job_contract after insert or update of status,is_d
 
 create function app.get_job_contract(p_job_id uuid) returns jsonb
 language plpgsql stable security definer set search_path='' as $$
-declare actor uuid:=auth.uid();kind text;gid uuid;job app.jobs%rowtype;contract app.job_contracts%rowtype;receipt app.job_contract_acceptances%rowtype;
+declare actor uuid:=auth.uid();kind text;gid uuid;job app.jobs%rowtype;contract app.job_contracts%rowtype;receipt app.job_contract_acceptances%rowtype;receipts jsonb:='[]'::jsonb;
 begin
  kind:=app.qg_active_message_role(actor);
  if kind is null then raise insufficient_privilege;end if;
@@ -144,7 +144,11 @@ begin
  if not found then return jsonb_build_object('job_id',p_job_id,'contract',null);end if;
  if contract.client_id is distinct from job.client_id then raise insufficient_privilege;end if;
  select * into receipt from app.job_contract_acceptances where job_id=p_job_id and guard_id=gid;
- return jsonb_build_object('job_id',p_job_id,'contract',jsonb_build_object('title',contract.title,'terms',contract.terms,'content_sha256',contract.content_sha256,'attached_at',contract.attached_at,'accepted_at',receipt.accepted_at),'can_accept',kind='guard');
+ if kind in ('client','admin') then
+  select coalesce(jsonb_agg(jsonb_build_object('guard_id',a.guard_id,'guard_name',coalesce(g.full_name,'Guard profile unavailable'),'accepted_at',a.accepted_at) order by a.accepted_at,a.guard_id),'[]'::jsonb) into receipts
+  from app.job_contract_acceptances a left join app.guards g on g.id=a.guard_id where a.job_id=p_job_id and a.content_sha256=contract.content_sha256;
+ end if;
+ return jsonb_build_object('job_id',p_job_id,'contract',jsonb_build_object('title',contract.title,'terms',contract.terms,'content_sha256',contract.content_sha256,'attached_at',contract.attached_at,'accepted_at',receipt.accepted_at),'can_accept',kind='guard','acceptances',receipts);
 end $$;
 revoke all on function app.get_job_contract(uuid) from public,anon;
 grant execute on function app.get_job_contract(uuid) to authenticated;

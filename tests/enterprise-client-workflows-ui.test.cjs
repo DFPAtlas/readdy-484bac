@@ -36,3 +36,14 @@ test('API integration requests are owner-scoped, retry one intent and distinguis
  nodes(tree).find(n=>n.type==='textarea').props.onChange({target:{value:'Read-only jobs feed for our scheduling system'}});tree=render();await nodes(tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});await flush();tree=render();assert.ok(text(tree).includes('Retry integration request'));
  await nodes(tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});await flush();tree=render();assert.deepEqual(calls[0],calls[1]);assert.equal(calls[0][0],USER);assert.equal(calls[0][1],CLIENT);assert.match(text(tree),/synchronisation is pending/);assert.ok(text(tree).includes('QG-API'));h.unmount();
 });
+
+test('contract RPC clients validate owner/job identity, receipt shape and account continuity',async()=>{
+ let current=USER;let response={...jobDetail,acceptances:[{guard_id:'guard',guard_name:'QA Guard',accepted_at:'2026-11-21T13:00:00Z'}]};let change=false;
+ const db={ auth:{ getUser:async()=>({ data:{ user:{ id:current } },error:null }) }, schema(name) { assert.equal(name,'app');return { rpc:async()=>{ if(change)current='other';return { data:response,error:null }; } }; } };
+ const api=loader({'./supabase':{supabase:db}})('lib/client-contracts.ts');
+ const detail=await api.readJobContract(USER,JOB);assert.equal(detail.acceptances[0].guard_name,'QA Guard');
+ response={...response,job_id:'foreign'};await assert.rejects(()=>api.readJobContract(USER,JOB),/could not be confirmed/);
+ response={...jobDetail,acceptances:[{guard_id:'guard'}]};await assert.rejects(()=>api.readJobContract(USER,JOB),/record could not be confirmed/);
+ response={...jobDetail,acceptances:[]};change=true;await assert.rejects(()=>api.readJobContract(USER,JOB),/account changed/);
+ assert.throws(()=>api.parseContractSettings({...settings,client_id:'foreign'},CLIENT),/could not be confirmed/);
+});

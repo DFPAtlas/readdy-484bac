@@ -15,7 +15,7 @@ test('versioned contracts enforce ownership, immutable publication, explicit acc
       create table app.users(id uuid primary key,user_type text);
       create table app.admin_users(user_id uuid,is_active boolean);
       create table app.clients(id uuid primary key,user_id uuid,company_name text,is_active boolean,is_suspended boolean);
-      create table app.guards(id uuid primary key,user_id uuid,is_active boolean);
+      create table app.guards(id uuid primary key,user_id uuid,is_active boolean,full_name text);
       create table app.account_closures(user_id uuid primary key);
       create table app.user_entitlements_data(user_id uuid primary key,is_active boolean,audience text,features jsonb);
       create table app.jobs(id uuid primary key,client_id uuid,status text,is_draft boolean default false,is_deleted boolean default false);
@@ -26,7 +26,7 @@ test('versioned contracts enforce ownership, immutable publication, explicit acc
       grant usage on schema app,auth to anon,authenticated,service_role;
       insert into auth.users values('${C}',now(),null,null),('${OTHER}',now(),null,null),('${G}',now(),null,null),('${G2}',now(),null,null);
       insert into app.clients values('${CID}','${C}','QA',true,false),('${OID}','${OTHER}','Other',true,false);
-      insert into app.guards values('${G}','${G}',true),('${G2}','${G2}',true);
+      insert into app.guards(id,user_id,is_active) values('${G}','${G}',true),('${G2}','${G2}',true);
       insert into app.user_entitlements_data values('${C}',true,'client','${features}'),('${OTHER}',true,'client','[]');`);
     const role = fs.readFileSync('supabase/migrations/20261120183707_quickguard_profile_role_compatibility.sql','utf8');
     await db.exec(role.slice(0,role.indexOf('create or replace function app.get_my_message_partners')));
@@ -61,7 +61,8 @@ test('versioned contracts enforce ownership, immutable publication, explicit acc
       await assert.rejects(()=>root("insert into app.job_assignments values($1,$2,$3,'selected')",[randomUUID(),j1,G]),/must review and accept/);
       await assert.rejects(()=>rpc(G,'accept_job_contract',[j1,'0'.repeat(64)]),/Contract changed/);
       await assert.rejects(()=>rpc(C,'accept_job_contract',[j1,detail.contract.content_sha256]),/permission denied|privilege/i);
-      const accepted=await rpc(G,'accept_job_contract',[j1,detail.contract.content_sha256]);assert.ok(accepted.contract.accepted_at);
+      const accepted=await rpc(G,'accept_job_contract',[j1,detail.contract.content_sha256]);assert.ok(accepted.contract.accepted_at);assert.deepEqual(accepted.acceptances,[]);
+      const ownerRecord=await rpc(C,'get_job_contract',[j1]);assert.equal(ownerRecord.acceptances[0].guard_id,G);assert.equal(ownerRecord.acceptances[0].accepted_at,accepted.contract.accepted_at);assert.equal(ownerRecord.acceptances[0].actor_user_id,undefined);
       const replay=await rpc(G,'accept_job_contract',[j1,detail.contract.content_sha256]);assert.equal(replay.contract.accepted_at,accepted.contract.accepted_at);
       await root("insert into app.job_assignments values($1,$2,$3,'selected')",[randomUUID(),j1,G]);
       await assert.rejects(()=>root("insert into app.job_assignments values($1,$2,$3,'confirmed')",[randomUUID(),j1,G2]),/must review and accept/);
