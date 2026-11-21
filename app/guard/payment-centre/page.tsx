@@ -21,6 +21,7 @@ export default function GuardPaymentCentrePage() {
     earningsSummary,
     stripeStatus,
     stripeLoading,
+    stripeError,
     jobPayments,
     refreshStripeStatus,
     handleConnectStripe,
@@ -68,7 +69,7 @@ export default function GuardPaymentCentrePage() {
 
     const params = new URLSearchParams(window.location.search);
     if (params.get('stripe_onboarding') === 'return') {
-      setToast({ message: 'Stripe setup complete! Your account is being verified.', type: 'success' });
+      setToast({ message: 'Returned from Stripe. Check the current account status below.', type: 'success' });
       refreshStripeStatus();
     }
     if (window.location.search) {
@@ -319,7 +320,11 @@ export default function GuardPaymentCentrePage() {
                   </button>
                 </div>
 
-                {!stripeStatus?.connected ? (
+                {stripeLoading || !stripeStatus ? (
+                  <div role={stripeError ? 'alert' : 'status'} className="rounded-xl border border-amber-500/30 p-4 text-slate-300">
+                    {stripeLoading ? 'Checking Stripe account status…' : (stripeError || 'Payout account status is unavailable. Refresh before changing your payout setup.')}
+                  </div>
+                ) : !stripeStatus.connected ? (
                   <div>
                     <div className="flex items-center gap-3 mb-4 p-4 bg-slate-500/5 rounded-xl border border-slate-500/15">
                       <div className="w-10 h-10 rounded-full bg-slate-500/15 flex items-center justify-center flex-shrink-0">
@@ -418,12 +423,6 @@ export default function GuardPaymentCentrePage() {
                   <div className="mt-5 pt-4 border-t border-[#1e2d4d]">
                     <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Account Details</h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {stripeStatus.stripeAccountId && (
-                        <div className="bg-[#0B1933] rounded-lg p-3 border border-[#1e2d4d]">
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Account ID</p>
-                          <p className="text-xs font-mono text-slate-300">{stripeStatus.stripeAccountId.slice(0, 4)}&bull;&bull;&bull;{stripeStatus.stripeAccountId.slice(-4)}</p>
-                        </div>
-                      )}
                       <div className="bg-[#0B1933] rounded-lg p-3 border border-[#1e2d4d]">
                         <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Payouts Enabled</p>
                         <p className={`text-xs font-semibold ${stripeStatus.payoutsEnabled ? 'text-emerald-400' : 'text-slate-500'}`}>
@@ -437,9 +436,9 @@ export default function GuardPaymentCentrePage() {
                         </p>
                       </div>
                       <div className="bg-[#0B1933] rounded-lg p-3 border border-[#1e2d4d]">
-                        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Charges Enabled</p>
-                        <p className={`text-xs font-semibold ${stripeStatus.chargesEnabled ? 'text-emerald-400' : 'text-slate-500'}`}>
-                          {stripeStatus.chargesEnabled ? 'Yes' : 'No'}
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Transfers Enabled</p>
+                        <p className={`text-xs font-semibold ${stripeStatus.transfersEnabled ? 'text-emerald-400' : 'text-slate-500'}`}>
+                          {stripeStatus.transfersEnabled ? 'Yes' : 'No'}
                         </p>
                       </div>
                       {stripeStatus.lastCheckedAt && (

@@ -1,5 +1,7 @@
 'use client';
 
+import { londonCalendarDate } from '@/lib/date-only';
+import { guardJobAcceptsApplications } from '@/lib/guard-job-availability';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -97,6 +99,7 @@ export default function GuardJobsPage() {
       `)
       .eq('status', 'open')
       .eq('is_deleted', false)
+      .gte('start_date', londonCalendarDate())
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -164,6 +167,7 @@ export default function GuardJobsPage() {
       return;
     }
 
+    if (!guardJobAcceptsApplications(job)) { showToast('This job is no longer accepting applications.', 'error'); return; }
     setApplyingId(job.id);
 
     try {

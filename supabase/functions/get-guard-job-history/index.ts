@@ -1,3 +1,5 @@
+import { guardApplicationGroup } from '../../../lib/guard-application-status.ts';
+import { guardHistoryTotals, isPaidGuardPayoutStatus } from '../../../lib/payments/guardPaymentDisplay.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
@@ -10,6 +12,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+
+  if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: corsHeaders });
 
   try {
     const authHeader = req.headers.get('authorization') || '';
@@ -29,12 +33,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: guard } = await supabaseApp
+    const { data: guard, error: guardError } = await supabaseApp
       .from('guards')
       .select('id, full_name, stripe_connect_status, total_earnings')
       .eq('user_id', user.id)
       .maybeSingle();
 
+    if (guardError) throw new Error('Unable to load guard history');
     if (!guard) {
       return new Response(JSON.stringify({ error: 'Guard not found' }), {
         status: 404,
@@ -44,14 +49,13 @@ Deno.serve(async (req) => {
 
     const guardId = guard.id;
 
-    const { data: applications } = await supabaseApp
+    const { data: applications, error: applicationsError } = await supabaseApp
       .from('job_applications')
       .select(`
         id,
         status,
         applied_at,
         cover_message,
-        proposed_rate,
         jobs (
           id,
           job_title,
@@ -74,7 +78,7 @@ Deno.serve(async (req) => {
       .eq('guard_id', guardId)
       .order('applied_at', { ascending: false });
 
-    const { data: assignments } = await supabaseApp
+    const { data: assignments, error: assignmentsError } = await supabaseApp
       .from('job_assignments')
       .select(`
         id,
@@ -112,42 +116,47 @@ Deno.serve(async (req) => {
       .eq('guard_id', guardId)
       .order('assigned_at', { ascending: false });
 
-    const { data: completionRequests } = await supabaseApp
+    const { data: completionRequests, error: completionRequestsError } = await supabaseApp
       .from('job_completion_requests')
       .select('id, job_id, status, requested_at, client_approved_at, client_disputed_at, dispute_reason, admin_approved_at, notes')
       .eq('guard_id', guardId)
       .order('requested_at', { ascending: false });
 
-    const { data: disputes } = await supabaseApp
+    const { data: disputes, error: disputesError } = await supabaseApp
       .from('disputes')
       .select('id, job_id, status, reason, details, resolution, refund_amount, created_at, resolved_at')
       .eq('guard_id', guardId)
       .order('created_at', { ascending: false });
 
-    const { data: reviews } = await supabaseApp
+    const { data: reviews, error: reviewsError } = await supabaseApp
       .from('reviews')
-      .select('id, job_id, client_id, rating, punctuality_rating, professionalism_rating, communication_rating, comment, created_at, clients (company_name)')
+      .select('id, job_id, client_id, rating, punctuality_rating:punctuality, professionalism_rating:professionalism, communication_rating:communication, comment:review_text, created_at, clients (company_name)')
+      .eq('status', 'published')
       .eq('guard_id', guardId)
       .order('created_at', { ascending: false });
 
-    const { data: clientReviews } = await supabaseApp
+    const { data: clientReviews, error: clientReviewsError } = await supabaseApp
       .from('client_reviews')
       .select('id, job_id, client_id, rating, comment, created_at')
       .eq('guard_id', guardId)
       .order('created_at', { ascending: false });
 
-    const { data: auditLogs } = await supabaseApp
+    const { data: auditLogs, error: auditLogsError } = await supabaseApp
       .from('payment_audit_logs')
       .select('id, job_id, from_status, to_status, changed_by_role, reason, created_at')
       .eq('guard_id', guardId)
       .order('created_at', { ascending: false })
       .limit(100);
 
-    const { data: payouts } = await supabaseApp
+    const { data: payouts, error: payoutsError } = await supabaseApp
       .from('guard_payouts')
-      .select('id, job_id, amount, status, stripe_transfer_id, created_at, paid_at')
+      .select('id, job_id, amount, net_amount, status, stripe_transfer_id, created_at, paid_at:completed_date')
       .eq('guard_id', guardId)
       .order('created_at', { ascending: false });
+
+    if ([applicationsError, assignmentsError, completionRequestsError, disputesError, reviewsError, clientReviewsError, auditLogsError, payoutsError].some(Boolean)) {
+      throw new Error('Unable to load complete guard history');
+    }
 
     const jobMap = new Map();
 
@@ -172,6 +181,8 @@ Deno.serve(async (req) => {
           stripe_payment_intent_id: app.jobs?.stripe_payment_intent_id,
           platform_fee: app.jobs?.platform_fee,
           guard_payout_amount: app.jobs?.guard_payout_amount,
+          application_id: app.id,
+          assignment_id: null,
           application_status: app.status,
           applied_at: app.applied_at,
           assignment_status: null,
@@ -197,6 +208,7 @@ Deno.serve(async (req) => {
         });
       } else {
         const entry = jobMap.get(jobId);
+        entry.application_id = app.id;
         entry.application_status = app.status;
         entry.applied_at = app.applied_at;
       }
@@ -207,6 +219,8 @@ Deno.serve(async (req) => {
       if (!jobId) return;
       if (jobMap.has(jobId)) {
         const entry = jobMap.get(jobId);
+        entry.assignment_id = ass.id;
+        entry.payment_amount = ass.payment_amount;
         entry.assignment_status = ass.status;
         entry.assigned_at = ass.assigned_at;
         entry.completed_at = ass.completed_at;
@@ -236,6 +250,9 @@ Deno.serve(async (req) => {
           stripe_payment_intent_id: ass.jobs?.stripe_payment_intent_id,
           platform_fee: ass.jobs?.platform_fee,
           guard_payout_amount: ass.jobs?.guard_payout_amount,
+          application_id: null,
+          assignment_id: ass.id,
+          payment_amount: ass.payment_amount,
           application_status: null,
           applied_at: null,
           assignment_status: ass.status,
@@ -325,10 +342,11 @@ Deno.serve(async (req) => {
 
     (payouts || []).forEach((p: any) => {
       const entry = jobMap.get(p.job_id);
-      if (entry) {
+      if (entry && !entry.payout) {
         entry.payout = {
           id: p.id,
           amount: p.amount,
+          net_amount: p.net_amount,
           status: p.status,
           stripe_transfer_id: p.stripe_transfer_id,
           created_at: p.created_at,
@@ -344,18 +362,14 @@ Deno.serve(async (req) => {
     });
 
     const totalApplied = applications?.length || 0;
-    const totalAccepted = applications?.filter((a: any) => a.status === 'accepted' || a.status === 'confirmed').length || 0;
+    const totalAccepted = applications?.filter((a: { status: string }) => guardApplicationGroup(a.status) === 'accepted').length || 0;
     const totalFunded = jobs.filter((j: any) => j.payment_status === 'funded' || j.payment_status === 'paid').length;
     const totalCompleted = jobs.filter((j: any) => j.assignment_status === 'completed').length;
     const totalPendingApproval = jobs.filter((j: any) => j.completion_request_status === 'pending').length;
-    const totalPaidOut = jobs.filter((j: any) => j.payout_released || j.payout?.status === 'paid').length;
+    const totalPaidOut = jobs.filter((j: any) => isPaidGuardPayoutStatus(j.payout?.status)).length;
     const totalDisputed = jobs.filter((j: any) => j.dispute_status === 'open' || j.dispute_status === 'under_review').length;
     const totalCancelled = jobs.filter((j: any) => j.job_status === 'cancelled').length;
-    const totalEarned = jobs.reduce((sum: number, j: any) => sum + (j.payout?.amount || j.guard_payout_amount || j.payment_amount || 0), 0);
-    const pendingPayout = jobs.filter((j: any) => j.assignment_status === 'completed' && !j.payout_released && !j.dispute_status)
-      .reduce((sum: number, j: any) => sum + (j.guard_payout_amount || j.payment_amount || 0), 0);
-    const releasedPayout = jobs.filter((j: any) => j.payout_released || j.payout?.status === 'paid')
-      .reduce((sum: number, j: any) => sum + (j.payout?.amount || j.guard_payout_amount || j.payment_amount || 0), 0);
+    const { totalEarned, pendingPayout, releasedPayout } = guardHistoryTotals(jobs, payouts || []);
 
     return new Response(
       JSON.stringify({
@@ -368,6 +382,7 @@ Deno.serve(async (req) => {
         jobs,
         stats: {
           total_applied: totalApplied,
+          total_selected: applications?.filter((a: { status: string }) => guardApplicationGroup(a.status) === 'selected').length || 0,
           total_accepted: totalAccepted,
           total_funded: totalFunded,
           total_completed: totalCompleted,
@@ -382,8 +397,8 @@ Deno.serve(async (req) => {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message || 'Internal error' }), {
+  } catch {
+    return new Response(JSON.stringify({ error: 'Unable to load complete guard history. Please retry.' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

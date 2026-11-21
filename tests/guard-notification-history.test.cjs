@@ -8,6 +8,7 @@ const compile = source => ts.transpileModule(source, { compilerOptions: { module
 const mod = { exports: {} };
 new Function('exports',compile(fs.readFileSync('lib/notification-snooze.ts','utf8')))(mod.exports);
 const { saveGuardNotificationSnooze } = mod.exports;
+const category = require('./helpers/enterprise-module.cjs').load('lib/guard-notification-category.ts');
 const future = () => new Date(Date.now()+3600000).toISOString();
 const row = (id, options={}) => ({id,title:id,message:'Update',type:'payment',is_read:false,link:null,created_at:new Date().toISOString(),snoozed_until:null,...options});
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return{promise,resolve,reject};};
@@ -45,7 +46,7 @@ function harness(read=async()=>({data:[row('a'),row('b')]}),change=async(_db,_ow
   const same=(a,b)=>a&&b&&a.length===b.length&&a.every((v,n)=>Object.is(v,b[n]));
   const hooks={useState(initial){const n=cursor++;if(!(n in slots))slots[n]=initial;return[slots[n],value=>{writes++;slots[n]=typeof value==='function'?value(slots[n]):value;}];},useRef(initial){const n=cursor++;if(!(n in slots))slots[n]={current:initial};return slots[n];},useCallback(fn,deps){const n=cursor++;if(!slots[n]||!same(slots[n].deps,deps))slots[n]={fn,deps};return slots[n].fn;},useMemo(fn,deps){const n=cursor++;if(!slots[n]||!same(slots[n].deps,deps))slots[n]={value:fn(),deps};return slots[n].value;},useEffect(fn,deps){const n=cursor++;if(!effects[n]||!same(effects[n].deps,deps))pending.push(()=>{effects[n]?.cleanup?.();effects[n]={deps,cleanup:fn()};});}};
   const db={from(table){const call={table,filters:[]};queries.push(call);const q={select(value){call.fields=value;return q;},eq(key,value){call.filters.push([key,value]);return q;},order(key,value){call.order=[key,value];return q;},limit(value){call.limit=value;return read(call);}};return q;},channel(name){const c={name,on(_kind,_filter,callback){c.notify=callback;return c;},subscribe(){channels.push(c);return c;}};return c;},removeChannel:c=>removed.push(c)};
-  const env={...hooks,...pure,supabase:db,changeOwnedNotifications:async(...args)=>{changes.push(args.slice(1));return change(...args);},saveGuardNotificationSnooze:async(...args)=>{snoozes.push(args.slice(1));return snooze(...args);},setTimeout:fn=>{const id=++timerId;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id)};
+  const env={...hooks,...pure,...category,supabase:db,changeOwnedNotifications:async(...args)=>{changes.push(args.slice(1));return change(...args);},saveGuardNotificationSnooze:async(...args)=>{snoozes.push(args.slice(1));return snooze(...args);},setTimeout:fn=>{const id=++timerId;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id)};
   const component=new Function(...Object.keys(env),compile(`return function(guardUserId){${body}\nreturn {notifications,loading,loadError,actionError,actionPending,clearing,deletingId,showClearConfirm,confirmDeleteId,snoozeToast,filtered,paginated,page,visiblePage,totalPages,clearCount,clearIds:clearIdsRef.current,setPage,setTypeFilter,setReadFilter,setShowSnoozed,setConfirmDeleteId,fetchAll,markAsRead,markAllAsRead,openClearConfirm,clearAll,deleteNotification,snoozeNotification,unsnoozeNotification};}`))(...Object.values(env));
   let owner='guard';return{queries,channels,removed,changes,snoozes,timers,get writes(){return writes;},render(next=owner){owner=next;cursor=0;return component(owner);},async effects(){pending.splice(0).forEach(fn=>fn());await flush();},unmount(){effects.forEach(e=>e?.cleanup?.());}};
 }
@@ -104,9 +105,17 @@ test('account switches or unmounts discard delayed mutations and do not trigger 
 
 test('rendered load failure exposes retry instead of empty history, and pending writes disable mutation controls',()=>{
   function render(overrides){let index=0;const hooks={...React,useState(initial){const state=React.useState(initial),n=index++;return n in overrides?[overrides[n],()=>{}]:state;}};const component={exports:{}};new Function('require','exports',compile(source))(name=>{
-    if(name==='react')return hooks;if(name==='@/lib/supabase')return{supabase:{}};if(name==='@/lib/client-notification-inbox')return{changeClientNotifications(){}};if(name==='@/lib/notification-snooze')return mod.exports;if(name==='@/lib/job-links')return{normalizeJobLink:value=>value};if(name==='next/link')return{__esModule:true,default:()=>null};return require(name);
+    if(name==='@/lib/guard-notification-category')return category;if(name==='react')return hooks;if(name==='@/lib/supabase')return{supabase:{}};if(name==='@/lib/client-notification-inbox')return{changeClientNotifications(){}};if(name==='@/lib/notification-snooze')return mod.exports;if(name==='@/lib/job-links')return{normalizeJobLink:value=>value};if(name==='next/link')return{__esModule:true,default:()=>null};return require(name);
   },component.exports);return renderToStaticMarkup(React.createElement(component.exports.default,{guardUserId:'guard'}));}
   const failed=render({1:false,15:true});assert.match(failed,/role="alert"/);assert.match(failed,/Retry loading history/);assert.doesNotMatch(failed,/No notifications found|0 total/);
   const pending=render({0:[row('a')],1:false,17:true});assert.ok((pending.match(/disabled=""/g)||[]).length>=7);
   const error=render({0:[row('a')],1:false,16:'Notification changes could not be confirmed.'});assert.match(error,/role="alert"/);assert.match(error,/Reload history/);
+});
+
+
+test('legacy payout alerts share the payment filter and mark-all remains scoped to those unread records',async()=>{
+  const r=harness(async()=>({data:[row('payout',{type:'success',title:'Payout Sent'}),row('approved',{type:'info',title:'Client Approved'}),row('application',{type:'info',title:'Application Submitted'}),row('message',{type:'message',title:'Payment Released'})]}));
+  r.render();await r.effects();r.render().setTypeFilter('payment');const api=r.render();
+  assert.deepEqual(api.filtered.map(n=>n.id),['payout','approved']);
+  await api.markAllAsRead();assert.deepEqual(r.changes[0],['guard',['payout','approved'],'mark_read']);
 });

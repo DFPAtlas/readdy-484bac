@@ -21,6 +21,7 @@ const APPLY_ERRORS: Record<string, [number, string, Record<string, unknown>?]> =
   job_not_found: [404, "Job not found"],
   job_removed: [400, "This job has been removed"],
   job_closed: [400, "Job is no longer open for applications"],
+  job_expired: [400, "This job is no longer accepting applications"],
   guard_inactive: [403, "Your account is not active. Contact support."],
   guard_not_verified: [403, "Your profile is not yet verified. You cannot apply for jobs until verification is complete."],
   sia_expired: [403, "Your SIA licence has expired. Please update your licence details."],

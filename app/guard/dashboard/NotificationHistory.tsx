@@ -1,5 +1,6 @@
 'use client';
 
+import { guardNotificationCategory } from '@/lib/guard-notification-category';
 import { normalizeJobLink } from '@/lib/job-links';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -12,6 +13,7 @@ interface Notification {
   title: string;
   message: string;
   type: string;
+  category?: string | null;
   is_read: boolean;
   link: string | null;
   created_at: string;
@@ -301,7 +303,7 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
   const unsnoozeNotification = (id: string) => runAction('snooze', [id], null);
 
   const filtered = notifications.filter(n => {
-    const typeOk = typeFilter === 'all' || n.type === typeFilter;
+    const typeOk = typeFilter === 'all' || guardNotificationCategory(n) === typeFilter;
     const readOk = readFilter === 'all' || (readFilter === 'unread' ? !n.is_read : n.is_read);
     const snoozeOk = showSnoozed ? isSnoozed(n) : !isSnoozed(n);
     const searchOk = !searchQuery ||
@@ -542,7 +544,7 @@ export default function NotificationHistory({ guardUserId }: NotificationHistory
                 </div>
                 <div className="space-y-3">
                   {items.map(n => {
-                    const meta = TYPE_META[n.type] || DEFAULT_META;
+                    const meta = TYPE_META[guardNotificationCategory(n)] || DEFAULT_META;
                     const isConfirmingDelete = confirmDeleteId === n.id;
                     const isDeleting = deletingId === n.id;
                     const snoozed = isSnoozed(n);

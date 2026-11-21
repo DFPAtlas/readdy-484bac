@@ -1,5 +1,6 @@
 'use client';
 
+import { guardJobAcceptsApplications } from '@/lib/guard-job-availability';
 import JobContractPanel from '@/components/JobContractPanel';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -68,7 +69,7 @@ export default function GuardApplyClient({ jobId }: { jobId: string }) {
       .eq('is_deleted', false)
       .maybeSingle();
 
-    if (!jobData || jobData.status !== 'open') {
+    if (!jobData || !guardJobAcceptsApplications(jobData)) {
       setJob(null);
       setLoading(false);
       return;
@@ -92,6 +93,7 @@ export default function GuardApplyClient({ jobId }: { jobId: string }) {
 
   const handleSubmit = async () => {
     if (!guardId || !job || !guardProfile) return;
+    if (!guardJobAcceptsApplications(job)) { showToast("This job is no longer accepting applications.", "error"); return; }
 
     if (job.sia_licence_required && job.required_licence_types && job.required_licence_types.length > 0) {
       const guardLicences = guardProfile.licence_types || [];

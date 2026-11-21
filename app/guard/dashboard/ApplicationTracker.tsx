@@ -1,5 +1,6 @@
 'use client';
 
+import { guardApplicationGroup } from '@/lib/guard-application-status';
 import Link from 'next/link';
 import { JobApplication } from './types';
 
@@ -13,10 +14,11 @@ interface Props {
 
 export default function ApplicationTracker({ applications, planName, periodEnd, applicationLimit, applicationsUsed }: Props) {
   const active = applications.filter(a => a.status !== 'withdrawn');
-  const pending = active.filter(a => a.status === 'pending').length;
-  const reviewed = active.filter(a => a.status === 'reviewed').length;
-  const accepted = active.filter(a => a.status === 'accepted' || a.status === 'confirmed').length;
-  const declined = active.filter(a => a.status === 'declined' || a.status === 'rejected').length;
+  const pending = active.filter(a => guardApplicationGroup(a.status) === 'pending').length;
+  const reviewed = active.filter(a => guardApplicationGroup(a.status) === 'reviewed').length;
+  const selected = active.filter(a => guardApplicationGroup(a.status) === 'selected').length;
+  const accepted = active.filter(a => guardApplicationGroup(a.status) === 'accepted').length;
+  const declined = active.filter(a => guardApplicationGroup(a.status) === 'declined').length;
 
   const used = applicationsUsed ?? active.length;
   const limit = applicationLimit ?? 10;
@@ -61,7 +63,8 @@ export default function ApplicationTracker({ applications, planName, periodEnd, 
         )}
       </div>
 
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-5 gap-1.5">
+        <div className="text-center p-2 rounded-xl bg-[#0B1933] border border-[#1a2b4a]"><p className="text-lg font-bold text-violet-400">{selected}</p><p className="text-[10px] text-slate-500">Selected</p></div>
         <div className="text-center p-2 rounded-xl bg-[#0B1933] border border-[#1a2b4a]">
           <p className="text-lg font-bold text-amber-400">{pending}</p>
           <p className="text-[10px] text-slate-500">Pending</p>
