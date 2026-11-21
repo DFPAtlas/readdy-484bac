@@ -1,7 +1,7 @@
 
 'use client';
 
-import { deriveGuardPaymentDisplayStatus, recordedGuardAmount } from '@/lib/payments/guardPaymentDisplay';
+import { deriveGuardPaymentDisplayStatus, isPaidGuardPayoutStatus, recordedGuardAmount } from '@/lib/payments/guardPaymentDisplay';
 import * as React from 'react';
 import { formatDateOnly } from '@/lib/date-only';
 
@@ -19,11 +19,8 @@ export default function PayoutTable({
   onViewDetails,
 }: PayoutTableProps) {
   const getStatusColor = (status: string) => {
+    if (isPaidGuardPayoutStatus(status)) return 'bg-green-100 text-green-700';
     switch (status) {
-      case 'paid_out':
-      case 'paid':
-      case 'completed':
-        return 'bg-green-100 text-green-700';
       case 'pending':
         return 'bg-orange-100 text-orange-700';
       case 'processing':
@@ -160,7 +157,7 @@ export default function PayoutTable({
                         status,
                       )}`}
                     >
-                      {status === 'paid' || status === 'completed' ? (
+                      {isPaidGuardPayoutStatus(status) ? (
                         <>
                           <i className="ri-check-line mr-1"></i>Paid
                         </>
@@ -176,6 +173,10 @@ export default function PayoutTable({
                         <>
                           <i className="ri-close-circle-line mr-1"></i>Failed
                         </>
+                      ) : ['cancelled', 'refunded', 'refund_completed', 'reversed'].includes(status) ? (
+                        <>
+                          <i className="ri-close-circle-line mr-1"></i>{status === 'cancelled' ? 'Cancelled' : status === 'reversed' ? 'Reversed' : 'Refunded'}
+                        </>
                       ) : (
                         <>
                           <i className="ri-time-line mr-1"></i>Pending
@@ -187,7 +188,7 @@ export default function PayoutTable({
                   <td className="px-6 py-4">
                     {expected ? (
                       <span className="text-sm text-slate-400">{expected}</span>
-                    ) : status === 'paid' || status === 'completed' ? (
+                    ) : isPaidGuardPayoutStatus(status) ? (
                       <span className="text-xs text-emerald-400 font-medium">Completed</span>
                     ) : (
                       <span className="text-xs text-slate-600">—</span>
