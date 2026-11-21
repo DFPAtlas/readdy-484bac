@@ -264,7 +264,7 @@ export default function ClientPaymentCentrePage() {
                   </div>
                   <div className="bg-[#0B1933] rounded-lg p-3 border border-[#1e2d4d]">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Payment Method</p>
-                    <PaymentMethodStatus state={paymentMethodState} onRefresh={refreshPaymentMethod} />
+                    <PaymentMethodStatus state={paymentMethodState} onRefresh={refreshPaymentMethod} onDark />
                   </div>
                   <div className="bg-[#0B1933] rounded-lg p-3 border border-[#1e2d4d]">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Plan</p>
