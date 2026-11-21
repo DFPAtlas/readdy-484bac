@@ -47,6 +47,9 @@ export async function requestGuardStripe(client: any, endpoint: 'get-guard-strip
     body: JSON.stringify({}),
   });
   const data = await response.json().catch(() => null);
+  if (endpoint === 'get-guard-stripe-status' && data?.error_code === 'connect_account_unavailable') {
+    throw new Error('Your linked Stripe account could not be verified. Contact support to check the connection; your existing account link has been kept.');
+  }
   if (!response.ok || !data || data.error) throw new Error('Stripe could not complete this request. Please retry or contact support.');
   return endpoint === 'get-guard-stripe-status' ? parseGuardStripeStatus(data) : { url: stripeAccountUrl(data.url) };
 }

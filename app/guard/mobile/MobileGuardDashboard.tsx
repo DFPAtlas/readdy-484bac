@@ -18,6 +18,8 @@ import BottomNav from './BottomNav';
 import { submitGuardApplication } from '@/lib/guard-applications';
 import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
 import HomeSkeleton from './HomeSkeleton';
+import GuardMessagesClient from '@/app/guard/messages/GuardMessagesClient';
+import { readMessageRows } from '@/lib/job-messages';
 
 
 
@@ -137,7 +139,7 @@ const guardTabs = [
 export default function MobileGuardDashboard() {
   const router = useRouter();
   const [guard, setGuard] = useState<Guard | null>(null);
-  const [, setGuardUserId] = useState<string | null>(null);
+  const [guardUserId, setGuardUserId] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<JobAssignment[]>([]);
   const [upcomingJobs, setUpcomingJobs] = useState<JobAssignment[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);
@@ -184,12 +186,13 @@ export default function MobileGuardDashboard() {
         id: job.application_id, status: job.application_status, applied_at: job.applied_at, jobs: job,
       }));
       const today = londonCalendarDate();
-      const [responsesResult, jobsResult, payoutsResult] = await Promise.all([
+      const [responsesResult, jobsResult, payoutsResult, messages] = await Promise.all([
         supabase.from('client_responses').select('id,response_type,message,is_read,created_at,jobs(job_title),clients(company_name)')
           .eq('guard_id', guardData.id).order('created_at', { ascending: false }),
         supabase.from('jobs').select('id,job_title,venue_city,venue_postcode,start_date,start_time,end_time,hourly_rate,status,clients(company_name),sia_licence_required,number_of_guards')
           .eq('status', 'open').eq('is_deleted', false).gte('start_date', today).order('start_date', { ascending: true }).limit(30),
         supabase.from('guard_payouts').select('amount,net_amount,status').eq('guard_id', guardData.id),
+        readMessageRows(supabase, userId, undefined, () => epoch === loadEpoch.current),
       ]);
       if (responsesResult.error || jobsResult.error || payoutsResult.error) throw new Error('Your dashboard data could not be loaded.');
       const after = await supabase.auth.getUser();
@@ -204,7 +207,7 @@ export default function MobileGuardDashboard() {
         .sort((a, b) => a.jobs.start_date.localeCompare(b.jobs.start_date)));
       setApplications(ownedApplications);
       setResponses((responsesResult.data || []).map(row => ({ ...row, jobs: oneRelation(row.jobs), clients: oneRelation(row.clients) })));
-      setUnreadCount((responsesResult.data || []).filter(row => !row.is_read).length);
+      setUnreadCount(messages.filter(row => row.receiver_id === userId && !row.read).length);
       setAvailableJobs((jobsResult.data || []).map(row => ({ ...row, clients: oneRelation(row.clients) })));
       setEarnings({ totalEarned: totalPaid, totalPaid,
         totalPending: payouts.filter(row => !isPaidGuardPayoutStatus(row.status) && ['pending', 'initiated', 'processing', 'payout_pending'].includes(row.status))
@@ -226,12 +229,15 @@ export default function MobileGuardDashboard() {
   useEffect(() => {
     if (!guard?.id) return;
     const channels: ReturnType<typeof supabase.channel>[] = [];
-    channels.push(supabase.channel('guard-mobile-jobs').on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => loadDashboardData()).subscribe());
-    channels.push(supabase.channel('guard-mobile-responses').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'client_responses', filter: `guard_id=eq.${guard.id}` }, () => loadDashboardData()).subscribe());
-    channels.push(supabase.channel('guard-mobile-assignments').on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments', filter: `guard_id=eq.${guard.id}` }, () => loadDashboardData()).subscribe());
-    channels.push(supabase.channel('guard-mobile-apps').on('postgres_changes', { event: '*', schema: 'public', table: 'job_applications', filter: `guard_id=eq.${guard.id}` }, () => loadDashboardData()).subscribe());
+    channels.push(supabase.channel('guard-mobile-jobs').on('postgres_changes', { event: '*', schema: 'app', table: 'jobs' }, () => loadDashboardData()).subscribe());
+    channels.push(supabase.channel('guard-mobile-responses').on('postgres_changes', { event: 'INSERT', schema: 'app', table: 'client_responses', filter: `guard_id=eq.${guard.id}` }, () => loadDashboardData()).subscribe());
+    channels.push(supabase.channel('guard-mobile-assignments').on('postgres_changes', { event: '*', schema: 'app', table: 'job_assignments', filter: `guard_id=eq.${guard.id}` }, () => loadDashboardData()).subscribe());
+    channels.push(supabase.channel('guard-mobile-apps').on('postgres_changes', { event: '*', schema: 'app', table: 'job_applications', filter: `guard_id=eq.${guard.id}` }, () => loadDashboardData()).subscribe());
+    if (guardUserId) channels.push(supabase.channel(`guard-mobile-inbox-${guardUserId}`)
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'messages', filter: `receiver_id=eq.${guardUserId}` }, () => loadDashboardData())
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'messages', filter: `sender_id=eq.${guardUserId}` }, () => loadDashboardData()).subscribe());
     return () => { channels.forEach(ch => supabase.removeChannel(ch)); };
-  }, [guard?.id, loadDashboardData]);
+  }, [guard?.id, guardUserId, loadDashboardData]);
 
   const handleTabChange = (tabId: string) => {
     const currentIdx = tabOrder.indexOf(activeTab);
@@ -293,7 +299,6 @@ export default function MobileGuardDashboard() {
     try {
       await supabase.from('client_responses').update({ is_read: true }).eq('id', responseId);
       setResponses(prev => prev.map(r => r.id === responseId ? { ...r, is_read: true } : r));
-      setUnreadCount(prev => Math.max(0, prev - 1));
     } catch {}
   };
 
@@ -978,19 +983,17 @@ export default function MobileGuardDashboard() {
       case 'messages':
         return (
           <div className={`space-y-3 transition-all duration-300 ${tabContentVisible ? 'opacity-100 translate-x-0' : `opacity-0 ${tabDirection === 'right' ? '-translate-x-4' : 'translate-x-4'}`}`}>
+            <GuardMessagesClient embedded onUnreadChange={setUnreadCount} />
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-bold text-white">Messages</h2>
-              {unreadCount > 0 && (
-                <span className="text-xs text-slate-500">{unreadCount} unread</span>
-              )}
+              <h2 className="text-lg font-bold text-white">Client Responses</h2>
             </div>
             {responses.length === 0 ? (
               <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-8 text-center">
                 <div className="w-12 h-12 bg-[#162036] rounded-xl flex items-center justify-center mx-auto mb-3">
                   <i className="ri-message-3-line text-slate-600 text-xl"></i>
                 </div>
-                <p className="text-sm text-slate-500">No messages yet</p>
-                <p className="text-xs text-slate-600 mt-1">Clients will reach out here</p>
+                <p className="text-sm text-slate-500">No client responses yet</p>
+                <p className="text-xs text-slate-600 mt-1">Job offers and application updates appear here</p>
               </div>
             ) : (
               responses.map(response => (

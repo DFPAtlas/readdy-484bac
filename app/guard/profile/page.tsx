@@ -134,6 +134,7 @@ function ProfileContent() {
         licence_types: licenceTypeValue,
         years_experience: form.years_experience,
         bio: form.bio,
+        availability: form.availability || null,
         max_distance_miles: form.max_distance_miles !== undefined ? form.max_distance_miles : null,
         willing_to_travel: form.willing_to_travel,
         sia_licence_front_url: frontUrl,
@@ -155,13 +156,19 @@ function ProfileContent() {
         }
       }
 
-      const { error } = await supabase
+      const { data: savedProfile, error } = await supabase
         .from('guards')
         .update(updatePayload)
-        .eq('id', profile.id);
+        .eq('id', profile.id)
+        .select('*')
+        .single();
 
       if (error) throw error;
-      setProfile({ ...profile, ...form, sia_licence_front_url: frontUrl, sia_licence_back_url: backUrl });
+      if (!savedProfile || savedProfile.id !== profile.id || savedProfile.availability !== updatePayload.availability) {
+        throw new Error('Your profile save could not be confirmed. Please reload and retry.');
+      }
+      setProfile({ ...profile, ...savedProfile });
+      setForm({ ...profile, ...savedProfile });
       setSiaFrontFile(null);
       setSiaBackFile(null);
       setSiaFrontPreview('');

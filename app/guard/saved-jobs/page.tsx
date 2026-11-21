@@ -92,11 +92,18 @@ export default function GuardSavedJobsPage() {
   useEffect(() => { load(); }, [load]);
 
   const unsave = async (savedId: string) => {
+    if (!guardId || removing) return;
     setRemoving(savedId);
-    await supabase.from('saved_jobs').delete().eq('id', savedId);
-    setSavedJobs(prev => prev.filter(s => s.id !== savedId));
-    showToast('Job removed from saved list', 'info');
-    setRemoving(null);
+    try {
+      const { data, error } = await supabase.from('saved_jobs').delete().eq('id', savedId).eq('guard_id', guardId).select('id');
+      if (error || data?.length !== 1 || data[0].id !== savedId) throw new Error('Removal could not be confirmed');
+      setSavedJobs(prev => prev.filter(s => s.id !== savedId));
+      showToast('Job removed from saved list', 'info');
+    } catch {
+      showToast('Job removal could not be confirmed. Please refresh and retry.', 'error');
+    } finally {
+      setRemoving(null);
+    }
   };
 
   const apply = async (jobId: string) => {
@@ -211,7 +218,18 @@ export default function GuardSavedJobsPage() {
             <div className="space-y-4">
               {savedJobs.map(saved => {
                 const job = saved.jobs;
-                if (!job) return null;
+                if (!job) return (
+                  <div key={saved.id} className="bg-[#111d35] rounded-2xl border border-[#1e2d4d] p-5 flex items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">Job no longer available</h3>
+                      <p className="text-sm text-slate-400">This saved job has closed or is no longer visible.</p>
+                    </div>
+                    <button onClick={() => unsave(saved.id)} disabled={removing === saved.id}
+                      className="px-4 py-2 text-sm text-slate-300 border border-[#1e2d4d] rounded-xl disabled:opacity-50">
+                      {removing === saved.id ? 'Removing…' : 'Remove saved job'}
+                    </button>
+                  </div>
+                );
                 const alreadyApplied = applications.has(job.id);
                 const isClosed = !guardJobAcceptsApplications(job);
                 return (
