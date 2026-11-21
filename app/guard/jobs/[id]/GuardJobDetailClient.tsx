@@ -1,5 +1,6 @@
 'use client';
 
+import { guardJobAcceptsApplications } from '@/lib/guard-job-availability';
 import JobContractPanel from '@/components/JobContractPanel';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -305,7 +306,7 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
       setBlockReason('Your guard profile is pending verification.');
       return;
     }
-    if (job.status !== 'open') {
+    if (!guardJobAcceptsApplications(job)) {
       setCanApply(false);
       setBlockReason('This job is no longer open for applications.');
       return;
@@ -333,6 +334,7 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
 
   const handleApply = async () => {
     if (!guardId || !job) return;
+    if (!guardJobAcceptsApplications(job)) { showToast("This job is no longer accepting applications.", "error"); return; }
 
     const limitCheck = await checkGuardApplicationLimit(supabase, guardId);
     if (!limitCheck.allowed) {
@@ -589,7 +591,7 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
                 ) : (
                   <button
                     onClick={() => {
-                      if (!canApply) {
+                      if (!canApply || !guardJobAcceptsApplications(job)) {
                         showToast(blockReason || 'Cannot apply for this job', 'error');
                       } else {
                         setShowApplyModal(true);
@@ -660,7 +662,7 @@ export default function GuardJobDetailClient({ jobId }: { jobId: string }) {
               ) : (
                 <button
                   onClick={() => {
-                    if (!canApply) {
+                    if (!canApply || !guardJobAcceptsApplications(job)) {
                       showToast(blockReason || 'Cannot apply for this job', 'error');
                     } else {
                       setShowApplyModal(true);

@@ -1,5 +1,6 @@
 'use client';
 
+import { guardJobAcceptsApplications } from '@/lib/guard-job-availability';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -104,10 +105,10 @@ export default function GuardSavedJobsPage() {
     try {
       const { data: jobRow } = await supabase
         .from('jobs')
-        .select('status')
+        .select('status, start_date')
         .eq('id', jobId)
         .maybeSingle();
-      if (!jobRow || jobRow.status !== 'open') {
+      if (!jobRow || !guardJobAcceptsApplications(jobRow)) {
         showToast('This job is no longer accepting applications.', 'error');
         setApplying(null);
         return;
@@ -212,7 +213,7 @@ export default function GuardSavedJobsPage() {
                 const job = saved.jobs;
                 if (!job) return null;
                 const alreadyApplied = applications.has(job.id);
-                const isClosed = job.status !== 'open';
+                const isClosed = !guardJobAcceptsApplications(job);
                 return (
                   <div key={saved.id} className="bg-[#111d35] rounded-2xl border border-[#1e2d4d] p-5 hover:border-teal-500/20 transition-all">
                     <div className="flex items-start justify-between gap-4">
@@ -220,7 +221,7 @@ export default function GuardSavedJobsPage() {
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <h3 className="text-lg font-semibold text-white">{job.job_title}</h3>
                           <span className={`text-xs font-medium ${getStatusColor(job.status)}`}>
-                            {job.status === 'open' ? '● Open' : '● ' + job.status}
+                            {job.status === 'open' ? (isClosed ? '● Expired' : '● Open') : '● ' + job.status}
                           </span>
                           {job.sia_licence_required && (
                             <span className="text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded-full">SIA Required</span>

@@ -5,6 +5,15 @@ function normalize(value: string | null | undefined): string {
   return (value || '').toLowerCase().replace(/[\s-]+/g, '_');
 }
 
+export function isPaidGuardPayoutStatus(status: string | null | undefined): boolean {
+  return PAID_STATUSES.has(normalize(status));
+}
+
+export function recordedGuardAmount(value: number | string | null | undefined): number {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
 export interface GuardPaymentDisplaySource {
   payoutStatus?: string | null;
   jobStatus?: string | null;
@@ -42,8 +51,31 @@ export function sumPaidGuardPayouts(
   payouts: Array<{ status?: string | null; net_amount?: number | string | null; amount?: number | string | null }>
 ): number {
   return payouts.reduce((total, payout) => {
-    if (!PAID_STATUSES.has(normalize(payout.status))) return total;
-    const amount = Number(payout.net_amount ?? payout.amount ?? 0);
-    return total + (Number.isFinite(amount) ? amount : 0);
+    if (!isPaidGuardPayoutStatus(payout.status)) return total;
+    return total + recordedGuardAmount(payout.net_amount ?? payout.amount);
   }, 0);
+}
+
+type Money = number | string | null;
+interface Payout { status?: string | null; amount?: Money; net_amount?: Money; }
+interface HistoryMoneyJob {
+  job_status?: string | null;
+  assignment_status?: string | null;
+  dispute_status?: string | null;
+  payout_released?: boolean;
+  payment_amount?: Money;
+  guard_payout_amount?: Money;
+  payout?: Payout | null;
+}
+
+/** Paid earnings use payout receipts, never the face value of cancelled jobs. */
+export function guardHistoryTotals(jobs: HistoryMoneyJob[], payouts: Payout[]) {
+  const paid = sumPaidGuardPayouts(payouts);
+  const pending = jobs.reduce((sum, job) => {
+    if (job.assignment_status !== 'completed' || job.job_status === 'cancelled' || job.payout_released ||
+        ['open', 'under_review'].includes(job.dispute_status || '') || isPaidGuardPayoutStatus(job.payout?.status) ||
+        ['refunded', 'reversed', 'cancelled', 'failed'].includes(job.payout?.status || '')) return sum;
+    return sum + recordedGuardAmount(job.payout?.net_amount ?? job.payout?.amount ?? job.guard_payout_amount ?? job.payment_amount);
+  }, 0);
+  return { totalEarned: paid, releasedPayout: paid, pendingPayout: pending };
 }

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { loadGuardHistoryJobs } from '@/lib/guard-bookings';
+import { useGuardPayoutSettings } from '@/hooks/useGuardPayoutSettings';
+import { requestGuardStripe, type GuardStripeAction } from '@/lib/guard-payout-settings';
 import { deriveGuardPaymentDisplayStatus } from '@/lib/payments/guardPaymentDisplay';
 
 interface EarningsSummary {
@@ -9,18 +11,6 @@ interface EarningsSummary {
   thisMonthEarnings: number;
   lifetimeEarnings: number;
   nextEstimatedPayout: string;
-}
-
-interface StripeStatus {
-  connected: boolean;
-  stripeAccountId: string | null;
-  detailsSubmitted: boolean;
-  chargesEnabled: boolean;
-  payoutsEnabled: boolean;
-  status: string;
-  requirementsDue: string[];
-  restrictedReason: string | null;
-  lastCheckedAt: string | null;
 }
 
 interface JobPayment {
@@ -51,6 +41,7 @@ interface GuardPayout {
 }
 
 export function useGuardPaymentCentre() {
+  const payoutSettings = useGuardPayoutSettings(true);
   const [loading, setLoading] = useState(true);
   const [guardId, setGuardId] = useState<string | null>(null);
   const [earningsSummary, setEarningsSummary] = useState<EarningsSummary>({
@@ -60,10 +51,8 @@ export function useGuardPaymentCentre() {
     lifetimeEarnings: 0,
     nextEstimatedPayout: '—',
   });
-  const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
   const [jobPayments, setJobPayments] = useState<JobPayment[]>([]);
   const [payouts, setPayouts] = useState<GuardPayout[]>([]);
-  const [stripeLoading, setStripeLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
@@ -186,19 +175,7 @@ export function useGuardPaymentCentre() {
         created_at: p.created_at,
       })));
 
-      if (guard.stripe_account_id) {
-        setStripeStatus({
-          connected: true,
-          stripeAccountId: guard.stripe_account_id,
-          detailsSubmitted: guard.stripe_details_submitted || false,
-          chargesEnabled: guard.stripe_charges_enabled || false,
-          payoutsEnabled: guard.stripe_payouts_enabled || false,
-          status: guard.stripe_account_status || 'not_started',
-          requirementsDue: Array.isArray(guard.stripe_requirements_due) ? guard.stripe_requirements_due : [],
-          restrictedReason: null,
-          lastCheckedAt: guard.stripe_last_checked_at,
-        });
-      }
+
     } catch {
       setError('Failed to load payment data');
     } finally {
@@ -208,67 +185,23 @@ export function useGuardPaymentCentre() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const refreshStripeStatus = useCallback(async () => {
-    setStripeLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-guard-stripe-status`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
-      );
-      if (res.ok) {
-        const status = await res.json();
-        setStripeStatus(status);
-      }
-    } catch (err) {
-      console.error('Error refreshing stripe status:', err);
-    } finally {
-      setStripeLoading(false);
+  const openAccountLink = useCallback(async (action: GuardStripeAction): Promise<string | null> => {
+    if (!payoutSettings.profile || !payoutSettings.status || payoutSettings.loading || payoutSettings.refreshing) {
+      throw new Error('Refresh and verify your payout account before opening Stripe.');
     }
-  }, []);
-
-  const handleConnectStripe = useCallback(async (): Promise<string | null> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) throw new Error('Session expired');
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-guard-connect-account`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` } }
-    );
-    if (!res.ok) throw new Error('Failed to connect');
-    const { url } = await res.json();
-    return url;
-  }, []);
-
-  const handleOnboardingLink = useCallback(async (): Promise<string | null> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) throw new Error('Session expired');
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-guard-onboarding-link`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` } }
-    );
-    if (!res.ok) throw new Error('Failed to get onboarding link');
-    const { url } = await res.json();
-    return url;
-  }, []);
-
-  const handleDashboardLink = useCallback(async (): Promise<string | null> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) throw new Error('Session expired');
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-guard-dashboard-link`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` } }
-    );
-    if (!res.ok) throw new Error('Failed to get dashboard link');
-    const { url } = await res.json();
-    return url;
-  }, []);
+    if (action === 'create-guard-connect-account' ? payoutSettings.status.connected : !payoutSettings.status.connected) {
+      throw new Error('Your payout setup has changed. Refresh its status.');
+    }
+    const data = await requestGuardStripe(supabase, action, payoutSettings.profile.userId, {
+      baseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!, publishableKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    });
+    const after = await supabase.auth.getUser();
+    if (after.error || after.data.user?.id !== payoutSettings.profile.userId) throw new Error("Your account changed. Please reload.");
+    return data.url;
+  }, [payoutSettings.profile, payoutSettings.status, payoutSettings.loading, payoutSettings.refreshing]);
+  const handleConnectStripe = useCallback(() => openAccountLink('create-guard-connect-account'), [openAccountLink]);
+  const handleOnboardingLink = useCallback(() => openAccountLink('create-guard-onboarding-link'), [openAccountLink]);
+  const handleDashboardLink = useCallback(() => openAccountLink('create-guard-dashboard-link'), [openAccountLink]);
 
   const exportCsv = useCallback(() => {
     const headers = ['Date', 'Job Title', 'Client', 'Gross Amount', 'Platform Fee', 'Net Payout', 'Payment Status', 'Transfer Status'];
@@ -297,11 +230,12 @@ export function useGuardPaymentCentre() {
     error,
     guardId,
     earningsSummary,
-    stripeStatus,
-    stripeLoading,
+    stripeStatus: payoutSettings.status,
+    stripeLoading: payoutSettings.loading || payoutSettings.refreshing,
+    stripeError: payoutSettings.error || payoutSettings.statusError,
     jobPayments,
     payouts,
-    refreshStripeStatus,
+    refreshStripeStatus: payoutSettings.refresh,
     handleConnectStripe,
     handleOnboardingLink,
     handleDashboardLink,

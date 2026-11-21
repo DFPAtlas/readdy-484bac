@@ -1,6 +1,7 @@
 
 'use client';
 
+import { deriveGuardPaymentDisplayStatus, recordedGuardAmount } from '@/lib/payments/guardPaymentDisplay';
 import * as React from 'react';
 import { formatDateOnly } from '@/lib/date-only';
 
@@ -19,6 +20,7 @@ export default function PayoutTable({
 }: PayoutTableProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'paid_out':
       case 'paid':
       case 'completed':
         return 'bg-green-100 text-green-700';
@@ -38,13 +40,13 @@ export default function PayoutTable({
 
   const getStatusLabel = (earning: any) => {
     const payout = payoutsMap[earning.id];
-    if (payout) return payout.status;
-    return earning.payment_status || 'pending';
+    return deriveGuardPaymentDisplayStatus({ payoutStatus: payout?.status, jobStatus: earning.jobs?.status,
+      assignmentStatus: earning.status, assignmentPaymentStatus: earning.payment_status });
   };
 
   const getPayoutAmount = (earning: any) => {
     const payout = payoutsMap[earning.id];
-    if (payout) return payout.net_amount;
+    if (payout) return recordedGuardAmount(payout.net_amount ?? payout.amount);
     return calculateEarnings(earning);
   };
 

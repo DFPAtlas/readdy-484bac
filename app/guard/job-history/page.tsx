@@ -1,5 +1,6 @@
 'use client';
 
+import { guardApplicationGroup } from '@/lib/guard-application-status';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -77,6 +78,7 @@ interface Stats {
   total_completed: number;
   total_pending_approval: number;
   total_paid_out: number;
+  total_selected: number;
   total_disputed: number;
   total_cancelled: number;
   total_earned: number;
@@ -87,6 +89,7 @@ interface Stats {
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
   { value: 'applied', label: 'Applied' },
+  { value: 'selected', label: 'Selected' },
   { value: 'accepted', label: 'Accepted' },
   { value: 'confirmed', label: 'Confirmed' },
   { value: 'in_progress', label: 'In Progress' },
@@ -110,6 +113,7 @@ const STAT_CARDS = [
   { key: 'total_funded', label: 'Funded', icon: 'ri-money-pound-circle-line', color: 'teal' },
   { key: 'total_completed', label: 'Completed', icon: 'ri-flag-line', color: 'violet' },
   { key: 'total_pending_approval', label: 'Pending Approval', icon: 'ri-time-line', color: 'amber' },
+  { key: 'total_selected', label: 'Selected', icon: 'ri-user-follow-line', color: 'violet' },
   { key: 'total_paid_out', label: 'Paid Out', icon: 'ri-check-double-line', color: 'emerald' },
   { key: 'total_disputed', label: 'Disputed', icon: 'ri-alarm-warning-line', color: 'red' },
   { key: 'total_cancelled', label: 'Cancelled', icon: 'ri-close-circle-line', color: 'slate' },
@@ -196,8 +200,8 @@ export default function GuardJobHistoryClient() {
     if (statusFilter !== 'all') {
       if (statusFilter === 'applied') {
         result = result.filter((j) => j.application_status && !j.assignment_status);
-      } else if (statusFilter === 'accepted') {
-        result = result.filter((j) => j.application_status === 'accepted' || j.application_status === 'confirmed');
+      } else if (statusFilter === 'selected' || statusFilter === 'accepted') {
+        result = result.filter((j) => guardApplicationGroup(j.application_status) === statusFilter);
       } else if (statusFilter === 'confirmed') {
         result = result.filter((j) => j.assignment_status === 'confirmed');
       } else if (statusFilter === 'in_progress') {
@@ -258,7 +262,10 @@ export default function GuardJobHistoryClient() {
     if (job.assignment_status === 'confirmed') {
       return { label: 'Confirmed', class: 'bg-teal-500/15 text-teal-400 border border-teal-500/25' };
     }
-    if (job.application_status === 'accepted' || job.application_status === 'confirmed') {
+    if (guardApplicationGroup(job.application_status) === 'selected') {
+      return { label: 'Selected', class: 'bg-violet-500/15 text-violet-400 border border-violet-500/25' };
+    }
+    if (guardApplicationGroup(job.application_status) === 'accepted') {
       return { label: 'Accepted', class: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' };
     }
     if (job.application_status === 'pending') {

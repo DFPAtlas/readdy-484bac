@@ -1,5 +1,8 @@
 'use client';
 
+import { guardApplicationGroup } from '@/lib/guard-application-status';
+import { londonCalendarDate } from '@/lib/date-only';
+import { guardJobAcceptsApplications } from '@/lib/guard-job-availability';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { oneRelation } from '@/lib/relations';
 import { supabase } from '@/lib/supabase';
@@ -484,7 +487,7 @@ export default function GuardDashboardClient() {
         `)
         .eq('status', 'open')
         .eq('is_deleted', false)
-        .gte('start_date', new Date().toISOString().split('T')[0])
+        .gte('start_date', londonCalendarDate())
         .order('start_date', { ascending: true })
         .range(from, to);
       if (!isCurrent()) return;
@@ -721,7 +724,7 @@ export default function GuardDashboardClient() {
     try {
       const { data: jobData } = await supabase
         .from('jobs')
-        .select('status, sia_licence_required, required_licence_types')
+        .select('status, start_date, sia_licence_required, required_licence_types')
         .eq('id', jobId)
         .maybeSingle();
 
@@ -730,7 +733,7 @@ export default function GuardDashboardClient() {
         return;
       }
 
-      if (jobData.status !== 'open') {
+      if (!guardJobAcceptsApplications(jobData)) {
         showGuardToast('This job is no longer open for applications.');
         return;
       }
@@ -1014,7 +1017,7 @@ export default function GuardDashboardClient() {
 
   const filteredApplications = filterStatus === 'all'
     ? applications
-    : applications.filter(app => app.status === filterStatus);
+    : applications.filter(app => guardApplicationGroup(app.status) === filterStatus);
 
   if (authLoading) {
     return (
@@ -1541,7 +1544,7 @@ export default function GuardDashboardClient() {
             {activeTab === 'applications' && (
               <div>
                 <div className="flex gap-1.5 sm:gap-2 mb-6 flex-wrap">
-                  {['all', 'pending', 'reviewed', 'accepted', 'declined'].map(status => (
+                  {['all', 'pending', 'reviewed', 'selected', 'accepted', 'declined'].map(status => (
                     <button key={status} onClick={() => setFilterStatus(status)} className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${filterStatus === status ? 'bg-teal-500 text-white' : 'bg-[#162036] text-slate-400 hover:bg-[#1a2b4a]'}`}>
                       {status === 'all' ? 'All' : status.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                     </button>

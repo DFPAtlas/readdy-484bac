@@ -1,8 +1,13 @@
 "use client";
 
+import { londonCalendarDate } from '@/lib/date-only';
+import { guardJobAcceptsApplications } from '@/lib/guard-job-availability';
 import QuickGuardImage from '@/components/QuickGuardImage';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { oneRelation, requiredRelation } from '@/lib/relations';
+import { oneRelation } from '@/lib/relations';
+import { loadGuardHistoryJobs } from '@/lib/guard-bookings';
+import { isPaidGuardPayoutStatus, sumPaidGuardPayouts, recordedGuardAmount } from '@/lib/payments/guardPaymentDisplay';
+import { useGuardPayoutSettings } from '@/hooks/useGuardPayoutSettings';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -110,17 +115,8 @@ interface AvailableJob {
   clients: {
     company_name: string;
   } | null;
-  licence_required: string | null;
+  sia_licence_required: boolean;
   number_of_guards: number | null;
-}
-
-interface BankDetail {
-  id: string;
-  guard_id: string;
-  account_holder_name: string | null;
-  sort_code: string | null;
-  account_number: string | null;
-  bank_name: string | null;
 }
 
 interface EarningsSummary {
@@ -152,7 +148,10 @@ export default function MobileGuardDashboard() {
   const [tabDirection, setTabDirection] = useState<'left' | 'right'>('right');
   const [unreadCount, setUnreadCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [bankDetails, setBankDetails] = useState<BankDetail | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const loadEpoch = useRef(0);
+  const retireRequests = useCallback(() => { ++loadEpoch.current; }, []);
+  const payoutSettings = useGuardPayoutSettings(!loading && !!guard);
   const [earnings, setEarnings] = useState<EarningsSummary>({ totalEarned: 0, totalPending: 0, totalPaid: 0, completedJobs: 0 });
   const [searchQuery, setSearchQuery] = useState('');
   const [applyingTo, setApplyingTo] = useState<string | null>(null);
@@ -164,106 +163,65 @@ export default function MobileGuardDashboard() {
   const tabOrder = ['home', 'jobs', 'shifts', 'messages', 'profile'];
 
   const loadDashboardData = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
-      router.push('/guard/login');
-      return;
+    const epoch = ++loadEpoch.current;
+    setLoadError('');
+    try {
+      const auth = await supabase.auth.getUser();
+      if (auth.error) throw new Error('Your account could not be confirmed.');
+      if (!auth.data.user) { router.push('/guard/login'); return; }
+      const userId = auth.data.user.id;
+      const { data: guardData, error: guardError } = await supabase.from('guards').select('*').eq('user_id', userId).maybeSingle();
+      if (guardError) throw new Error('Your guard profile could not be loaded.');
+      if (!guardData) { router.push('/guard/complete-profile-wizard'); return; }
+      if (!['approved', 'verified'].includes(guardData.verification_status)) { router.push('/guard/onboarding'); return; }
+      const history = await loadGuardHistoryJobs(supabase, guardData.id);
+      const allAssignments = history.filter(job => job.assignment_id).map(job => ({
+        id: job.assignment_id, status: job.assignment_status, payment_amount: job.payment_amount,
+        payment_status: job.payment_status, assigned_at: job.assigned_at,
+        check_in_time: job.check_in_time, check_out_time: job.check_out_time, jobs: job,
+      }));
+      const ownedApplications = history.filter(job => job.application_id).map(job => ({
+        id: job.application_id, status: job.application_status, applied_at: job.applied_at, jobs: job,
+      }));
+      const today = londonCalendarDate();
+      const [responsesResult, jobsResult, payoutsResult] = await Promise.all([
+        supabase.from('client_responses').select('id,response_type,message,is_read,created_at,jobs(job_title),clients(company_name)')
+          .eq('guard_id', guardData.id).order('created_at', { ascending: false }),
+        supabase.from('jobs').select('id,job_title,venue_city,venue_postcode,start_date,start_time,end_time,hourly_rate,status,clients(company_name),sia_licence_required,number_of_guards')
+          .eq('status', 'open').eq('is_deleted', false).gte('start_date', today).order('start_date', { ascending: true }).limit(30),
+        supabase.from('guard_payouts').select('amount,net_amount,status').eq('guard_id', guardData.id),
+      ]);
+      if (responsesResult.error || jobsResult.error || payoutsResult.error) throw new Error('Your dashboard data could not be loaded.');
+      const after = await supabase.auth.getUser();
+      if (epoch !== loadEpoch.current) return;
+      if (after.error || after.data.user?.id !== userId) throw new Error('Your account changed. Please reload.');
+      const payouts = payoutsResult.data || [];
+      const totalPaid = sumPaidGuardPayouts(payouts);
+      setGuard({ ...guardData, total_earnings: totalPaid });
+      setGuardUserId(userId);
+      setAssignments(allAssignments.filter(row => ['confirmed', 'in_progress', 'accepted', 'pending', 'selected', 'awaiting_payment'].includes(row.status)));
+      setUpcomingJobs(allAssignments.filter(row => ['confirmed', 'accepted'].includes(row.status) && row.jobs.start_date >= today)
+        .sort((a, b) => a.jobs.start_date.localeCompare(b.jobs.start_date)));
+      setApplications(ownedApplications);
+      setResponses((responsesResult.data || []).map(row => ({ ...row, jobs: oneRelation(row.jobs), clients: oneRelation(row.clients) })));
+      setUnreadCount((responsesResult.data || []).filter(row => !row.is_read).length);
+      setAvailableJobs((jobsResult.data || []).map(row => ({ ...row, clients: oneRelation(row.clients) })));
+      setEarnings({ totalEarned: totalPaid, totalPaid,
+        totalPending: payouts.filter(row => !isPaidGuardPayoutStatus(row.status) && ['pending', 'initiated', 'processing', 'payout_pending'].includes(row.status))
+          .reduce((sum, row) => sum + recordedGuardAmount(row.net_amount ?? row.amount), 0),
+        completedJobs: allAssignments.filter(row => row.status === 'completed').length,
+      });
+    } catch (cause) {
+      if (epoch === loadEpoch.current) setLoadError(cause instanceof Error ? cause.message : 'Your dashboard could not be loaded.');
+    } finally {
+      if (epoch === loadEpoch.current) { setLoading(false); setRefreshing(false); }
     }
-    const userId = session.user.id;
-    setGuardUserId(userId);
-
-    const { data: guardData } = await supabase
-      .from('guards')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (!guardData) {
-      router.push('/guard/complete-profile-wizard');
-      return;
-    }
-
-    if (guardData.verification_status === 'rejected') {
-      router.push('/guard/verification-failed');
-      return;
-    }
-    if (guardData.verification_status !== 'approved' && guardData.verification_status !== 'verified') {
-      router.push('/guard/onboarding');
-      return;
-    }
-
-    setGuard(guardData as Guard);
-
-    const today = new Date().toISOString().split('T')[0];
-
-    const { data: assignmentsData } = await supabase
-      .from('job_assignments')
-      .select('id, status, payment_amount, payment_status, assigned_at, check_in_time, check_out_time, jobs!inner (id, job_title, location:venue_city, postcode:venue_postcode, start_date, start_time, end_time, hourly_rate)')
-      .eq('guard_id', guardData.id)
-      .in('status', ['confirmed', 'in_progress', 'accepted'])
-      .order('assigned_at', { ascending: false });
-
-    const allAssignments = (assignmentsData || []).map(row => ({ ...row, jobs: requiredRelation(row.jobs) }));
-    setAssignments(allAssignments);
-
-    const upcoming = allAssignments
-      .filter(a => (a.status === 'confirmed' || a.status === 'accepted') && (a.jobs as any)?.start_date >= today)
-      .sort((a, b) => ((a.jobs as any)?.start_date || '').localeCompare((b.jobs as any)?.start_date || ''));
-    setUpcomingJobs(upcoming);
-
-    const { data: appsData } = await supabase
-      .from('job_applications')
-      .select('id, status, applied_at, jobs!inner (id, job_title, location:venue_city, postcode:venue_postcode, start_date, start_time, end_time, hourly_rate, clients (company_name))')
-      .eq('guard_id', guardData.id)
-      .order('applied_at', { ascending: false });
-    setApplications((appsData || []).map(row => {
-      const job = requiredRelation(row.jobs);
-      return { ...row, jobs: { ...job, clients: oneRelation(job.clients) } };
-    }));
-
-    const { data: responsesData } = await supabase
-      .from('client_responses')
-      .select('id, response_type, message, is_read, created_at, jobs (job_title), clients (company_name)')
-      .eq('guard_id', guardData.id)
-      .order('created_at', { ascending: false });
-    setResponses((responsesData || []).map(row => ({ ...row, jobs: oneRelation(row.jobs), clients: oneRelation(row.clients) })));
-    setUnreadCount((responsesData || []).filter((r: any) => !r.is_read).length);
-
-    const { data: jobsData } = await supabase
-      .from('jobs')
-      .select('id, job_title, venue_city, venue_postcode, start_date, start_time, end_time, hourly_rate, status, clients (company_name), licence_required, number_of_guards')
-      .eq('status', 'open')
-      .eq('is_deleted', false)
-      .gte('start_date', today)
-      .order('start_date', { ascending: true })
-      .limit(30);
-    setAvailableJobs((jobsData || []).map(row => ({ ...row, clients: oneRelation(row.clients) })));
-
-    const { data: bankData } = await supabase
-      .from('guard_bank_details')
-      .select('*')
-      .eq('guard_id', guardData.id)
-      .maybeSingle();
-    setBankDetails(bankData as BankDetail | null);
-
-    const { data: payoutsData } = await supabase
-      .from('guard_payouts')
-      .select('amount, status')
-      .eq('guard_id', guardData.id);
-    const payouts = payoutsData || [];
-    const totalEarned = payouts.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-    const totalPending = payouts.filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-    const totalPaid = payouts.filter((p: any) => p.status === 'paid').reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-    const completedJobs = allAssignments.filter(a => a.status === 'completed').length;
-    setEarnings({ totalEarned, totalPending, totalPaid, completedJobs });
-
-    setLoading(false);
-    setRefreshing(false);
   }, [router]);
 
   useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    void loadDashboardData();
+    return retireRequests;
+  }, [loadDashboardData, retireRequests]);
 
   useEffect(() => {
     if (!guard?.id) return;
@@ -293,6 +251,8 @@ export default function MobileGuardDashboard() {
 
   const handleApplyToJob = async (jobId: string) => {
     if (!guard) return;
+    const job = availableJobs.find(row => row.id === jobId);
+    if (!job || !guardJobAcceptsApplications(job)) { alert("This job is no longer accepting applications."); return; }
     setApplyingTo(jobId);
     try {
       const limitCheck = await checkGuardApplicationLimit(supabase, guard.id);
@@ -521,8 +481,8 @@ export default function MobileGuardDashboard() {
     if (unreadCount > 0) {
       items.push({ id: 'messages', icon: 'ri-message-3-line', text: `${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`, subtext: 'Tap to read', color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20', action: '/guard/mobile' });
     }
-    if (!bankDetails) {
-      items.push({ id: 'bank', icon: 'ri-bank-card-line', text: 'Add bank details', subtext: 'To get paid', color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20', action: '/guard/bank-settings' });
+    if (payoutSettings.status && (!payoutSettings.status.connected || payoutSettings.status.status !== 'ready')) {
+      items.push({ id: 'bank', icon: 'ri-bank-card-line', text: 'Review payout setup', subtext: 'Check Stripe requirements', color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20', action: '/guard/bank-settings' });
     }
     return items;
   };
@@ -568,12 +528,17 @@ export default function MobileGuardDashboard() {
     );
   }
 
+  if (loadError) return <div role="alert" className="p-6 bg-[#0B1933] min-h-screen text-slate-200">
+    <h1>Guard dashboard unavailable</h1><p>{loadError}</p>
+    <button onClick={() => { setLoading(true); void loadDashboardData(); }}>Retry dashboard</button>
+    <Link href="/guard/dashboard">Full Dashboard</Link>
+  </div>;
   if (!guard) return null;
 
   const siaStatus = getSIAStatus();
   const subStatus = getSubscriptionStatus();
   const profilePercent = getProfilePercent();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = londonCalendarDate();
   const todaysJobs = upcomingJobs.filter(j => (j.jobs as any)?.start_date === todayStr);
   const actionItems = getActionItems();
   const appCounts = {
@@ -885,10 +850,10 @@ export default function MobileGuardDashboard() {
                         {formatTime(job.start_time)}
                       </span>
                     </div>
-                    {job.licence_required && (
+                    {job.sia_licence_required && (
                       <div className="flex items-center gap-1 mb-3">
                         <i className="ri-shield-line text-amber-400 text-xs"></i>
-                        <span className="text-xs text-amber-400">{job.licence_required}</span>
+                        <span className="text-xs text-amber-400">SIA licence required</span>
                       </div>
                     )}
                     <div className="flex items-center justify-between">
@@ -1141,7 +1106,7 @@ export default function MobileGuardDashboard() {
                   </div>
                   <div>
                     <span className="text-sm text-white block">Bank Settings</span>
-                    <span className="text-[10px] text-slate-500">{bankDetails ? bankDetails.bank_name || 'Bank saved' : 'Add payment details'}</span>
+                    <span className="text-[10px] text-slate-500">{payoutSettings.status?.status === 'ready' ? 'Payouts enabled' : payoutSettings.loading || payoutSettings.refreshing ? 'Checking payout status' : 'Review payout status'}</span>
                   </div>
                 </div>
                 <i className="ri-arrow-right-s-line text-slate-500"></i>

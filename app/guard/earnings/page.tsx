@@ -1,6 +1,6 @@
 'use client';
 
-  import { useState, useEffect, useMemo, useCallback } from 'react';
+  import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
   import Link from 'next/link';
   import { supabase } from '@/lib/supabase';
   import PortalSidebar from '@/components/PortalSidebar';
@@ -14,6 +14,8 @@
   import LiveIndicator from '@/components/LiveIndicator';
   import { useRouteGuard } from '@/hooks/useRouteGuard';
   import UpgradePrompt from '@/components/UpgradePrompt';
+  import { hydrateGuardJobRows } from '@/lib/guard-bookings';
+  import { deriveGuardPaymentDisplayStatus, isPaidGuardPayoutStatus, recordedGuardAmount } from '@/lib/payments/guardPaymentDisplay';
   import BankPayoutTracker from './BankPayoutTracker';
 
   export default function GuardEarningsPage() {
@@ -21,6 +23,9 @@
     const [payouts, setPayouts] = useState<any[]>([]);
     const [guardId, setGuardId] = useState<string|null>(null);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState('');
+    const loadEpoch = useRef(0);
+    const retireRequests = useCallback(() => { ++loadEpoch.current; }, []);
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'processing' | 'paid' | 'held'>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedEarning, setSelectedEarning] = useState<any>(null);
@@ -57,73 +62,62 @@
       channels.push(payoutsChannel);
 
       return () => {
+        retireRequests();
         channels.forEach(ch => supabase.removeChannel(ch));
       };
-    }, []);
+    }, [retireRequests]);
 
     const fetchGuardAndEarnings = async () => {
+      const epoch = ++loadEpoch.current;
+      setLoading(true);
+      setLoadError('');
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          setLoading(false);
-          return;
+        const auth = await supabase.auth.getUser();
+        if (auth.error || !auth.data.user) throw new Error('Your account could not be confirmed. Please sign in again.');
+        const user = auth.data.user;
+        const { data: guard, error } = await supabase.from('guards').select('id').eq('user_id', user.id).maybeSingle();
+        if (error || !guard) throw new Error('Your guard profile could not be loaded.');
+        const [assignmentsRes, payoutsRes] = await Promise.all([
+          supabase.from('job_assignments').select('id,job_id,status,payment_status,payment_amount,assigned_at')
+            .eq('guard_id', guard.id).order('assigned_at', { ascending: false }),
+          supabase.from('guard_payouts').select('*').eq('guard_id', guard.id).order('created_at', { ascending: false }),
+        ]);
+        if (assignmentsRes.error || payoutsRes.error) throw new Error('Your earnings could not be loaded.');
+        const assignments = await hydrateGuardJobRows(supabase, guard.id, assignmentsRes.data || []);
+        const after = await supabase.auth.getUser();
+        if (epoch !== loadEpoch.current) return;
+        if (after.error || after.data.user?.id !== user.id) throw new Error('Your account changed. Please reload.');
+        setGuardId(guard.id);
+        setEarnings(assignments.map(row => ({ ...row, created_at: row.assigned_at })));
+        setPayouts(payoutsRes.data || []);
+      } catch (cause) {
+        if (epoch === loadEpoch.current) {
+          setEarnings([]); setPayouts([]);
+          setLoadError(cause instanceof Error ? cause.message : 'Your earnings could not be loaded.');
         }
-
-        const { data: guard } = await supabase
-          .from('guards')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (guard) {
-          setGuardId(guard.id);
-          const [assignmentsRes, payoutsRes] = await Promise.all([
-            supabase
-              .from('job_assignments')
-              .select(
-                `*, jobs (job_title, location, start_date, end_date, shift_start_time, shift_end_time, hourly_rate, clients (company_name, contact_name))`
-              )
-              .eq('guard_id', guard.id)
-              .order('created_at', { ascending: false }),
-            supabase
-              .from('guard_payouts')
-              .select('*')
-              .eq('guard_id', guard.id)
-              .order('created_at', { ascending: false })
-          ]);
-
-          setEarnings(assignmentsRes.data || []);
-          setPayouts(payoutsRes.data || []);
-        }
-      } catch {
       } finally {
-        setLoading(false);
+        if (epoch === loadEpoch.current) setLoading(false);
       }
-    };
-
-    const calculateEarnings = (assignment: any) => {
-      if (assignment.payment_amount) return parseFloat(assignment.payment_amount);
-      if (assignment.jobs) {
-        const s = new Date(`2000-01-01 ${assignment.jobs.shift_start_time}`);
-        const e = new Date(`2000-01-01 ${assignment.jobs.shift_end_time}`);
-        const hours = (e.getTime() - s.getTime()) / (1000 * 60 * 60);
-        return assignment.jobs.hourly_rate * Math.max(hours, 0);
-      }
-      return 0;
     };
 
     const payoutsMap = useMemo(() => {
       const map: Record<string, any> = {};
       payouts.forEach(p => {
-        if (p.assignment_id) map[p.assignment_id] = p;
+        const assignmentId = p.assignment_id || earnings.find(row => row.job_id === p.job_id)?.id;
+        if (assignmentId && !map[assignmentId]) map[assignmentId] = p;
       });
       return map;
-    }, [payouts]);
+    }, [payouts, earnings]);
 
     const getEffectiveStatus = useCallback((earning: any) => {
       const payout = payoutsMap[earning.id];
-      if (payout) return payout.status;
-      return earning.payment_status || 'pending';
+      return deriveGuardPaymentDisplayStatus({ payoutStatus: payout?.status, jobStatus: earning.jobs?.status,
+        assignmentStatus: earning.status, assignmentPaymentStatus: earning.payment_status });
+    }, [payoutsMap]);
+
+    const calculateEarnings = useCallback((assignment: { id: string; payment_amount?: number | string | null }) => {
+      const payout = payoutsMap[assignment.id];
+      return recordedGuardAmount(payout ? payout.net_amount ?? payout.amount : assignment.payment_amount);
     }, [payoutsMap]);
 
     const filteredEarnings = useMemo(() => {
@@ -131,7 +125,7 @@
         const status = getEffectiveStatus(e);
         const matchesTab =
           activeTab === 'all' ||
-          (activeTab === 'paid' && (status === 'paid' || status === 'completed')) ||
+          (activeTab === 'paid' && isPaidGuardPayoutStatus(status)) ||
           (activeTab === 'pending' && status === 'pending') ||
           (activeTab === 'processing' && (status === 'processing' || status === 'initiated')) ||
           (activeTab === 'held' && (status === 'held' || status === 'failed'));
@@ -156,7 +150,7 @@
       });
 
       return filtered;
-    }, [earnings, activeTab, searchTerm, sortBy, getEffectiveStatus]);
+    }, [earnings, activeTab, searchTerm, sortBy, getEffectiveStatus, calculateEarnings]);
 
     const filteredPayouts = useMemo(() => {
       let filtered = [...payouts];
@@ -185,7 +179,7 @@
     const totalEarned = earnings
       .filter(e => {
         const s = getEffectiveStatus(e);
-        return s === 'paid' || s === 'completed';
+        return isPaidGuardPayoutStatus(s);
       })
       .reduce((sum, e) => sum + calculateEarnings(e), 0);
     const pendingPayouts = earnings
@@ -206,7 +200,7 @@
 
     const paidCount = earnings.filter(e => {
       const s = getEffectiveStatus(e);
-      return s === 'paid' || s === 'completed';
+      return isPaidGuardPayoutStatus(s);
     }).length;
     const pendingCount = earnings.filter(e => getEffectiveStatus(e) === 'pending').length;
     const processingCount = earnings.filter(e => {
@@ -219,15 +213,15 @@
     }).length;
 
     const totalNetPaid = payouts
-      .filter(p => p.status === 'completed' || p.status === 'paid')
-      .reduce((sum, p) => sum + (p.net_amount || 0), 0);
+      .filter(p => isPaidGuardPayoutStatus(p.status))
+      .reduce((sum, p) => sum + recordedGuardAmount(p.net_amount ?? p.amount), 0);
     const totalFees = payouts
-      .filter(p => p.status === 'completed' || p.status === 'paid')
-      .reduce((sum, p) => sum + (p.fee_deducted || 0), 0);
+      .filter(p => isPaidGuardPayoutStatus(p.status))
+      .reduce((sum, p) => sum + recordedGuardAmount(p.fee_deducted), 0);
     const totalGross = payouts
-      .filter(p => p.status === 'completed' || p.status === 'paid')
-      .reduce((sum, p) => sum + (p.amount || 0), 0);
-    const completedPayoutCount = payouts.filter(p => p.status === 'completed' || p.status === 'paid').length;
+      .filter(p => isPaidGuardPayoutStatus(p.status))
+      .reduce((sum, p) => sum + recordedGuardAmount(p.amount), 0);
+    const completedPayoutCount = payouts.filter(p => isPaidGuardPayoutStatus(p.status)).length;
 
     const monthlyData = useMemo(() => {
       const months: { month: string; earned: number; pending: number }[] = [];
@@ -244,14 +238,14 @@
           if (jobDate.getFullYear() === year && jobDate.getMonth() === month) {
             const amt = calculateEarnings(e);
             const s = getEffectiveStatus(e);
-            if (s === 'paid' || s === 'completed') earned += amt;
+            if (isPaidGuardPayoutStatus(s)) earned += amt;
             else pending += amt;
           }
         });
         months.push({ month: label, earned, pending });
       }
       return months;
-    }, [earnings, getEffectiveStatus]);
+    }, [earnings, getEffectiveStatus, calculateEarnings]);
 
     const handleExport = () => {
       const headers = ['Job Title', 'Client', 'Date', 'Amount', 'Status', 'Reference'];
@@ -282,9 +276,9 @@
       const rows = filteredPayouts.map(p => [
         p.reference_number || `P-${(p.id || '').toString().slice(0, 8).toUpperCase()}`,
         p.created_at ? new Date(p.created_at).toLocaleDateString('en-GB') : '',
-        (p.amount || 0).toFixed(2),
-        (p.fee_deducted || 0).toFixed(2),
-        (p.net_amount || 0).toFixed(2),
+        recordedGuardAmount(p.amount).toFixed(2),
+        recordedGuardAmount(p.fee_deducted).toFixed(2),
+        recordedGuardAmount(p.net_amount ?? p.amount).toFixed(2),
         p.status,
         p.payout_method || 'bank'
       ]);
@@ -317,6 +311,12 @@
       }
       loadSidebarInfo();
     }, []);
+
+    if (loadError) return <div role="alert" className="p-8 text-slate-200 bg-[#0B1933] min-h-screen">
+      <h1>Earnings unavailable</h1><p>{loadError}</p>
+      <button onClick={() => void fetchGuardAndEarnings()}>Retry earnings</button>
+      <Link href="/guard/dashboard">Back to Dashboard</Link>
+    </div>;
 
     if (loading || authLoading || !allowed || checking) {
       return (
