@@ -56,9 +56,10 @@ serve(async (req) => {
 
   try {
     const payload: any = await req.json();
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
 
-    const { data: preferences } = await supabase.from('notification_preferences').select('job_matches').eq('user_id', payload.guard_id).maybeSingle();
+    const { data: preferences, error: preferencesError } = await supabase.from('notification_preferences').select('job_matches').eq('user_id', payload.guard_id).maybeSingle();
+    if (preferencesError) throw new Error('Job-alert preferences could not be verified');
     if (preferences && preferences.job_matches === false) {
       return new Response(
         JSON.stringify({ success: false, suppressed: true, reason: 'preference_disabled' }),
@@ -112,14 +113,6 @@ serve(async (req) => {
 
     const renderData = await renderRes.json();
 
-    await supabase.from('notifications').insert({
-      user_id: payload.guard_id, user_type: 'guard',
-      title: isDirect ? 'Direct Booking Alert' : 'New Job Match',
-      message: `${payload.job_title} — £${payload.hourly_rate}/hr • ${payload.distance_miles} miles away${venueLabel ? ` • ${venueLabel}` : ''}`,
-      type: 'info', is_read: false,
-      link: `/jobs/detail?id=${encodeURIComponent(payload.job_id)}`, created_at: new Date().toISOString(),
-    });
-
     if (!renderData?.email_id) {
       return new Response(
         JSON.stringify({ success: false, error: 'Template render did not return a provider email id' }),
@@ -127,7 +120,16 @@ serve(async (req) => {
       );
     }
 
-    return new Response(JSON.stringify({ success: true, email_id: renderData.email_id }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    const { error: notificationError } = await supabase.from('notifications').insert({
+      user_id: payload.guard_id, user_type: 'guard',
+      title: isDirect ? 'Direct Booking Alert' : 'New Job Match',
+      message: `${payload.job_title} — £${payload.hourly_rate}/hr • ${payload.distance_miles} miles away${venueLabel ? ` • ${venueLabel}` : ''}`,
+      type: 'job_match', is_read: false,
+      link: `/jobs/detail?id=${encodeURIComponent(payload.job_id)}`, created_at: new Date().toISOString(),
+    });
+    if (notificationError) console.error('Job-match notification was not saved', { code: notificationError.code });
+
+    return new Response(JSON.stringify({ success: true, email_id: renderData.email_id, notification_saved: !notificationError }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error: any) {
     console.error('Error:', error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
