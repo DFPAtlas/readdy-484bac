@@ -59,7 +59,7 @@ const quickActions: QuickAction[] = [
     title: 'Support Tickets',
     description: 'Resolve client and guard support requests.',
     icon: 'ri-customer-service-2-line',
-    href: '/admin/complaints',
+    href: '/admin/support-tickets',
     accent: 'rose',
   },
   {

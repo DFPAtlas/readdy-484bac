@@ -3,13 +3,16 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const ts=require('typescript');
 const {PGlite}=require('@electric-sql/pglite');
-function monitor({authorized=true,admin=true,heartbeat=null,counts={},queryError=false}={}) {
+function monitor({authorized=true,admin=true,heartbeat=null,heartbeats=null,counts={},queryError=false}={}) {
  const queries=[];
  const db={auth:{getUser:async()=>({data:{user:authorized?{id:'admin-user'}:null},error:null})},from(table){
   queries.push(table);
   const query={};
   for(const key of ['select','eq','in','gte','lte','lt','order','limit'])query[key]=()=>query;
-  query.maybeSingle=async()=>table==='admin_users'?{data:admin?{id:'admin',is_active:true}:null,error:null}:{data:heartbeat,error:queryError?{message:'private error'}:null};
+  const filters=[];
+  query.eq=(key,value)=>{filters.push(row=>row[key]===value);return query;};
+  query.in=(key,values)=>{filters.push(row=>values.includes(row[key]));return query;};
+  query.maybeSingle=async()=>table==='admin_users'?{data:admin?{id:'admin',is_active:true}:null,error:null}:{data:heartbeats?heartbeats.filter(row=>filters.every(filter=>filter(row))).sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at))[0]||null:heartbeat,error:queryError?{message:'private error'}:null};
   query.then=resolve=>Promise.resolve({count:counts[table]??0,error:queryError?{message:'private error'}:null}).then(resolve);
   // No write methods exist: tests fail if a diagnostic attempts a mutation.
   return query;
@@ -37,10 +40,28 @@ test('fresh healthy heartbeat permits healthy data checks; stale heartbeat canno
   const data=await(await m.call({agent:'jobs'})).json();assert.equal(data.results[0].status,status);
  }
 });
+test('monitor resolves the actual worker IDs, supports legacy IDs and ignores unrelated workers/sites',async()=>{
+ const ids={payments:'qg-payout-agent-v01',sia:'qg-sia-verification-agent-v01',jobs:'qg-job-monitoring-agent-v01'};
+ for(const [agent,id] of Object.entries(ids)) {
+  for(const agent_id of [agent,id]) {
+   const m=monitor({heartbeats:[{agent_id,site:'quickguard.uk',health:'healthy',created_at:new Date().toISOString()}]});
+   assert.equal((await(await m.call({agent})).json()).results[0].checks.find(c=>c.key==='worker_heartbeat').status,'ok');
+  }
+  const m=monitor({heartbeats:[{agent_id:id,site:'different.test',health:'healthy',created_at:new Date().toISOString()},{agent_id:'unrelated',site:'quickguard.uk',health:'healthy',created_at:new Date().toISOString()}]});
+  assert.equal((await(await m.call({agent})).json()).results[0].checks.find(c=>c.key==='worker_heartbeat').status,'warn');
+ }
+});
 test('financial issues and read errors are failures, not zero-count healthy results',async()=>{
  for(const options of [{counts:{financial_operations:1}},{queryError:true}]){
   const m=monitor(options);const data=await(await m.call({agent:'payments'})).json();assert.equal(data.status,'fail');
   assert.ok(!JSON.stringify(data).includes('private error'));
+ }
+});
+test('monitor understands live GREEN/AMBER/RED health values without hiding reported failures',async()=>{
+ for(const [health,status] of [['GREEN','ok'],['AMBER','warn'],['RED','fail']]) {
+  const m=monitor({heartbeats:[{agent_id:'qg-job-monitoring-agent-v01',site:'quickguard.uk',health,created_at:new Date().toISOString()}]});
+  const data=await(await m.call({agent:'jobs'})).json();
+  assert.equal(data.results[0].checks.find(c=>c.key==='worker_heartbeat').status,status);
  }
 });
 test('trusted automation can read diagnostics and invalid agent/site input is rejected',async()=>{

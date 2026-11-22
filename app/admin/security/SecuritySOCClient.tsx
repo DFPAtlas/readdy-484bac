@@ -116,7 +116,7 @@ export interface BackupComplianceData {
     status: string;
     last_backup_at: string | null;
     last_restore_test_at: string | null;
-    retention_days: number;
+    retention_days: number | null;
     notes: string | null;
   }[];
   compliance: {
@@ -164,7 +164,7 @@ export default function SecuritySOCClient() {
     emergencySettings: 'idle',
     apiSecrets: 'idle',
     paymentEmail: 'idle',
-    backupCompliance: 'idle',
+    backupCompliance: 'loading',
   });
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -269,6 +269,7 @@ export default function SecuritySOCClient() {
 
   const fetchBackupCompliance = useCallback(async () => {
     setFetchState(s => ({ ...s, backupCompliance: 'loading' }));
+    setBackupComplianceData(null);
     try {
       const data = await invokeFunction('backup_compliance_status', undefined, 1);
       setBackupComplianceData(data || null);
@@ -389,7 +390,7 @@ export default function SecuritySOCClient() {
 
       <PaymentEmailSecurityPanel paymentEmailData={paymentEmailData} />
 
-      <BackupCompliancePanel backupComplianceData={backupComplianceData} />
+      <BackupCompliancePanel backupComplianceData={backupComplianceData} fetchState={fetchState.backupCompliance} onRetry={fetchBackupCompliance} />
 
       <SecurityTimeline timelineEvents={timelineEvents} />
 

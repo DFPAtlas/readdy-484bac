@@ -193,13 +193,24 @@ Deno.serve(async (req) => {
       }
 
       const userIds = [...new Set(guards.map((g: any) => g.user_id))];
-      const { data: users } = await supabase
+      const { data: users, error: usersError } = await supabase
         .from("users")
         .select("id,full_name,email,sia_license_number,sia_license_status,sia_license_expiry,sia_sectors,sia_verification_details,sia_verified_at,created_at")
         .in("id", userIds);
+      if (usersError) throw new Error('Unable to load verification contact details');
 
       const userMap: Record<string, any> = {};
       if (users) users.forEach((u: any) => { userMap[u.id] = u; });
+
+      // Only resolve missing contacts for this page, after the admin + MFA checks.
+      const contactEmails = new Map<string, string>();
+      await Promise.all(userIds.map(async (userId: string) => {
+        const profileEmail = userMap[userId]?.email?.trim();
+        if (profileEmail) { contactEmails.set(userId, profileEmail); return; }
+        const { data, error: contactError } = await supabase.auth.admin.getUserById(userId);
+        if (contactError && contactError.status !== 404) throw new Error('Unable to load verification contact details');
+        contactEmails.set(userId, data?.user?.email?.trim() || '');
+      }));
 
       let combined = guards.map((g: any) => {
         const u = userMap[g.user_id] || {};
@@ -207,7 +218,7 @@ Deno.serve(async (req) => {
           guardId: g.id,
           userId: g.user_id,
           fullName: g.full_name || u.full_name || "N/A",
-          email: u.email || "",
+          email: contactEmails.get(g.user_id) || "",
           siaLicenseNumber: g.sia_licence_number || u.sia_license_number || "N/A",
           verificationStatus: mapGuardStatus(g.verification_status),
           siaVerified: g.sia_verified,

@@ -24,23 +24,44 @@ export default function CompletionRequestsPanel() {
   const [filter, setFilter] = useState('pending');
   const [processing, setProcessing] = useState<string | null>(null);
   const [toast, setToast] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadRequests = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const { data, error } = await supabase
         .from('job_completion_requests')
-        .select(`
-          id, job_id, guard_id, status, requested_at, dispute_reason, notes,
-          jobs:job_id(job_title, venue_city, agreed_amount),
-          guards:guard_id(full_name)
-        `)
+        .select('id, job_id, guard_id, status, requested_at, dispute_reason, notes')
         .order('requested_at', { ascending: false })
         .limit(100);
       if (error) throw error;
-      setRequests((data || []).map(r => ({...r, jobs: Array.isArray(r.jobs) ? r.jobs[0] || null : r.jobs, guards: Array.isArray(r.guards) ? r.guards[0] || null : r.guards})));
-    } catch (err) {setToast(err instanceof Error ? err.message : 'Unable to load completion requests');}
-    setLoading(false);
+      const rows = data || [];
+      if (rows.length === 0) {
+        setRequests([]);
+        return;
+      }
+      // Completion requests have no foreign keys. Read their related records
+      // separately, retaining the signed-in administrator's RLS permissions.
+      const [jobsResult, guardsResult] = await Promise.all([
+        supabase.from('jobs').select('id, job_title, venue_city, agreed_amount')
+          .in('id', [...new Set(rows.map(row => row.job_id))]),
+        supabase.from('guards').select('id, full_name')
+          .in('id', [...new Set(rows.map(row => row.guard_id))]),
+      ]);
+      if (jobsResult.error) throw jobsResult.error;
+      if (guardsResult.error) throw guardsResult.error;
+      const jobs = new Map((jobsResult.data || []).map(job => [job.id, job]));
+      const guards = new Map((guardsResult.data || []).map(guard => [guard.id, guard]));
+      setRequests(rows.map(row => ({
+        ...row, jobs: jobs.get(row.job_id) || null, guards: guards.get(row.guard_id) || null,
+      })));
+    } catch {
+      setRequests([]);
+      setLoadError('Unable to load completion requests. Please retry.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { loadRequests(); }, []);
@@ -60,8 +81,8 @@ export default function CompletionRequestsPanel() {
         setToast(data.payoutWarning || 'Completion approved but payout requires attention');
       }
       loadRequests();
-    } catch (err: any) {
-      setToast(err.message || 'Failed to process');
+    } catch (err: unknown) {
+      setToast(err instanceof Error ? err.message : 'Failed to process');
     } finally {
       setProcessing(null);
     }
@@ -83,20 +104,29 @@ export default function CompletionRequestsPanel() {
           <h2 className="text-xl font-extrabold text-white">Job Completion Requests</h2>
           <p className="text-sm text-slate-400 mt-1">Guards requesting completion approval and payment release</p>
         </div>
-        <button onClick={loadRequests} className="px-4 py-2 bg-teal-500/10 text-teal-400 rounded-xl text-sm font-semibold hover:bg-teal-500/20 flex items-center gap-2 whitespace-nowrap cursor-pointer">
+        <button onClick={loadRequests} disabled={loading} className="px-4 py-2 bg-teal-500/10 text-teal-400 rounded-xl text-sm font-semibold hover:bg-teal-500/20 flex items-center gap-2 whitespace-nowrap cursor-pointer disabled:opacity-50">
           <i className="ri-refresh-line"></i>Refresh
         </button>
       </div>
 
-      <CompletionStatsCards counts={counts} filter={filter} onFilterChange={setFilter} />
+      {loadError ? (
+        <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-300">
+          <p>{loadError}</p>
+          <button onClick={loadRequests} className="mt-2 underline">Retry completion requests</button>
+        </div>
+      ) : (
+        <>
+          {!loading && <CompletionStatsCards counts={counts} filter={filter} onFilterChange={setFilter} />}
 
-      <CompletionRequestsTable
-        requests={filtered}
-        loading={loading}
-        filter={filter}
-        processing={processing}
-        onApprove={handleAdminApprove}
-      />
+          <CompletionRequestsTable
+            requests={filtered}
+            loading={loading}
+            filter={filter}
+            processing={processing}
+            onApprove={handleAdminApprove}
+          />
+        </>
+      )}
 
       {toast && (
         <div className="fixed top-24 right-6 z-50 bg-[#111d35] border border-[#1e2d4d] shadow-lg px-5 py-3 rounded-xl flex items-center gap-2">

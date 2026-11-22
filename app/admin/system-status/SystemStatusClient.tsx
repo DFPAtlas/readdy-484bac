@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import StorageUsageWidget from '@/components/admin/StorageUsageWidget';
+import { loadAdminCleanupLogs, type CleanupLog } from '@/lib/adminMaintenance';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vnywjfpkepjgclkbcmsj.supabase.co';
 const WEBSITE_URL = 'https://quickguard.uk';
@@ -41,7 +42,7 @@ interface AdminStatusData {
       total_guard_payout_pending: number;
     };
   };
-  cron_jobs: CronJobData[];
+  cron_jobs: CronJobData[] | null;
   cleanup: {
     status: string;
     last_run: { table: string; at: string; rows_removed: number } | null;
@@ -170,8 +171,9 @@ export default function SystemStatusClient() {
   const [edgePings, setEdgePings] = useState<EdgeFunctionPing[]>([]);
   const [edgeLoading, setEdgeLoading] = useState(true);
 
-  const [cleanupLogs, setCleanupLogs] = useState<any[]>([]);
+  const [cleanupLogs, setCleanupLogs] = useState<CleanupLog[]>([]);
   const [cleanupLogsLoading, setCleanupLogsLoading] = useState(true);
+  const [cleanupLogsError, setCleanupLogsError] = useState<string | null>(null);
 
   const [tableSizes, setTableSizes] = useState<Record<string, string>>();
   const [tableSizesLoading, setTableSizesLoading] = useState(true);
@@ -182,8 +184,9 @@ export default function SystemStatusClient() {
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [logPage, setLogPage] = useState(0);
   const [logTotalCount, setLogTotalCount] = useState(0);
-  const [allLogs, setAllLogs] = useState<any[]>([]);
+  const [allLogs, setAllLogs] = useState<CleanupLog[]>([]);
   const [logLoading, setLogLoading] = useState(false);
+  const [logError, setLogError] = useState<string | null>(null);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
@@ -381,11 +384,13 @@ export default function SystemStatusClient() {
   // ── Fetch cleanup logs ───────────────────────────────────────────────
   const fetchCleanupLogs = useCallback(async () => {
     setCleanupLogsLoading(true);
+    setCleanupLogsError(null);
     try {
-      const { data } = await supabase.schema('public').from('cleanup_log').select('*').order('started_at', { ascending: false }).limit(20);
-      setCleanupLogs(data || []);
+      const { logs } = await loadAdminCleanupLogs();
+      setCleanupLogs(logs);
     } catch {
       setCleanupLogs([]);
+      setCleanupLogsError('Unable to load cleanup activity. Please retry.');
     } finally {
       setCleanupLogsLoading(false);
     }
@@ -436,19 +441,17 @@ export default function SystemStatusClient() {
   // ── Open full log modal ──────────────────────────────────────────────
   const openFullLog = useCallback(async (page: number) => {
     setLogLoading(true);
+    setLogError(null);
     try {
       const from = page * PER_PAGE;
-      const to = from + PER_PAGE - 1;
-      const [{ count }, { data }] = await Promise.all([
-        supabase.schema('public').from('cleanup_log').select('*', { count: 'exact', head: true }),
-        supabase.schema('public').from('cleanup_log').select('*').order('started_at', { ascending: false }).range(from, to),
-      ]);
-      setLogTotalCount(count ?? 0);
-      setAllLogs(data ?? []);
+      const { logs, totalCount } = await loadAdminCleanupLogs(from, PER_PAGE);
+      setLogTotalCount(totalCount);
+      setAllLogs(logs);
       setLogPage(page);
     } catch {
       setLogTotalCount(0);
       setAllLogs([]);
+      setLogError('Unable to load cleanup records. Please retry.');
     }
     setLogLoading(false);
   }, []);
@@ -1080,8 +1083,8 @@ export default function SystemStatusClient() {
                       { table: 'notifications', retention: '180 days', icon: 'ri-notification-line' },
                       { table: 'processed_stripe_events', retention: '365 days', icon: 'ri-bank-card-line' },
                     ].map((row) => {
-                      const log = cleanupLogs.find((l: any) => l.table_name === row.table && l.status === 'completed');
-                      const failLog = cleanupLogs.find((l: any) => l.table_name === row.table && l.status === 'failed');
+                      const log = cleanupLogs.find(l => l.table_name === row.table && l.status === 'completed');
+                      const failLog = cleanupLogs.find(l => l.table_name === row.table && l.status === 'failed');
                       return (
                         <tr key={row.table} className="hover:bg-[#0a1628]/50 transition-colors">
                           <td className="px-4 py-3">
@@ -1134,6 +1137,11 @@ export default function SystemStatusClient() {
                 <div className="flex items-center justify-center py-4">
                   <i className="ri-loader-4-line animate-spin text-teal-400 text-sm"></i>
                 </div>
+              ) : cleanupLogsError ? (
+                <div role="alert" className="text-sm text-red-400">
+                  <p>{cleanupLogsError}</p>
+                  <button onClick={fetchCleanupLogs} className="underline">Retry cleanup activity</button>
+                </div>
               ) : cleanupLogs.length === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-[11px] text-slate-600">No cleanup activity logged yet.</p>
@@ -1141,7 +1149,7 @@ export default function SystemStatusClient() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {cleanupLogs.slice(0, 5).map((log: any) => (
+                  {cleanupLogs.slice(0, 5).map(log => (
                     <div key={log.id} className="flex items-center justify-between text-[11px]">
                       <div className="flex items-center gap-2">
                         <div className={`w-1.5 h-1.5 rounded-full ${log.status === 'completed' ? 'bg-emerald-500' : log.status === 'failed' ? 'bg-red-500' : 'bg-amber-500'}`}></div>
@@ -1269,6 +1277,11 @@ export default function SystemStatusClient() {
                       <i className="ri-loader-4-line animate-spin text-lg"></i>
                     </div>
                   </div>
+                ) : logError ? (
+                  <div role="alert" className="text-sm text-red-400">
+                    <p>{logError}</p>
+                    <button onClick={() => openFullLog(logPage)} className="underline">Retry cleanup records</button>
+                  </div>
                 ) : allLogs.length === 0 ? (
                   <div className="text-center py-12">
                     <p className="text-sm text-slate-500">No cleanup records found</p>
@@ -1285,7 +1298,7 @@ export default function SystemStatusClient() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#1a2b4a]">
-                      {allLogs.map((log: any) => (
+                      {allLogs.map(log => (
                         <tr key={log.id} className="hover:bg-[#0a1628]/50">
                           <td className="py-2.5 text-slate-400 font-mono text-[10px]">
                             {new Date(log.started_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}

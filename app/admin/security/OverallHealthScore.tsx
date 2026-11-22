@@ -1,6 +1,7 @@
 'use client';
 
 import { AdminCounts, SuspiciousActivity, PaymentEmailData, BackupComplianceData } from './SecuritySOCClient';
+import { assessBackup } from '@/supabase/functions/_shared/backup-health';
 
 interface HealthCategory {
   name: string;
@@ -91,7 +92,7 @@ function computeCategories(props: Props): HealthCategory[] {
 
   const backupsScore = (() => {
     if (!props.backupComplianceData?.backups || props.backupComplianceData.backups.length === 0) return { score: 40, status: 'warning' as const };
-    const healthy = props.backupComplianceData.backups.filter(b => b.status === 'healthy').length;
+    const healthy = props.backupComplianceData.backups.filter(b => assessBackup(b).status === 'healthy').length;
     const total = props.backupComplianceData.backups.length;
     const pct = Math.round((healthy / total) * 100);
     return { score: pct, status: pct >= 80 ? 'healthy' as const : pct >= 50 ? 'warning' as const : 'critical' as const };
