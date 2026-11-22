@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { emailConfiguration, stripeHealth } from '../_shared/admin-service-health.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -168,33 +169,19 @@ Deno.serve(async (req: Request) => {
     overallStatus = "critical";
   }
 
-  // --- Stripe health ---
-  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
-  if (stripeKey) {
-    const startStripe = Date.now();
-    try {
-      const res = await fetch("https://api.stripe.com/v1/balance", {
-        headers: { Authorization: `Bearer ${stripeKey}` },
-      });
-      checks.stripe = { status: res.ok ? "healthy" : "unhealthy", latency_ms: Date.now() - startStripe };
-      if (!res.ok) overallStatus = overallStatus === "healthy" ? "degraded" : overallStatus;
-    } catch (e: any) {
-      checks.stripe = { status: "unhealthy", error: e.message };
-      overallStatus = overallStatus === "healthy" ? "degraded" : overallStatus;
-    }
-  } else {
-    checks.stripe = { status: "not_configured" };
+  const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
+  checks.stripe = await stripeHealth(stripeKey);
+  checks.email = emailConfiguration(name => Deno.env.get(name));
+  if (checks.stripe.status !== 'healthy' || checks.email.status !== 'configured') {
+    overallStatus = overallStatus === 'healthy' ? 'degraded' : overallStatus;
   }
-
-  // --- Email config ---
-  const smtpUser = Deno.env.get("SMTP_USER");
-  const smtpPass = Deno.env.get("SMTP_PASS");
-  checks.email = { status: smtpUser && smtpPass ? "configured" : "not_configured" };
-
-  // --- Environment ---
-  checks.environment = {
-    status: (!!supabaseUrl && !!serviceKey && !!stripeKey && !!smtpUser && !!smtpPass) ? "healthy" : "degraded",
-  };
+  checks.environment = { status: stripeKey && checks.email.status === 'configured' ? 'healthy' : 'degraded' };
+  const { data: serviceMetrics, error: serviceMetricsError } = await app.rpc('get_admin_service_metrics');
+  if (serviceMetricsError || !serviceMetrics?.stripe || !serviceMetrics?.email) {
+    return new Response(JSON.stringify({ error: 'Admin service metrics could not be loaded' }), {
+      status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    });
+  }
 
   // --- Parallel business queries (app schema) ---
   const metricPromises = [
@@ -244,8 +231,8 @@ Deno.serve(async (req: Request) => {
 
   let stuckFundedOver24h = 0;
   let stuckAwaitingOver72h = 0;
-  let pendingPayoutsCount = 0;
-  let failedPayoutsCount = 0;
+  const pendingPayoutsCount = serviceMetrics.stripe.pendingPayouts;
+  const failedPayoutsCount = serviceMetrics.stripe.failedPayouts;
 
   try {
     const [{ data: allAssignments, error: allErr }, overdueCompletions] = await Promise.all([
@@ -270,10 +257,6 @@ Deno.serve(async (req: Request) => {
           if (assignedDate && assignedDate < new Date(Date.now() - 24 * 60 * 60 * 1000)) {
             stuckFundedOver24h++;
           }
-          pendingPayoutsCount++;
-        }
-        if (ps === "failed" || (a.payment_date && ps !== "paid" && ps !== "pending")) {
-          failedPayoutsCount++;
         }
       }
     }
@@ -296,20 +279,7 @@ Deno.serve(async (req: Request) => {
     schemaErrors.push(`Unreleased value exception: ${e.message}`);
   }
 
-  let totalGuardPayoutPending = 0;
-  try {
-    const { data: payoutData, error: payoutErr } = await app
-      .from("guard_payouts")
-      .select("net_amount")
-      .in("status", ["pending", "processing"]);
-    if (!payoutErr && payoutData) {
-      totalGuardPayoutPending = payoutData.reduce((sum: number, r: any) => sum + (Number(r.net_amount) || 0), 0);
-    } else if (payoutErr) {
-      schemaErrors.push(`Payout value query failed: ${payoutErr.message}`);
-    }
-  } catch (e: any) {
-    schemaErrors.push(`Payout value exception: ${e.message}`);
-  }
+  const totalGuardPayoutPending = Number(serviceMetrics.pendingPayoutAmount);
 
   return new Response(
     JSON.stringify({

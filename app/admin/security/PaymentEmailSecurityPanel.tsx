@@ -35,18 +35,21 @@ function MetricCard({ metric }: { metric: MetricCardData }) {
 
 export default function PaymentEmailSecurityPanel({ paymentEmailData }: Props) {
   const d = paymentEmailData;
+  const emailConfigured = d?.email.configured ?? d?.email.smtpConnected ?? false;
 
   const stripeMetrics: MetricCardData[] = d ? [
-    { label: 'Webhook Status', value: d.stripe.webhookStatus, status: 'healthy', icon: 'ri-webhook-line' },
-    { label: 'Webhook Verification', value: d.stripe.webhookVerification, status: 'healthy', icon: 'ri-shield-check-line' },
+    { label: 'Stripe API Health', value: d.stripe.apiHealth?.status === 'healthy' ? 'Verified' : d.stripe.apiHealth?.error || 'Not checked', status: d.stripe.apiHealth?.status === 'healthy' ? 'healthy' : 'warning', icon: 'ri-bank-card-line' },
+    { label: 'Webhook Activity', value: d.stripe.webhookStatus, status: d.stripe.webhookStatus === 'Recent activity recorded' ? 'healthy' : 'warning', icon: 'ri-webhook-line' },
+    { label: 'Webhook Verification', value: d.stripe.webhookVerification, status: 'warning', icon: 'ri-shield-check-line' },
     { label: 'Failed Events (24h)', value: d.stripe.failedEvents24h, status: d.stripe.failedEvents24h > 0 ? 'warning' : 'healthy', icon: 'ri-error-warning-line' },
-    { label: 'Pending Events', value: d.stripe.pendingEvents, status: d.stripe.pendingEvents > 5 ? 'warning' : 'healthy', icon: 'ri-time-line' },
+    { label: 'Pending Events', value: d.stripe.pendingEvents ?? 'Not checked', status: d.stripe.pendingEvents === null || d.stripe.pendingEvents > 5 ? 'warning' : 'healthy', icon: 'ri-time-line' },
+    { label: 'Failed Payouts', value: d.stripe.failedPayouts ?? 'Not checked', status: d.stripe.failedPayouts === undefined ? 'warning' : d.stripe.failedPayouts > 0 ? 'critical' : 'healthy', icon: 'ri-bank-line' },
     { label: 'Pending Payouts', value: d.stripe.pendingPayouts, status: d.stripe.pendingPayouts > 5 ? 'warning' : 'healthy', icon: 'ri-bank-line' },
     { label: 'Open Disputes', value: d.stripe.openDisputes, status: d.stripe.openDisputes > 0 ? 'critical' : 'healthy', icon: 'ri-scales-line' },
-    { label: 'Refunds (7d)', value: d.stripe.refunds, status: 'healthy', icon: 'ri-refund-2-line' },
+    { label: 'Refunded Payments (7d)', value: d.stripe.refunds, status: 'healthy', icon: 'ri-refund-2-line' },
     { label: 'Webhook Latency', value: d.stripe.webhookLatency, status: d.stripe.webhookLatency === '—' ? 'warning' : 'healthy', icon: 'ri-speed-line' },
     { label: 'Signing Secret', value: d.stripe.signingSecret, status: d.stripe.signingSecret === 'Configured' ? 'healthy' : 'critical', icon: 'ri-key-2-fill' },
-    { label: 'Latest Webhook', value: d.stripe.latestWebhook ? new Date(d.stripe.latestWebhook).toLocaleTimeString() : 'None', status: d.stripe.latestWebhook ? 'healthy' : 'warning', icon: 'ri-history-line' },
+    { label: 'Latest Webhook', value: d.stripe.latestWebhook ? new Date(d.stripe.latestWebhook).toLocaleString() : 'None', status: d.stripe.webhookStatus === 'Recent activity recorded' ? 'healthy' : 'warning', icon: 'ri-history-line' },
   ] : [
     { label: 'Webhook Status', value: 'No data', status: 'warning', icon: 'ri-webhook-line' },
     { label: 'Failed Events', value: '—', status: 'warning', icon: 'ri-error-warning-line' },
@@ -55,13 +58,13 @@ export default function PaymentEmailSecurityPanel({ paymentEmailData }: Props) {
   ];
 
   const emailMetrics: MetricCardData[] = d ? [
-    { label: 'SMTP Connection', value: d.email.smtpConnected ? 'Connected' : 'Not Connected', status: d.email.smtpConnected ? 'healthy' : 'critical', icon: 'ri-plug-line' },
+    { label: d.email.provider || 'Email Provider', value: emailConfigured ? 'Configured' : 'Not Configured', status: emailConfigured ? 'healthy' : 'critical', icon: 'ri-plug-line' },
     { label: 'Queue Status', value: `${d.email.queuePending} pending`, status: d.email.queuePending > 50 ? 'warning' : 'healthy', icon: 'ri-stack-line' },
     { label: 'Failed Emails (24h)', value: String(d.email.failedEmails24h), status: d.email.failedEmails24h > 5 ? 'warning' : 'healthy', icon: 'ri-mail-close-line' },
     { label: 'Sent Today', value: String(d.email.sentToday), status: 'healthy', icon: 'ri-send-plane-line' },
-    { label: 'Bounce Rate', value: d.email.bounceRate, status: parseFloat(d.email.bounceRate) > 2 ? 'warning' : 'healthy', icon: 'ri-arrow-go-back-line' },
-    { label: 'SPF Record', value: d.email.spfValid ? 'Valid' : 'Invalid', status: d.email.spfValid ? 'healthy' : 'critical', icon: 'ri-check-double-line' },
-    { label: 'DKIM Record', value: d.email.dkimValid ? 'Valid' : 'Invalid', status: d.email.dkimValid ? 'healthy' : 'critical', icon: 'ri-check-double-line' },
+    { label: 'Bounce Rate', value: d.email.bounceRate ?? 'Not checked', status: d.email.bounceRate === null || parseFloat(d.email.bounceRate) > 2 ? 'warning' : 'healthy', icon: 'ri-arrow-go-back-line' },
+    { label: 'SPF Record', value: d.email.spfValid === null ? 'Not checked' : d.email.spfValid ? 'Valid' : 'Invalid', status: d.email.spfValid === null ? 'warning' : d.email.spfValid ? 'healthy' : 'critical', icon: 'ri-check-double-line' },
+    { label: 'DKIM Record', value: d.email.dkimValid === null ? 'Not checked' : d.email.dkimValid ? 'Valid' : 'Invalid', status: d.email.dkimValid === null ? 'warning' : d.email.dkimValid ? 'healthy' : 'critical', icon: 'ri-check-double-line' },
     { label: 'Daily Send Count', value: String(d.email.dailySendCount), status: 'healthy', icon: 'ri-send-plane-line' },
   ] : [
     { label: 'SMTP Connection', value: 'No data', status: 'warning', icon: 'ri-plug-line' },
@@ -70,8 +73,8 @@ export default function PaymentEmailSecurityPanel({ paymentEmailData }: Props) {
     { label: 'Daily Send Count', value: '—', status: 'warning', icon: 'ri-send-plane-line' },
   ];
 
-  const stripeStatus = d ? (d.stripe.failedEvents24h > 0 || d.stripe.signingSecret !== 'Configured' ? 'Needs Attention' : 'All Systems Operational') : 'Data Unavailable';
-  const emailStatus = d ? (d.email.failedEmails24h > 3 || !d.email.smtpConnected ? 'Needs Attention' : 'Healthy') : 'Data Unavailable';
+  const stripeStatus = d ? (d.stripe.apiHealth?.status !== 'healthy' || d.stripe.failedEvents24h > 0 || (d.stripe.failedPayouts ?? 0) > 0 || d.stripe.openDisputes > 0 || d.stripe.signingSecret !== 'Configured' ? 'Needs Attention' : 'No Recorded Failures') : 'Data Unavailable';
+  const emailStatus = d ? (d.email.failedEmails24h > 3 || !emailConfigured ? 'Needs Attention' : 'Configured') : 'Data Unavailable';
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -81,7 +84,7 @@ export default function PaymentEmailSecurityPanel({ paymentEmailData }: Props) {
             <i className="ri-bank-card-line text-violet-400 text-sm"></i>
           </div>
           <h2 className="text-base font-semibold text-white">Stripe Security</h2>
-          <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold ${stripeStatus === 'All Systems Operational' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+          <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold ${stripeStatus === 'No Recorded Failures' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
             {stripeStatus}
           </span>
         </div>
@@ -98,7 +101,7 @@ export default function PaymentEmailSecurityPanel({ paymentEmailData }: Props) {
             <i className="ri-mail-line text-sky-400 text-sm"></i>
           </div>
           <h2 className="text-base font-semibold text-white">Email Security</h2>
-          <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold ${emailStatus === 'Healthy' ? 'bg-emerald-500/10 text-emerald-400' : emailStatus === 'Data Unavailable' ? 'bg-slate-500/10 text-slate-400' : 'bg-amber-500/10 text-amber-400'}`}>
+          <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold ${emailStatus === 'Configured' ? 'bg-emerald-500/10 text-emerald-400' : emailStatus === 'Data Unavailable' ? 'bg-slate-500/10 text-slate-400' : 'bg-amber-500/10 text-amber-400'}`}>
             {emailStatus}
           </span>
         </div>

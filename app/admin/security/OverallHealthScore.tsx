@@ -72,6 +72,11 @@ function computeCategories(props: Props): HealthCategory[] {
     if (!props.paymentEmailData) return { score: 70, status: 'warning' as const };
     let s = 100;
     if (props.paymentEmailData.stripe.failedEvents24h > 0) s -= 15;
+    if ((props.paymentEmailData.stripe.failedPayouts ?? 0) > 0) s -= 15;
+    if (props.paymentEmailData.stripe.apiHealth?.status !== 'healthy') s -= 15;
+    if (props.paymentEmailData.stripe.openDisputes > 0) s -= 20;
+    if (props.paymentEmailData.stripe.signingSecret !== 'Configured') s -= 25;
+    if (props.paymentEmailData.stripe.webhookVerification !== 'Verified') s -= 10;
     if (props.paymentEmailData.stripe.pendingPayouts > 5) s -= 10;
     return { score: Math.max(30, s), status: s >= 90 ? 'healthy' as const : s >= 70 ? 'warning' as const : 'critical' as const };
   })();
