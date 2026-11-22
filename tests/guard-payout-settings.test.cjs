@@ -73,7 +73,7 @@ test('Stripe links must use approved HTTPS account hosts; a return URL is never 
   assert.equal(api.stripeReturnNotice('https://quickguard.uk/guard/bank-settings?source=earnings'), null);
 });
 
-function render(status, { statusError = '', tab = 'setup', notice = '' } = {}) {
+function render(status, { statusError = '', tab = 'setup', notice = '', accessError = null } = {}) {
   const react = { ...React, useState: initial => [initial === 'setup' ? tab : initial, () => {}], useEffect: () => {} };
   const settings = { profile: { id: 'guard', fullName: 'Guard Name' }, status, loading: false, refreshing: false,
     error: '', statusError, actionError: '', busyAction: null, requiresLogin: false, load() {}, refresh() {}, openStripe() {} };
@@ -83,7 +83,8 @@ function render(status, { statusError = '', tab = 'setup', notice = '' } = {}) {
     if (id === 'react') return react;
     if (id === 'next/navigation') return { useRouter: () => ({ replace() {} }) };
     if (id === 'next/link') return { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) };
-    if (id === '@/hooks/useGuardGuard') return { useGuardGuard: () => ({ loading: false, allowed: true }) };
+    if (id === '@/hooks/useGuardGuard') return { useGuardGuard: () => ({ loading: false, allowed: !accessError, error: accessError, retry() {} }) };
+    if (id === '@/components/GuardAccessRecovery') return { __esModule: true, default: require('./helpers/finish-test-runtime.cjs').loader({'next/link':{__esModule:true,default:'a'}})('components/GuardAccessRecovery.tsx').default };
     if (id === '@/hooks/useGuardPayoutSettings') return { useGuardPayoutSettings: () => settings };
     if (id === '@/lib/guard-payout-settings') return { ...api, stripeReturnNotice: () => ({ notice }) };
     if (id === '@/lib/customer-guidance') return guidance.exports;
@@ -111,4 +112,10 @@ test('payout guide explains the two stages, and bank history uses the bank-depos
   assert.match(guide, /Job payment release/); assert.match(guide, /Stripe account and bank deposit/);
   assert.match(guide, /support request does not itself stop/); assert.doesNotMatch(guide, /every Friday|1st of each month|1-2 business days/);
   const history = render(ready, { tab: 'history' }); assert.match(history, /data-guard-id="guard"/); assert.match(history, /View job earnings and receipts/);
+});
+
+test('failed access renders retry and sign-in before exposing saved payout status or Stripe actions', () => {
+  const page=render(ready,{accessError:'private backend error'});
+  assert.match(page,/Retry access check/);assert.match(page,/href="\/guard\/login"/);
+  assert.doesNotMatch(page,/private backend error|enabled for payouts|Manage Bank Account in Stripe|Set Up Payouts/);
 });

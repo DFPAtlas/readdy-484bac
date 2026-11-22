@@ -8,12 +8,13 @@ import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
 import { useGuardPaymentCentre } from '@/hooks/useGuardPaymentCentre';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
+import GuardAccessRecovery from '@/components/GuardAccessRecovery';
 
 type TabKey = 'overview' | 'history' | 'statements';
 
 export default function GuardPaymentCentrePage() {
   const { collapsed: sidebarCollapsed } = useSidebar();
-  const { loading: authLoading, allowed } = useGuardGuard();
+  const { loading: authLoading, allowed, error: accessError, retry: retryAccess } = useGuardGuard();
   const {
     loading,
     error,
@@ -151,6 +152,8 @@ export default function GuardPaymentCentrePage() {
     { key: 'history', label: 'Payment History', icon: 'ri-receipt-line' },
     { key: 'statements', label: 'Statements', icon: 'ri-file-list-3-line' },
   ];
+
+  if (accessError) return <GuardAccessRecovery onRetry={retryAccess} />;
 
   if (loadTimedOut || (!authLoading && !allowed)) {
     const sessionUnavailable = !authLoading && !allowed;

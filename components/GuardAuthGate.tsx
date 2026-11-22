@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useSafeRouter } from '@/hooks/useSafeRouter'
 import { resolveAccountState, QuickGuardAccountState } from '@/lib/account-state'
 import { logAuditEvent } from '@/lib/qg-error'
+import { withRequestDeadline } from '@/lib/request-deadline'
+import GuardAccessRecovery from './GuardAccessRecovery'
 
 const OPEN_PATHS = [
   '/guard/login',
@@ -60,18 +62,48 @@ export default function GuardAuthGate({ children }: { children: React.ReactNode 
   const [allowed, setAllowed] = useState(false)
   const [blockedStatus, setBlockedStatus] = useState<string | null>(null)
   const [, setGuardName] = useState<string>('')
+  const [accessError, setAccessError] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  const [checkedPath, setCheckedPath] = useState<string | null>(null)
+  const generationRef = useRef(0)
+  const allowedOwnerRef = useRef<string | null>(null)
 
   useEffect(() => {
-    let cancelled = false
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Keep login/onboarding forms mounted while their own auth transitions finish.
+      if (OPEN_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))) return
+      if (event !== 'SIGNED_IN' && event !== 'SIGNED_OUT' && event !== 'USER_UPDATED') return
+      if (event === 'SIGNED_IN' && session?.user.id === allowedOwnerRef.current) return
+      generationRef.current++
+      allowedOwnerRef.current = null
+      setCheckedPath(null)
+      setAllowed(false)
+      setLoading(true)
+      setAttempt(value => value + 1)
+    })
+    return () => { subscription.unsubscribe() }
+  }, [pathname])
+
+  useEffect(() => {
+    let retired = false
+    const generation = ++generationRef.current
+    const current = () => !retired && generationRef.current === generation
+    allowedOwnerRef.current = null
+    setLoading(true)
+    setAllowed(false)
+    setBlockedStatus(null)
+    setAccessError(false)
+    setCheckedPath(pathname)
 
     const check = async () => {
       if (OPEN_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))) {
-        if (!cancelled) { setLoading(false); setAllowed(true) }
+        if (current()) { setLoading(false); setAllowed(true) }
         return
       }
 
-      const state: QuickGuardAccountState = await resolveAccountState()
-      if (cancelled) return
+      const state: QuickGuardAccountState = await withRequestDeadline(resolveAccountState())
+      if (!current()) return
+      if (state.requiredNextStep?.includes('service_unavailable')) throw new Error('Account check unavailable')
 
       if (!state.userId) {
         logAuditEvent({ action: 'unauthorized_route_attempt', entityType: 'route', metadata: { path: pathname } })
@@ -80,7 +112,7 @@ export default function GuardAuthGate({ children }: { children: React.ReactNode 
       }
 
       if (state.role === 'admin') {
-        if (!cancelled) { setLoading(false); setAllowed(true) }
+        if (current()) { allowedOwnerRef.current = state.userId; setLoading(false); setAllowed(true) }
         return
       }
 
@@ -98,7 +130,7 @@ export default function GuardAuthGate({ children }: { children: React.ReactNode 
 
       if (state.accountStatus === 'suspended' || state.accountStatus === 'disabled') {
         logAuditEvent({ userId: state.userId, role: 'guard', action: 'account_suspension_enforced', entityType: 'account', metadata: { status: state.accountStatus, path: pathname } })
-        if (!cancelled) {
+        if (current()) {
           setBlockedStatus(state.accountStatus)
           setLoading(false)
           setAllowed(false)
@@ -112,13 +144,14 @@ export default function GuardAuthGate({ children }: { children: React.ReactNode 
         return
       }
 
-      const { data: guardData } = await supabase
+      const { data: guardData, error: guardError } = await withRequestDeadline(supabase
         .from('guards')
         .select('full_name, verification_status, dashboard_access')
         .eq('user_id', state.userId)
-        .maybeSingle()
+        .maybeSingle())
 
-      if (cancelled) return
+      if (!current()) return
+      if (guardError) throw new Error('Guard check unavailable')
 
       const vs = guardData?.verification_status || 'unknown'
       setGuardName(guardData?.full_name || '')
@@ -126,14 +159,14 @@ export default function GuardAuthGate({ children }: { children: React.ReactNode 
       if (vs === 'verified' || vs === 'approved') {
         if (guardData?.dashboard_access === false) {
           logAuditEvent({ userId: state.userId, role: 'guard', action: 'guard_blocked_access', entityType: 'guard', metadata: { verification_status: 'approved_no_dashboard_access', path: pathname } })
-          if (!cancelled) {
+          if (current()) {
             setBlockedStatus('approved_no_dashboard_access')
             setLoading(false)
             setAllowed(false)
           }
           return
         }
-        if (!cancelled) { setLoading(false); setAllowed(true) }
+        if (current()) { allowedOwnerRef.current = state.userId; setLoading(false); setAllowed(true) }
         return
       }
 
@@ -143,7 +176,7 @@ export default function GuardAuthGate({ children }: { children: React.ReactNode 
       }
 
       if (vs === 'expired') {
-        if (!cancelled) {
+        if (current()) {
           setBlockedStatus('expired')
           setLoading(false)
           setAllowed(false)
@@ -152,16 +185,22 @@ export default function GuardAuthGate({ children }: { children: React.ReactNode 
       }
 
       logAuditEvent({ userId: state.userId, role: 'guard', action: 'guard_blocked_access', entityType: 'guard', metadata: { verification_status: vs, path: pathname } })
-      if (!cancelled) {
+      if (current()) {
         setBlockedStatus(vs)
         setLoading(false)
         setAllowed(false)
       }
     }
 
-    check()
-    return () => { cancelled = true }
-  }, [pathname, router])
+    void check().catch(() => {
+      if (!current()) return
+      setAllowed(false)
+      setBlockedStatus(null)
+      setAccessError(true)
+      setLoading(false)
+    })
+    return () => { retired = true }
+  }, [pathname, router, attempt])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -172,7 +211,9 @@ export default function GuardAuthGate({ children }: { children: React.ReactNode 
     router.push('/guard/login')
   }
 
-  if (loading) {
+  if (checkedPath === pathname && accessError) return <GuardAccessRecovery onRetry={() => setAttempt(value => value + 1)} />
+
+  if (loading || checkedPath !== pathname) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#0B1933]">
         <div className="text-center">

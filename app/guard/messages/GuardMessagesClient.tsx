@@ -7,6 +7,7 @@ import { readMessageRows, readMessagePartners, sendJobMessage, changeJobMessages
 import { useMessageOwner } from '@/hooks/useMessageOwner';
 import PortalSidebar from '@/components/PortalSidebar';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
+import GuardAccessRecovery from '@/components/GuardAccessRecovery';
 import Link from 'next/link';
 import { formatDateOnly } from '@/lib/date-only';
 
@@ -94,7 +95,7 @@ export default function GuardMessagesClient({ embedded = false, onUnreadChange }
   return <GuardMessageInbox key={`${actor.id}:${actor.revision}`} expectedOwner={actor.id} embedded={embedded} onUnreadChange={onUnreadChange} />;
 }
 function GuardMessageInbox({ expectedOwner, embedded, onUnreadChange }: { expectedOwner: string } & GuardMessagesProps) {
-  const { loading: authLoading, allowed } = useGuardGuard();
+  const { loading: authLoading, allowed, error: accessError, retry: retryAccess } = useGuardGuard();
 
   const [loading, setLoading] = useState(true);
   const [guardUserId, setGuardUserId] = useState('');
@@ -331,6 +332,8 @@ function GuardMessageInbox({ expectedOwner, embedded, onUnreadChange }: { expect
       groupedMessages[groupedMessages.length - 1].items.push(msg);
     }
   }
+
+  if (accessError) return <GuardAccessRecovery onRetry={retryAccess} />;
 
   if (authLoading || !allowed) {
     return (

@@ -7,11 +7,12 @@ import Link from 'next/link';
 import PortalSidebar from '@/components/PortalSidebar';
 import NotificationHistory from '@/app/guard/dashboard/NotificationHistory';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
+import GuardAccessRecovery from '@/components/GuardAccessRecovery';
 import RoleSwitchModal from '@/components/RoleSwitchModal';
 
 export default function GuardNotificationsPage() {
   const router = useRouter();
-  const { loading: authLoading, allowed, roleSwitch } = useGuardGuard();
+  const { loading: authLoading, allowed, roleSwitch, error: accessError, retry: retryAccess } = useGuardGuard();
   const [guardUserId, setGuardUserId] = useState<string | null>(null);
   const [guardName, setGuardName] = useState('');
   const [pageLoading, setPageLoading] = useState(true);
@@ -34,6 +35,8 @@ export default function GuardNotificationsPage() {
     };
     init();
   }, [router]);
+
+  if (accessError) return <GuardAccessRecovery onRetry={retryAccess} />;
 
   if (authLoading || pageLoading) {
     return (

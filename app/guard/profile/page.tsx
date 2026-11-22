@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
+import GuardAccessRecovery from '@/components/GuardAccessRecovery';
 import PortalSidebar from '@/components/PortalSidebar';
 import SIALicenceImage from '@/components/SIALicenceImage';
 import ImageCropper from '@/components/ImageCropper';
@@ -18,7 +19,7 @@ function ProfileContent() {
   const searchParams = useSearchParams();
   const guardId = searchParams.get('id');
   const isAdminView = searchParams.get('admin') === 'true';
-  const { loading: authLoading, allowed } = useGuardGuard();
+  const { loading: authLoading, allowed, error: accessError, retry: retryAccess } = useGuardGuard();
 
   const [activeTab, setActiveTab] = useState('personal');
   const [isEditing, setIsEditing] = useState(false);
@@ -202,6 +203,8 @@ function ProfileContent() {
       setUploadingImage(false);
     }
   };
+
+  if (accessError && !isAdminView) return <GuardAccessRecovery onRetry={retryAccess} />;
 
   if (authLoading || loading) {
     return (
