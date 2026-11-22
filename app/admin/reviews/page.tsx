@@ -74,10 +74,10 @@ export default function AdminReviewsPage() {
         { count: fiveStar },
         { data: publishedRatings },
       ] = await Promise.all([
-        supabase.from('reviews').select('*', { count: 'exact', head: true }),
-        supabase.from('reviews').select('*', { count: 'exact', head: true }).eq('status', 'published'),
-        supabase.from('reviews').select('*', { count: 'exact', head: true }).eq('status', 'hidden'),
-        supabase.from('reviews').select('*', { count: 'exact', head: true }).eq('rating', 5),
+        supabase.from('reviews').select('id', { count: 'exact', head: true }),
+        supabase.from('reviews').select('id', { count: 'exact', head: true }).eq('status', 'published'),
+        supabase.from('reviews').select('id', { count: 'exact', head: true }).eq('status', 'hidden'),
+        supabase.from('reviews').select('id', { count: 'exact', head: true }).eq('rating', 5),
         supabase.from('reviews').select('rating').eq('status', 'published'),
       ]);
 
