@@ -7,7 +7,7 @@ const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve()};
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText;
 function verificationHarness({getUser,status=async()=>({data:{verification_status:'pending'},error:null})}){
  const source=fs.readFileSync('app/guard/verification-pending/page.tsx','utf8');
- const body=source.slice(source.indexOf('export default function VerificationPendingPage() {')+'export default function VerificationPendingPage() {'.length,source.indexOf('  if (authLoading || !allowed) {'));
+ const body=source.slice(source.indexOf('export default function VerificationPendingPage() {')+'export default function VerificationPendingPage() {'.length,source.indexOf('  if (accessError) return'));
  const effects=[],timers=new Map(),writes=[],routes=[];let next=0;
  const q={select:()=>q,eq:()=>q,maybeSingle:status};
  const db={auth:{getUser},from:()=>q};
