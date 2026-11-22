@@ -7,12 +7,14 @@ import PlanPrice from '@/components/pricing/PlanPrice';
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { getActivePlan } from '@/lib/entitlements';
 import { usePublicPricing } from '@/lib/use-public-pricing';
 import NavSidebar from '@/components/NavSidebar';
+
+type PendingTokenCheckout = { request_id: string; tokens: number; plan_slug: string; billing_cycle: 'monthly' | 'annual' };
 
 const FEATURE_RECOMMENDED_PLAN: Record<string, string> = {
   'client.post_job': 'client_free',
@@ -229,8 +231,8 @@ const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { 
   ]
 },
   'guard.profile_boost': {
-  "title": "Profile boost entitlement",
-  "desc": "The catalogue records profile-boost eligibility for this plan. Featured placement and scheduled boost controls are planned; this does not guarantee a search position, invitation or booking.",
+  "title": "Featured profile placement",
+  "desc": "Eligible active profiles appear ahead of standard profiles in Find a Guard and the Recommended applicant order. Client filters and explicit rating, distance or price sorts still apply. Placement does not guarantee an invitation or booking.",
   "points": [
     {
       "icon": "ri-user-line",
@@ -288,6 +290,10 @@ function UpgradeContent() {
   const loading = catalogue.loading || audienceLoading;
   const [subscribing, setSubscribing] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const tokenLoadEpoch = useRef(0);
+  const tokenOwner = useRef<string | null>(null);
+  const [tokensToRedeem, setTokensToRedeem] = useState(0);
+  const [tokenSummary, setTokenSummary] = useState<{ enabled: boolean; new_subscription: boolean; balance: number; pence_per_100: number; max_percent: number; pending: PendingTokenCheckout | null } | null>(null);
   const [confirmSwitch, setConfirmSwitch] = useState<any>(null);
   const [switchSuccess, setSwitchSuccess] = useState<{ oldPlanName: string; newPlanName: string } | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState<number>(0);
@@ -307,6 +313,8 @@ function UpgradeContent() {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error) throw error;
         if (!active) return;
+        const epoch = tokenLoadEpoch.current;
+        tokenOwner.current = user?.id || null;
         if (user) {
           const { data: userData, error: roleError } = await supabase.from('users').select('user_type').eq('id', user.id).maybeSingle();
           if (roleError) throw roleError;
@@ -315,6 +323,8 @@ function UpgradeContent() {
           setAudience(aud);
           const cp = await getActivePlan(user.id);
           if (active) setCurrentPlan(cp);
+          const summary = await supabase.rpc('get_my_token_checkout_summary');
+          if (active && epoch === tokenLoadEpoch.current && !summary.error && (summary.data?.enabled === true || summary.data?.pending) && Number.isSafeInteger(summary.data.balance) && summary.data.balance >= 0 && Number.isSafeInteger(summary.data.pence_per_100) && summary.data.pence_per_100 > 0 && Number.isSafeInteger(summary.data.max_percent) && summary.data.max_percent > 0 && summary.data.max_percent <= 50) setTokenSummary(summary.data);
         }
       } catch {
         if (active) setMembershipError(true);
@@ -324,6 +334,13 @@ function UpgradeContent() {
     };
     load();
     return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || (event === 'SIGNED_IN' && session?.user.id !== tokenOwner.current)) { ++tokenLoadEpoch.current;tokenOwner.current = session?.user.id || null;setTokenSummary(null);setTokensToRedeem(0); }
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -356,7 +373,9 @@ function UpgradeContent() {
     await executeSubscribe(plan);
   };
 
-  const executeSubscribe = async (plan: any) => {
+  const executeSubscribe = async (plan: any, resume?: PendingTokenCheckout) => {
+    const selectedTokens = resume?.tokens ?? tokensToRedeem;
+    const selectedCycle = resume?.billing_cycle ?? billingCycle;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       window.location.href = plan.audience === 'guard' ? '/guard/register' : '/client/register';
@@ -377,6 +396,12 @@ function UpgradeContent() {
       const basePath = window.location.pathname.replace(/\/(pricing|upgrade).*$/, '');
       const siteUrl = window.location.origin + basePath;
 
+      const tokenKey = `qg-token-checkout:${user.id}:${plan.slug}:${selectedCycle}:${selectedTokens}`;
+      let tokenCheckoutRequestId: string | null = null;
+      if (selectedTokens > 0) {
+        tokenCheckoutRequestId = resume?.request_id || sessionStorage.getItem(tokenKey) || crypto.randomUUID();
+        sessionStorage.setItem(tokenKey, tokenCheckoutRequestId);
+      }
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-subscription-checkout`,
         {
@@ -391,12 +416,15 @@ function UpgradeContent() {
             userEmail: user.email,
             accountType: plan.audience,
             planId: plan.slug,
-            billingCycle,
+            billingCycle: selectedCycle,
             siteUrl,
+            ...(selectedTokens > 0 ? { tokensToRedeem: selectedTokens, tokenCheckoutRequestId } : {}),
           }),
         }
       );
       const data = await response.json();
+      const after = await supabase.auth.getUser();
+      if (after.error || after.data.user?.id !== user.id) throw new Error('Your account changed. Reload before checkout.');
       if (data.switched) {
         setConfirmSwitch(null);
         setSwitchSuccess({ oldPlanName: data.oldPlanName || 'previous plan', newPlanName: data.newPlanName || plan.name });
@@ -404,6 +432,7 @@ function UpgradeContent() {
       } else if (data.url) {
         window.open(data.url, '_blank');
       } else {
+        if (data.error?.includes('closed')) sessionStorage.removeItem(tokenKey);
         alert(data.error || 'Payment setup failed. Please try again.');
       }
     } catch {
@@ -413,6 +442,25 @@ function UpgradeContent() {
       setConfirmSwitch(null);
     }
   };
+
+  async function cancelTokenCheckout() {
+    if (!tokenSummary?.pending) return;
+    setSubscribing('token-cancel');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Please sign in again.');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-subscription-checkout`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}`, apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        body: JSON.stringify({ planId: tokenSummary.pending.plan_slug, tokenCheckoutRequestId: tokenSummary.pending.request_id, cancelTokenCheckout: true }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.cancelled) throw new Error(result.error || 'Cancellation was not confirmed.');
+      const { data, error } = await supabase.rpc('get_my_token_checkout_summary');
+      if (error) throw new Error('Checkout cancelled. Reload to refresh your token balance.');
+      setTokenSummary(data);setTokensToRedeem(0);
+    } catch (cause) { alert(cause instanceof Error ? cause.message : 'Cancellation was not confirmed.'); }
+    finally { setSubscribing(null); }
+  }
 
   const benefit = FEATURE_BENEFITS[reason];
 
@@ -568,6 +616,16 @@ function UpgradeContent() {
             </div>
           )}
 
+          {tokenSummary && <div className="mx-auto mt-5 max-w-xl rounded-xl border border-teal-700 bg-[#111d35] p-4 text-left">
+            {tokenSummary.enabled && tokenSummary.new_subscription && <label className="text-sm text-white">QG Tokens for your first subscription invoice
+              <input aria-label="Tokens to redeem" type="number" min="0" max={tokenSummary.balance} step="1" value={tokensToRedeem} onChange={e => { const n = Number(e.target.value);setTokensToRedeem(Number.isSafeInteger(n) && n >= 0 ? Math.min(n, tokenSummary.balance) : 0); }} className="ml-2 w-24 rounded bg-[#162036] p-2" />
+            </label>}
+            <p className="mt-2 text-xs text-slate-400">{tokenSummary.balance} approved tokens available. 100 tokens = £{(tokenSummary.pence_per_100 / 100).toFixed(2)}; maximum {tokenSummary.max_percent}% of the first invoice. Renewals use the normal plan price. Cannot be combined with a trial offer. Tokens stay reserved until payment, confirmed expiry or cancellation.</p>
+            {tokenSummary.pending && <div className="mt-3 flex gap-3">
+              <button type="button" disabled={!!subscribing} onClick={() => { const pending = tokenSummary.pending;const plan = plans.find(p => p.slug === pending?.plan_slug);if (pending && plan) void executeSubscribe(plan, pending); }} className="rounded bg-teal-700 px-3 py-2 text-sm text-white disabled:opacity-50">Resume token checkout</button>
+              <button type="button" disabled={!!subscribing} onClick={() => void cancelTokenCheckout()} className="rounded border border-slate-600 px-3 py-2 text-sm text-white disabled:opacity-50">Cancel token checkout</button>
+            </div>}
+          </div>}
           <div className="inline-flex items-center bg-slate-800/80 backdrop-blur-sm rounded-full p-1 gap-1 border border-slate-700 mt-6">
             <button
               onClick={() => setBillingCycle('monthly')}
@@ -748,7 +806,11 @@ function UpgradeContent() {
           <div className={`grid grid-cols-1 gap-8 ${plans.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : plans.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
             {plans.map((plan) => {
               const isSelected = recommendedPlan === plan.slug;
-              const priceAvailable = subscriptionPrice(plan, billingCycle) !== null;
+              const price = subscriptionPrice(plan, billingCycle);
+              const priceAvailable = price !== null;
+              const tokenCredit = tokenSummary && tokensToRedeem > 0 ? Math.floor(tokensToRedeem * tokenSummary.pence_per_100 / 100) : 0;
+              const tokenLimit = price && tokenSummary ? Math.floor(price.billedPence * tokenSummary.max_percent / 100) : 0;
+              const tokenValid = tokensToRedeem === 0 || (!!tokenSummary && tokenCredit > 0 && tokenCredit <= tokenLimit);
               const accentColor = plan.audience === 'guard' ? 'blue' : 'teal';
               const isPopular = !!plan.badge || isSelected;
               const borderColor = accentColor === 'teal' ? 'border-teal-500' : 'border-blue-500';
@@ -787,6 +849,9 @@ function UpgradeContent() {
 
                     <div className="mb-6">
                       <PlanPrice plan={plan} billingCycle={billingCycle} />
+                      {tokenCredit > 0 && price && plan.monthly_price_pence > 0 && <p className={`mt-2 text-xs ${tokenValid ? 'text-teal-300' : 'text-amber-300'}`}>
+                        {tokenValid ? `First invoice: £${((price.billedPence - tokenCredit) / 100).toFixed(2)} after £${(tokenCredit / 100).toFixed(2)} token discount. Later invoices use the normal price.` : `Choose fewer tokens for this plan. Maximum discount: £${(tokenLimit / 100).toFixed(2)}.`}
+                      </p>}
                       {plan.monthly_price_pence === 0 && plan.audience === 'client' && (
                         <p className="text-xs text-amber-300 mt-3">Booking service fees apply when you pay for a booking; guard pay is separate from your subscription.</p>
                       )}
@@ -819,9 +884,9 @@ function UpgradeContent() {
                     ) : (
                       <button
                         onClick={() => handleSubscribe(plan)}
-                        disabled={subscribing === plan.slug || !priceAvailable}
+                        disabled={!!subscribing || !priceAvailable || !tokenValid}
                         className={`w-full py-3.5 rounded-xl font-bold text-base transition-all whitespace-nowrap block text-center ${bgColor} text-white ${hoverBg} shadow-lg ${
-                          subscribing === plan.slug || !priceAvailable ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                          subscribing || !priceAvailable || !tokenValid ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
                         }`}
                       >
                         {subscribing === plan.slug ? 'Processing...' : 'Subscribe'}

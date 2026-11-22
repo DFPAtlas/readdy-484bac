@@ -5,11 +5,14 @@ import QuickGuardImage from '@/components/QuickGuardImage';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { compareGuardPlacement, loadGuardPlacement } from '@/lib/guard-placement';
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 interface Guard {
   id: string;
+  profile_boost?: boolean;
+  priority_profile?: boolean;
   full_name: string;
   profile_image_url: string | null;
   sia_verified: boolean;
@@ -73,6 +76,7 @@ function FindGuardContent() {
 
   const [guards, setGuards] = useState<Guard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [postcode, setPostcode] = useState(urlPostcode);
   const [licenseFilter, setLicenseFilter] = useState(urlLicense);
   const [venueFilter, setVenueFilter] = useState(urlVenue);
@@ -88,12 +92,18 @@ function FindGuardContent() {
     const query = supabase
       .from('guard_public_profiles')
       .select('id, full_name, profile_image_url, sia_verified, rating, total_reviews, hourly_rate, location, city, postcode_area, licence_types, years_experience, willing_to_travel, has_transport, bio, accepts_direct_bookings, preferred_venue_categories')
-      .eq('verification_status', 'verified')
+      .in('verification_status', ['approved', 'verified'])
       .eq('accepts_direct_bookings', true)
       .order('rating', { ascending: false });
 
     const { data, error } = await query;
-    if (!error) setGuards(data || []);
+    try {
+      if (error) throw error;
+      const rows = data || [];
+      const placement = await loadGuardPlacement(supabase, rows.map(g => g.id));
+      setGuards(rows.filter(g => placement.has(g.id)).map(g => ({ ...g, ...placement.get(g.id) })).sort(compareGuardPlacement));
+      setLoadError('');
+    } catch { setGuards([]);setLoadError('Guard listings could not be loaded. Please refresh.'); }
     setLoading(false);
   };
 
@@ -155,6 +165,8 @@ function FindGuardContent() {
           </div>
         </div>
 
+        {loadError && <p role="alert" className="mb-4 text-amber-300">{loadError}</p>}
+        <p className="mb-4 text-xs text-slate-400">Featured profiles appear first, followed by priority profiles and ratings. Your filters still apply.</p>
         {showFilters && (
           <div className="bg-[#111d35] border border-[#1e2d4d] rounded-xl p-4 mb-6 flex flex-wrap gap-4">
             <div>
@@ -224,6 +236,7 @@ function FindGuardContent() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-white truncate">{guard.full_name}</h3>
+                        {guard.profile_boost && <span className="text-xs text-teal-400">Featured profile</span>}
                         <div className="flex items-center gap-2 mt-1">
                           <StarRating rating={guard.rating} />
                           <span className="text-xs text-slate-500">({guard.total_reviews || 0})</span>

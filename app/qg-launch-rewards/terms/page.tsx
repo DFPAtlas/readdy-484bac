@@ -87,14 +87,10 @@ export default function QGLaunchRewardsTermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-white mb-3">7. Token Redemption</h2>
             <div className="space-y-2 text-sm text-slate-400 leading-relaxed">
-              <p>Redemption is planned, not available at checkout yet. Proposed eligible charges include:</p>
-              <ul className="list-disc pl-5 space-y-1.5">
-                <li>QuickGuard subscription plans.</li>
-                <li>Job posting fees.</li>
-                <li>Profile boosts and featured listings.</li>
-                <li>Future QuickGuard platform credits.</li>
-              </ul>
-              <p>We will publish eligible charges, conversion rates, transaction limits and refund handling before redemption opens. Current subscription and booking payments use their normal prices; recorded tokens do not automatically discount them.</p>
+              <p>Where the token option is enabled at checkout, approved, unexpired tokens can discount the first invoice of a new QuickGuard subscription. 100 QG Tokens = £10 of discount, up to 50% of that invoice.</p>
+              <p>Renewals, changes to existing subscriptions, job payments and trial offers are not eligible. Later invoices use the normal subscription price.</p>
+              <p>Selected tokens are reserved while checkout is open or payment is pending. A confirmed payment consumes them once. Confirmed checkout expiry or cancellation releases them; leaving the checkout page alone does not release a reservation.</p>
+              <p>Tokens have no cash value. Refund requests are reviewed against the amount actually paid. Token restoration requires review and is not automatic.</p>
             </div>
           </section>
 

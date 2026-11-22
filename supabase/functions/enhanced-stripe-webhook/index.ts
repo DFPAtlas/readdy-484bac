@@ -1,3 +1,4 @@
+import { finishTokenCheckout } from '../_shared/token-checkout.ts';
 import { persistUserNotifications } from '../_shared/user-notifications.ts';
 async function requireAudit(write: PromiseLike<{error: unknown}>) {const result=await write;if(result.error) throw result.error;return result;}
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -404,6 +405,10 @@ serve(async (req) => {
           console.log(`[EnhancedWebhook] Checkout session ${session.id} completed with payment pending; waiting for async success or failure`);
           break;
         }
+        if (session.metadata?.qg_token_redemption_id) {
+          const currentSession = await stripe.checkout.sessions.retrieve(session.id);
+          await finishTokenCheckout(appSupabase, currentSession);
+        }
         const isJobPayment = session.metadata?.paymentType === 'job_payment';
         const isSubscription = session.metadata?.paymentType === 'subscription' || session.mode === 'subscription';
         if (isJobPayment) await finalizeJobPayment(appSupabase, supabaseUrl, supabaseKey, session);
@@ -491,8 +496,18 @@ serve(async (req) => {
         break;
       }
 
+      case 'checkout.session.expired': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.metadata?.qg_token_redemption_id) await finishTokenCheckout(appSupabase, await stripe.checkout.sessions.retrieve(session.id));
+        break;
+      }
+
       case 'checkout.session.async_payment_failed': {
         const session = event.data.object as Stripe.Checkout.Session;
+        if (session.metadata?.qg_token_redemption_id) {
+          const currentSession = await stripe.checkout.sessions.retrieve(session.id);
+          if (currentSession.payment_status === 'unpaid' && currentSession.status === 'complete') await finishTokenCheckout(appSupabase, { ...currentSession, status: 'expired' });
+        }
         if (session.metadata?.paymentType === 'job_payment') {
           await failJobPayment(appSupabase, supabaseUrl, supabaseKey, session);
         } else {
