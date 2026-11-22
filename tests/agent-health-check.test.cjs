@@ -3,6 +3,8 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const ts=require('typescript');
 const {PGlite}=require('@electric-sql/pglite');
+const {load}=require('./helpers/enterprise-module.cjs');
+const {parseAgentResult}=load('lib/admin-agent-result.ts');
 function monitor({authorized=true,admin=true,heartbeat=null,heartbeats=null,counts={},queryError=false}={}) {
  const queries=[];
  const db={auth:{getUser:async()=>({data:{user:authorized?{id:'admin-user'}:null},error:null})},from(table){
@@ -38,6 +40,7 @@ test('fresh healthy heartbeat permits healthy data checks; stale heartbeat canno
  for(const [age,status] of [[0,'ok'],[7200000,'warn']]) {
   const m=monitor({heartbeat:{health:'healthy',created_at:new Date(Date.now()-age).toISOString()}});
   const data=await(await m.call({agent:'jobs'})).json();assert.equal(data.results[0].status,status);
+  assert.equal(parseAgentResult(data,'jobs').status,status);
  }
 });
 test('monitor resolves the actual worker IDs, supports legacy IDs and ignores unrelated workers/sites',async()=>{
@@ -54,6 +57,7 @@ test('monitor resolves the actual worker IDs, supports legacy IDs and ignores un
 test('financial issues and read errors are failures, not zero-count healthy results',async()=>{
  for(const options of [{counts:{financial_operations:1}},{queryError:true}]){
   const m=monitor(options);const data=await(await m.call({agent:'payments'})).json();assert.equal(data.status,'fail');
+  assert.equal(parseAgentResult(data,'payments').status,'fail');
   assert.ok(!JSON.stringify(data).includes('private error'));
  }
 });
@@ -61,6 +65,7 @@ test('monitor understands live GREEN/AMBER/RED health values without hiding repo
  for(const [health,status] of [['GREEN','ok'],['AMBER','warn'],['RED','fail']]) {
   const m=monitor({heartbeats:[{agent_id:'qg-job-monitoring-agent-v01',site:'quickguard.uk',health,created_at:new Date().toISOString()}]});
   const data=await(await m.call({agent:'jobs'})).json();
+  assert.equal(parseAgentResult(data,'jobs').status,status);
   assert.equal(data.results[0].checks.find(c=>c.key==='worker_heartbeat').status,status);
  }
 });
