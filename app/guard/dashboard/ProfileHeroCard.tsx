@@ -4,6 +4,7 @@ import QuickGuardImage from '@/components/QuickGuardImage';
 
 import Link from 'next/link';
 import { Guard } from './types';
+import { guardProfileCompletion } from '@/lib/guard-profile-completion';
 
 interface Props {
   guard: Guard | null;
@@ -17,19 +18,6 @@ function getAvailability(guard: Guard | null) {
   if (guard.is_active && guard.accepts_direct_bookings) return { label: 'Available', color: 'emerald', dot: 'bg-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400' };
   if (guard.is_active && !guard.accepts_direct_bookings) return { label: 'Busy', color: 'amber', dot: 'bg-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400' };
   return { label: 'Offline', color: 'red', dot: 'bg-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400' };
-}
-
-function getProfileCompletion(guard: Guard | null): number {
-  if (!guard) return 0;
-  let score = 0;
-  if (guard.full_name) score += 15;
-  if (guard.email) score += 15;
-  if (guard.profile_image_url) score += 15;
-  if (guard.location) score += 15;
-  if (guard.postcode) score += 15;
-  if (guard.years_experience !== null) score += 15;
-  if (guard.sia_licence_front_url) score += 10;
-  return score;
 }
 
 function getSIAStatus(guard: Guard | null) {
@@ -56,7 +44,7 @@ export default function ProfileHeroCard({ guard, onAvailabilityToggle, planName,
     ? guard.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
     : 'GU';
   const availability = getAvailability(guard);
-  const completion = getProfileCompletion(guard);
+  const completion = guardProfileCompletion(guard);
   const sia = getSIAStatus(guard);
   const verification = getVerificationBadge(guard.verification_status);
 

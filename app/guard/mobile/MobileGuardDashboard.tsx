@@ -20,6 +20,7 @@ import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
 import HomeSkeleton from './HomeSkeleton';
 import GuardMessagesClient from '@/app/guard/messages/GuardMessagesClient';
 import { readMessageRows } from '@/lib/job-messages';
+import { guardProfileCompletion } from '@/lib/guard-profile-completion';
 
 
 
@@ -140,6 +141,9 @@ export default function MobileGuardDashboard() {
   const router = useRouter();
   const [guard, setGuard] = useState<Guard | null>(null);
   const [guardUserId, setGuardUserId] = useState<string | null>(null);
+  const [plan, setPlan] = useState<{ plan_name: string; subscription_status: string } | null>(null);
+  const [responseError, setResponseError] = useState('');
+  const [markingResponse, setMarkingResponse] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<JobAssignment[]>([]);
   const [upcomingJobs, setUpcomingJobs] = useState<JobAssignment[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);
@@ -186,13 +190,14 @@ export default function MobileGuardDashboard() {
         id: job.application_id, status: job.application_status, applied_at: job.applied_at, jobs: job,
       }));
       const today = londonCalendarDate();
-      const [responsesResult, jobsResult, payoutsResult, messages] = await Promise.all([
+      const [responsesResult, jobsResult, payoutsResult, messages, entitlementResult] = await Promise.all([
         supabase.from('client_responses').select('id,response_type,message,is_read,created_at,jobs(job_title),clients(company_name)')
           .eq('guard_id', guardData.id).order('created_at', { ascending: false }),
         supabase.from('jobs').select('id,job_title,venue_city,venue_postcode,start_date,start_time,end_time,hourly_rate,status,clients(company_name),sia_licence_required,number_of_guards')
           .eq('status', 'open').eq('is_deleted', false).gte('start_date', today).order('start_date', { ascending: true }).limit(30),
         supabase.from('guard_payouts').select('amount,net_amount,status').eq('guard_id', guardData.id),
         readMessageRows(supabase, userId, undefined, () => epoch === loadEpoch.current),
+        supabase.from('user_entitlements_data').select('plan_name,subscription_status').eq('user_id', userId).eq('audience', 'guard').maybeSingle(),
       ]);
       if (responsesResult.error || jobsResult.error || payoutsResult.error) throw new Error('Your dashboard data could not be loaded.');
       const after = await supabase.auth.getUser();
@@ -202,6 +207,7 @@ export default function MobileGuardDashboard() {
       const totalPaid = sumPaidGuardPayouts(payouts);
       setGuard({ ...guardData, total_earnings: totalPaid });
       setGuardUserId(userId);
+      setPlan(entitlementResult.error ? null : entitlementResult.data);
       setAssignments(allAssignments.filter(row => ['confirmed', 'in_progress', 'accepted', 'pending', 'selected', 'awaiting_payment'].includes(row.status)));
       setUpcomingJobs(allAssignments.filter(row => ['confirmed', 'accepted'].includes(row.status) && row.jobs.start_date >= today)
         .sort((a, b) => a.jobs.start_date.localeCompare(b.jobs.start_date)));
@@ -296,10 +302,27 @@ export default function MobileGuardDashboard() {
   };
 
   const handleMarkAsRead = async (responseId: string) => {
+    if (!guard || !guardUserId || markingResponse) return;
+    const epoch = loadEpoch.current;
+    const guardId = guard.id;
+    setResponseError('');
+    setMarkingResponse(responseId);
     try {
-      await supabase.from('client_responses').update({ is_read: true }).eq('id', responseId);
+      const before = await supabase.auth.getUser();
+      if (before.error || before.data.user?.id !== guardUserId) throw new Error('account_changed');
+      if (epoch !== loadEpoch.current) return;
+      const result = await supabase.from('client_responses').update({ is_read: true })
+        .eq('id', responseId).eq('guard_id', guardId).select('id,is_read').maybeSingle();
+      const after = await supabase.auth.getUser();
+      if (epoch !== loadEpoch.current) return;
+      if (after.error || after.data.user?.id !== guardUserId || result.error
+        || result.data?.id !== responseId || result.data?.is_read !== true) throw new Error('unconfirmed_read');
       setResponses(prev => prev.map(r => r.id === responseId ? { ...r, is_read: true } : r));
-    } catch {}
+    } catch {
+      if (epoch === loadEpoch.current) setResponseError('Marking this response as read could not be confirmed. Please refresh and retry.');
+    } finally {
+      setMarkingResponse(null);
+    }
   };
 
   const handleLogout = async () => {
@@ -418,12 +441,15 @@ export default function MobileGuardDashboard() {
 
   const getSubscriptionStatus = () => {
     if (!guard) return null;
-    const { subscription_status, subscription_plan, subscription_tier } = guard;
-    if (subscription_status === 'trialing') return { text: 'Free Plan', color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20', icon: 'ri-vip-crown-line' };
-    if (subscription_status === 'active') return { text: subscription_plan || subscription_tier || 'Active', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: 'ri-vip-crown-line' };
-    if (subscription_status === 'cancelled') return { text: 'Cancelled', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: 'ri-close-circle-line' };
-    if (subscription_status === 'past_due') return { text: 'Past Due', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: 'ri-time-line' };
-    return { text: 'Inactive', color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20', icon: 'ri-vip-crown-line' };
+    const name = plan?.plan_name?.trim();
+    const status = plan?.subscription_status;
+    const neutral = { color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20', icon: 'ri-vip-crown-line' };
+    if (!name || !status) return { ...neutral, text: 'Plan unavailable' };
+    if (status === 'trialing') return { text: `${name} · Trial`, color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20', icon: 'ri-vip-crown-line' };
+    if (status === 'active') return { text: name, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: 'ri-vip-crown-line' };
+    if (status === 'cancelled' || status === 'canceled') return { text: `${name} · Cancelled`, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: 'ri-close-circle-line' };
+    if (status === 'past_due') return { text: `${name} · Past Due`, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: 'ri-time-line' };
+    return { ...neutral, text: `${name} · Inactive` };
   };
 
   const getGreeting = () => {
@@ -446,16 +472,7 @@ export default function MobileGuardDashboard() {
   };
 
   const getProfilePercent = () => {
-    if (!guard) return 0;
-    let score = 0;
-    const fields = [
-      guard.full_name, guard.email, guard.mobile_number, guard.location,
-      guard.postcode, guard.years_experience, guard.sia_licence_number,
-      guard.sia_licence_type, guard.sia_licence_front_url, guard.dbs_certificate_url,
-      guard.first_aid_certificate_url, guard.profile_image_url
-    ];
-    score = fields.filter(Boolean).length;
-    return Math.round((score / fields.length) * 100);
+    return guardProfileCompletion(guard);
   };
 
   const getActionItems = () => {
@@ -987,6 +1004,7 @@ export default function MobileGuardDashboard() {
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg font-bold text-white">Client Responses</h2>
             </div>
+            {responseError && <p role="alert" className="text-sm text-red-400">{responseError}</p>}
             {responses.length === 0 ? (
               <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-8 text-center">
                 <div className="w-12 h-12 bg-[#162036] rounded-xl flex items-center justify-center mx-auto mb-3">
@@ -1021,9 +1039,10 @@ export default function MobileGuardDashboard() {
                         {!response.is_read && (
                           <button
                             onClick={() => handleMarkAsRead(response.id)}
+                            disabled={markingResponse !== null}
                             className="text-xs text-teal-400 font-medium cursor-pointer px-2 py-1 bg-teal-500/10 rounded-lg"
                           >
-                            Mark read
+                            {markingResponse === response.id ? 'Saving…' : 'Mark read'}
                           </button>
                         )}
                       </div>
