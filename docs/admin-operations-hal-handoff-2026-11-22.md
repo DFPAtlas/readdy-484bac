@@ -2,6 +2,26 @@
 
 Continue the authorised QuickGuard admin repairs from this repository. Production project: `vnywjfpkepjgclkbcmsj`. The separate approved recovery target is `dnbvybmulsppfjntbsxz` in Frankfurt; its private `qg_recovery_20261122` schema is a core-data drill, not a live application database.
 
+## Subscription classification repair, 22:07 UTC
+
+HAL Subscription workflow `pGoacDSUO4i4dNMN` now reports three verified cases as informational. The Enterprise QA override matches the protected PR239 audit to the current profile, Starter sandbox billing, and Enterprise entitlement. The closed free-client case matches the PR240 closure and retention event to the inactive profile, cancelled subscription, and inactive cancelled entitlement. The Elite complimentary grant still uses its existing protected plan-history check.
+
+Incomplete free-tier onboarding now has a distinct warning. The `free` and `client_free` labels are treated as aliases for verified unbilled free client accounts. Missing, failed, stale, ambiguous, or mismatched evidence retains the applicable warning. The paid cancelled Client Starter sandbox fixture still has an active profile and stale auto-renew flag and lacks matching closure evidence.
+
+Version `d45450cd-f50a-410c-815e-2c641d0fee30` was published at 22:04:45.042 UTC on 22 November. All nine focused tests passed on Node 22, including valid exceptions, failed or incomplete reads, stale or conflicting evidence, genuine unexplained mismatches, and preservation of existing workflow behaviour.
+
+Scheduled run `380237` succeeded and wrote **AMBER** snapshot `b9adca65-2853-421d-aa20-8bb63e9af194` at 22:07:04.798 UTC. The four protected evidence reads each returned HTTP 200 and one complete row. The snapshot recorded three informational findings, zero critical incidents, and ten warnings. The Basic stale-period warning stayed cleared.
+
+| Remaining warning | Count |
+| --- | ---: |
+| Incomplete free-tier profile onboarding | 6 |
+| Blank Basic profile plan | 1 |
+| Basic sandbox subscription and live profile Stripe customer mismatch | 1 |
+| Terminal Client Starter sandbox subscription | 1 |
+| Cleared entitlement plan on that cancelled Starter fixture | 1 |
+
+The private rollback export is on HAL at `~/Documents/Codex/2026-11-22/continue-quickguard-admin-repairs-from-dfpatlas/work/subscription-classification/backup-20261122T220145Z/pGoacDSUO4i4dNMN.json`. Its original active version is `fa12f052-e9b9-41ce-8101-0c86892895ec`. The parent directory contains the backup checksum, deployment diff, focused test log, and verified heartbeat. Billing, entitlements, account access, Stripe routing, and the closed account's Auth ban and retention dates were preserved.
+
 ## Closed free-client lifecycle repaired, 21:24 UTC
 
 The closed free client (`ecdf41db`) no longer has an active local subscription. The database closure path now reconciles only verified unbilled free rows with one transactional retention event. The closed-account entitlement trigger preserves retained evidence; profile, entitlement, Auth ban, closure/retention dates, paid records and all provider references remain unchanged. The existing account was reconciled once, with repeat safety verified. See `docs/admin-closed-free-subscription-2026-11-22.md`. HAL may still report generic terminal/profile warnings; do not reactivate the account to clear them. The historical decision row below is superseded by this completed lifecycle repair.
