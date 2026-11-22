@@ -43,7 +43,8 @@ function computeCategories(props: Props): HealthCategory[] {
     if (!props.infrastructure?.tables) return { score: 60, status: 'warning' as const };
     const appTables = props.infrastructure.tables.filter((t: any) => t.schema_name === 'app');
     const withRLS = appTables.filter((t: any) => t.rls_enabled).length;
-    const pct = appTables.length > 0 ? Math.round((withRLS / appTables.length) * 100) : 100;
+    if (appTables.length === 0) return { score: 0, status: 'warning' as const };
+    const pct = Math.round((withRLS / appTables.length) * 100);
     return { score: pct, status: pct >= 90 ? 'healthy' as const : pct >= 70 ? 'warning' as const : 'critical' as const };
   })();
 

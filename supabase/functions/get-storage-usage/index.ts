@@ -186,12 +186,8 @@ Deno.serve(async (req: Request) => {
       const hasPolicies = policyMap[name] || false;
       const limit = bucket?.file_size_limit ? Number(bucket.file_size_limit) : null;
 
-      let percentageUsed = null;
-      if (limit && limit > 0) {
-        percentageUsed = Math.min(100, Math.round((stats.total_bytes / limit) * 100));
-      }
-
-      const nearLimit = limit && limit > 0 && stats.total_bytes > limit * 0.9;
+      // file_size_limit caps one uploaded file, not total bucket capacity.
+      const percentageUsed = null;
 
       const warnings: string[] = [];
 
@@ -203,9 +199,6 @@ Deno.serve(async (req: Request) => {
       }
       if (!hasPolicies) {
         warnings.push("No RLS policies configured");
-      }
-      if (nearLimit) {
-        warnings.push("Storage near or exceeding file size limit");
       }
 
       return {

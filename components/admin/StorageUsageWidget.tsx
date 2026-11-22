@@ -168,7 +168,7 @@ export default function StorageUsageWidget({ standalone = false }: Props) {
 
   const exportCSV = () => {
     if (!data) return;
-    const headers = ['Bucket', 'Public', 'Files', 'Total Size', 'Size Limit', 'Usage %', 'RLS Policies', 'Warnings'];
+    const headers = ['Bucket', 'Public', 'Files', 'Total Size', 'Max File Size', 'Bucket Usage %', 'RLS Policies', 'Warnings'];
     const rows = data.buckets.map((b) => [
       b.name,
       b.public ? 'Yes' : 'No',
@@ -381,7 +381,7 @@ export default function StorageUsageWidget({ standalone = false }: Props) {
                       <span className="text-[10px] font-medium text-slate-500">
                         {formatBytes(bucket.total_bytes)} used
                       </span>
-                      <span className="text-[10px] font-medium text-slate-600">No limit set</span>
+                      <span className="text-[10px] font-medium text-slate-600">Bucket quota not reported</span>
                     </div>
                   )}
 
@@ -397,7 +397,7 @@ export default function StorageUsageWidget({ standalone = false }: Props) {
                         <div className="w-3 h-3 flex items-center justify-center">
                           <i className="ri-ruler-line text-[10px]"></i>
                         </div>
-                        {formatBytes(bucket.file_size_limit)}
+                        Max file: {formatBytes(bucket.file_size_limit)}
                       </span>
                     )}
                   </div>
