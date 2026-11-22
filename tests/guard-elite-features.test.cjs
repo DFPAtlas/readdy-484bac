@@ -67,3 +67,15 @@ test('actual statement control downloads a valid PDF for the selected month and 
   for (let i = 0; i < 20 && !saved; i++) await new Promise(r => setImmediate(r));
   assert.equal(saved?.type, 'application/pdf');assert.ok(saved.size > 1000);h.unmount();
 });
+
+test('token selector survives a same-account sign-in event but clears private balance on account change', async () => {
+  const { hooksHarness, nodes } = require('./helpers/guard-ui-fixture.cjs');let callback;
+  const db = { auth: { getUser: async () => ({ data: { user: { id: 'owner' } }, error: null }), onAuthStateChange(fn) { callback = fn;return { data: { subscription: { unsubscribe() {} } } }; } },
+    from() { const q = { select() { return q; }, eq() { return q; }, maybeSingle: async () => ({ data: { user_type: 'guard' }, error: null }) };return q; },
+    rpc: async () => ({ data: { enabled: true, new_subscription: true, balance: 200, pence_per_100: 1000, max_percent: 50, pending: null }, error: null }) };
+  const h = hooksHarness('app/upgrade/page.tsx', { '@/lib/supabase': { supabase: db }, 'next/navigation': { useSearchParams: () => new URLSearchParams() }, '@/lib/entitlements': { getActivePlan: async () => ({ plan_slug: 'guard_starter', plan_name: 'Free', is_free_tier: true, features: [] }) }, '@/lib/use-public-pricing': { usePublicPricing: () => ({ plans: [], loading: false, error: null }) } });
+  const Inner = h.render().props.children.type;h.renderComponent(Inner);await h.effects();
+  let input = nodes(h.renderComponent(Inner)).find(n => n.props?.['aria-label'] === 'Tokens to redeem');assert.ok(input);input.props.onChange({ target: { value: '100' } });
+  callback('SIGNED_IN', { user: { id: 'owner' } });input = nodes(h.renderComponent(Inner)).find(n => n.props?.['aria-label'] === 'Tokens to redeem');assert.equal(input.props.value, 100);
+  callback('SIGNED_IN', { user: { id: 'other' } });assert.equal(nodes(h.renderComponent(Inner)).find(n => n.props?.['aria-label'] === 'Tokens to redeem'), undefined);h.unmount();
+});

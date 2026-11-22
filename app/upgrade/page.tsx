@@ -291,6 +291,7 @@ function UpgradeContent() {
   const [subscribing, setSubscribing] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const tokenLoadEpoch = useRef(0);
+  const tokenOwner = useRef<string | null>(null);
   const [tokensToRedeem, setTokensToRedeem] = useState(0);
   const [tokenSummary, setTokenSummary] = useState<{ enabled: boolean; new_subscription: boolean; balance: number; pence_per_100: number; max_percent: number; pending: PendingTokenCheckout | null } | null>(null);
   const [confirmSwitch, setConfirmSwitch] = useState<any>(null);
@@ -307,12 +308,13 @@ function UpgradeContent() {
 
   useEffect(() => {
     let active = true;
-    const epoch = tokenLoadEpoch.current;
     const load = async () => {
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error) throw error;
         if (!active) return;
+        const epoch = tokenLoadEpoch.current;
+        tokenOwner.current = user?.id || null;
         if (user) {
           const { data: userData, error: roleError } = await supabase.from('users').select('user_type').eq('id', user.id).maybeSingle();
           if (roleError) throw roleError;
@@ -335,8 +337,8 @@ function UpgradeContent() {
   }, []);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
-      if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') { ++tokenLoadEpoch.current;setTokenSummary(null);setTokensToRedeem(0); }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || (event === 'SIGNED_IN' && session?.user.id !== tokenOwner.current)) { ++tokenLoadEpoch.current;tokenOwner.current = session?.user.id || null;setTokenSummary(null);setTokensToRedeem(0); }
     });
     return () => subscription.unsubscribe();
   }, []);
