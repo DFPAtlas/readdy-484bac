@@ -2,6 +2,18 @@
 
 Continue the authorised QuickGuard admin repairs from this repository. Production project: `vnywjfpkepjgclkbcmsj`. The separate approved recovery target is `dnbvybmulsppfjntbsxz` in Frankfurt; its private `qg_recovery_20261122` schema is a core-data drill, not a live application database.
 
+## Review & Reputation repair, 16:32 UTC
+
+Workflow `8M4HAkmigFxAH7ck` now calculates public ratings and review counts from `status='published'` reviews only. The public average is rounded to one decimal place and defaults to zero when there are no published reviews. Hidden reviews still count as submitted for booking and review integrity checks. Review `21633a4d-6d27-41d4-8bb6-a23d1b3e0864` remains hidden, and the guard's stored public rating and count are both zero.
+
+Closed, unassigned, unfunded adverts no longer require reviews. The scheduled run covered all five retired adverts and raised no missing-review warnings for them. Warnings for paid or assigned closed jobs without reviews, genuine reputation drift, and review integrity issues remain in place. Failed or malformed reads produce warnings and unknown counts for the affected inputs.
+
+Version `d0a7ceb9-03a7-4f34-bb48-83fbdf16b1b8` was published at 16:30:28.039 UTC on 22 November. All nine focused tests passed on Node 22. They covered hidden-only and mixed reviews, genuine rating and count drift, rounding, retired adverts, failed or malformed reads, hidden-review integrity checks, and workflow preservation.
+
+Scheduled run `379217` succeeded and wrote **GREEN** snapshot `77a5a0e9-8d35-4f86-8efd-7ea039f406de` at 16:32:02.874 UTC. All four input reads returned HTTP 200 and matched the snapshot counts. The run observed 10 jobs, 17 assignments, 22 guards, one hidden review, and zero published reviews. The two false drift warnings cleared. The snapshot recorded zero incidents and zero warnings.
+
+The private rollback export is on HAL at `~/Documents/Codex/2026-11-22/continue-quickguard-admin-repairs-from-dfpatlas/work/reputation-repair/backup-20261122T162958Z/8M4HAkmigFxAH7ck.json`. The original active version is `968f0d6c-36da-48ff-8a01-81c4a9d796f3`. The parent work directory contains the checksum manifest, deployment diff, focused test log, and heartbeat evidence. Credentials, schedules, workflow wiring, reviews, and guard ratings were preserved.
+
 ## Subscription worker wording and Basic renewal trace, 15:12 UTC
 
 HAL subscription workflow `pGoacDSUO4i4dNMN` now describes the Elite incident as active paid-tier access without linked Stripe billing evidence. The original incident code `PAID_SUBSCRIPTION_MISSING_STRIPE_ID`, P1 severity, and trigger condition were preserved. The Basic stale-sync alert was unchanged. The patch changed one string in Subscription Reasoning and preserved the workflow ID, five-minute schedule, active state, credentials, queries, and downstream contracts.
