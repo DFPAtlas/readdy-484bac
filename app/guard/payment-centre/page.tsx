@@ -297,9 +297,9 @@ export default function GuardPaymentCentrePage() {
                 <div className="bg-[#111d35] rounded-xl border border-[#1e2d4d] p-5 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-20 h-20 bg-teal-500/10 rounded-full -translate-y-8 translate-x-8" />
                   <div className="relative">
-                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Next Estimated Payout</p>
-                    <p className="text-lg font-bold text-white mt-1">{earningsSummary.nextEstimatedPayout}</p>
-                    <p className="text-xs text-slate-500 mt-1">Typical payout day</p>
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Bank Deposit Timing</p>
+                    <Link href="/guard/earnings" className="inline-block text-lg font-bold text-teal-300 mt-1 underline">View bank deposits</Link>
+                    <p className="text-xs text-slate-500 mt-1">Arrival estimates, when available, appear with each deposit.</p>
                   </div>
                 </div>
               </div>

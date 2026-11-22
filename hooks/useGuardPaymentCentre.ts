@@ -10,7 +10,6 @@ interface EarningsSummary {
   pendingBalance: number;
   thisMonthEarnings: number;
   lifetimeEarnings: number;
-  nextEstimatedPayout: string;
 }
 
 interface JobPayment {
@@ -49,7 +48,6 @@ export function useGuardPaymentCentre() {
     pendingBalance: 0,
     thisMonthEarnings: 0,
     lifetimeEarnings: 0,
-    nextEstimatedPayout: '—',
   });
   const [jobPayments, setJobPayments] = useState<JobPayment[]>([]);
   const [payouts, setPayouts] = useState<GuardPayout[]>([]);
@@ -150,16 +148,11 @@ export function useGuardPaymentCentre() {
         };
       });
 
-      const nextFriday = new Date();
-      nextFriday.setDate(nextFriday.getDate() + ((5 + 7 - nextFriday.getDay()) % 7 || 7));
-      const nextPayoutStr = nextFriday.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-
       setEarningsSummary({
         availableBalance: available,
         pendingBalance: pending,
         thisMonthEarnings: thisMonth,
         lifetimeEarnings: lifetime,
-        nextEstimatedPayout: nextPayoutStr,
       });
 
       setJobPayments(jobPaymentsList);

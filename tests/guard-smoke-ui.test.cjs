@@ -55,3 +55,15 @@ test('actual Payment Centre renders unavailable and checking states without Stri
     const text=content(h.render());assert.match(text,stripeLoading?/Checking Stripe account status/:/Stripe status unavailable/);assert.doesNotMatch(text,/Ready for Payouts|Set Up Payouts|Update Bank Details/);
   }
 });
+
+test('Payment Centre never presents a browser-generated Friday as a provider payout forecast',()=>{
+  for(const state of ['unavailable','checking','ready']) {
+    const api={loading:false,error:null,refetch(){},earningsSummary:{availableBalance:250,pendingBalance:0,thisMonthEarnings:0,lifetimeEarnings:250,nextEstimatedPayout:'Friday 27 November'},stripeStatus:state==='ready'?ready:null,stripeLoading:state==='checking',stripeError:state==='unavailable'?'Stripe status unavailable':'',jobPayments:[],refreshStripeStatus(){},handleConnectStripe(){},handleOnboardingLink(){},handleDashboardLink(){},exportCsv(){}};
+    const h=hooksHarness('app/guard/payment-centre/page.tsx',{...childMocks,'@/lib/supabase':{supabase:uiDatabase()},'@/lib/SidebarContext':{useSidebar:()=>({collapsed:false})},'@/hooks/useGuardGuard':{useGuardGuard:()=>({loading:false,allowed:true})},'@/hooks/useGuardPaymentCentre':{useGuardPaymentCentre:()=>api}});
+    const tree=h.render(),text=content(tree);
+    assert.doesNotMatch(text,/Next Estimated Payout|Typical payout day|Friday 27 November/,state);
+    assert.match(text,/Arrival estimates, when available, appear with each deposit\./,state);
+    assert.ok(nodes(tree).some(n=>n.props?.href==='/guard/earnings'&&content(n)==='View bank deposits'),state);
+    assert.match(text,/250\.00/,state);h.unmount();
+  }
+});
