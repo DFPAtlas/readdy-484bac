@@ -2,6 +2,14 @@
 
 Continue the authorised QuickGuard admin repairs from this repository. Production project: `vnywjfpkepjgclkbcmsj`. The separate approved recovery target is `dnbvybmulsppfjntbsxz` in Frankfurt; its private `qg_recovery_20261122` schema is a core-data drill, not a live application database.
 
+## Job Intake evidence for test draft `874f8b49`
+
+The 19:12 UTC Job Intake snapshot on 22 November reported `SIA_TYPE_NOT_SPECIFIED` for job `874f8b49-2641-4238-b2a0-2b822bc362d4`. The booking has `sia_licence_required=true`, but its licence-type fields are blank. The `event-security` category and booking description do not support a specific SIA licence type.
+
+The job is still a draft. Its title identifies it as a test draft and the description says no booking or work is requested. QuickGuard showed no applications, assignments, or guard notifications.
+
+**Open decision for the booking owner.** Confirm whether to retire the internal audit draft. If the owner intends to publish it as a real booking, confirm the duties and required licence type before publishing. The review left the booking and workflow in place.
+
 ## Dispute & Refund monitor repair, 19:02 UTC
 
 Workflow `2wtdCiZ55DLQrfQg` now reads Stripe chargeback audit records. It matches each event to the booking and a completed payment transaction, checks the charge reference when recorded on the transaction, and uses the latest matching event per Stripe dispute. The audit query is read-only. An unavailable or malformed audit response raises its own warning. Unexplained dispute flags still raise a P1 finding, and existing refund and payout safeguards remain in place.
