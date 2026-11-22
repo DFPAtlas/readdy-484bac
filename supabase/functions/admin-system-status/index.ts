@@ -6,6 +6,21 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
+interface MaintenanceSnapshot {
+  cron_jobs: { jobid: number; jobname: string; schedule: string; active: boolean;
+    last_run: { status: string; start_time: string; end_time: string | null; return_message: string } | null;
+    run_count_7d: number }[] | null;
+  cleanup: {
+    status: string;
+    last_run: { table: string; at: string; rows_removed: number } | null;
+    last_failure: { table: string; at: string; error: string } | null;
+    logs: { id: string; table_name: string; started_at: string; status: string;
+      rows_removed: number | null; retention_days: number | null;
+      finished_at: string | null; error_message: string | null }[] | null;
+    total_count: number | null;
+  };
+}
+
 function getAal(token: string): string | null {
   try {
     const parts = token.split(".");
@@ -21,6 +36,11 @@ function getAal(token: string): string | null {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+  if (req.method !== "GET") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -89,8 +109,6 @@ Deno.serve(async (req: Request) => {
   }
 
   const app = createClient(supabaseUrl, serviceKey, { db: { schema: "app" } });
-  const publicDb = createClient(supabaseUrl, serviceKey, { db: { schema: "public" } });
-  const cronDb = createClient(supabaseUrl, serviceKey, { db: { schema: "cron" } });
 
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const since72h = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
@@ -98,6 +116,40 @@ Deno.serve(async (req: Request) => {
   let overallStatus = "healthy";
   const checks: Record<string, any> = {};
   const schemaErrors: string[] = [];
+
+  // Private schemas remain outside the Data API. The service-only invoker RPC
+  // reads maintenance metadata after the admin/MFA checks above.
+  let maintenance: MaintenanceSnapshot;
+  try {
+    const url = new URL(req.url);
+    const offset = Number(url.searchParams.get("cleanup_offset") || 0);
+    const limit = Number(url.searchParams.get("cleanup_limit") || 20);
+    if (!Number.isSafeInteger(offset) || offset < 0 ||
+        !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      return new Response(JSON.stringify({ error: "Invalid cleanup pagination" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data, error } = await app.rpc("get_admin_maintenance_snapshot", {
+      p_offset: offset, p_limit: limit,
+    });
+    if (error || !data) throw new Error(error?.message || "Missing maintenance snapshot");
+    maintenance = data;
+  } catch (error: unknown) {
+    schemaErrors.push(`Maintenance snapshot failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    overallStatus = overallStatus === "critical" ? "critical" : "degraded";
+    maintenance = { cron_jobs: null, cleanup: {
+      status: "unknown", last_run: null, last_failure: null, logs: null, total_count: null,
+    } };
+  }
+
+  if (new URL(req.url).searchParams.get("section") === "maintenance") {
+    return new Response(JSON.stringify(maintenance.cleanup.status === "unknown"
+      ? { error: "Unable to load maintenance records" } : maintenance), {
+      status: maintenance.cleanup.status === "unknown" ? 503 : 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
+  }
 
   // --- Database health ---
   const startDb = Date.now();
@@ -259,87 +311,6 @@ Deno.serve(async (req: Request) => {
     schemaErrors.push(`Payout value exception: ${e.message}`);
   }
 
-  // --- Cron jobs (cron schema) ---
-  let cronJobs: any[] = [];
-  try {
-    const { data: cronJobList, error: cronErr } = await cronDb.from("job").select("jobid, jobname, schedule, active, command");
-    if (cronErr) {
-      schemaErrors.push(`Cron job query failed: ${cronErr.message}`);
-    } else if (cronJobList && cronJobList.length > 0) {
-      const jobIds = cronJobList.map((j: any) => j.jobid);
-      const { data: recentRuns, error: runsErr } = await cronDb
-        .from("job_run_details")
-        .select("jobid, status, start_time, end_time, return_message")
-        .in("jobid", jobIds)
-        .order("start_time", { ascending: false });
-
-      if (runsErr) {
-        schemaErrors.push(`Cron run details query failed: ${runsErr.message}`);
-      }
-
-      const runsByJob: Record<number, any[]> = {};
-      (recentRuns || []).forEach((run: any) => {
-        if (!runsByJob[run.jobid]) runsByJob[run.jobid] = [];
-        runsByJob[run.jobid].push(run);
-      });
-
-      cronJobs = cronJobList.map((job: any) => {
-        const runs = runsByJob[job.jobid] || [];
-        const lastRun = runs[0] || null;
-        return {
-          jobid: job.jobid,
-          jobname: job.jobname,
-          schedule: job.schedule,
-          active: job.active,
-          last_run: lastRun
-            ? {
-                status: lastRun.status,
-                start_time: lastRun.start_time,
-                end_time: lastRun.end_time,
-                return_message: lastRun.return_message,
-              }
-            : null,
-          run_count_7d: runs.filter((r: any) => new Date(r.start_time) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length,
-        };
-      });
-    }
-  } catch (e: any) {
-    schemaErrors.push(`Cron exception: ${e.message}`);
-  }
-
-  // --- Cleanup status (public schema) ---
-  let cleanupStatus = "healthy";
-  let lastCleanupRun = null;
-  let lastCleanupFailure = null;
-  try {
-    const { data: lastFail, error: failErr } = await publicDb
-      .from("cleanup_log")
-      .select("table_name, started_at, error_message")
-      .eq("status", "failed")
-      .order("started_at", { ascending: false })
-      .limit(1);
-    if (failErr) {
-      schemaErrors.push(`Cleanup failure query failed: ${failErr.message}`);
-    } else if (lastFail && lastFail.length > 0) {
-      cleanupStatus = "degraded";
-      lastCleanupFailure = { table: lastFail[0].table_name, at: lastFail[0].started_at, error: lastFail[0].error_message };
-    }
-
-    const { data: lastOk, error: okErr } = await publicDb
-      .from("cleanup_log")
-      .select("table_name, started_at, rows_removed")
-      .eq("status", "completed")
-      .order("started_at", { ascending: false })
-      .limit(1);
-    if (okErr) {
-      schemaErrors.push(`Cleanup run query failed: ${okErr.message}`);
-    } else if (lastOk && lastOk.length > 0) {
-      lastCleanupRun = { table: lastOk[0].table_name, at: lastOk[0].started_at, rows_removed: lastOk[0].rows_removed };
-    }
-  } catch (e: any) {
-    schemaErrors.push(`Cleanup exception: ${e.message}`);
-  }
-
   return new Response(
     JSON.stringify({
       status: overallStatus,
@@ -372,12 +343,8 @@ Deno.serve(async (req: Request) => {
           total_guard_payout_pending: totalGuardPayoutPending,
         },
       },
-      cron_jobs: cronJobs,
-      cleanup: {
-        status: cleanupStatus,
-        last_run: lastCleanupRun,
-        last_failure: lastCleanupFailure,
-      },
+      cron_jobs: maintenance.cron_jobs,
+      cleanup: maintenance.cleanup,
     }),
     {
       headers: {

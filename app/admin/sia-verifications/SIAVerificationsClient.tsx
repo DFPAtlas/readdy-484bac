@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { logAdminAction } from '@/lib/admin-logger';
-import Link from 'next/link';
 import DocumentThumbnail from './DocumentThumbnail';
 import ProfileAvatar from './ProfileAvatar';
 import Pagination from '@/components/Pagination';
@@ -757,7 +756,7 @@ export default function SIAVerificationsClient() {
                       </div>
                       <div>
                         <h3 className="text-base font-bold text-white">{entry.fullName || 'N/A'}</h3>
-                        <p className="text-sm text-slate-400 font-medium">{entry.email}</p>
+                        <p className="text-sm text-slate-400 font-medium">{entry.email?.trim() || 'Email unavailable'}</p>
                         <p className="text-xs text-slate-500 mt-1">
                           License <span className="font-semibold text-slate-300">{entry.siaLicenseNumber}</span>
                           {entry.siaCheckStatus && (
@@ -875,10 +874,10 @@ export default function SIAVerificationsClient() {
                       <div className="w-4 h-4 flex items-center justify-center"><i className="ri-download-2-line text-sm"></i></div>
                       Download CSV
                     </button>
-                    <Link href={`mailto:${entry.email}`} className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#1a2b4a] text-slate-400 rounded-xl text-sm font-semibold hover:bg-[#243452] hover:text-slate-300 transition-all whitespace-nowrap cursor-pointer">
+                    {entry.email?.trim() ? <a href={`mailto:${encodeURIComponent(entry.email.trim())}`} className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#1a2b4a] text-slate-400 rounded-xl text-sm font-semibold hover:bg-[#243452] hover:text-slate-300 transition-all whitespace-nowrap cursor-pointer">
                       <div className="w-4 h-4 flex items-center justify-center"><i className="ri-mail-line text-sm"></i></div>
                       Contact User
-                    </Link>
+                    </a> : <button disabled className="px-5 py-2.5 rounded-xl text-sm text-slate-500 cursor-not-allowed">Email unavailable</button>}
                   </div>
                 </div>
               );

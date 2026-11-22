@@ -4,6 +4,7 @@ type Status = 'ok' | 'warn' | 'fail';
 type Agent = 'payments' | 'sia' | 'jobs';
 interface Check {key:string;label:string;status:Status;detail:string;}
 const labels:Record<Agent,string>={payments:'Payments',sia:'SIA Badges',jobs:'Jobs'};
+const workerIds:Record<Agent,string>={payments:'qg-payout-agent-v01',sia:'qg-sia-verification-agent-v01',jobs:'qg-job-monitoring-agent-v01'};
 const origins=['https://quickguard.uk','https://www.quickguard.uk'];
 
 // Read-only diagnostics: never execute workers, change verification or release money.
@@ -45,16 +46,16 @@ export async function handleAgentHealth(req:Request):Promise<Response> {
       }catch{return {key,label,status:'fail',detail:'The monitor could not read this check.'};}
     }
     async function heartbeat(agent:Agent):Promise<Check>{
-      const key='worker_heartbeat',label='Worker heartbeat';
+      const key='worker_heartbeat',label=agent==='payments'?'Payout worker heartbeat':'Worker heartbeat';
       try {
-        const {data,error}=await db.from('agent_state_snapshots').select('health,created_at').eq('site','quickguard.uk').eq('agent_id',agent).order('created_at',{ascending:false}).limit(1).maybeSingle();
+        const {data,error}=await db.from('agent_state_snapshots').select('health,created_at').eq('site','quickguard.uk').in('agent_id',[workerIds[agent],agent]).order('created_at',{ascending:false}).limit(1).maybeSingle();
         if(error)return {key,label,status:'fail',detail:'Worker heartbeat storage could not be read.'};
         if(!data)return {key,label,status:'warn',detail:'No heartbeat received for this agent. Data checks do not prove the worker is running.'};
         const time=Date.parse(data.created_at);
         if(!Number.isFinite(time)||time>now.getTime()+300000||time<now.getTime()-3600000)return {key,label,status:'warn',detail:'No current worker heartbeat within the last hour.'};
         const health=String(data.health).toLowerCase();
-        if(['healthy','ok'].includes(health))return {key,label,status:'ok',detail:'The worker reported a healthy heartbeat within the last hour.'};
-        if(['fail','failed','unhealthy','critical','down'].includes(health))return {key,label,status:'fail',detail:'The latest worker heartbeat reports a failure.'};
+        if(['healthy','ok','green'].includes(health))return {key,label,status:'ok',detail:'The worker reported a healthy heartbeat within the last hour.'};
+        if(['fail','failed','unhealthy','critical','down','red'].includes(health))return {key,label,status:'fail',detail:'The latest worker heartbeat reports a failure.'};
         return {key,label,status:'warn',detail:'The latest worker heartbeat needs attention.'};
       }catch{return {key,label,status:'fail',detail:'Worker heartbeat storage could not be read.'};}
     }

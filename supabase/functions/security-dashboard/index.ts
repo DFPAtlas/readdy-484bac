@@ -1,5 +1,6 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { assessBackup } from '../_shared/backup-health.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -683,7 +684,14 @@ Deno.serve(async (req) => {
         supabaseQ.from('compliance_status').select('*').order('created_at', { ascending: true }),
       ]);
 
-      const backups = backupRes.status === 'fulfilled' ? (backupRes.value.data || []) : [];
+      if (backupRes.status === 'rejected' || backupRes.value.error || complianceRes.status === 'rejected' || complianceRes.value.error) {
+        return new Response(JSON.stringify({ error: 'Unable to load backup and compliance records' }), {
+          status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const backups = (backupRes.value.data || []).map((record) => ({
+        ...record, recorded_status: record.status, ...assessBackup(record),
+      }));
       const compliance = complianceRes.status === 'fulfilled' ? (complianceRes.value.data || []) : [];
 
       return new Response(JSON.stringify({
@@ -696,7 +704,7 @@ Deno.serve(async (req) => {
         compliance: compliance.length > 0 ? compliance : [
           { key: 'gdpr', label: 'GDPR Compliance', status: 'review', notes: 'Manual verification needed' },
           { key: 'ico', label: 'ICO Registration', status: 'review', notes: 'Manual verification needed' },
-          { key: 'privacy_policy', label: 'Privacy Policy', status: 'complete', notes: 'Published' },
+          { key: 'privacy_policy', label: 'Privacy Policy', status: 'review', notes: 'Manual verification needed' },
         ],
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
