@@ -50,9 +50,10 @@ test('configured consent fields do not duplicate the canonical guard consent con
 const guardReviewAdminId = 'admin-user-id';
 const guardReviewAdminToken = 'header.' + Buffer.from(JSON.stringify({ aal: 'aal2' })).toString('base64url') + '.signature';
 
-function guardAdminHarness({ updateError = null, updated = true, status = 'pending' } = {}) {
+function guardAdminHarness({ updateError = null, updated = true, status = 'pending', emailResponse = () => new Response(JSON.stringify({ success: true, email_id: 'message-id' }), { status: 200 }) } = {}) {
   let handler;
   const writes = [];
+  const emails = [];
   const guard = {
     id: 'guard-id',
     user_id: null,
@@ -103,14 +104,18 @@ function guardAdminHarness({ updateError = null, updated = true, status = 'pendi
     serve: fn => { handler = fn; },
   };
   new Function('module', 'exports', 'require', 'Deno', 'fetch', compile('supabase/functions/admin-verify-guard/index.ts'))(
-    mod, mod.exports, () => ({ createClient: () => db }), deno, async () => new Response(null, { status: 200 }),
+    mod, mod.exports, () => ({ createClient: () => db }), deno, async (url, options) => {
+      emails.push({ url, ...options });
+      return emailResponse();
+    },
   );
   return {
     writes,
-    call: (action, token = 'service-secret') => handler(new Request('https://worker.test', {
+    emails,
+    call: (action, token = 'service-secret', body = {}) => handler(new Request('https://worker.test', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ guardId: guard.id, action }),
+      body: JSON.stringify({ guardId: guard.id, action, rejectionReason: 'Synthetic test reason', ...body }),
     })),
   };
 }
@@ -123,10 +128,64 @@ test('guard administration never reports success after rejected or unconfirmed d
       assert.equal(h.writes.length, 1, action);
       assert.equal(response.status, 500, action);
       assert.equal((await response.json()).error, 'Internal server error');
+      assert.equal(h.emails.length, 0);
     }
   }
   const success = guardAdminHarness();
   assert.equal((await success.call('manual_sia_verify')).status, 200);
+});
+
+test('guard rejection persists before requesting the rejection template with bounded, trusted section labels', async () => {
+  const h = guardAdminHarness();
+  const response = await h.call('reject', guardReviewAdminToken, {
+    rejectionReason: '  Test documents could not be verified  ',
+    unconfirmedSections: ['Documents', '<img src=x onerror=alert(1)>', 'Documents'],
+  });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).notification_status, 'accepted');
+  assert.equal(h.writes[0].verification_status, 'rejected');
+  assert.equal(h.writes[0].rejection_reason, 'Test documents could not be verified');
+  assert.equal(h.writes[0].dashboard_access, false);
+  assert.equal(h.emails.length, 1);
+  assert.equal(h.emails[0].url, 'https://test.supabase.co/functions/v1/send-guard-approval-email');
+  assert.deepEqual(JSON.parse(h.emails[0].body), {
+    guardId: 'guard-id', approved: false, rejectionReason: 'Test documents could not be verified', unconfirmedSections: ['Documents'],
+  });
+  assert.ok(h.emails[0].signal instanceof AbortSignal);
+});
+
+test('guard rejection reports email failures without undoing or repeating the decision', async () => {
+  for (const emailResponse of [
+    () => new Response(JSON.stringify({ error: 'Provider failed' }), { status: 502 }),
+    () => { throw new Error('Network failed'); },
+    () => new Response('not json'),
+    () => new Response(JSON.stringify({ success: true })),
+    () => new Response(JSON.stringify({ success: false, email_id: 'invalid' })),
+  ]) {
+    const h = guardAdminHarness({ emailResponse });
+    const response = await h.call('reject', guardReviewAdminToken);
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.success, true);
+    assert.equal(result.notification_status, 'failed');
+    assert.equal(h.writes.length, 1);
+    assert.equal(h.emails.length, 1);
+  }
+  const duplicate = guardAdminHarness({ emailResponse: () => new Response(JSON.stringify({ success: true, skipped: true })) });
+  assert.equal((await (await duplicate.call('reject')).json()).notification_status, 'already_sent');
+  const rejected = guardAdminHarness({ status: 'rejected' });
+  assert.equal((await rejected.call('reject')).status, 400);
+  assert.equal(rejected.writes.length, 0);
+  assert.equal(rejected.emails.length, 0);
+});
+
+test('guard rejection rejects blank, oversized or non-text reasons before any write or email', async () => {
+  for (const rejectionReason of ['', '  ', null, 42, 'x'.repeat(501)]) {
+    const h = guardAdminHarness();
+    assert.equal((await h.call('reject', guardReviewAdminToken, { rejectionReason })).status, 400);
+    assert.equal(h.writes.length, 0);
+    assert.equal(h.emails.length, 0);
+  }
 });
 
 test('guard approval requires and records a human admin reviewer', async () => {

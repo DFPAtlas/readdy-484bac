@@ -173,15 +173,39 @@ Deno.serve(async function(req) {
       return new Response(JSON.stringify({ success: true, guard_id: guardId, status: 'approved', message: 'Guard approved successfully', action: 'approved' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
     }
     if (action === 'reject') {
+      if (typeof rejectionReason !== 'string' || !rejectionReason.trim() || rejectionReason.trim().length > 500) {
+        return new Response(JSON.stringify({ error: 'A rejection reason of 1–500 characters is required' }), { status: 400, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
+      }
       if (guard.verification_status === 'rejected') {
         return new Response(JSON.stringify({ error: 'Guard is already rejected' }), { status: 400, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
       }
-      const reason = rejectionReason || 'Unable to verify provided information';
+      const reason = rejectionReason.trim();
       await updateGuard(supabaseQ, guardId, { verification_status: 'rejected', is_active: false, sia_verified: false, dashboard_access: false, rejection_reason: reason, rejected_at: now, updated_at: now });
       if (guard.user_id) {
         await safeExecute(async function() { await supabaseQ.from('users').update({ verification_status: 'rejected', updated_at: now }).eq('id', guard.user_id); });
       }
-      return new Response(JSON.stringify({ success: true, message: 'Guard rejected successfully', action: 'rejected' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
+      // The rejection remains successful if email fails; never invite a repeat of the decision.
+      let notificationStatus: 'accepted' | 'already_sent' | 'failed' = 'failed';
+      try {
+        const sectionLabels = ['Personal Info', 'Sia License', 'Documents', 'Professional Details', 'Availability', 'Subscription'];
+        const unconfirmedSections = Array.isArray(body.unconfirmedSections)
+          ? sectionLabels.filter(label => body.unconfirmedSections.includes(label)) : [];
+        const emailResponse = await fetch(supabaseUrl + '/functions/v1/send-guard-approval-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + supabaseServiceKey },
+          body: JSON.stringify({ guardId: guard.id, approved: false, rejectionReason: reason, unconfirmedSections }),
+          signal: AbortSignal.timeout(10000),
+        });
+        const emailResult: unknown = await emailResponse.json();
+        if (emailResponse.ok && emailResult && typeof emailResult === 'object' && 'success' in emailResult && emailResult.success === true) {
+          if ('skipped' in emailResult && emailResult.skipped === true) notificationStatus = 'already_sent';
+          else if ('email_id' in emailResult && typeof emailResult.email_id === 'string' && emailResult.email_id.trim()) notificationStatus = 'accepted';
+        }
+        if (notificationStatus === 'failed') console.error('[admin-verify-guard] Rejection email was not confirmed', emailResponse.status);
+      } catch {
+        console.error('[admin-verify-guard] Rejection email request failed');
+      }
+      return new Response(JSON.stringify({ success: true, message: 'Guard rejected successfully', action: 'rejected', notification_status: notificationStatus }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
     }
     if (action === 'suspend') {
       if (guard.verification_status === 'suspended') {

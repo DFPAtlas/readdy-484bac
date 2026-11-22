@@ -362,7 +362,13 @@ export default function GuardVerificationsClient() {
         throw new Error((result.error || `Server returned ${response.status}`) + detail);
       }
 
-      showToast('Guard rejected. Notification email sent.', 'success');
+      if (result.notification_status === 'accepted') {
+        showToast('Guard rejected. Rejection email accepted for sending.', 'success');
+      } else if (result.notification_status === 'already_sent') {
+        showToast('Guard rejected. A rejection email was already sent within the last 24 hours.', 'success');
+      } else {
+        showToast('Guard rejected, but the rejection email could not be confirmed. Check the email log before retrying the email.', 'error');
+      }
       setShowRejectModal(false);
       setRejectionReason('');
       closeGuardDetails();
