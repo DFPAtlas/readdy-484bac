@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { readAdminSidebarCounts } from '../_shared/admin-sidebar-counts.ts';
 
 interface BackupRecord {
   status: string;
@@ -1019,18 +1020,15 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'dashboard_stats') {
-      const [failedRes, guardRes, siaRes, heldRes, contactRes] = await Promise.all([
-        supabaseQ.from('transactions').select('id', { count: 'exact', head: true }).eq('status', 'failed'),
-        supabaseQ.from('guards').select('id', { count: 'exact', head: true }).in('verification_status', ['manual_review', 'pending_sia_check']),
-        supabaseQ.from('sia_verifications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabaseQ.from('guard_payouts').select('id', { count: 'exact', head: true }).eq('status', 'held'),
-        supabaseQ.from('contact_submissions').select('id', { count: 'exact', head: true }).eq('status', 'new'),
-      ]);
-      return new Response(JSON.stringify({
-        failedPayments: failedRes.count ?? 0, guardVerifications: guardRes.count ?? 0,
-        siaVerifications: siaRes.count ?? 0, heldPayments: heldRes.count ?? 0,
-        complaints: 0, contactSubmissions: contactRes.count ?? 0,
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      try {
+        const counts = await readAdminSidebarCounts(async (table, column, value) => {
+          const query = supabaseQ.from(table).select('id', { count: 'exact', head: true });
+          return typeof value === 'string' ? await query.eq(column, value) : await query.in(column, value);
+        });
+        return new Response(JSON.stringify(counts), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      } catch {
+        return new Response(JSON.stringify({ error: 'Unable to load admin sidebar counts' }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
     return new Response(JSON.stringify({ error: "Unknown action" }),
