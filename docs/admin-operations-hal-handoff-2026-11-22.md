@@ -15,7 +15,16 @@ Both monitors now classify recorded dispute holds before applying active-booking
 
 Nine focused tests passed on Node 22. Fixtures covered won and lost holds, real undisputed selection gaps, missing and duplicate payment evidence, genuine amount and currency mismatches, failed job reads, and preservation of workflow wiring and schedules. Both scheduled job reads returned HTTP 200. Other reader outputs matched the persisted counts. The runs saved fresh rows in `app.agent_state_snapshots`.
 
-Finance still needs the original checkout or payment-provider evidence to establish the intended client charge on each job. The GBP 8 difference between the recorded payment and agreed amount remains unreconciled. Operations and finance still need to decide the disposition of both bookings. The repair left the dispute holds and original payment records in place.
+### Stripe sandbox evidence
+
+The QuickGuard sandbox PaymentIntents requested GBP 88 and the linked charges captured GBP 88 for each booking. Both PaymentIntents are tagged `quickguard_dispute_uat` and carry the corresponding job ID.
+
+| Booking | PaymentIntent | Charge | Requested | Captured |
+| --- | --- | --- | --- | --- |
+| `726f86b4-e8a5-4a3e-907e-3a2d1facbd25` (chargeback lost) | [`pi_3UMu9yIMkpwfAEDT1WTjA19K`](https://dashboard.stripe.com/acct_1SYmuoIMkpwfAEDT/test/payments/pi_3UMu9yIMkpwfAEDT1WTjA19K) | `ch_3UMu9yIMkpwfAEDT1AGkNnmW` | GBP 88 | GBP 88 |
+| `626f86b4-e8a5-4a3e-907e-3a2d1facbd25` (chargeback won) | [`pi_3UMu3yIMkpwfAEDT0ATDH5Wl`](https://dashboard.stripe.com/acct_1SYmuoIMkpwfAEDT/test/payments/pi_3UMu3yIMkpwfAEDT0ATDH5Wl) | `ch_3UMu3yIMkpwfAEDT0d59AoSa` | GBP 88 | GBP 88 |
+
+Stripe establishes the intended sandbox charge on both payments. QuickGuard records an agreed amount of GBP 80 and a client charge total of zero on each booking. Neither PaymentIntent had an associated Checkout Session or a fee breakdown, so what the GBP 8 difference represents remains unknown. Operations and finance still need to decide the disposition of both bookings. The evidence review left the dispute holds and original payment records in place.
 
 ### Selection and funding rollback
 
