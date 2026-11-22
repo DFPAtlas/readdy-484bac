@@ -430,7 +430,10 @@ function UpgradeContent() {
         setSwitchSuccess({ oldPlanName: data.oldPlanName || 'previous plan', newPlanName: data.newPlanName || plan.name });
         setRedirectCountdown(3);
       } else if (data.url) {
-        window.open(data.url, '_blank');
+        const checkoutWindow = window.open(data.url, '_blank');
+        // Browsers can block a popup after the authenticated checkout request.
+        // Continue in this tab when no new window was opened.
+        if (!checkoutWindow) window.location.assign(data.url);
       } else {
         if (data.error?.includes('closed')) sessionStorage.removeItem(tokenKey);
         alert(data.error || 'Payment setup failed. Please try again.');
