@@ -8,6 +8,7 @@ import ThreatSessionsPanel from './ThreatSessionsPanel';
 import InfrastructureSecurityPanel from './InfrastructureSecurityPanel';
 import PaymentEmailSecurityPanel from './PaymentEmailSecurityPanel';
 import BackupCompliancePanel from './BackupCompliancePanel';
+import type { ServiceHealth } from '@/supabase/functions/_shared/admin-service-health';
 import SecurityTimeline from './SecurityTimeline';
 import EmergencyControls from './EmergencyControls';
 import SecurityToolsPanel from './SecurityToolsPanel';
@@ -89,7 +90,9 @@ export interface PaymentEmailData {
     webhookStatus: string;
     webhookVerification: string;
     failedEvents24h: number;
-    pendingEvents: number;
+    pendingEvents: number | null;
+    failedPayouts?: number;
+    apiHealth?: ServiceHealth;
     pendingPayouts: number;
     openDisputes: number;
     refunds: number;
@@ -99,13 +102,15 @@ export interface PaymentEmailData {
   };
   email: {
     smtpConnected: boolean;
+    provider?: string;
+    configured?: boolean;
     queuePending: number;
     failedEmails24h: number;
     sentToday: number;
-    bounceRate: string;
-    spfValid: boolean;
-    dkimValid: boolean;
-    dmarcValid: boolean;
+    bounceRate: string | null;
+    spfValid: boolean | null;
+    dkimValid: boolean | null;
+    dmarcValid: boolean | null;
     dailySendCount: number;
   };
 }

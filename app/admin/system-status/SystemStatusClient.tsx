@@ -52,6 +52,8 @@ interface AdminStatusData {
 
 interface HealthCheck {
   status: string;
+  provider?: string;
+  http_status?: number;
   latency_ms?: number;
   error?: string;
 }
@@ -98,8 +100,15 @@ function formatCurrency(n: number): string {
 function getStatusBadge(status: string | undefined) {
   switch (status) {
     case 'healthy':
-    case 'configured':
       return { label: 'Online', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
+    case 'configured':
+      return { label: 'Configured', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
+    case 'access_denied':
+      return { label: 'Check Access', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
+    case 'invalid_credentials':
+      return { label: 'Check Key', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
+    case 'rate_limited':
+      return { label: 'Rate Limited', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
     case 'degraded':
       return { label: 'Degraded', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
     case 'critical':
@@ -691,14 +700,14 @@ export default function SystemStatusClient() {
                   <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#0a1628] text-slate-400">
                     <i className="ri-mail-send-line text-lg"></i>
                   </div>
-                  <span className="text-sm font-bold text-white">Email (SMTP)</span>
+                  <span className="text-sm font-bold text-white">{health?.checks?.email?.provider || 'Email Provider'}</span>
                 </div>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${getStatusBadge(health?.checks?.email?.status).color}`}>
                   {getStatusBadge(health?.checks?.email?.status).label}
                 </span>
               </div>
               {health?.checks?.email?.status === 'not_configured' && (
-                <p className="text-[10px] text-amber-400 mt-2">SMTP credentials not set</p>
+                <p className="text-[10px] text-amber-400 mt-2">Email provider configuration is incomplete</p>
               )}
             </div>
           </div>

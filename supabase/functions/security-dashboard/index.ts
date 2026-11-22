@@ -1,6 +1,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { assessBackup } from '../_shared/backup-health.ts';
+import type { BackupRecord } from '../_shared/backup-health.ts';
+import { emailConfiguration, stripeHealth } from '../_shared/admin-service-health.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -615,67 +617,25 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'payment_email_status') {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
-      const [
-        stripeEventsRes, emailQueueRes, emailSendRes, emailDailyRes, payoutsHeldRes
-      ] = await Promise.allSettled([
-        supabaseQ.from('processed_stripe_events').select('*')
-          .order('processed_at', { ascending: false }).limit(50),
-        supabaseQ.from('email_queue').select('*')
-          .eq('status', 'pending').order('created_at', { ascending: false }).limit(100),
-        supabaseQ.from('email_send_log').select('*')
-          .gte('created_at', todayStart.toISOString()).order('created_at', { ascending: false }).limit(200),
-        supabaseQ.from('email_provider_daily_usage').select('*')
-          .eq('usage_date', todayStart.toISOString().slice(0, 10)).limit(10),
-        supabaseQ.from('guard_payouts').select('*').eq('status', 'held'),
-      ]);
-
-      const stripeEvents = stripeEventsRes.status === 'fulfilled' ? (stripeEventsRes.value.data || []) : [];
-      const emailQueue = emailQueueRes.status === 'fulfilled' ? (emailQueueRes.value.data || []) : [];
-      const emailSends = emailSendRes.status === 'fulfilled' ? (emailSendRes.value.data || []) : [];
-      const dailyUsage = emailDailyRes.status === 'fulfilled' ? (emailDailyRes.value.data || []) : [];
-      const heldPayouts = payoutsHeldRes.status === 'fulfilled' ? (payoutsHeldRes.value.data || []) : [];
-
-      const failedStripe = stripeEvents.filter((e: any) => e.event_type?.includes('failed') || e.metadata?.error);
-      const pendingStripe = stripeEvents.filter((e: any) => e.status === 'pending' || !e.processed_at);
-      const latestWebhook = stripeEvents.length > 0 ? stripeEvents.reduce((latest: any, e: any) =>
-        e.processed_at && new Date(e.processed_at) > new Date(latest) ? e.processed_at : latest, '1970-01-01') : null;
-
-      const failedEmails = emailSends.filter((e: any) => e.status === 'failed');
-      const sentToday = emailSends.filter((e: any) => e.status === 'sent');
-      const totalSent = (dailyUsage || []).reduce((s: number, d: any) => s + (d.sent_count || 0), 0);
-
-      const bounceRate = emailSends.length > 0
-        ? ((failedEmails.length / emailSends.length) * 100).toFixed(1) + '%'
-        : '0.0%';
-
+      const { data: metrics, error } = await supabaseQ.rpc('get_admin_service_metrics');
+      if (error || !metrics?.stripe || !metrics?.email) {
+        return new Response(JSON.stringify({ error: 'Admin service metrics could not be loaded' }), {
+          status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const email = emailConfiguration(name => Deno.env.get(name));
+      const apiHealth = await stripeHealth(Deno.env.get('STRIPE_SECRET_KEY'));
       return new Response(JSON.stringify({
         stripe: {
-          webhookStatus: stripeEvents.length > 0 ? 'Operational' : 'No recent events',
-          webhookVerification: 'Verified',
-          failedEvents24h: failedStripe.length,
-          pendingEvents: pendingStripe.length,
-          pendingPayouts: heldPayouts.length,
-          openDisputes: 0,
-          refunds: 0,
-          webhookLatency: '\u2014',
-          latestWebhook,
-          signingSecret: !!Deno.env.get('STRIPE_SECRET_KEY') ? 'Configured' : 'Missing',
+          ...metrics.stripe, apiHealth,
+          signingSecret: Deno.env.get('STRIPE_WEBHOOK_SECRET') ? 'Configured' : 'Missing',
         },
         email: {
-          smtpConnected: !!Deno.env.get('SMTP_HOST'),
-          queuePending: emailQueue.length,
-          failedEmails24h: failedEmails.length,
-          sentToday: sentToday.length,
-          bounceRate,
-          spfValid: true,
-          dkimValid: true,
-          dmarcValid: true,
-          dailySendCount: totalSent,
+          ...metrics.email, provider: email.provider,
+          configured: email.status === 'configured',
+          smtpConnected: email.provider === 'SMTP' && email.status === 'configured',
         },
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     if (action === 'backup_compliance_status') {
@@ -689,7 +649,7 @@ Deno.serve(async (req) => {
           status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      const backups = (backupRes.value.data || []).map((record) => ({
+      const backups = (backupRes.value.data || []).map((record: BackupRecord) => ({
         ...record, recorded_status: record.status, ...assessBackup(record),
       }));
       const compliance = complianceRes.status === 'fulfilled' ? (complianceRes.value.data || []) : [];
