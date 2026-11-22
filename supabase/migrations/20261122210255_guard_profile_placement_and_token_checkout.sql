@@ -14,7 +14,7 @@ language sql stable security definer set search_path = '' as $$
     and g.verification_status in ('approved','verified')
     and app.guard_has_current_sia(g.sia_verified,g.sia_licence_number,g.sia_expiry_date,current_date)
     and (not coalesce(g.is_test_account,false) or exists (
-      select 1 from app.clients c where c.user_id=auth.uid() and c.company_name='QG E2E Sandbox — Test Only'
+      select 1 from app.client_applicant_profiles a where a.guard_id=g.id
     ) or g.user_id=auth.uid());
 $$;
 revoke all on function app.get_guard_placement(uuid[]) from public;

@@ -92,7 +92,7 @@ function FindGuardContent() {
     const query = supabase
       .from('guard_public_profiles')
       .select('id, full_name, profile_image_url, sia_verified, rating, total_reviews, hourly_rate, location, city, postcode_area, licence_types, years_experience, willing_to_travel, has_transport, bio, accepts_direct_bookings, preferred_venue_categories')
-      .eq('verification_status', 'verified')
+      .in('verification_status', ['approved', 'verified'])
       .eq('accepts_direct_bookings', true)
       .order('rating', { ascending: false });
 
@@ -101,7 +101,7 @@ function FindGuardContent() {
       if (error) throw error;
       const rows = data || [];
       const placement = await loadGuardPlacement(supabase, rows.map(g => g.id));
-      setGuards(rows.map(g => ({ ...g, ...placement.get(g.id) })).sort(compareGuardPlacement));
+      setGuards(rows.filter(g => placement.has(g.id)).map(g => ({ ...g, ...placement.get(g.id) })).sort(compareGuardPlacement));
       setLoadError('');
     } catch { setGuards([]);setLoadError('Guard listings could not be loaded. Please refresh.'); }
     setLoading(false);

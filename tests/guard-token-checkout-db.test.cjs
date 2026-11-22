@@ -10,6 +10,8 @@ async function setup() {
     create table app.guards(id uuid primary key,user_id uuid,is_active boolean,profile_completed boolean,verified_by uuid,verification_status text,sia_verified boolean,sia_licence_number text,sia_expiry_date date,is_test_account boolean);
     create table app.clients(user_id uuid,is_active boolean,company_name text);
     create table app.account_closures(user_id uuid);
+    create table app.test_applicants(guard_id uuid,client_user_id uuid);
+    create view app.client_applicant_profiles as select guard_id from app.test_applicants where client_user_id=auth.uid();
     create table app.user_entitlements_data(user_id uuid,audience text,is_active boolean,subscription_status text,current_period_end timestamptz,features jsonb);
     create table app.plans(slug text primary key,active boolean,audience text,monthly_price_pence integer);
     create table app.subscriptions(user_id uuid,stripe_subscription_id text,status text);
@@ -69,6 +71,8 @@ test('actual placement migration: current entitled reviewed guards only; expiry 
     assert.equal((await db.query('select * from app.get_guard_placement($1)', [[owner]])).rows[0].profile_boost, false);
     await db.exec('reset role;update app.guards set verified_by=null;set role anon;');assert.equal((await db.query('select * from app.get_guard_placement($1)', [[owner]])).rows.length, 0);
     await db.exec(`reset role;update app.guards set verified_by='${other}',is_test_account=true;set role anon;`);assert.equal((await db.query('select * from app.get_guard_placement($1)', [[owner]])).rows.length, 0);
+    await db.exec(`reset role;insert into app.test_applicants values('${owner}','${other}');set role authenticated;select set_config('test.owner','${other}',false);`);
+    assert.equal((await db.query('select * from app.get_guard_placement($1)', [[owner]])).rows.length, 1);
   } finally { await db.close(); }
 });
 
