@@ -26,7 +26,7 @@ async function logReconciliation(supabase: any, email: any, jobId: string | null
   try {
     await supabase.from('email_send_log').insert({
       function_name: 'process-email-queue',
-      template: 'job_match_reconciliation',
+      template: email?.email_type === 'job_match' ? 'job_match_reconciliation' : `${email?.email_type || 'queued_email'}_reconciliation`,
       recipient: email?.recipient_email || '',
       related_user_id: email?.user_id || null,
       related_job_id: jobId || null,
@@ -38,6 +38,26 @@ async function logReconciliation(supabase: any, email: any, jobId: string | null
   } catch {
     // ignore logging failure
   }
+}
+
+function confirmedDelegatedNotification(value: unknown, field: string, eventId: unknown): boolean {
+  if (!value || typeof value !== 'object' || typeof eventId !== 'string') return false;
+  const success: unknown = Object.getOwnPropertyDescriptor(value, 'success')?.value;
+  const acknowledgedId: unknown = Object.getOwnPropertyDescriptor(value, field)?.value;
+  const results: unknown = Object.getOwnPropertyDescriptor(value, 'results')?.value;
+  if (success !== true || acknowledgedId !== eventId || !Array.isArray(results) || results.length === 0) return false;
+  const recipients = new Set<string>();
+  for (const result of results) {
+    if (!result || typeof result !== 'object' || 'error' in result) return false;
+    const recipient: unknown = Object.getOwnPropertyDescriptor(result, 'recipient')?.value;
+    const emailId: unknown = Object.getOwnPropertyDescriptor(result, 'email_id')?.value;
+    if ((recipient !== 'client' && recipient !== 'guard') || recipients.has(recipient)
+        || typeof emailId !== 'string' || emailId.trim().length === 0) return false;
+    recipients.add(recipient);
+  }
+  // These queue rows are created for the booking's client; guard-only results
+  // cannot confirm that the queued recipient was notified.
+  return recipients.has('client');
 }
 
 async function sendEmailViaResend(apiKey: string, to: string, subject: string, html: string, idempotencyKey?: string) {
@@ -118,27 +138,35 @@ serve(async (req) => {
           continue;
         }
 
-        if (email.email_type === 'cancellation_notification' && metadata.cancellation_id) {
-          const res = await fetch(`${functionsBaseUrl}/send-cancellation-notification`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
-            body: JSON.stringify({ cancellation_id: metadata.cancellation_id }),
-          });
-          if (!res.ok) throw new Error(await res.text());
-          await supabase.rpc('complete_email_queue', { p_queue_id: email.id });
-          delegated++;
-          continue;
-        }
-
-        if (email.email_type === 'refund_notification' && metadata.refund_request_id) {
-          const res = await fetch(`${functionsBaseUrl}/send-refund-notification`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
-            body: JSON.stringify({ refund_request_id: metadata.refund_request_id }),
-          });
-          if (!res.ok) throw new Error(await res.text());
-          await supabase.rpc('complete_email_queue', { p_queue_id: email.id });
-          delegated++;
+        if (email.email_type === 'cancellation_notification' || email.email_type === 'refund_notification') {
+          const cancellation = email.email_type === 'cancellation_notification';
+          const field = cancellation ? 'cancellation_id' : 'refund_request_id';
+          const endpoint = cancellation ? 'send-cancellation-notification' : 'send-refund-notification';
+          try {
+            if (typeof metadata[field] !== 'string' || !metadata[field].trim()) throw new Error('Notification event ID is missing');
+            const res = await fetch(`${functionsBaseUrl}/${endpoint}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
+              body: JSON.stringify({ [field]: metadata[field] }),
+            });
+            if (!res.ok) throw new Error(`Notification endpoint returned HTTP ${res.status}`);
+            const outcome: unknown = await res.json();
+            if (!confirmedDelegatedNotification(outcome, field, metadata[field])) {
+              throw new Error('Recipient provider acceptance was not confirmed');
+            }
+            const { data: completion, error: completionError } = await supabase.rpc('complete_email_queue', { p_queue_id: email.id });
+            if (completionError || completion !== true) throw new Error('Queue completion was not confirmed');
+            delegated++;
+          } catch (error: unknown) {
+            // The delegate may already have sent one or more emails, including
+            // before a timeout or a failed in-app notification write. Leave the
+            // claimed row processing for reconciliation; fail_email_queue would
+            // automatically requeue it and could resend accepted messages.
+            const message = `${email.email_type} ${email.id}: operator review required; ${error instanceof Error ? error.message : 'notification outcome unknown'}`;
+            await logReconciliation(supabase, email, metadata.job_id || null, message);
+            errors.push(message);
+            failed++;
+          }
           continue;
         }
 
