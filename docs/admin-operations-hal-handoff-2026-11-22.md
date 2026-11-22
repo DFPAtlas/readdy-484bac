@@ -2,6 +2,23 @@
 
 Continue the authorised QuickGuard admin repairs from this repository. Production project: `vnywjfpkepjgclkbcmsj`. The separate approved recovery target is `dnbvybmulsppfjntbsxz` in Frankfurt; its private `qg_recovery_20261122` schema is a core-data drill, not a live application database.
 
+## Email reporting and event deduplication, 18:17 UTC
+
+The email worker and Master now report current failures separately from historical test failures. A failed `email_system_e2e_test` row marked `metadata.test=true` is historical once at least 30 days have elapsed since its last recorded update. Both snapshots retain the historical and total failure counts. The worker also retains an audit finding per historical failure, including the queue ID and stored error. Recent test failures and other failed messages remain actionable. A failed queue read produces an explicit finding with unknown counts.
+
+The five original 2 October test rows remain failed and unsent in QuickGuard. Their stored Resend responses show sender-domain verification rejections before acceptance. The connected Resend account currently lists `quickguard.uk` as verified with sending enabled, and later QuickGuard test messages were delivered. The original provider responses are preserved in the queue.
+
+The email worker now compares the event identity, recipient, and email type. Cancellation messages use `cancellation_id` when present. Other messages can use an explicit event ID or idempotency key. Rows without an event identity are excluded from duplicate matching. The two cancellation notices with identical subjects and recipients have different cancellation IDs, and the false warning cleared. Matching rows for the same event still raise a warning. Dispatch logic, schedules, credentials, and workflow wiring were preserved.
+
+| Workflow | Published version | Published UTC, 22 Nov | Scheduled run | Snapshot ID and time UTC | Verified result |
+| --- | --- | --- | --- | --- | --- |
+| Email & Notification `Dgd8rf3KUSoxmVfi` | `21b06d77-9378-4251-8ebc-a3de67992e69` | 18:16:34.615 | `379534` | `2dbe1fe1-edc7-4205-9f56-7bc4b7b90e3f` at 18:17:03.225 | GREEN, 60 rows, 55 sent, zero current failures, five historical failures, zero duplicate warnings |
+| QuickGuard Master `hd2rIh2umh83tydj` | `4c0c9575-751c-42a3-9185-f048acfd4824` | 18:16:34.776 | `379543` | `45606afa-3e84-4f5c-a08f-73bbb44a745e` at 18:17:04.621 | AMBER for other findings, zero current email failures and five historical failures |
+
+All seven focused tests passed on Node 22. Both scheduled queue reads returned HTTP 200 and matched the persisted snapshots. No message was replayed, and the Resend send node did not run in the verified execution.
+
+Private exports are on HAL under `~/Documents/Codex/2026-11-22/continue-quickguard-admin-repairs-from-dfpatlas/work/email-reporting/backup-20261122T181607Z/`, named by workflow ID. The original active versions were `adf0fed7-7dca-400c-8fd5-5dde23320fad` for Email & Notification and `c912df68-838d-46ec-b2d7-468052837911` for Master. The parent directory contains the backup checksums, diffs, focused test log, and heartbeat verification. Check for intervening changes before restoring an export to the same workflow ID through the supported n8n interface.
+
 ## Review & Reputation repair, 16:32 UTC
 
 Workflow `8M4HAkmigFxAH7ck` now calculates public ratings and review counts from `status='published'` reviews only. The public average is rounded to one decimal place and defaults to zero when there are no published reviews. Hidden reviews still count as submitted for booking and review integrity checks. Review `21633a4d-6d27-41d4-8bb6-a23d1b3e0864` remains hidden, and the guard's stored public rating and count are both zero.
