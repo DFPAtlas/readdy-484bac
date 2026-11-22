@@ -18,6 +18,14 @@ interface BadgeCounts {
   contactSubmissions: number;
 }
 
+function isBadgeCounts(value: unknown): value is BadgeCounts {
+  if (!value || typeof value !== 'object') return false;
+  return ['failedPayments', 'guardVerifications', 'siaVerifications', 'heldPayments', 'complaints', 'contactSubmissions'].every(key => {
+    const count: unknown = Object.getOwnPropertyDescriptor(value, key)?.value;
+    return typeof count === 'number' && Number.isSafeInteger(count) && count >= 0;
+  });
+}
+
 interface NavItem {
   href: string;
   icon: string;
@@ -46,6 +54,8 @@ export default function AdminSidebar() {
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [badgeState, setBadgeState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [badgeRefresh, setBadgeRefresh] = useState(0);
   const [badges, setBadges] = useState<BadgeCounts>({
     failedPayments: 0,
     guardVerifications: 0,
@@ -81,8 +91,8 @@ export default function AdminSidebar() {
   const isActive = useCallback((href: string) =>
     pathname === href || (href !== '/admin/dashboard' && pathname.startsWith(`${href}/`)), [pathname]);
 
-  const Badge = ({ count, color = 'red' }: { count: number; color?: 'red' | 'yellow' }) => {
-    if (count === 0) return null;
+  const Badge = useCallback(function Badge({ count, color = 'red' }: { count: number; color?: 'red' | 'yellow' }) {
+    if (badgeState !== 'ready' || count === 0) return null;
     const cls = color === 'red'
       ? 'bg-red-500 text-white'
       : 'bg-amber-400 text-slate-900';
@@ -92,7 +102,7 @@ export default function AdminSidebar() {
         {count > 99 ? '99+' : count}
       </span>
     );
-  };
+  }, [badgeState]);
 
   const groups = useMemo<NavGroup[]>(() => [
     {
@@ -200,7 +210,7 @@ export default function AdminSidebar() {
         { href: '/admin/settings', icon: 'ri-settings-3-line', label: 'Settings' },
       ],
     },
-  ], [badges]);
+  ], [badges, Badge]);
 
   const [openGroup, setOpenGroup] = useState<string | null>(() => {
     const active = groups.find(group => group.items.some(item => isActive(item.href)));
@@ -214,34 +224,32 @@ export default function AdminSidebar() {
   }, [groups, isActive]);
 
   useEffect(() => {
+    let active = true;
+    let sequence = 0;
     async function loadBadges() {
+      const request = ++sequence;
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        if (!active || request !== sequence) return;
+        if (!session) throw new Error('Session unavailable');
 
         const { data, error } = await supabase.functions.invoke('admin-security', {
           body: { action: 'dashboard_stats' },
         });
 
-        if (error) return;
-
-        setBadges({
-          failedPayments: data.failedPayments ?? 0,
-          guardVerifications: data.guardVerifications ?? 0,
-          siaVerifications: data.siaVerifications ?? 0,
-          heldPayments: data.heldPayments ?? 0,
-          complaints: data.complaints ?? 0,
-          contactSubmissions: data.contactSubmissions ?? 0,
-        });
+        if (!active || request !== sequence) return;
+        if (error || !isBadgeCounts(data)) throw new Error('Counts unavailable');
+        setBadges(data);
+        setBadgeState('ready');
       } catch {
-        // Sidebar badges are non-critical.
+        if (active && request === sequence) setBadgeState('error');
       }
     }
 
     loadBadges();
     const interval = setInterval(loadBadges, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    return () => { active = false; clearInterval(interval); };
+  }, [badgeRefresh]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -329,6 +337,17 @@ export default function AdminSidebar() {
           <i className={`${collapsed ? 'ri-menu-unfold-4-line' : 'ri-menu-fold-4-line'} text-lg`}></i>
         </button>
       </div>
+
+      {badgeState === 'error' && (
+        <div role="status" className="mx-3 mb-2 text-amber-400">
+          <button type="button" aria-label="Retry navigation counts" title="Navigation counts unavailable — retry"
+            onClick={() => { setBadgeState('loading'); setBadgeRefresh(value => value + 1); }}
+            className="flex items-center gap-2 px-2 py-1 text-xs rounded-lg hover:bg-[#1a2b4a]">
+            <i className="ri-refresh-line" aria-hidden="true" />
+            <span className={collapsed ? 'sr-only' : ''}>Counts unavailable — retry</span>
+          </button>
+        </div>
+      )}
 
       <nav data-sidebar-scroll className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-3 space-y-1">
         {groups.map((group) => {
