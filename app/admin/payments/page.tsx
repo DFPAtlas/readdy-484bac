@@ -37,35 +37,49 @@ export default function AdminPaymentsPage() {
   const activeRef = useRef(true);
   const paymentsRequestRef = useRef(0);
   const missingRequestRef = useRef(0);
+  const backfillRunRef = useRef(false);
 
   const checkMissing = useCallback(async () => {
     if (!activeRef.current) return;
     const request = ++missingRequestRef.current;
     const { data: subs } = await supabase.from('subscriptions').select('id, user_id').not('stripe_subscription_id', 'is', null);
-    const { data: pmts } = await supabase.from('subscription_payments').select('user_id');
+    const { data: pmts } = await supabase.from('subscription_payments').select('subscription_id');
     if (!activeRef.current || missingRequestRef.current !== request || !subs) return;
-    const pmtUserIds = new Set((pmts ?? []).map((p: any) => p.user_id));
-    const missing = subs.filter((s: any) => !pmtUserIds.has(s.user_id));
+    const paymentSubscriptionIds = new Set((pmts ?? []).map(p => p.subscription_id));
+    const missing = subs.filter(s => !paymentSubscriptionIds.has(s.id));
     setMissingCount(missing.length);
   }, []);
 
   const runBackfill = async () => {
+    if (backfillRunRef.current || !activeRef.current) return;
+    backfillRunRef.current = true;
     setBackfilling(true);
     try {
-      const res = await fetch('https://vnywjfpkepjgclkbcmsj.supabase.co/functions/v1/backfill-subscription-payments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json();
-      const backfilled = data.results?.filter((r: any) => r.action === 'backfilled').length || 0;
-      showToast(`Backfill complete: ${backfilled} payment(s) created`, 'success');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) throw new Error('Your admin session is unavailable. Sign in again.');
+      if (!activeRef.current) return;
+      const { data, error } = await supabase.functions.invoke('backfill-subscription-payments', { body: {} });
+      if (error) throw new Error('Invoice reconciliation was rejected or unavailable. Check your admin MFA session and try again.');
+      const payload: unknown = data;
+      if (!payload || typeof payload !== 'object' || !('success' in payload) || !('results' in payload)
+          || !Array.isArray(payload.results)) throw new Error('Invoice reconciliation was not confirmed.');
+      let backfilled = 0, failed = 0;
+      for (const result of payload.results) {
+        if (!result || typeof result !== 'object' || !('action' in result)) throw new Error('Invalid invoice reconciliation result.');
+        if (result.action === 'backfilled') backfilled++;
+        else if (result.action === 'error') failed++;
+        else if (result.action !== 'skipped') throw new Error('Unexpected invoice reconciliation result.');
+      }
+      if (!activeRef.current) return;
+      if (payload.success !== true || failed) showToast(`Invoice reconciliation incomplete: ${backfilled} recorded; ${failed} need review.`, 'error');
+      else showToast(`Invoice check complete: ${backfilled} payment(s) recorded`, 'success');
       await fetchPayments();
       await checkMissing();
     } catch (err: unknown) {
-      showToast('Backfill failed: ' + (err instanceof Error ? err.message : 'Unknown error'), 'error');
+      if (activeRef.current) showToast('Backfill failed: ' + (err instanceof Error ? err.message : 'Unknown error'), 'error');
     } finally {
-      setBackfilling(false);
+      backfillRunRef.current = false;
+      if (activeRef.current) setBackfilling(false);
     }
   };
 
@@ -283,7 +297,7 @@ export default function AdminPaymentsPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {missingCount > 0 && (
+              {(
                 <button
                   onClick={runBackfill}
                   disabled={backfilling}
@@ -292,7 +306,7 @@ export default function AdminPaymentsPage() {
                   <div className="w-5 h-5 flex items-center justify-center">
                     <i className={`${backfilling ? 'ri-loader-4-line animate-spin' : 'ri-tools-line'}`}></i>
                   </div>
-                  {backfilling ? 'Backfilling...' : `Backfill Missing (${missingCount})`}
+                  {backfilling ? 'Checking invoices...' : missingCount > 0 ? `Backfill Missing (${missingCount})` : 'Check Subscription Invoices'}
                 </button>
               )}
               <button
