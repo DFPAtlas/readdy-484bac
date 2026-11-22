@@ -1,12 +1,14 @@
 'use client';
 
-import { BackupComplianceData } from './SecuritySOCClient';
-import { assessBackup } from '@/supabase/functions/_shared/backup-health';
+import type { BackupComplianceData } from './SecuritySOCClient';
+import { assessBackup } from '@/lib/backup-health';
+import ComplianceRecordRow from './ComplianceRecordRow';
 
 interface Props {
   backupComplianceData: BackupComplianceData | null;
   fetchState: 'idle' | 'loading' | 'error';
   onRetry: () => void;
+  onUpdated: () => void;
 }
 
 function timeAgo(dateStr: string | null): string {
@@ -21,7 +23,17 @@ function timeAgo(dateStr: string | null): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-export default function BackupCompliancePanel({ backupComplianceData, fetchState, onRetry }: Props) {
+const COMPLIANCE_ORDER = ['gdpr', 'ico', 'privacy_policy', 'terms', 'cookie_policy', 'data_retention', 'data_deletion', 'encryption', 'audit_logging', 'sia_compliance'];
+
+function orderCompliance<T extends { key: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const ai = COMPLIANCE_ORDER.indexOf(a.key);
+    const bi = COMPLIANCE_ORDER.indexOf(b.key);
+    return (ai === -1 ? COMPLIANCE_ORDER.length : ai) - (bi === -1 ? COMPLIANCE_ORDER.length : bi);
+  });
+}
+
+export default function BackupCompliancePanel({ backupComplianceData, fetchState, onRetry, onUpdated }: Props) {
   const d = backupComplianceData;
   if (fetchState === 'loading') return <p role="status" className="text-slate-400">Loading backup and compliance records…</p>;
   if (fetchState === 'error') return (
@@ -88,26 +100,12 @@ export default function BackupCompliancePanel({ backupComplianceData, fetchState
           </div>
           <h2 className="text-base font-semibold text-white">Compliance Centre</h2>
         </div>
+        <p className="text-xs text-slate-400 mb-3">Open any row to review its evidence notes, reference and last reviewed date.</p>
         {d && d.compliance.length > 0 ? (
           <div className="space-y-1.5">
-            {d.compliance.map((item) => {
-              const status = item.status || 'missing';
-              const colors = status === 'complete' ? { bg: 'bg-emerald-500/10', text: 'text-emerald-400', icon: 'ri-check-fill' } : status === 'review' ? { bg: 'bg-amber-500/10', text: 'text-amber-400', icon: 'ri-time-fill' } : { bg: 'bg-red-500/10', text: 'text-red-400', icon: 'ri-close-fill' };
-              return (
-                <div key={item.key} className="flex items-center justify-between bg-[#0a1628] rounded-lg px-4 py-2.5 border border-[#1a2b4a]">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`w-6 h-6 flex items-center justify-center rounded ${colors.bg}`}>
-                      <i className={`${item.key === 'gdpr' ? 'ri-shield-check-line' : item.key === 'ico' ? 'ri-government-line' : item.key === 'privacy_policy' ? 'ri-file-text-line' : item.key === 'terms' ? 'ri-file-list-2-line' : item.key === 'cookie_policy' ? 'ri-shield-flash-line' : item.key === 'data_retention' ? 'ri-archive-line' : item.key === 'encryption' ? 'ri-lock-password-line' : item.key === 'audit_logging' ? 'ri-survey-line' : item.key === 'sia_compliance' ? 'ri-police-car-line' : 'ri-delete-back-line'} text-xs ${colors.text}`}></i>
-                    </div>
-                    <span className="text-sm text-slate-300">{item.label}</span>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${colors.bg} ${colors.text}`}>
-                    <i className={`${colors.icon} text-[10px] mr-0.5`}></i>
-                    {status === 'complete' ? 'Complete' : status === 'review' ? 'Needs Review' : 'Missing'}
-                  </span>
-                </div>
-              );
-            })}
+            {orderCompliance(d.compliance).map((item) => (
+              <ComplianceRecordRow key={item.key} item={item} onUpdated={onUpdated} />
+            ))}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-8 text-slate-500">

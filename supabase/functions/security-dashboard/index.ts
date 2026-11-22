@@ -1,9 +1,95 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { assessBackup } from '../_shared/backup-health.ts';
-import type { BackupRecord } from '../_shared/backup-health.ts';
-import { emailConfiguration, stripeHealth } from '../_shared/admin-service-health.ts';
-import { isInfrastructureSnapshot, isInfrastructureBuckets } from '../_shared/admin-infrastructure.ts';
+
+interface BackupRecord {
+  status: string;
+  last_backup_at: string | null;
+  last_restore_test_at: string | null;
+  retention_days: number | null;
+}
+
+function assessBackup(record: BackupRecord, now = Date.now()): {
+  status: 'healthy' | 'warning' | 'critical'; label: string; reason: string;
+} {
+  const backupAt = record.last_backup_at ? Date.parse(record.last_backup_at) : NaN;
+  if (!Number.isFinite(backupAt) || backupAt > now) {
+    return { status: record.status === 'critical' ? 'critical' : 'warning', label: record.status === 'critical' ? 'Critical' : 'Needs Check', reason: 'No valid last-backup timestamp is recorded.' };
+  }
+  const retention = record.retention_days;
+  if (retention === null || !Number.isFinite(retention) || retention <= 0) {
+    return { status: record.status === 'critical' ? 'critical' : 'warning', label: record.status === 'critical' ? 'Critical' : 'Needs Check', reason: 'No valid retention window is recorded.' };
+  }
+  if (now - backupAt > retention * 86400000) {
+    return { status: 'critical', label: 'Stale Record', reason: 'The last recorded backup is older than the recorded retention window.' };
+  }
+  if (record.status === 'critical') {
+    return { status: 'critical', label: 'Critical', reason: 'Backup tracking reports a critical issue.' };
+  }
+  const restoredAt = record.last_restore_test_at ? Date.parse(record.last_restore_test_at) : NaN;
+  if (!Number.isFinite(restoredAt) || restoredAt > now) {
+    return { status: 'warning', label: 'Needs Check', reason: 'No valid restore-test timestamp is recorded.' };
+  }
+  if (record.status !== 'healthy') {
+    return { status: 'warning', label: 'Needs Check', reason: 'Backup tracking requires review.' };
+  }
+  return { status: 'healthy', label: 'Current Record', reason: 'Recorded backup is within the retention window; provider verification is still required.' };
+}
+
+interface ServiceHealth {
+  status: 'healthy' | 'configured' | 'not_configured' | 'access_denied' | 'invalid_credentials' | 'rate_limited' | 'unhealthy' | 'unknown';
+  provider?: string;
+  latency_ms?: number;
+  http_status?: number;
+  error?: string;
+}
+
+function emailConfiguration(env: (name: string) => string | undefined): ServiceHealth {
+  if (env('RESEND_API_KEY')) return { status: 'configured', provider: 'Resend API' };
+  if (env('SMTP_HOST') && env('SMTP_USER') && env('SMTP_PASS')) return { status: 'configured', provider: 'SMTP' };
+  return { status: 'not_configured', provider: 'Email', error: 'No complete email provider configuration is available.' };
+}
+
+async function stripeHealth(key: string | undefined, request: typeof fetch = fetch): Promise<ServiceHealth> {
+  if (!key) return { status: 'not_configured', provider: 'Stripe' };
+  const start = Date.now();
+  try {
+    const response = await request('https://api.stripe.com/v1/balance', {
+      headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(8000),
+    });
+    const base = { provider: 'Stripe', http_status: response.status, latency_ms: Date.now() - start };
+    if (response.ok) return { ...base, status: 'healthy' };
+    if (response.status === 401) return { ...base, status: 'invalid_credentials', error: 'Stripe rejected the configured credential. Check the key and environment.' };
+    if (response.status === 403) return { ...base, status: 'access_denied', error: 'The configured key cannot read balance health. Check its permissions; this does not establish a Stripe outage.' };
+    if (response.status === 429) return { ...base, status: 'rate_limited', error: 'Stripe rate-limited this health probe.' };
+    return { ...base, status: response.status >= 500 ? 'unhealthy' : 'unknown', error: `Stripe health probe returned HTTP ${response.status}.` };
+  } catch {
+    return { provider: 'Stripe', status: 'unknown', latency_ms: Date.now() - start, error: 'Stripe health probe could not be completed.' };
+  }
+}
+
+interface InfrastructureSnapshot {
+  tables: { schema_name: string; table_name: string; rls_enabled: boolean; public_access: boolean }[];
+  policies: { schema_name: string; table_name: string; policy_count: number }[];
+  indexes: { schema_name: string; table_name: string; index_count: number }[];
+}
+interface InfrastructureBucket { id: string; name: string; public: boolean; created_at: string; }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function hasIdentity(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && typeof value.schema_name === 'string' && typeof value.table_name === 'string';
+}
+function isInfrastructureBuckets(value: unknown): value is InfrastructureBucket[] {
+  return Array.isArray(value) && value.every(b => isRecord(b) && typeof b.id === 'string' && typeof b.name === 'string'
+    && typeof b.public === 'boolean' && typeof b.created_at === 'string');
+}
+function isInfrastructureSnapshot(value: unknown): value is InfrastructureSnapshot {
+  return isRecord(value) && Array.isArray(value.tables) && Array.isArray(value.policies) && Array.isArray(value.indexes)
+    && value.tables.some(t => isRecord(t) && t.schema_name === 'app')
+    && value.tables.every(t => hasIdentity(t) && typeof t.rls_enabled === 'boolean' && typeof t.public_access === 'boolean')
+    && value.policies.every(p => hasIdentity(p) && Number.isSafeInteger(p.policy_count) && Number(p.policy_count) >= 0)
+    && value.indexes.every(i => hasIdentity(i) && Number.isSafeInteger(i.index_count) && Number(i.index_count) >= 0);
+}
 
 function hasMfaAssurance(token: string): boolean {
   try {
@@ -682,12 +768,88 @@ Deno.serve(async (req) => {
           { backup_type: 'Environment Backup', status: 'warning', last_backup_at: null, last_restore_test_at: null, retention_days: 14, notes: 'Needs Setup' },
           { backup_type: 'Edge Functions Backup', status: 'warning', last_backup_at: null, last_restore_test_at: null, retention_days: 7, notes: 'Needs Setup' },
         ],
-        compliance: compliance.length > 0 ? compliance : [
-          { key: 'gdpr', label: 'GDPR Compliance', status: 'review', notes: 'Manual verification needed' },
-          { key: 'ico', label: 'ICO Registration', status: 'review', notes: 'Manual verification needed' },
-          { key: 'privacy_policy', label: 'Privacy Policy', status: 'review', notes: 'Manual verification needed' },
-        ],
+        compliance: compliance.map((row: any) => ({
+          key: row.key,
+          label: row.label,
+          status: row.status || 'missing',
+          evidence_url: row.evidence_url || null,
+          evidence_reference: row.evidence_reference || null,
+          renewal_due_at: row.renewal_due_at || null,
+          notes: row.notes || null,
+          last_reviewed_at: row.last_reviewed_at || null,
+        })),
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === 'update_compliance_record') {
+      const recordKey = String(body.key || '').trim();
+      if (!recordKey) {
+        return new Response(JSON.stringify({ error: 'A compliance record key is required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: current, error: currentError } = await supabaseQ.from('compliance_status')
+        .select('key, status, notes, evidence_url, evidence_reference, renewal_due_at')
+        .eq('key', recordKey)
+        .maybeSingle();
+
+      if (currentError || !current) {
+        return new Response(JSON.stringify({ error: 'Compliance record not found' }), {
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const patch: Record<string, unknown> = {};
+      if (typeof body.notes === 'string') patch.notes = body.notes.trim().slice(0, 2000) || null;
+      if (typeof body.evidence_url === 'string') patch.evidence_url = body.evidence_url.trim() || null;
+      if (typeof body.evidence_reference === 'string') patch.evidence_reference = body.evidence_reference.trim() || null;
+
+      if (body.renewal_due_at === null || body.renewal_due_at === '') {
+        patch.renewal_due_at = null;
+      } else if (typeof body.renewal_due_at === 'string') {
+        const parsed = Date.parse(body.renewal_due_at);
+        if (!Number.isFinite(parsed)) {
+          return new Response(JSON.stringify({ error: 'The renewal date is not a valid date' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        patch.renewal_due_at = new Date(parsed).toISOString();
+      }
+
+      if (Object.keys(patch).length === 0) {
+        return new Response(JSON.stringify({ error: 'No compliance details were supplied' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const reference = ('evidence_reference' in patch ? patch.evidence_reference : current.evidence_reference) as string | null;
+      const renewal = ('renewal_due_at' in patch ? patch.renewal_due_at : current.renewal_due_at) as string | null;
+      const renewalInFuture = !!renewal && Date.parse(renewal) >= Date.now() - 86400000;
+      patch.status = reference && renewalInFuture ? 'complete' : 'review';
+      patch.last_reviewed_at = new Date().toISOString();
+      patch.updated_at = new Date().toISOString();
+
+      const { data: saved, error: saveError } = await supabaseQ.from('compliance_status')
+        .update(patch).eq('key', recordKey).select('*').maybeSingle();
+
+      if (saveError || !saved) {
+        return new Response(JSON.stringify({ error: 'The compliance record could not be saved' }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      await supabaseQ.from('admin_activity_log').insert({
+        admin_username: resolvedAdmin.email || `admin_${resolvedAdmin.id}`,
+        admin_name: 'Admin',
+        action_type: 'compliance_record_updated',
+        action_description: `Compliance evidence updated for "${saved.label}" (${patch.status})`,
+        ip_address: req.headers.get('x-forwarded-for') || 'unknown',
+      });
+
+      return new Response(JSON.stringify({ success: true, record: saved }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Preserve the recorded-check and log-search routes from deployed v63.

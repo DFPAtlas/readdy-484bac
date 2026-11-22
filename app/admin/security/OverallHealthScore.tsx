@@ -1,7 +1,7 @@
 'use client';
 
 import { AdminCounts, SuspiciousActivity, PaymentEmailData, BackupComplianceData } from './SecuritySOCClient';
-import { assessBackup } from '@/supabase/functions/_shared/backup-health';
+import { assessBackup } from '@/lib/backup-health';
 
 interface HealthCategory {
   name: string;

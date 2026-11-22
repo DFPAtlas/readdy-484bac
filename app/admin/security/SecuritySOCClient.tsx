@@ -8,7 +8,6 @@ import ThreatSessionsPanel from './ThreatSessionsPanel';
 import InfrastructureSecurityPanel from './InfrastructureSecurityPanel';
 import PaymentEmailSecurityPanel from './PaymentEmailSecurityPanel';
 import BackupCompliancePanel from './BackupCompliancePanel';
-import type { ServiceHealth } from '@/supabase/functions/_shared/admin-service-health';
 import SecurityTimeline from './SecurityTimeline';
 import EmergencyControls from './EmergencyControls';
 import SecurityToolsPanel from './SecurityToolsPanel';
@@ -92,7 +91,7 @@ export interface PaymentEmailData {
     failedEvents24h: number;
     pendingEvents: number | null;
     failedPayouts?: number;
-    apiHealth?: ServiceHealth;
+    apiHealth?: ServiceHealthStatus;
     pendingPayouts: number;
     openDisputes: number;
     refunds: number;
@@ -115,6 +114,17 @@ export interface PaymentEmailData {
   };
 }
 
+export interface ComplianceRecord {
+  key: string;
+  label: string;
+  status: string;
+  evidence_url?: string | null;
+  evidence_reference?: string | null;
+  renewal_due_at?: string | null;
+  notes: string | null;
+  last_reviewed_at?: string | null;
+}
+
 export interface BackupComplianceData {
   backups: {
     backup_type: string;
@@ -124,12 +134,7 @@ export interface BackupComplianceData {
     retention_days: number | null;
     notes: string | null;
   }[];
-  compliance: {
-    key: string;
-    label: string;
-    status: string;
-    notes: string | null;
-  }[];
+  compliance: ComplianceRecord[];
 }
 
 interface FetchState {
@@ -140,6 +145,19 @@ interface FetchState {
   apiSecrets: 'idle' | 'loading' | 'error';
   paymentEmail: 'idle' | 'loading' | 'error';
   backupCompliance: 'idle' | 'loading' | 'error';
+}
+
+function isPermissionLimited(err: any): boolean {
+  const status = err?.context?.status ?? err?.status;
+  return status === 403;
+}
+
+export interface ServiceHealthStatus {
+  status: 'healthy' | 'configured' | 'not_configured' | 'access_denied' | 'invalid_credentials' | 'rate_limited' | 'unhealthy' | 'unknown';
+  provider?: string;
+  latency_ms?: number;
+  http_status?: number;
+  error?: string;
 }
 
 export default function SecuritySOCClient() {
@@ -191,6 +209,7 @@ export default function SecuritySOCClient() {
       }
     }
   }, []);
+
 
   const fetchSecurityData = useCallback(async () => {
     setFetchState(s => ({ ...s, security: 'loading' }));
@@ -246,8 +265,9 @@ export default function SecuritySOCClient() {
       const data = await invokeFunction('get_emergency_settings', undefined, 1);
       setEmergencySettings(data?.settings || {});
       setFetchState(s => ({ ...s, emergencySettings: 'idle' }));
-    } catch {
-      setFetchState(s => ({ ...s, emergencySettings: 'error' }));
+    } catch (err) {
+      setEmergencySettings({});
+      setFetchState(s => ({ ...s, emergencySettings: isPermissionLimited(err) ? 'idle' : 'error' }));
     }
   }, [invokeFunction]);
 
@@ -257,8 +277,9 @@ export default function SecuritySOCClient() {
       const data = await invokeFunction('api_secret_status', undefined, 1);
       setApiSecrets(data?.secrets || []);
       setFetchState(s => ({ ...s, apiSecrets: 'idle' }));
-    } catch {
-      setFetchState(s => ({ ...s, apiSecrets: 'error' }));
+    } catch (err) {
+      setApiSecrets([]);
+      setFetchState(s => ({ ...s, apiSecrets: isPermissionLimited(err) ? 'idle' : 'error' }));
     }
   }, [invokeFunction]);
 
@@ -398,7 +419,7 @@ export default function SecuritySOCClient() {
 
       <PaymentEmailSecurityPanel paymentEmailData={paymentEmailData} />
 
-      <BackupCompliancePanel backupComplianceData={backupComplianceData} fetchState={fetchState.backupCompliance} onRetry={fetchBackupCompliance} />
+      <BackupCompliancePanel backupComplianceData={backupComplianceData} fetchState={fetchState.backupCompliance} onRetry={fetchBackupCompliance} onUpdated={fetchBackupCompliance} />
 
       <SecurityTimeline timelineEvents={timelineEvents} />
 
