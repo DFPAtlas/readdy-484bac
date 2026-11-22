@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 import BreadcrumbNav from './BreadcrumbNav';
 import ImageUploadField from './ImageUploadField';
 import DocumentUploadField from './DocumentUploadField';
@@ -25,7 +26,6 @@ interface FormData {
   available_hours_to: string;
   certifications: string[];
   licence_types: string[];
-  auto_approve: boolean;
 }
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -51,7 +51,6 @@ const initialForm: FormData = {
   available_hours_to: '',
   certifications: [],
   licence_types: [],
-  auto_approve: false,
 };
 
 const inputClasses = 'w-full px-4 py-2.5 bg-[#0a1628] border border-[#1a2b4a] rounded-lg focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 text-sm outline-none text-slate-200 placeholder:text-slate-600';
@@ -95,14 +94,16 @@ export default function AddGuardPage() {
   const [form, setForm] = useState<FormData>(initialForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState<{ email: string; password: string; auto_approve: boolean; uploadErrors?: string[] } | null>(null);
+  const [success, setSuccess] = useState<{ email: string } | null>(null);
+  const submissionRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const submittingRef = useRef(false);
   const [profileImage, setProfileImage] = useState<FileState | null>(null);
   const [siaFront, setSiaFront] = useState<FileState | null>(null);
   const [siaBack, setSiaBack] = useState<FileState | null>(null);
   const [siaSupporting, setSiaSupporting] = useState<FileState | null>(null);
   const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
 
-  const updateField = (key: keyof FormData, value: any) => {
+  const updateField = <K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
   };
 
@@ -130,6 +131,7 @@ export default function AddGuardPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     setError('');
     setSuccess(null);
 
@@ -141,10 +143,13 @@ export default function AddGuardPage() {
 
     if (!allValid) return;
 
+    submittingRef.current = true;
     setLoading(true);
 
     try {
-      const payload: any = { ...form };
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.access_token) throw new Error('Please sign in again before creating a guard.');
+      const payload: Record<string, unknown> = { ...form };
       if (profileImage) {
         payload.profile_image_base64 = profileImage.base64;
         payload.profile_image_name = profileImage.name;
@@ -162,39 +167,48 @@ export default function AddGuardPage() {
         payload.sia_supporting_name = siaSupporting.name;
       }
 
+      const fingerprint = JSON.stringify(payload);
+      if (submissionRef.current?.fingerprint !== fingerprint) {
+        submissionRef.current = { fingerprint, key: crypto.randomUUID() };
+      }
+      payload.idempotency_key = submissionRef.current.key;
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-guard-from-admin`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${session.access_token}`,
             'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
           },
           body: JSON.stringify(payload),
         }
       );
 
-      const result = await response.json();
+      const result: unknown = await response.json();
 
-      if (!response.ok) {
-        throw new Error(result.error || `Failed to create guard (${response.status})`);
+      if (!response.ok || !result || typeof result !== 'object' || !('success' in result) || result.success !== true) {
+        const message = result && typeof result === 'object' && 'error' in result && typeof result.error === 'string' ? result.error : `Failed to create guard (${response.status})`;
+        throw new Error(message);
       }
-
-      setSuccess({
-        email: result.email,
-        password: result.password,
-        auto_approve: form.auto_approve,
-        uploadErrors: result.upload_errors,
-      });
+      if (!('guardId' in result) || typeof result.guardId !== 'string' || !result.guardId
+          || !('email' in result) || typeof result.email !== 'string'
+          || result.email.toLowerCase() !== form.email.trim().toLowerCase()
+          || !('status' in result) || result.status !== 'pending_review') {
+        throw new Error('Guard creation could not be confirmed. Keep these details and check Guard Verifications before retrying.');
+      }
+      setSuccess({ email: result.email });
+      submissionRef.current = null;
       setForm(initialForm);
       setProfileImage(null);
       setSiaFront(null);
       setSiaBack(null);
       setSiaSupporting(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to create guard');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create guard');
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
@@ -228,33 +242,14 @@ export default function AddGuardPage() {
             </div>
             <div className="flex-1">
               <h3 className="text-lg font-bold text-emerald-300 mb-2">
-                Guard {success.auto_approve ? 'Created & Approved' : 'Created'} Successfully
+                Guard Created — Pending Review
               </h3>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400">Email:</span>
                   <span className="font-mono font-semibold text-slate-200">{success.email}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-400">Password:</span>
-                  <span className="font-mono font-semibold text-slate-200">{success.password}</span>
-                </div>
               </div>
-              {success.uploadErrors && success.uploadErrors.length > 0 && (
-                <div className="mt-3 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-                  <p className="text-sm font-medium text-amber-300 mb-1">Guard created but some files failed to upload:</p>
-                  <ul className="text-xs text-amber-400 space-y-0.5">
-                    {success.uploadErrors.map((e, i) => (
-                      <li key={i} className="flex items-center gap-1">
-                        <div className="w-3 h-3 flex items-center justify-center">
-                          <i className="ri-error-warning-line"></i>
-                        </div>
-                        {e}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
               <div className="mt-4 flex items-center gap-3">
                 <Link
                   href="/admin/guard-verifications"
@@ -269,11 +264,11 @@ export default function AddGuardPage() {
                   className="inline-flex items-center gap-2 px-4 py-2 bg-[#1a2b4a] border border-[#1a2b4a] text-slate-300 rounded-lg font-medium hover:bg-[#243452] transition-colors whitespace-nowrap cursor-pointer"
                 >
                   <i className="ri-login-box-line"></i>
-                  Test Guard Login
+                  Guard Sign-In
                 </Link>
               </div>
               <p className="text-xs text-slate-500 mt-3">
-                Copy the credentials above. The guard can use Forgot Password at <strong>/guard/forgot-password</strong> to set their own password. If auto-approved, they should land directly on the dashboard.
+                Review the guard&apos;s details and documents in Guard Verifications before approving access. Account creation does not approve their SIA licence.
               </p>
             </div>
           </div>
@@ -451,7 +446,7 @@ export default function AddGuardPage() {
           </div>
         </div>
 
-        {/* Auto-approve */}
+        {/* Creation always requires a separate verification decision. */}
         <div className="bg-[#0a1628] rounded-xl border border-[#1a2b4a] p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -459,17 +454,10 @@ export default function AddGuardPage() {
                 <i className="ri-flashlight-line text-amber-400"></i>
               </div>
               <div>
-                <h3 className="font-semibold text-white">Auto-Approve</h3>
-                <p className="text-sm text-slate-400">Skip verification and approve immediately</p>
+                <h3 className="font-semibold text-white">Pending Review</h3>
+                <p className="text-sm text-slate-400">New guards require verification before they can accept jobs.</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => updateField('auto_approve', !form.auto_approve)}
-              className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${form.auto_approve ? 'bg-teal-500' : 'bg-[#1a2b4a]'}`}
-            >
-              <div className={`w-6 h-6 bg-white rounded-full shadow absolute top-1 transition-transform ${form.auto_approve ? 'translate-x-7' : 'translate-x-1'}`} />
-            </button>
           </div>
         </div>
 
