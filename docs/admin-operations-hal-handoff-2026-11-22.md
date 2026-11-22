@@ -2,6 +2,23 @@
 
 Continue the authorised QuickGuard admin repairs from this repository. Production project: `vnywjfpkepjgclkbcmsj`. The separate approved recovery target is `dnbvybmulsppfjntbsxz` in Frankfurt; its private `qg_recovery_20261122` schema is a core-data drill, not a live application database.
 
+## Dispute & Refund monitor repair, 19:02 UTC
+
+Workflow `2wtdCiZ55DLQrfQg` now reads Stripe chargeback audit records. It matches each event to the booking and a completed payment transaction, checks the charge reference when recorded on the transaction, and uses the latest matching event per Stripe dispute. The audit query is read-only. An unavailable or malformed audit response raises its own warning. Unexplained dispute flags still raise a P1 finding, and existing refund and payout safeguards remain in place.
+
+| Booking | Verified scheduled finding |
+| --- | --- |
+| `726f86b4-e8a5-4a3e-907e-3a2d1facbd25` | GBP 88 Stripe sandbox chargeback lost. Audit `2471c613-5f25-4c2f-9c0e-4509bbedb483`. Hold remains pending finance closeout. |
+| `626f86b4-e8a5-4a3e-907e-3a2d1facbd25` | GBP 88 Stripe sandbox chargeback won. Audit `d80bc06c-922b-4936-92a4-d9136ec2c6dc`. Hold remains pending finance closeout. |
+| `926f86b4-e8a5-4a3e-907e-3a2d1facbd25` | Explicit superseded sandbox payout hold. The GBP 88 capture remains recorded, and the assignment still shows `payout_pending` without a payout release or transfer reference. Operations and finance still need to decide how to retire the fixture and whether to refund or retain the sandbox capture. |
+| `826f86b4-e8a5-4a3e-907e-3a2d1facbd25` | Separate open internal client dispute `9ed87b9e-2846-4e84-8155-7a9a78ddada1`. Preserve it for the existing dispute process. |
+
+Version `5795fd94-cbfd-4b20-8702-8fac3ad0be73` was published at 18:59:25.999 UTC on 22 November. All eight focused tests passed on Node 22. They covered won and lost outcomes, mismatched and unavailable audit evidence, the documented hold, unexplained flags, internal disputes, refund limits, and preserved workflow configuration.
+
+Scheduled run `379667` succeeded and wrote **AMBER** snapshot `7179f178-2e0f-4fe7-8025-b65fde429160` at 19:02:03.052 UTC. The audit read returned HTTP 200 and four rows. The snapshot recorded two chargeback warnings, one superseded hold warning, one open internal dispute warning, and zero critical incidents. The three generic missing-dispute alerts cleared. Read-back confirmed all four dispute flags and the superseded assignment's unreleased payout state. No holds or payment records were changed.
+
+The private rollback export is on HAL at `~/Documents/Codex/2026-11-22/continue-quickguard-admin-repairs-from-dfpatlas/work/dispute-reporting/backup-20261122T185854Z/2wtdCiZ55DLQrfQg.json`. Its original active version is `9a26039c-d54a-44ce-9343-b48253e00c00`. The parent directory contains the checksum manifest, diff, focused test log, and heartbeat evidence. Check for intervening changes before restoring the same workflow ID through the supported n8n interface.
+
 ## Email reporting and event deduplication, 18:17 UTC
 
 The email worker and Master now report current failures separately from historical test failures. A failed `email_system_e2e_test` row marked `metadata.test=true` is historical once at least 30 days have elapsed since its last recorded update. Both snapshots retain the historical and total failure counts. The worker also retains an audit finding per historical failure, including the queue ID and stored error. Recent test failures and other failed messages remain actionable. A failed queue read produces an explicit finding with unknown counts.
