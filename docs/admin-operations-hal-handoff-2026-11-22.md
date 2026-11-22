@@ -2,6 +2,10 @@
 
 Continue the authorised QuickGuard admin repairs from this repository. Production project: `vnywjfpkepjgclkbcmsj`. The separate approved recovery target is `dnbvybmulsppfjntbsxz` in Frankfurt; its private `qg_recovery_20261122` schema is a core-data drill, not a live application database.
 
+## Cancelled Starter auto-renew metadata repaired, 22:39 UTC
+
+The retained cancelled Starter sandbox subscription `7a010528-5acb-431f-ae27-50def502fe79` now has `auto_renew=false`. Stripe independently confirmed its canceled test-clock/UAT state. A database guard prevents future terminal-status writes from retaining true/null renewal flags; the precise existing-record correction produced one audit and preserved all historical billing, profile and inactive-entitlement fields. See `docs/admin-terminal-renewal-2026-11-22.md`. The older stale-auto-renew statement below is superseded. The cancelled fixture remains distinct from account closure; generic terminal/cleared-entitlement warnings are not suppressed.
+
 ## Subscription classification repair, 22:07 UTC
 
 HAL Subscription workflow `pGoacDSUO4i4dNMN` now reports three verified cases as informational. The Enterprise QA override matches the protected PR239 audit to the current profile, Starter sandbox billing, and Enterprise entitlement. The closed free-client case matches the PR240 closure and retention event to the inactive profile, cancelled subscription, and inactive cancelled entitlement. The Elite complimentary grant still uses its existing protected plan-history check.
