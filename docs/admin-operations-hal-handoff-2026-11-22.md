@@ -102,8 +102,25 @@ If rollback is needed, compare the current active version to this handoff and ch
 
 ### Decisions still open
 
-- **Three funded assignments.** Assignments `8b7ecedb-2829-4954-a627-025f2d13533a`, `6f837b43-416f-4a41-beb5-f89b5d97da11`, and `0b9325dc-e26c-4c60-82a8-47161a2d7110` remain confirmed and funded. Their scheduled dates passed on 21 October, and the live records show completed funding transactions with no check-in, check-out, or completion evidence. Operations and finance need to decide the disposition of each booking. Any authorised cancellation or refund must follow the existing contract. Attendance and approval timestamps require actual evidence.
+- **Three overdue funded assignments.** Operations and finance decisions remain open. The booking, attendance and Stripe evidence is recorded below.
 - **SIA review.** The verified snapshot contains five incidents, 11 warnings, and one historical expiry finding. Review the three approved or verified profiles missing a recorded admin reviewer, the missing licence number, and the SIA data mismatch. Reconcile the administrative override, six missing front-document references, the missing valid expiry date, and three missing verification timestamps against the underlying evidence. An authorised reviewer must decide any profile or eligibility action. The monitor changed no guard records.
+
+### Evidence for the three overdue funded assignments
+
+All three Pub Door Supervisor sandbox UAT bookings were scheduled for 21 October 2026, 18:00 to 23:00 as recorded on the booking. Each booking and assignment still shows `confirmed` and `funded`. QuickGuard records a client charge total of GBP 86.25 and one completed funding transaction per booking on 7 October. The matching Stripe sandbox PaymentIntents each requested GBP 86.25 and the linked charges each captured GBP 86.25, for GBP 258.75 in total. Stripe showed zero refunded and no dispute on any of the three charges.
+
+| Assignment ID | Booking ID | QuickGuard funding transaction ID | Stripe sandbox payment |
+| --- | --- | --- | --- |
+| `8b7ecedb-2829-4954-a627-025f2d13533a` | `b7313021-04a0-4774-a9f0-51dbae4e03b7` | `5469a8ab-18b6-4c06-841c-885b99e9aeca` | [`pi_3UNuN9IMkpwfAEDT1eBNIrtM`](https://dashboard.stripe.com/acct_1SYmuoIMkpwfAEDT/test/payments/pi_3UNuN9IMkpwfAEDT1eBNIrtM) |
+| `6f837b43-416f-4a41-beb5-f89b5d97da11` | `840e01b4-8676-4e80-bd5e-1b8bf75d28a8` | `1f41467d-e0d1-4adc-8da1-a404cf024b1e` | [`pi_3UNuCUIMkpwfAEDT0SrNCK8j`](https://dashboard.stripe.com/acct_1SYmuoIMkpwfAEDT/test/payments/pi_3UNuCUIMkpwfAEDT0SrNCK8j) |
+| `0b9325dc-e26c-4c60-82a8-47161a2d7110` | `ce737c6c-5297-4494-9503-252dfac9774a` | `4787eb03-0b08-4ec2-bcda-5dcf89908c6c` | [`pi_3UNxIkIMkpwfAEDT0mJORoje`](https://dashboard.stripe.com/acct_1SYmuoIMkpwfAEDT/test/payments/pi_3UNxIkIMkpwfAEDT0mJORoje) |
+
+Attendance remains unverified. All three assignments show `awaiting_confirmation`. The review found no guard confirmation, check-in, check-out, completion timestamp, completion request, or attendance audit event. QuickGuard shows no payout release or guard payout record.
+
+- **Operations decision.** Determine the disposition of each expired fixture and whether evidence outside QuickGuard establishes what happened. Record the reason for the disposition and preserve the booking history. Any completion or no-show classification requires supporting evidence.
+- **Finance decision.** Determine whether closeout should include a sandbox refund through the existing cancellation and refund process or whether to retain the captures as UAT evidence with a documented disposition.
+
+The evidence review was read-only.
 
 ## Original repair instructions
 
