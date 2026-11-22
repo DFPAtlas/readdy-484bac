@@ -2,6 +2,10 @@
 
 Continue the authorised QuickGuard admin repairs from this repository. Production project: `vnywjfpkepjgclkbcmsj`. The separate approved recovery target is `dnbvybmulsppfjntbsxz` in Frankfurt; its private `qg_recovery_20261122` schema is a core-data drill, not a live application database.
 
+## Closed free-client lifecycle repaired, 21:24 UTC
+
+The closed free client (`ecdf41db`) no longer has an active local subscription. The database closure path now reconciles only verified unbilled free rows with one transactional retention event. The closed-account entitlement trigger preserves retained evidence; profile, entitlement, Auth ban, closure/retention dates, paid records and all provider references remain unchanged. The existing account was reconciled once, with repeat safety verified. See `docs/admin-closed-free-subscription-2026-11-22.md`. HAL may still report generic terminal/profile warnings; do not reactivate the account to clear them. The historical decision row below is superseded by this completed lifecycle repair.
+
 ## Enterprise QA access provenance recovered, 20:56 UTC
 
 The Client Enterprise versus Starter finding is an intentional QA access override, not evidence of an unauthorised billing upgrade. The original **QA quota configuration receipt** in `QuickGuard-code-repair-backlog-2026-11-20.md`, version **39**, lines **160–166**, names the exact account: Atlas Event Services Test Ltd / `qgtest.client@digital-footprint.uk`, client `567a2518-86ec-4b78-9230-12794f0ead27`, Auth `8a6451b5-6b9f-4b42-a1d2-1bf36e5a8a0b`. It records the deliberate entitlement-only change from Starter to Enterprise for unlimited QA quota, preserving all sixteen features, Stripe references, price and billing status. Merged PR208 and `docs/enterprise-client-capabilities.md` corroborate the operation. Original PR208 head: `d455c9e787d225a5426287c85efe98c3ad68cdba`.
