@@ -2,6 +2,27 @@
 
 Continue the authorised QuickGuard admin repairs from this repository. Production project: `vnywjfpkepjgclkbcmsj`. The separate approved recovery target is `dnbvybmulsppfjntbsxz` in Frankfurt; its private `qg_recovery_20261122` schema is a core-data drill, not a live application database.
 
+## Elite complimentary-access repair, 20:27 UTC
+
+Subscription workflow `pGoacDSUO4i4dNMN` now recognises the authorised complimentary Guard Elite grant for subscription `676905df-1efb-4c27-ad17-453cb82d3581`. The service-authorised read matched the latest plan-change history row `1` to the current user, account type, plan and active subscription. The record documents an admin-approved pre-launch grant, with zero plan amount, auto-renew disabled and no Stripe customer, subscription or price reference. Production row-level security was enabled on `app.plan_change_history`, with no permissive browser-role write policy.
+
+The worker records `RECORDED_COMPLIMENTARY_ACCESS` as informational, retaining the history ID, subscription ID and recorded reason. Missing, failed, malformed or incomplete history responses, superseded or revoked grants, mismatched records and positive subscription prices still leave the missing-billing finding active where applicable. Other billing findings remain in place.
+
+Version `fa12f052-e9b9-41ce-8101-0c86892895ec` was published at 20:24:14.069 UTC on 22 November. All eight focused tests passed on Node 22. They covered the matching grant, absent or untrusted audit evidence, mismatches, revocation and supersession, positive-price cases, failed or incomplete reads, preservation of genuine billing warnings, and workflow configuration.
+
+Scheduled run `379936` succeeded and wrote **AMBER** snapshot `b11e7286-c82e-4800-a7ab-3874ffc9efbb` at 20:27:04.681 UTC. The plan-history read returned HTTP 200 and one complete row. The snapshot recorded one informational grant, zero P1 incidents, and 20 warnings. The Basic stale-period finding remained cleared.
+
+| Remaining warning | Count |
+| --- | ---: |
+| Profile plan drift | 8 |
+| Profile subscription-status drift | 7 |
+| Entitlement plan drift | 2 |
+| Entitlement status drift | 1 |
+| Terminal subscription | 1 |
+| Profile and subscription Stripe customer mismatch for the Basic sandbox fixture | 1 |
+
+The private rollback export is on HAL at `~/Documents/Codex/2026-11-22/continue-quickguard-admin-repairs-from-dfpatlas/work/elite-complimentary/backup-20261122T202340Z/pGoacDSUO4i4dNMN.json`. The original active version is `68e8eb33-b22f-4089-8f0d-17583f44aa5d`. The parent directory contains the checksum manifest, diff, focused test log and heartbeat evidence. Billing, entitlements and account access were left intact.
+
 ## Basic sandbox renewal reconciliation, 20:12 UTC
 
 The Basic stale-sync warning cleared after the recorded reconciliation at 19:35:31 UTC on 22 November. Admin audit entry `9bc73b25-02d5-4032-a46d-f8e614f20274` records the decision to keep the sandbox fixture and reconcile the renewal. The subscription and entitlement were updated together to the Stripe period end of 5 December 2026, 18:30:50 UTC. QuickGuard recorded the GBP 10 renewal as succeeded in payment row `d64d89c1-4389-4d66-b21d-f71b040fa702`, linked to Stripe sandbox invoice `in_1UYVRqIMkpwfAEDTE5wg03Vk`. A fresh Stripe read confirmed the invoice is paid for GBP 10 and the subscription item has the same December period end.
@@ -78,7 +99,7 @@ The new version `68e8eb33-b22f-4089-8f0d-17583f44aa5d` was published at 15:07:16
 - The current sandbox endpoint configuration routes invoice and subscription events to projects `alfwwggavmyerjyqumuo` and `dnbvybmulsppfjntbsxz`. The production project `vnywjfpkepjgclkbcmsj` has a sandbox bank-payout endpoint, which does not subscribe to renewal invoices. This supports a routing gap. The endpoint list and pending count do not establish the historical delivery outcome for each destination.
 - The guard profile points to `cus_VcfannyExX18cO`, a live Stripe customer tagged with the same QuickGuard user ID. Stripe returned zero subscriptions for that live customer. The sandbox and live IDs refer to different Stripe environments. An authorised billing owner needs to decide how this sandbox UAT subscription and its entitlement should be represented in QuickGuard before any routing, mapping, or reconciliation change.
 
-Elite subscription `676905df-1efb-4c27-ad17-453cb82d3581` still grants an active paid tier without a linked billing reference. An authorised reviewer still needs to establish whether this is an intentional non-billed grant or an incorrect entitlement.
+At 15:12 UTC, Elite subscription `676905df-1efb-4c27-ad17-453cb82d3581` still raised a billing-evidence finding. The recorded grant and the verified 20:27 UTC classification are documented above.
 
 ### Subscription worker rollback
 
