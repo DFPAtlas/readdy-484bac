@@ -2,6 +2,10 @@
 
 Continue the authorised QuickGuard admin repairs from this repository. Production project: `vnywjfpkepjgclkbcmsj`. The separate approved recovery target is `dnbvybmulsppfjntbsxz` in Frankfurt; its private `qg_recovery_20261122` schema is a core-data drill, not a live application database.
 
+## Basic QA profile labels reconciled, 22:58 UTC
+
+The designated Basic QA guard `20826398-1bcf-4a93-9b61-493c3e156610` now has `plan_slug=guard-basic`, `subscription_plan=guard-basic` and `plan_name=Guard Basic`, matching its existing subscription and canonical entitlement. One guarded audit records the label-only correction; all other guard fields, all subscriptions, entitlements and subscription payments were preserved. Its separate live profile customer and sandbox billing IDs remain unchanged. See `docs/admin-basic-qa-profile-plan-2026-11-22.md`. The historical blank-Basic-plan finding below is superseded by the database correction; the separate sandbox/live mapping and renewal-routing work remains open.
+
 ## Cancelled Starter auto-renew metadata repaired, 22:39 UTC
 
 The retained cancelled Starter sandbox subscription `7a010528-5acb-431f-ae27-50def502fe79` now has `auto_renew=false`. Stripe independently confirmed its canceled test-clock/UAT state. A database guard prevents future terminal-status writes from retaining true/null renewal flags; the precise existing-record correction produced one audit and preserved all historical billing, profile and inactive-entitlement fields. See `docs/admin-terminal-renewal-2026-11-22.md`. The older stale-auto-renew statement below is superseded. The cancelled fixture remains distinct from account closure; generic terminal/cleared-entitlement warnings are not suppressed.
