@@ -2,6 +2,78 @@
 
 Continue the authorised QuickGuard admin repairs from this repository. Production project: `vnywjfpkepjgclkbcmsj`. The separate approved recovery target is `dnbvybmulsppfjntbsxz` in Frankfurt; its private `qg_recovery_20261122` schema is a core-data drill, not a live application database.
 
+## Worker query and Master telemetry repair, 13:42 UTC
+
+The four published versions below retained their workflow IDs, active state, five-minute schedules, credential references and downstream contracts. The repairs changed monitoring reads and reasoning. No payment, dispute, assignment, guard verification or eligibility record was edited.
+
+| Workflow | Published version | Published UTC, 22 Nov | Scheduled run | Snapshot ID | Snapshot UTC, 22 Nov | Verified inputs and health |
+| --- | --- | --- | --- | --- | --- | --- |
+| Review & Reputation `8M4HAkmigFxAH7ck` | `968f0d6c-36da-48ff-8a01-81c4a9d796f3` | 13:38:38.929 | `378706` | `f0b0e1de-9043-49c5-9c0e-aa3ad795fa11` | 13:42:02.806 | 22 guards, AMBER |
+| Diagnostics & Recovery `Mz39wYS4Fewhyvs0` | `e7141d58-d800-4528-8fea-c13057641795` | 13:38:39.079 | `378711` | `a9b9ffa8-ea22-4fd8-b48f-b291f631761b` | 13:42:04.004 | 0 registry rows, 500 snapshots, RED |
+| QuickGuard Master `hd2rIh2umh83tydj` | `c912df68-838d-46ec-b2d7-468052837911` | 13:38:39.208 | `378716` | `7d070bed-8a2a-4b56-af51-5bb4596ecb21` | 13:42:04.540 | 0 registry rows, 500 snapshots, AMBER |
+| SIA Verification `adtv1EnDe1eblBED` | `4d0cf731-d17a-4bef-afe1-48dcdd1303bc` | 13:38:39.353 | `378715` | `8552fb78-e6a3-4e00-849c-57085960881f` | 13:42:04.206 | 4 active assignments, all after the cutoff, AMBER |
+
+All ten focused tests passed on Node 22. Fixtures covered valid inputs, empty HTTP 200 responses, PostgREST errors, invalid response shapes, stale and missing telemetry, canonical URLs, and preserved schedules and downstream nodes. Direct read-only checks and normal scheduled executions confirmed the repaired queries. Each affected scheduled input returned HTTP 200 and its count matched the persisted snapshot. The saved executions contained no SQLSTATE `42703` errors.
+
+- Review uses `rating`, `total_reviews`, and `total_jobs_completed` from the guard record. Unavailable reputation dimensions stay unknown. The run retained six closed jobs without reviews and two guard reputation drift warnings.
+- Diagnostics and Master read `name` and `enabled` from the registry and derive health from snapshots for `quickguard.uk`. Master uses the latest snapshot per monitored agent from the latest 500 site rows and a 15-minute freshness threshold. It warns on the empty registry separately from failed reads, missing or stale telemetry. It saw 13 agents with fresh telemetry, three GREEN, eight AMBER and two RED. The Client Selection and Job Funding RED findings remain open. Master also retained the warning about five failed email queue items.
+- SIA uses `assigned_at` for assignment age and validates the response before counting rows. The four real assignments replace the earlier invalid count of one error item. No critical SIA finding appeared after the corrected read. Five incidents, 11 warnings and one historical expiry finding remain for the authorised reviewer, as described below.
+- Read-back confirmed that the three overdue assignments are still confirmed and funded without attendance or completion evidence, the client dispute is still open, and the reconciled £80 reversal is still failed. The booking disposition, chargeback review, and SIA decisions remain open.
+
+### Query repair rollback
+
+Private API exports are on HAL in `~/Documents/Codex/2026-11-22/continue-quickguard-admin-repairs-from-dfpatlas/work/query-repair/backup-20261122T133646Z/`. Use the appropriate `<workflow-id>.json` file.
+
+| Workflow ID | Active version before query repair |
+| --- | --- |
+| `8M4HAkmigFxAH7ck` | `d146ad96-014a-4fcc-b053-8e1e9ce366bf` |
+| `Mz39wYS4Fewhyvs0` | `5c690468-7871-4798-959d-7b54d926296a` |
+| `hd2rIh2umh83tydj` | `57a9f0d7-e06d-4bda-9c81-254c173d07b8` |
+| `adtv1EnDe1eblBED` | `6850092d-3912-4bab-94cf-77965626edb9` |
+
+Use this SIA backup to undo only the query repair while retaining the earlier eligibility-monitoring change. The parent `query-repair/` directory contains backup checksums in `manifest.json`, per-workflow diffs, `focused.log` and `verification.json`. To roll back, check for intervening changes and use the supported n8n API or UI to restore the affected definition to the same ID. Verify its active definition and scheduled snapshot. Keep private exports outside Git and leave the running SQLite database intact.
+
+## Earlier HAL deployment and verification, 02:07 UTC
+
+The three repairs are live on HAL. Each workflow retained its ID, five-minute schedule, active state, credential references, and downstream reporting contract. The workflow updates changed monitoring only. Payment, dispute, attendance, and guard eligibility records were preserved.
+
+| Workflow ID | Published version | Published UTC, 22 Nov | Scheduled execution ID | Snapshot ID | Snapshot UTC, 22 Nov |
+| --- | --- | --- | --- | --- | --- |
+| `TG4JyKI67D1Fro4b` | `67b2b64a-2be9-411c-b200-5d300cc4bd0d` | 02:03:23.405 | `376619` | `e2393811-4f8f-4adf-ac56-0e8a8688fe39` | 02:07:04.408 |
+| `6LMw86OKAGurTJv3` | `bbdae81f-3f61-46df-a8f7-ec44cecf28f0` | 02:03:23.599 | `376611` | `abb426d9-7c4f-4456-801d-b7a07b00a96d` | 02:07:02.774 |
+| `adtv1EnDe1eblBED` | `6850092d-3912-4bab-94cf-77965626edb9` | 02:01:18.348 | `376621` | `5d1159b8-c2a3-4c34-bcbc-8fe02f3eb503` | 02:07:04.172 |
+
+Each execution succeeded in scheduled trigger mode, ran the listed version, and wrote the matching row in `app.agent_state_snapshots`. All three snapshots were AMBER with zero critical incidents. A later execution-data review found that the 02:07 SIA assignment request returned HTTP 400 and its one error item was counted as an assignment. The query repair and corrected counts are recorded above.
+
+- **Payout.** The monitor now reads paginated completion requests and requires approved evidence for the same job, guard and client, timestamped before payout initiation. The read stops the workflow on HTTP errors. The scheduled run read six completion requests and cleared the three false approval alerts. It reported one warning for the reconciled £80 reversal, which remains failed. Missing payment evidence, open disputes and duplicate transfer IDs still raise critical findings in the reasoning tests.
+- **Job monitoring.** The monitor reads dispute records and distinguishes an open client dispute, a Stripe chargeback hold, and a dispute flag needing investigation. A held job stays visible while the monitor skips staffing, funding, and attendance expectations that assume the job can proceed. It retains recorded no-shows and operational issues. The run observed six jobs and 17 assignments, with three holds, six incidents and six warnings. Both chargeback holds and the open client dispute remain in place.
+- **SIA.** The monitor counts account activity, pending or manual-review onboarding, and the marketplace account checks separately. Marketplace account checks require an active account and recorded admin approval with an approved or verified status, and exclude expired SIA dates. Job-specific licence, entitlement, and selection requirements still apply. The heartbeat observed 20 guards, including 13 active accounts, 10 pending or manual-review profiles, and three meeting the marketplace account checks. It read zero separate SIA verification rows in that run.
+
+All 15 isolated workflow tests passed. All 973 repository unit tests passed on Node 22, the CI runtime. The first scheduled pass exposed a malformed URL expression in the new payout and dispute reads. The revised versions include expression coverage, and the subsequent scheduled executions confirmed both reads and snapshot writes. The isolated tests did not invoke downstream payment or messaging actions.
+
+### Rollback
+
+Private originals are on HAL under `~/Documents/Codex/2026-11-22/continue-quickguard-admin-repairs-from-dfpatlas/work/hal-backup/20261122T015322Z/`. Use the `<workflow-id>-api.json` export for the corresponding workflow.
+
+| Rollback export | Original active version |
+| --- | --- |
+| `TG4JyKI67D1Fro4b-api.json` | `c7240a62-9a55-49a0-bb0e-ed1dbb1d375a` |
+| `6LMw86OKAGurTJv3-api.json` | `878c6fd4-9e6a-4c35-b086-f4471b46388a` |
+| `adtv1EnDe1eblBED-api.json` | `a6171848-e163-4462-99c8-6801da65fe96` |
+
+The parent chat workspace's `work/` directory contains `deployment-manifest.json` with backup checksums, the three `<workflow-id>-repair.diff` files, `heartbeat-verification.json`, `hal-tests.log`, and `repo-unit-node22.log`. These files and workflow exports are stored outside Git.
+
+If rollback is needed, compare the current active version to this handoff and check for intervening changes. Restore the affected workflow definition to the same workflow ID through the supported n8n API or UI. Read back its active version and verify a new scheduled snapshot. Keep the running SQLite database intact.
+
+### Decisions still open
+
+- **Three funded assignments.** Assignments `8b7ecedb-2829-4954-a627-025f2d13533a`, `6f837b43-416f-4a41-beb5-f89b5d97da11`, and `0b9325dc-e26c-4c60-82a8-47161a2d7110` remain confirmed and funded. Their scheduled dates passed on 21 October, and the live records show completed funding transactions with no check-in, check-out, or completion evidence. Operations and finance need to decide the disposition of each booking. Any authorised cancellation or refund must follow the existing contract. Attendance and approval timestamps require actual evidence.
+- **SIA review.** The verified snapshot contains five incidents, 11 warnings, and one historical expiry finding. Review the three approved or verified profiles missing a recorded admin reviewer, the missing licence number, and the SIA data mismatch. Reconcile the administrative override, six missing front-document references, the missing valid expiry date, and three missing verification timestamps against the underlying evidence. An authorised reviewer must decide any profile or eligibility action. The monitor changed no guard records.
+
+## Original repair instructions
+
+The following sections record the pre-deployment findings, scope and repair instructions.
+
 ## Scope and workflow identity
 
 Inspect current exports on HAL before editing. Preserve credentials, schedules, activation state, unrelated nodes, workflow IDs and webhook contracts. Keep private exports/backups outside git. Do not overwrite n8n's SQLite database while it is running.
