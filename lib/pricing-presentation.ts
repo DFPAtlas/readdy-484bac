@@ -42,8 +42,8 @@ export const guardFeatureLabels: Record<string, string> = {
   'guard.apply_job': 'Apply for jobs',
   'guard.view_jobs': 'View jobs',
   'guard.create_profile': 'Create a guard profile',
-  'guard.priority_profile': 'Priority profile eligibility',
-  'guard.profile_boost': 'Profile boost entitlement (placement planned)',
+  'guard.priority_profile': 'Priority profile placement',
+  'guard.profile_boost': 'Featured profile placement',
   'guard.advanced_alerts': 'Advanced job alerts',
   'guard.direct_contact': 'Direct client contact',
 };

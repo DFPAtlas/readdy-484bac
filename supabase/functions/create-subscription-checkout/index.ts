@@ -1,3 +1,4 @@
+import { tokenRequest, reserveTokenCheckout, finishTokenCheckout } from '../_shared/token-checkout.ts';
 import { canUseChristmasOffer, christmasOfferAmount, christmasOfferCheckoutParams, isChristmasOfferPrice } from '../_shared/christmas-offer.mjs';
 import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
 import { matchesSubscriptionPrice } from '../_shared/subscription-price.ts';
@@ -248,6 +249,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
+    const redeem = tokenRequest(body);
 
     const { userId: requestedUserId, accountType: requestedAccountType, planId, userEmail: requestedEmail, billingCycle, siteUrl: bodySiteUrl } = body;
 
@@ -295,6 +297,24 @@ serve(async (req) => {
       db: { schema: 'app' }
     });
 
+    if (body.cancelTokenCheckout === true) {
+      const requestId = body.tokenCheckoutRequestId;
+      if (typeof requestId !== 'string' || !/^[0-9a-f-]{36}$/i.test(requestId)) throw new Error('Invalid checkout request.');
+      const { data: pending, error: pendingError } = await publicSupabase.from('qg_token_redemptions')
+        .select('id,status,stripe_checkout_session_id').eq('user_id', userId).eq('checkout_request_id', requestId).maybeSingle();
+      if (pendingError || !pending) throw new Error('Token checkout not found.');
+      if (pending.status === 'confirmed') throw new Error('Payment already completed. Contact support for a refund review.');
+      if (pending.status === 'pending') {
+        if (!pending.stripe_checkout_session_id) throw new Error('Retry the original checkout first to recover its provider confirmation.');
+        let current = await stripe.checkout.sessions.retrieve(pending.stripe_checkout_session_id);
+        if (current.client_reference_id !== userId || current.metadata?.qg_token_redemption_id !== pending.id) throw new Error('Token checkout ownership mismatch.');
+        if (current.status === 'open') current = await stripe.checkout.sessions.expire(current.id);
+        await finishTokenCheckout(publicSupabase, current);
+        if (current.status !== 'expired') throw new Error('Payment is complete or still processing. Tokens remain reserved until its result is confirmed.');
+      }
+      return new Response(JSON.stringify({ cancelled: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const [{ data: guardProfile }, { data: clientProfile }] = await Promise.all([
       publicSupabase.from('guards').select('id,email').eq('user_id', userId).maybeSingle(),
       publicSupabase.from('clients').select('id,email').eq('user_id', userId).maybeSingle(),
@@ -323,11 +343,12 @@ serve(async (req) => {
 
     const { data: planData } = await publicSupabase
       .from('plans')
-      .select('monthly_price_pence, features')
+      .select('monthly_price_pence, features, audience')
       .eq('slug', planId)
       .maybeSingle();
 
-    const planAmount = planData?.monthly_price_pence || 0;
+    if (!planData || planData.audience !== accountType) throw new Error('Subscription plan does not match your account.');
+    const planAmount = planData.monthly_price_pence || 0;
     const planFeatures = planData?.features || '[]';
 
     const { data: existingSub, error: subscriptionError } = await publicSupabase
@@ -337,6 +358,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingSub?.stripe_subscription_id && (existingSub.status === 'active' || existingSub.status === 'trialing')) {
+      if (redeem) throw new Error('Tokens currently support new subscription checkout only.');
       const oldPlanSlug = existingSub.plan_slug;
 
       if (oldPlanSlug === planId) {
@@ -477,6 +499,25 @@ serve(async (req) => {
       }
     }
 
+    if (redeem && (useChristmasOffer || existingSub?.stripe_subscription_id)) throw new Error('Tokens cannot be combined with a trial offer or an existing subscription.');
+    const tokenReservation = redeem ? await reserveTokenCheckout(publicSupabase, userId, planId, billingCycle || 'monthly', redeem) : null;
+    const couponId = tokenReservation ? `qgt_${tokenReservation.id.replace(/-/g, '')}` : null;
+    if (tokenReservation?.stripe_checkout_session_id) {
+      const previous = await stripe.checkout.sessions.retrieve(tokenReservation.stripe_checkout_session_id);
+      if (previous.client_reference_id !== userId || previous.metadata?.qg_token_redemption_id !== tokenReservation.id) throw new Error('Token checkout ownership mismatch.');
+      await finishTokenCheckout(publicSupabase, previous);
+      if (previous.status !== 'open' || !previous.url) throw new Error('This token checkout is closed. Start a new checkout.');
+      return new Response(JSON.stringify({ url: previous.url }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    if (tokenReservation && Date.now() - Date.parse(tokenReservation.created_at) > 22 * 60 * 60 * 1000) throw new Error('This token checkout needs reconciliation. Contact support; your tokens remain reserved.');
+    if (tokenReservation && couponId) {
+      const verifiedPrice = await stripe.prices.retrieve(priceId);
+      const productId = typeof verifiedPrice.product === 'string' ? verifiedPrice.product : verifiedPrice.product?.id;
+      if (!productId) throw new Error('Subscription product unavailable.');
+      await stripe.coupons.create({ id: couponId, amount_off: tokenReservation.credit_pence, currency: 'gbp', duration: 'once', max_redemptions: 1, applies_to: { products: [productId] },
+        metadata: { qg_token_redemption_id: tokenReservation.id, user_id: userId } }, { idempotencyKey: `qg-token-coupon:${tokenReservation.id}` });
+    }
+
     const email = userEmail;
 
     let customerId: string | undefined;
@@ -501,7 +542,7 @@ serve(async (req) => {
       const customer = await stripe.customers.create({
         email,
         metadata: { user_id: userId, account_type: accountType, plan_id: planId },
-      });
+      }, tokenReservation ? { idempotencyKey: `qg-token-customer:${tokenReservation.id}` } : undefined);
       customerId = customer.id;
 
       // Persist the customer before checkout so retries reuse it instead of creating duplicates.
@@ -531,6 +572,7 @@ serve(async (req) => {
 
     const session = await stripe.checkout.sessions.create({
       ...(useChristmasOffer && offerAmount !== null ? christmasOfferCheckoutParams(offerAmount) : {}),
+      ...(tokenReservation && couponId ? { discounts: [{ coupon: couponId }] } : {}),
       customer: customerId,
       client_reference_id: userId,
       line_items: [{ price: priceId, quantity: 1 }],
@@ -538,6 +580,7 @@ serve(async (req) => {
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: {
+        ...(tokenReservation && couponId ? { qg_token_redemption_id: tokenReservation.id, qg_token_coupon_id: couponId, qg_token_credit_pence: String(tokenReservation.credit_pence) } : {}),
         paymentType: 'subscription',
         user_id: userId,
         account_type: accountType,
@@ -546,7 +589,12 @@ serve(async (req) => {
         plan_name: PLAN_NAMES[planId] || planId,
         billing_cycle: billingCycle || 'monthly',
       },
-    });
+    }, tokenReservation ? { idempotencyKey: `qg-token-session:${tokenReservation.id}` } : undefined);
+
+    if (tokenReservation && couponId) {
+      const { error: attachError } = await publicSupabase.rpc('attach_qg_token_checkout', { p_id: tokenReservation.id, p_user_id: userId, p_session_id: session.id, p_coupon_id: couponId });
+      if (attachError) throw new Error('Token checkout was created but its confirmation is pending. Retry to recover the same checkout.');
+    }
 
     console.log(`[create-subscription-checkout] Created session ${session.id} for ${accountType} plan ${planId}`);
 

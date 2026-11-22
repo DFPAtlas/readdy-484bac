@@ -8,6 +8,7 @@ import GuardComplianceBadge from "../compliance/GuardComplianceBadge";
 
 interface Guard {
   id: string;
+  profile_boost?: boolean;
   full_name: string;
   profile_image_url: string | null;
   rating: number | null;
@@ -259,6 +260,7 @@ export default function ApplicantCard({
                 <h3 className="text-base font-semibold text-slate-200">
                   {guard.full_name}
                 </h3>
+                {guard.profile_boost && <span className="text-xs text-teal-400">Featured profile</span>}
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <StatusBadge
                     isSelected={isSelected}

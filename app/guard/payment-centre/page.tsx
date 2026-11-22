@@ -9,6 +9,7 @@ import LiveIndicator from '@/components/LiveIndicator';
 import { useGuardPaymentCentre } from '@/hooks/useGuardPaymentCentre';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
 import GuardAccessRecovery from '@/components/GuardAccessRecovery';
+import GuardStatementDownload from '@/components/GuardStatementDownload';
 
 type TabKey = 'overview' | 'history' | 'statements';
 
@@ -24,6 +25,7 @@ export default function GuardPaymentCentrePage() {
     stripeLoading,
     stripeError,
     jobPayments,
+    ownerId,
     refreshStripeStatus,
     handleConnectStripe,
     handleOnboardingLink,
@@ -617,16 +619,7 @@ export default function GuardPaymentCentrePage() {
                     </div>
                     <div className="ml-auto w-8 h-8 flex items-center justify-center"><i className="ri-download-line text-slate-500 group-hover:text-teal-400 text-lg"></i></div>
                   </button>
-                  <div className="flex items-center gap-3 p-4 bg-[#162036] rounded-xl border border-[#1e2d4d] opacity-50">
-                    <div className="w-12 h-12 rounded-xl bg-slate-500/15 flex items-center justify-center">
-                      <div className="w-6 h-6 flex items-center justify-center"><i className="ri-file-pdf-2-line text-slate-500 text-xl"></i></div>
-                    </div>
-                    <div className="text-left">
-                      <p className="font-semibold text-slate-400 text-sm">PDF Statement</p>
-                      <p className="text-xs text-slate-600">Coming soon — formatted monthly payment statements</p>
-                    </div>
-                    <span className="ml-auto px-2.5 py-1 bg-slate-500/15 text-slate-500 text-xs rounded-full border border-slate-500/20 whitespace-nowrap">Soon</span>
-                  </div>
+                  <GuardStatementDownload key={ownerId} payments={jobPayments} ownerId={ownerId} />
                 </div>
               </div>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { loadGuardHistoryJobs } from '@/lib/guard-bookings';
 import { useGuardPayoutSettings } from '@/hooks/useGuardPayoutSettings';
@@ -40,6 +40,8 @@ interface GuardPayout {
 }
 
 export function useGuardPaymentCentre() {
+  const epoch = useRef(0);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
   const payoutSettings = useGuardPayoutSettings(true);
   const [loading, setLoading] = useState(true);
   const [guardId, setGuardId] = useState<string | null>(null);
@@ -54,6 +56,8 @@ export function useGuardPaymentCentre() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
+    const version = ++epoch.current;
+    setOwnerId(null);
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
@@ -148,6 +152,10 @@ export function useGuardPaymentCentre() {
         };
       });
 
+      const after = await supabase.auth.getUser();
+      if (version !== epoch.current) return;
+      if (after.error || after.data.user?.id !== user.id) throw new Error('Your account changed. Reload payment data.');
+      setOwnerId(user.id);
       setEarningsSummary({
         availableBalance: available,
         pendingBalance: pending,
@@ -170,13 +178,22 @@ export function useGuardPaymentCentre() {
 
 
     } catch {
-      setError('Failed to load payment data');
+      if (version === epoch.current) { setOwnerId(null);setJobPayments([]);setPayouts([]);setError('Failed to load payment data'); }
     } finally {
-      setLoading(false);
+      if (version === epoch.current) setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    const state = epoch;let timer: ReturnType<typeof setTimeout> | undefined;let active = true;
+    void fetchAll();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      if (!active) return;
+      ++state.current;setOwnerId(null);setJobPayments([]);setPayouts([]);
+      clearTimeout(timer);timer = setTimeout(() => { if (active) void fetchAll(); }, 0);
+    });
+    return () => { active = false;++state.current;clearTimeout(timer);subscription.unsubscribe(); };
+  }, [fetchAll]);
 
   const openAccountLink = useCallback(async (action: GuardStripeAction): Promise<string | null> => {
     if (!payoutSettings.profile || !payoutSettings.status || payoutSettings.loading || payoutSettings.refreshing) {
@@ -222,6 +239,7 @@ export function useGuardPaymentCentre() {
     loading,
     error,
     guardId,
+    ownerId,
     earningsSummary,
     stripeStatus: payoutSettings.status,
     stripeLoading: payoutSettings.loading || payoutSettings.refreshing,

@@ -105,14 +105,14 @@ test('annual total and monthly equivalent match checkout price validation, and m
   assert.doesNotMatch(html, /£990\.00<\/span>/);
 });
 
-test('pricing, upgrade and print pages render the same changed annual prices and planned feature labels', () => {
+test('pricing, upgrade and print pages render the same changed annual prices and implemented placement labels', () => {
   for (const file of ['app/pricing/PricingClient.tsx', 'app/upgrade/page.tsx', 'app/pricing/pdf/PricingPDFClient.tsx']) {
     const html = renderPage(file, { cycle: 'annual' });
     assert.match(html, /£52\.50/, file); assert.match(html, /£630\.00/, file);
     assert.match(html, /£14\.58/, file); assert.match(html, /£175\.00/, file);
     assert.match(html, /12 job postings per month/, file);
     assert.match(html, /14 applications per month/, file);
-    assert.match(html, /placement planned/, file);
+    assert.match(html, /Featured profile placement/, file);
     assert.doesNotMatch(html, /£490\.00|£49<|10 applications per month/, file);
   }
 });

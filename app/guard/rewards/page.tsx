@@ -98,7 +98,7 @@ export default function GuardRewardsPage() {
   const shareEmail = () => {
     const link = `${window.location.origin}/qg-launch-rewards?ref=${referralCode}`;
     const subject = encodeURIComponent('Join QuickGuard — QG Launch Rewards');
-    const body = encodeURIComponent(`Hey! QuickGuard is opening early access and I thought you'd be interested. Create a verified guard or client profile using my referral link and we both earn QG Tokens (discount credits).\n\n${link}\n\n100 QG Tokens = £10 planned QuickGuard credit. Checkout redemption is not available yet.`);
+    const body = encodeURIComponent(`Hey! QuickGuard is opening early access and I thought you'd be interested. Create a verified guard or client profile using my referral link and we both earn QG Tokens (discount credits).\n\n${link}\n\n100 QG Tokens = £10 QuickGuard credit. Eligible checkout discounts are subject to the published redemption terms.`);
     window.open(`mailto:?subject=${subject}&body=${body}`);
   };
 
@@ -193,8 +193,8 @@ export default function GuardRewardsPage() {
               <p className="text-5xl font-bold text-white">{balance.toLocaleString()}</p>
               <p className="text-teal-400 text-sm mt-2">≈ £{poundsValue} QuickGuard credit</p>
             </div>
-            <Link href="/guard/payment-centre" className="px-6 py-3 bg-teal-500 text-slate-900 font-bold rounded-xl hover:bg-teal-400 transition-all text-sm whitespace-nowrap cursor-pointer">
-              Use on Subscription
+            <Link href="/upgrade?audience=guard" className="px-6 py-3 bg-teal-500 text-slate-900 font-bold rounded-xl hover:bg-teal-400 transition-all text-sm whitespace-nowrap cursor-pointer">
+              View eligible subscription checkout
             </Link>
           </div>
         </div>
@@ -256,7 +256,7 @@ export default function GuardRewardsPage() {
                       {preAccountData.pre_account_status === 'linked' && (
                         <p className="flex items-center gap-1 text-amber-400 text-xs self-end pb-2">
                           <div className="w-3.5 h-3.5 flex items-center justify-center"><i className="ri-information-line"></i></div>
-                          Eligible tokens can be linked after account verification. Checkout redemption is planned and is not available yet.
+                          Eligible tokens can be linked after account verification. Approved tokens can be used where the token option is enabled in new subscription checkout.
                         </p>
                       )}
                     </div>
@@ -549,7 +549,7 @@ export default function GuardRewardsPage() {
             {redemptions.length === 0 ? (
               <div className="bg-[#111d35] border border-[#1a2b4a] rounded-2xl p-12 text-center">
                 <div className="w-12 h-12 flex items-center justify-center mx-auto rounded-full bg-teal-500/10 mb-4"><i className="ri-coupon-line text-teal-400 text-xl"></i></div>
-                <p className="text-slate-400">Checkout redemption is not available yet. Eligible recorded rewards will remain visible here.</p>
+                <p className="text-slate-400">No recorded redemptions. See checkout for eligible new subscription discounts.</p>
                 <Link href="/qg-launch-rewards/terms" className="mt-4 inline-block px-6 py-3 bg-teal-500 text-slate-900 font-bold rounded-xl hover:bg-teal-400 transition-all text-sm whitespace-nowrap cursor-pointer">
                   View programme terms
                 </Link>

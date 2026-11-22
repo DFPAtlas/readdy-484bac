@@ -1,5 +1,6 @@
 "use client";
 
+import { compareGuardPlacement, loadGuardPlacement } from '@/lib/guard-placement';
 import { scheduledHoursPerGuard, grossGuardPence } from "@/lib/shift-hours";
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
@@ -32,6 +33,8 @@ import { useMessageOwner } from '@/hooks/useMessageOwner';
 
 interface Guard {
   id: string;
+  profile_boost?: boolean;
+  priority_profile?: boolean;
   full_name: string;
   profile_image_url: string | null;
   rating: number | null;
@@ -147,12 +150,12 @@ const defaultFilters = {
   rating: "",
   experience: "",
   availability: "",
-  sortBy: "rating",
+  sortBy: "best_match",
   compliance: "",
 };
 
 const GUARD_SORT_OPTIONS = [
-  { value: "best_match", label: "Best Match" },
+  { value: "best_match", label: "Recommended (featured first)" },
   { value: "rating", label: "Highest Rated" },
   { value: "distance", label: "Closest" },
   { value: "experience", label: "Most Experienced" },
@@ -392,7 +395,8 @@ function OwnedSelectGuards({ jobId, expectedOwner }: { jobId: string; expectedOw
           };
         });
 
-        setAllGuards(enrichedGuards);
+        const placement = await loadGuardPlacement(supabase, enrichedGuards.map(g => g.id));
+        setAllGuards(enrichedGuards.map(g => ({ ...g, ...placement.get(g.id) })));
       }
     } catch {
       setLoadError(true);
@@ -767,6 +771,7 @@ function OwnedSelectGuards({ jobId, expectedOwner }: { jobId: string; expectedOw
     }
     return true;
   }).sort((a, b) => {
+    if ((sortBy || filters.sortBy) === "best_match") return compareGuardPlacement(a, b);
     if (filters.sortBy === "compliance" || sortBy === "compliance") {
       const getScore = (g: Guard) => {
         const guardData: GuardComplianceData = {
