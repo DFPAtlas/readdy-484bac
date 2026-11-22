@@ -8,6 +8,7 @@ import SupportInboxError from '@/components/SupportInboxError';
 import PortalSidebar from '@/components/PortalSidebar';
 import LiveIndicator from '@/components/LiveIndicator';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
+import GuardAccessRecovery from '@/components/GuardAccessRecovery';
 import TicketCard from './TicketCard';
 import CreateTicketModal from './CreateTicketModal';
 import TicketDetailDrawer from './TicketDetailDrawer';
@@ -99,7 +100,7 @@ function capitalize(s: string): string {
 
 export default function SupportPage() {
   const router = useRouter();
-  const { loading: authLoading, allowed } = useGuardGuard();
+  const { loading: authLoading, allowed, error: accessError, retry: retryAccess } = useGuardGuard();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [tickets, setTickets] = useState<any[]>([]);
@@ -384,6 +385,8 @@ export default function SupportPage() {
     if (actionKey === 'export') handleBulkExportTickets();
     else if (actionKey === 'resolve') handleBulkMarkResolved();
   };
+
+  if (accessError) return <GuardAccessRecovery onRetry={retryAccess} />;
 
   if (loadError && !loading && (authLoading || !allowed)) return <SupportInboxError onRetry={() => window.location.reload()} />;
 

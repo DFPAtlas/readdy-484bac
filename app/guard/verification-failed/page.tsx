@@ -2,9 +2,12 @@
 
 import Link from 'next/link';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
+import GuardAccessRecovery from '@/components/GuardAccessRecovery';
 
 export default function VerificationFailedPage() {
-  const { loading: authLoading, allowed } = useGuardGuard();
+  const { loading: authLoading, allowed, error: accessError, retry: retryAccess } = useGuardGuard();
+
+  if (accessError) return <GuardAccessRecovery onRetry={retryAccess} />;
 
   if (authLoading || !allowed) {
     return (

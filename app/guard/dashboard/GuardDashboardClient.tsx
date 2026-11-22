@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useSidebar } from '@/lib/SidebarContext';
 import PortalSidebar from '@/components/PortalSidebar';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
+import GuardAccessRecovery from '@/components/GuardAccessRecovery';
 import NotificationHistory from './NotificationHistory';
 import RealtimeToastContainer, { showRealtimeToast } from '@/components/RealtimeToast';
 import ReviewsTab from './ReviewsTab';
@@ -60,7 +61,7 @@ import { haversineDistanceMiles, formatDistance } from './distance';
 
 export default function GuardDashboardClient() {
   const router = useSafeRouter();
-  const { loading: authLoading, allowed, roleSwitch } = useGuardGuard();
+  const { loading: authLoading, allowed, roleSwitch, error: accessError, retry: retryAccess } = useGuardGuard();
   const [guard, setGuard] = useState<Guard | null>(null);
   const [guardUserId, setGuardUserId] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<JobAssignment[]>([]);
@@ -1018,6 +1019,8 @@ export default function GuardDashboardClient() {
   const filteredApplications = filterStatus === 'all'
     ? applications
     : applications.filter(app => guardApplicationGroup(app.status) === filterStatus);
+
+  if (accessError) return <GuardAccessRecovery onRetry={retryAccess} />;
 
   if (authLoading) {
     return (

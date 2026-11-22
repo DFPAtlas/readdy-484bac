@@ -9,6 +9,7 @@ import PreferenceToggle from './PreferenceToggle';
 import SaveToast from './SaveToast';
 import { useRouteGuard } from '@/hooks/useRouteGuard';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
+import GuardAccessRecovery from '@/components/GuardAccessRecovery';
 import UpgradePrompt from '@/components/UpgradePrompt';
 import { useRouter } from 'next/navigation';
 
@@ -22,7 +23,7 @@ export default function NotificationSettingsPage() {
   const [displayName, setDisplayName] = useState('Guard');
   const [initials, setInitials] = useState('G');
   const { checking, blocked } = useRouteGuard();
-  const { loading: authLoading, allowed } = useGuardGuard();
+  const { loading: authLoading, allowed, error: accessError, retry: retryAccess } = useGuardGuard();
 
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     job_matches: true,
@@ -127,6 +128,8 @@ export default function NotificationSettingsPage() {
     { value: 'weekly', label: 'Weekly', desc: 'Once per week summary' },
     { value: 'none', label: 'None', desc: 'No email notifications' },
   ];
+
+  if (accessError) return <GuardAccessRecovery onRetry={retryAccess} />;
 
   if (loading || authLoading || !allowed || checking) {
     return (

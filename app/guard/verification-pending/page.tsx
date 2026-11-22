@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
+import GuardAccessRecovery from '@/components/GuardAccessRecovery';
 import { clearBadStoredRedirects } from '@/lib/safe-redirect';
 
 const POLL_INTERVAL = 30;
 
 export default function VerificationPendingPage() {
   const router = useRouter();
-  const { loading: authLoading, allowed } = useGuardGuard();
+  const { loading: authLoading, allowed, error: accessError, retry: retryAccess } = useGuardGuard();
   const [userEmail, setUserEmail] = useState('');
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [timeElapsed, setTimeElapsed] = useState(0);
@@ -140,6 +141,8 @@ export default function VerificationPendingPage() {
     const terminal = await checkVerificationStatus(false);
     if (activeRef.current && generation === generationRef.current && !terminal) startPolling();
   };
+
+  if (accessError) return <GuardAccessRecovery onRetry={retryAccess} />;
 
   if (authLoading || !allowed) {
     return (

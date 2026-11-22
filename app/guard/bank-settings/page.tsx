@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import PortalSidebar from '@/components/PortalSidebar';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
+import GuardAccessRecovery from '@/components/GuardAccessRecovery';
 import { useGuardPayoutSettings } from '@/hooks/useGuardPayoutSettings';
 import { stripeReturnNotice } from '@/lib/guard-payout-settings';
 import { PAYMENT_RELEASE_GUIDANCE } from '@/lib/customer-guidance';
@@ -12,7 +13,7 @@ import BankPayoutTracker from '@/app/guard/earnings/BankPayoutTracker';
 
 export default function BankSettingsPage() {
   const router = useRouter();
-  const { loading: authLoading, allowed, roleSwitch } = useGuardGuard();
+  const { loading: authLoading, allowed, roleSwitch, error: accessError, retry: retryAccess } = useGuardGuard();
   const settings = useGuardPayoutSettings(!authLoading && allowed);
   const [activeTab, setActiveTab] = useState<'setup' | 'guide' | 'history'>('setup');
   const [notice, setNotice] = useState('');
@@ -22,9 +23,9 @@ export default function BankSettingsPage() {
   const busy = !!settings.busyAction || settings.refreshing;
 
   useEffect(() => {
-    if (!authLoading && !allowed) router.replace(roleSwitch === 'client' ? '/client/dashboard' : '/guard/login');
+    if (!authLoading && !allowed && !accessError) router.replace(roleSwitch === 'client' ? '/client/dashboard' : '/guard/login');
     else if (settings.requiresLogin) router.replace('/guard/login');
-  }, [authLoading, allowed, roleSwitch, settings.requiresLogin, router]);
+  }, [authLoading, allowed, roleSwitch, accessError, settings.requiresLogin, router]);
 
   useEffect(() => {
     const result = stripeReturnNotice(window.location.href);
@@ -33,6 +34,8 @@ export default function BankSettingsPage() {
       window.history.replaceState(window.history.state, '', result.path);
     }
   }, []);
+
+  if (accessError) return <GuardAccessRecovery onRetry={retryAccess} />;
 
   return <div className="min-h-screen bg-[#0B1933] text-white flex">
     <PortalSidebar role="guard" displayName={displayName} subtitle="Guard" initials={initials} />

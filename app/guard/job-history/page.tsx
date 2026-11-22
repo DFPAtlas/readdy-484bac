@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
 import { useGuardGuard } from '@/hooks/useGuardGuard';
+import GuardAccessRecovery from '@/components/GuardAccessRecovery';
 import MessageClientModal from '@/app/guard/components/MessageClientModal';
 import { formatDateOnly } from '@/lib/date-only';
 
@@ -130,7 +131,7 @@ const colorMap: Record<string, { bg: string; text: string; border: string }> = {
 };
 
 export default function GuardJobHistoryClient() {
-  const { loading: authLoading, allowed } = useGuardGuard();
+  const { loading: authLoading, allowed, error: accessError, retry: retryAccess } = useGuardGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jobs, setJobs] = useState<HistoryJob[]>([]);
@@ -327,6 +328,8 @@ export default function GuardJobHistoryClient() {
   const canMessageJob = (job: HistoryJob) => {
     return !!job.application_status || !!job.assignment_status;
   };
+
+  if (accessError) return <GuardAccessRecovery onRetry={retryAccess} />;
 
   if (authLoading || !allowed) {
     return (
