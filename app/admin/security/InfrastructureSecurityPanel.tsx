@@ -68,9 +68,11 @@ interface Props {
   edgeFunctions: EdgeFunctionInfo[];
   edgeFunctionsError: string | null;
   apiSecrets: ApiSecretStatus[];
+  infrastructureError?: boolean;
+  onRetry?: () => void;
 }
 
-export default function InfrastructureSecurityPanel({ infrastructure, edgeFunctions, edgeFunctionsError, apiSecrets }: Props) {
+export default function InfrastructureSecurityPanel({ infrastructure, edgeFunctions, edgeFunctionsError, apiSecrets, infrastructureError, onRetry }: Props) {
   const [activeTab, setActiveTab] = useState<'database' | 'storage' | 'functions' | 'secrets'>('database');
 
   const tables: TableRow[] = useMemo(() => {
@@ -111,7 +113,7 @@ export default function InfrastructureSecurityPanel({ infrastructure, edgeFuncti
   }, [infrastructure]);
 
   const buckets: BucketRow[] = infrastructure?.buckets || [];
-  const isLoading = !infrastructure;
+  const isLoading = !infrastructure && !infrastructureError;
   const funcWarnings = edgeFunctions.filter(f => !f.verify_jwt || f.status !== 'ACTIVE').length;
   const hasLiveFunctions = edgeFunctions.length > 0;
   const hasLiveSecrets = apiSecrets.length > 0;
@@ -167,6 +169,10 @@ export default function InfrastructureSecurityPanel({ infrastructure, edgeFuncti
       </div>
 
       <div className="p-5">
+        {infrastructureError && <div role="alert" className="text-amber-300 text-sm">
+          Infrastructure audit could not be loaded. Results are unavailable.
+          <button onClick={onRetry} className="ml-3 underline">Retry infrastructure audit</button>
+        </div>}
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-12 text-slate-500">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500 mb-3"></div>
@@ -174,7 +180,7 @@ export default function InfrastructureSecurityPanel({ infrastructure, edgeFuncti
           </div>
         )}
 
-        {activeTab === 'database' && !isLoading && (
+        {activeTab === 'database' && !isLoading && !infrastructureError && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -216,7 +222,7 @@ export default function InfrastructureSecurityPanel({ infrastructure, edgeFuncti
           </div>
         )}
 
-        {activeTab === 'storage' && !isLoading && (
+        {activeTab === 'storage' && !isLoading && !infrastructureError && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

@@ -3,6 +3,28 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { assessBackup } from '../_shared/backup-health.ts';
 import type { BackupRecord } from '../_shared/backup-health.ts';
 import { emailConfiguration, stripeHealth } from '../_shared/admin-service-health.ts';
+import { isInfrastructureSnapshot, isInfrastructureBuckets } from '../_shared/admin-infrastructure.ts';
+
+function hasMfaAssurance(token: string): boolean {
+  try {
+    const base=token.split('.')[1]?.replace(/-/g,'+').replace(/_/g,'/');
+    if (!base) return false;
+    const payload: unknown=JSON.parse(atob(base+'='.repeat((4-base.length%4)%4)));
+    return typeof payload === 'object' && payload !== null && 'aal' in payload && payload.aal === 'aal2';
+  } catch { return false; }
+}
+
+async function loadInfrastructure(app: ReturnType<typeof createClient>, admin: ReturnType<typeof createClient>) {
+  const [snapshot, buckets] = await Promise.all([
+    app.rpc('get_admin_infrastructure_snapshot'), admin.storage.listBuckets(),
+  ]);
+  const metadata: unknown=snapshot.data;
+  const bucketRows: unknown=buckets.data;
+  if (snapshot.error || !isInfrastructureSnapshot(metadata) || buckets.error || !isInfrastructureBuckets(bucketRows)) {
+    throw new Error('Infrastructure audit could not be loaded');
+  }
+  return { ...metadata, buckets: bucketRows.map(b => ({ id:b.id,name:b.name,public:b.public,createdAt:b.created_at })) };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -139,8 +161,9 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
 
-  if (!supabaseUrl || !supabaseServiceKey) {
+  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
     return new Response(
       JSON.stringify({ error: "Server configuration error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -174,13 +197,20 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(jwt);
 
     if (userError || !user) {
       return new Response(
         JSON.stringify({ error: "Unauthorized: Invalid authentication token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    if (!hasMfaAssurance(jwt)) {
+      return new Response(JSON.stringify({error:'MFA required'}), {
+        status:403,headers:{...corsHeaders,'Content-Type':'application/json'},
+      });
     }
 
     const { data: adminUser } = await supabaseAdmin
@@ -334,24 +364,15 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'infrastructure_audit') {
-      const [tablesRes, policiesRes, indexesRes, bucketsRes] = await Promise.allSettled([
-        supabaseAdmin.rpc('security_audit_tables'),
-        supabaseAdmin.rpc('security_audit_policies'),
-        supabaseAdmin.rpc('security_audit_indexes'),
-        supabaseAdmin.storage.listBuckets(),
-      ]);
-
-      const tablesData = tablesRes.status === 'fulfilled' ? tablesRes.value.data : [];
-      const policiesData = policiesRes.status === 'fulfilled' ? policiesRes.value.data : [];
-      const indexesData = indexesRes.status === 'fulfilled' ? indexesRes.value.data : [];
-      const bucketsData = bucketsRes.status === 'fulfilled' ? bucketsRes.value.data : [];
-
-      return new Response(JSON.stringify({
-        tables: tablesData || [],
-        policies: policiesData || [],
-        indexes: indexesData || [],
-        buckets: (bucketsData || []).map((b: any) => ({ id: b.id, name: b.name, public: b.public, createdAt: b.created_at })),
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      try {
+        return new Response(JSON.stringify(await loadInfrastructure(supabaseQ,supabaseAdmin)), {
+          status:200,headers:{...corsHeaders,'Content-Type':'application/json'},
+        });
+      } catch {
+        return new Response(JSON.stringify({error:'Infrastructure audit could not be loaded'}), {
+          status:503,headers:{...corsHeaders,'Content-Type':'application/json'},
+        });
+      }
     }
 
     if (action === 'edge_functions_audit') {
@@ -669,22 +690,60 @@ Deno.serve(async (req) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Preserve the recorded-check and log-search routes from deployed v63.
+    if (action === 'security_checks') {
+      const [checksRes,findingsRes]=await Promise.allSettled([
+        supabaseQ.from('security_health_checks').select('*').order('last_checked_at',{ascending:false}),
+        supabaseQ.from('security_findings').select('*').eq('status','open').order('created_at',{ascending:false}).limit(50),
+      ]);
+      if(checksRes.status==='rejected'||checksRes.value.error||findingsRes.status==='rejected'||findingsRes.value.error){
+        return new Response(JSON.stringify({error:'Unable to load recorded security checks'}),{
+          status:503,headers:{...corsHeaders,'Content-Type':'application/json'},
+        });
+      }
+      const checks=checksRes.value.data||[];
+      const findings=findingsRes.value.data||[];
+      const lastChecked=checks.reduce((latest:string|null,c:{last_checked_at?:string|null})=>{
+        if(!c.last_checked_at)return latest;
+        return !latest||new Date(c.last_checked_at)>new Date(latest)?c.last_checked_at:latest;
+      },null);
+      return new Response(JSON.stringify({checks,findings,last_checked_at:lastChecked}),{
+        status:200,headers:{...corsHeaders,'Content-Type':'application/json'},
+      });
+    }
+
+    if(action==='search_audit_log'){
+      const term=String(body.search||'').trim().toLowerCase();
+      const {data,error}=await supabaseQ.from('admin_activity_log')
+        .select('id, admin_username, admin_name, action_type, action_description, ip_address, created_at')
+        .order('created_at',{ascending:false}).limit(200);
+      if(error)return new Response(JSON.stringify({error:'Unable to search the audit log'}),{
+        status:503,headers:{...corsHeaders,'Content-Type':'application/json'},
+      });
+      const rows=(data||[]).filter((row:{admin_username?:string;admin_name?:string;action_type?:string;action_description?:string;ip_address?:string})=>
+        !term||[row.admin_username,row.admin_name,row.action_type,row.action_description,row.ip_address]
+          .some((value:unknown)=>typeof value==='string'&&value.toLowerCase().includes(term)));
+      return new Response(JSON.stringify({results:rows.slice(0,100),scanned:(data||[]).length}),{
+        status:200,headers:{...corsHeaders,'Content-Type':'application/json'},
+      });
+    }
+
     if (action === 'run_security_scan') {
       if (!isSuperAdmin) {
         return new Response(JSON.stringify({ error: "Forbidden: Super Admin only" }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      const [tablesRes, policiesRes, , bucketsRes] = await Promise.allSettled([
-        supabaseAdmin.rpc('security_audit_tables'),
-        supabaseAdmin.rpc('security_audit_policies'),
-        supabaseAdmin.rpc('security_audit_indexes'),
-        supabaseAdmin.storage.listBuckets(),
-      ]);
-
-      const tablesData = tablesRes.status === 'fulfilled' ? (tablesRes.value.data || []) : [];
-      void policiesRes;
-      const bucketsData = bucketsRes.status === 'fulfilled' ? (bucketsRes.value.data || []) : [];
+      let infrastructure;
+      try {
+        infrastructure=await loadInfrastructure(supabaseQ,supabaseAdmin);
+      } catch {
+        return new Response(JSON.stringify({error:'Infrastructure audit could not be loaded; scan was not saved'}), {
+          status:503,headers:{...corsHeaders,'Content-Type':'application/json'},
+        });
+      }
+      const tablesData=infrastructure.tables;
+      const bucketsData=infrastructure.buckets;
 
       const appTables = tablesData.filter((t: any) => t.schema_name === 'app');
       const withoutRLS = appTables.filter((t: any) => !t.rls_enabled);
@@ -711,9 +770,9 @@ Deno.serve(async (req) => {
           check_key: 'jwt_functions',
           category: 'API',
           label: 'JWT-Protected Functions',
-          status: 'healthy',
-          score: 95,
-          details: { noJWTCount: 0 },
+          status: 'warning',
+          score: 0,
+          details: { verification:'Not independently checked' },
         },
         {
           check_key: 'secret_config',
@@ -727,9 +786,9 @@ Deno.serve(async (req) => {
           check_key: 'admin_sessions',
           category: 'Authentication',
           label: 'Admin Session Tracking',
-          status: 'healthy',
-          score: 95,
-          details: { sessionsTracked: true },
+          status: 'warning',
+          score: 0,
+          details: { verification:'Not independently checked' },
         },
       ];
 
@@ -750,19 +809,21 @@ Deno.serve(async (req) => {
       }
 
       for (const chk of checks) {
-        await supabaseQ.from('security_health_checks').upsert({
+        const {error}=await supabaseQ.from('security_health_checks').upsert({
           check_key: chk.check_key, category: chk.category, label: chk.label,
           status: chk.status, score: chk.score, details: chk.details,
           last_checked_at: new Date().toISOString(),
         }, { onConflict: 'check_key' }).select('id').maybeSingle();
+        if(error) throw new Error('Security check could not be saved');
       }
 
       for (const f of findings) {
-        await supabaseQ.from('security_findings').insert({
+        const {error}=await supabaseQ.from('security_findings').insert({
           category: f.category, severity: f.severity, title: f.title,
           description: f.description, recommendation: f.recommendation,
           status: 'open', source: 'automated_scan',
         });
+        if(error) throw new Error('Security finding could not be saved');
       }
 
       await supabaseQ.from('admin_activity_log').insert({

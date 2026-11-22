@@ -18,6 +18,7 @@ interface Props {
 }
 
 export default function GenerateReport({ stats, loginEvents, resetEvents, infrastructure, edgeFunctions, emergencySettings }: Props) {
+  const databaseAvailable = Array.isArray(infrastructure?.tables) && infrastructure.tables.some((table: {schema_name?: string}) => table.schema_name === 'app');
   const [generating, setGenerating] = useState(false);
   const [reportReady, setReportReady] = useState(false);
   const [reportUrl, setReportUrl] = useState<string | null>(null);
@@ -65,6 +66,7 @@ export default function GenerateReport({ stats, loginEvents, resetEvents, infras
   };
 
   const handleGenerate = () => {
+    if (!databaseAvailable) return;
     setGenerating(true);
     setReportReady(false);
     setReportUrl(null);
@@ -301,7 +303,7 @@ export default function GenerateReport({ stats, loginEvents, resetEvents, infras
           )}
           <button
             onClick={handleGenerate}
-            disabled={generating}
+            disabled={generating || !databaseAvailable}
             className={`px-5 py-2.5 text-sm font-bold rounded-xl transition cursor-pointer whitespace-nowrap flex items-center gap-2 ${
               generating
                 ? 'bg-slate-500/20 text-slate-400 cursor-not-allowed'
@@ -340,15 +342,15 @@ export default function GenerateReport({ stats, loginEvents, resetEvents, infras
           </div>
           <div className="bg-[#0a1628] rounded-lg px-3 py-2">
             <span className="text-slate-500">Overall Score</span>
-            <p className="font-bold mt-0.5" style={{ color: scoreColor }}>{score}% — {scoreLabel}</p>
+            <p className="font-bold mt-0.5" style={{ color: scoreColor }}>{databaseAvailable ? `${score}% — ${scoreLabel}` : 'Unavailable — database audit missing'}</p>
           </div>
           <div className="bg-[#0a1628] rounded-lg px-3 py-2">
             <span className="text-slate-500">Issues Found</span>
-            <p className="font-bold mt-0.5" style={{ color: totalIssues > 5 ? '#ef4444' : totalIssues > 2 ? '#f59e0b' : '#10b981' }}>{totalIssues} — {issueLabel}</p>
+            <p className="font-bold mt-0.5" style={{ color: totalIssues > 5 ? '#ef4444' : totalIssues > 2 ? '#f59e0b' : '#10b981' }}>{databaseAvailable ? `${totalIssues} — ${issueLabel}` : 'Not checked'}</p>
           </div>
           <div className="bg-[#0a1628] rounded-lg px-3 py-2">
             <span className="text-slate-500">Data Sources</span>
-            <p className="text-slate-300 font-medium mt-0.5">Live audit</p>
+            <p className="text-slate-300 font-medium mt-0.5">{databaseAvailable ? 'Live audit' : 'Audit unavailable'}</p>
           </div>
         </div>
       </div>

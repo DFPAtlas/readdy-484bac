@@ -217,6 +217,7 @@ export default function SecuritySOCClient() {
       setInfrastructure(data || null);
       setFetchState(s => ({ ...s, infrastructure: 'idle' }));
     } catch {
+      setInfrastructure(null);
       setFetchState(s => ({ ...s, infrastructure: 'error' }));
     }
   }, [invokeFunction]);
@@ -388,6 +389,8 @@ export default function SecuritySOCClient() {
 
       <InfrastructureSecurityPanel
         infrastructure={infrastructure}
+        infrastructureError={fetchState.infrastructure === 'error'}
+        onRetry={fetchInfrastructure}
         edgeFunctions={edgeFunctions}
         edgeFunctionsError={edgeFunctionsError}
         apiSecrets={apiSecrets}
