@@ -21,6 +21,7 @@ import HomeSkeleton from './HomeSkeleton';
 import GuardMessagesClient from '@/app/guard/messages/GuardMessagesClient';
 import { readMessageRows } from '@/lib/job-messages';
 import { guardProfileCompletion } from '@/lib/guard-profile-completion';
+import { submitGuardCompletion } from '@/lib/guard-completion';
 
 
 
@@ -141,6 +142,17 @@ export default function MobileGuardDashboard() {
   const router = useRouter();
   const [guard, setGuard] = useState<Guard | null>(null);
   const [guardUserId, setGuardUserId] = useState<string | null>(null);
+  const [completingShift, setCompletingShift] = useState<string | null>(null);
+  const [completionError, setCompletionError] = useState('');
+  const [completionNotice, setCompletionNotice] = useState('');
+  const completionLock = useRef(false);
+  const completionScope = useRef(0);
+  const retireCompletion = useCallback(() => { ++completionScope.current; }, []);
+  useEffect(() => {
+    retireCompletion();
+    setCompletionError(''); setCompletionNotice(''); setCompletingShift(null);
+    return retireCompletion;
+  }, [guardUserId, retireCompletion]);
   const [plan, setPlan] = useState<{ plan_name: string; subscription_status: string } | null>(null);
   const [responseError, setResponseError] = useState('');
   const [markingResponse, setMarkingResponse] = useState<string | null>(null);
@@ -382,6 +394,26 @@ export default function MobileGuardDashboard() {
     }
   };
 
+  const handleRequestCompletion = async (assignmentId: string) => {
+    if (completionLock.current || !guardUserId) return;
+    const assignment = assignments.find(row => row.id === assignmentId);
+    if (!assignment || assignment.status !== 'in_progress' || !assignment.check_in_time || !assignment.check_out_time) return;
+    const scope = completionScope.current, current = () => scope === completionScope.current;
+    completionLock.current = true;
+    setCompletingShift(assignmentId); setCompletionError(''); setCompletionNotice('');
+    try {
+      await submitGuardCompletion(supabase, guardUserId, assignmentId, assignment.jobs.id, current);
+      if (!current()) return;
+      setCompletionNotice('Completion requested — awaiting client approval.');
+      await loadDashboardData();
+    } catch {
+      if (current()) setCompletionError('Completion could not be confirmed. Refresh your shifts before retrying.');
+    } finally {
+      completionLock.current = false;
+      if (current()) setCompletingShift(null);
+    }
+  };
+
   const handlePullRefresh = (e: React.TouchEvent) => {
     if (scrollRef.current && scrollRef.current.scrollTop === 0 && e.touches[0].clientY > touchStartY.current + 60) {
       handleRefresh();
@@ -561,7 +593,7 @@ export default function MobileGuardDashboard() {
   const subStatus = getSubscriptionStatus();
   const profilePercent = getProfilePercent();
   const todayStr = londonCalendarDate();
-  const todaysJobs = upcomingJobs.filter(j => (j.jobs as any)?.start_date === todayStr);
+  const todaysJobs = assignments.filter(j => ['confirmed', 'in_progress'].includes(j.status) && j.jobs.start_date === todayStr);
   const actionItems = getActionItems();
   const appCounts = {
     applied: applications.filter(a => a.status === 'pending').length,
@@ -781,9 +813,10 @@ export default function MobileGuardDashboard() {
                         </button>
                       )}
                       {job.status === 'in_progress' && job.check_out_time && (
-                        <span className="w-full block bg-emerald-500/10 text-emerald-400 text-xs font-semibold py-2 rounded-lg border border-emerald-500/20 text-center whitespace-nowrap">
-                          <i className="ri-check-double-line mr-1"></i>Checked Out — Awaiting Approval
-                        </span>
+                        <button onClick={() => handleRequestCompletion(job.id)} disabled={completingShift !== null}
+                          className="w-full bg-emerald-500 text-slate-900 text-xs font-semibold py-2 rounded-lg disabled:opacity-50">
+                          {completingShift === job.id ? 'Requesting completion…' : 'Request Completion'}
+                        </button>
                       )}
                     </div>
                   ))}
@@ -976,9 +1009,10 @@ export default function MobileGuardDashboard() {
                       </button>
                     )}
                     {isToday && isInProgress && assignment.check_out_time && (
-                      <span className="w-full block bg-emerald-500/10 text-emerald-400 text-xs font-semibold py-2.5 rounded-lg border border-emerald-500/20 text-center whitespace-nowrap">
-                        <i className="ri-check-double-line mr-1"></i>Checked Out — Awaiting Approval
-                      </span>
+                      <button onClick={() => handleRequestCompletion(assignment.id)} disabled={completingShift !== null}
+                        className="w-full bg-emerald-500 text-slate-900 text-xs font-semibold py-2.5 rounded-lg disabled:opacity-50">
+                        {completingShift === assignment.id ? 'Requesting completion…' : 'Request Completion'}
+                      </button>
                     )}
                     {!isToday && (
                       <div className="flex gap-2">
@@ -1194,6 +1228,8 @@ export default function MobileGuardDashboard() {
       </div>
 
       {/* Content */}
+      {completionError && <p role="alert" className="px-4 py-3 text-sm text-red-400">{completionError}</p>}
+      {completionNotice && <p role="status" className="px-4 py-3 text-sm text-emerald-400">{completionNotice}</p>}
       <div
         ref={scrollRef}
         className="flex-1 px-4 py-4 overflow-y-auto"
