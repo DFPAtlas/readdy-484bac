@@ -20,7 +20,7 @@ test('recorded backup health expires at the retention boundary and rejects missi
 test('backup panel and overall score reject stale healthy flags; loading and errors never claim missing setup', () => {
   const backup = { ...current, backup_type: 'Database Backup', last_backup_at: '2026-06-30', notes: null };
   const props = { backupComplianceData: { backups: [backup], compliance: [] }, fetchState: 'idle', onRetry() {} };
-  const panel = load('app/admin/security/BackupCompliancePanel.tsx').default;
+  const panel = load('app/admin/security/BackupCompliancePanel.tsx', { '@/lib/supabase': { supabase: {} } }).default;
   assert.match(content(panel(props)), /Stale Record/);
   assert.match(content(panel(props)), /independent verification/);
   assert.doesNotMatch(content(panel({ ...props, fetchState: 'loading' })), /not configured|Stale Record/);

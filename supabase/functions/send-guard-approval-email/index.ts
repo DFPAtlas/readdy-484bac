@@ -88,7 +88,7 @@ serve(async (req) => {
       const supabase = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
       const { data: byId } = await supabase
         .from('guards')
-        .select('id, user_id, email, full_name, first_name, last_name')
+        .select('id, user_id, email, full_name')
         .eq('id', guardId)
         .maybeSingle();
 
@@ -96,7 +96,7 @@ serve(async (req) => {
       if (!guardRecord) {
         const { data: byUserId } = await supabase
           .from('guards')
-          .select('id, user_id, email, full_name, first_name, last_name')
+          .select('id, user_id, email, full_name')
           .eq('user_id', guardId)
           .maybeSingle();
         guardRecord = byUserId;
@@ -104,7 +104,7 @@ serve(async (req) => {
 
       if (guardRecord) {
         email = guardRecord.email || email;
-        displayName = guardRecord.full_name || (guardRecord.first_name && guardRecord.last_name ? `${guardRecord.first_name} ${guardRecord.last_name}` : displayName);
+        displayName = guardRecord.full_name || displayName;
         relatedUserId = guardRecord.user_id || relatedUserId;
       }
     }
@@ -144,7 +144,7 @@ serve(async (req) => {
       guard_name: displayName,
       rejection_reason: rejectionReason || 'Unable to verify provided information',
       unconfirmed_sections_block: unconfirmedSectionsHtml,
-      dashboard_url: 'https://quickguard.uk/guard/dashboard',
+      ...(approved ? { dashboard_url: 'https://quickguard.uk/guard/dashboard' } : {}),
       support_email: 'info@quickguard.uk',
       year: String(new Date().getFullYear()),
     };

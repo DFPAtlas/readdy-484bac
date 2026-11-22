@@ -62,6 +62,15 @@ function json(data: any, status: number, corsHeaders: Record<string, string>): R
   });
 }
 
+async function bestEffort(label: string, operation: () => PromiseLike<{ error: unknown }>): Promise<void> {
+  try {
+    const result = await operation();
+    if (result.error) console.error(label);
+  } catch {
+    console.error(label);
+  }
+}
+
 function sanitizeText(value: unknown, maxLen: number): string {
   if (typeof value !== 'string') return '';
   return value
@@ -323,29 +332,34 @@ Deno.serve(async (req) => {
     return json({ error: 'A guard account with these details already exists' }, 409, corsHeaders);
   }
 
-  const createdResources = { user: false, storagePaths: [] as { bucket: string; path: string }[], guard: false, subscription: false, entitlement: false, notificationPrefs: false };
+  const createdResources = { user: false, appUser: false, storagePaths: [] as { bucket: string; path: string }[], guard: false, subscription: false, entitlement: false, notificationPrefs: false };
   let userId: string | null = null;
   let guardId: string | null = null;
 
   async function cleanup() {
-    if (createdResources.user && userId) {
-      await supabase.auth.admin.deleteUser(userId).catch(() => {});
-    }
     const storageClient = createClient(supabaseUrl!, supabaseServiceKey!);
     for (const obj of createdResources.storagePaths) {
-      await storageClient.storage.from(obj.bucket).remove([obj.path]).catch(() => {});
+      await bestEffort('Provisioning cleanup: storage removal failed', () => storageClient.storage.from(obj.bucket).remove([obj.path]));
     }
     if (createdResources.guard && userId) {
-      await supabase.from('guards').delete().eq('user_id', userId).catch(() => {});
+      await bestEffort('Provisioning cleanup: guard removal failed', () => supabase.from('guards').delete().eq('user_id', userId));
     }
     if (createdResources.subscription && userId) {
-      await supabase.from('subscriptions').delete().eq('user_id', userId).catch(() => {});
+      await bestEffort('Provisioning cleanup: subscription removal failed', () => supabase.from('subscriptions').delete().eq('user_id', userId));
     }
     if (createdResources.entitlement && userId) {
-      await supabase.from('user_entitlements_data').delete().eq('user_id', userId).catch(() => {});
+      await bestEffort('Provisioning cleanup: entitlement removal failed', () => supabase.from('user_entitlements_data').delete().eq('user_id', userId));
     }
     if (createdResources.notificationPrefs && userId) {
-      await supabase.from('notification_preferences').delete().eq('user_id', userId).catch(() => {});
+      await bestEffort('Provisioning cleanup: notification preference removal failed', () => supabase.from('notification_preferences').delete().eq('user_id', userId));
+    }
+    if (createdResources.appUser && userId) {
+      await bestEffort('Provisioning cleanup: application user removal failed', () => supabase.from('users').delete().eq('id', userId));
+    }
+    // Subscriptions have a restrictive Auth FK, so remove owned child rows first.
+    if (createdResources.user && userId) {
+      const cleanupUserId = userId;
+      await bestEffort('Provisioning cleanup: Auth user removal failed', () => supabase.auth.admin.deleteUser(cleanupUserId));
     }
   }
 
@@ -370,6 +384,16 @@ Deno.serve(async (req) => {
 
     userId = userData.user.id;
     createdResources.user = true;
+
+    // Notification preferences reference app.users, independently of the Auth guard trigger.
+    const { error: appUserError } = await supabase.from('users').upsert({
+      id: userId, email, full_name: fullName, user_type: 'guard', phone: phone || null,
+      profile_completed: false, verification_status: 'pending',
+      plan_slug: 'guard_starter', plan_name: 'Free Starter', subscription_status: 'active',
+      created_at: now, updated_at: now,
+    }, { onConflict: 'id', ignoreDuplicates: true });
+    if (appUserError) throw new Error('Failed to create application user');
+    createdResources.appUser = true;
 
     const storageClient = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -438,7 +462,8 @@ Deno.serve(async (req) => {
     if (siaBackPath) guardRecord.sia_licence_back_path = siaBackPath;
     if (siaSupportingPath) guardRecord.sia_supporting_document_path = siaSupportingPath;
 
-    const { data: createdGuard, error: guardError } = await supabase.from('guards').insert(guardRecord).select('id').maybeSingle();
+    // Auth signup may already have provisioned this new user's guard shell.
+    const { data: createdGuard, error: guardError } = await supabase.from('guards').upsert(guardRecord, { onConflict: 'user_id' }).select('id').maybeSingle();
     if (guardError || !createdGuard) {
       throw new Error('Failed to create guard profile');
     }
@@ -460,7 +485,8 @@ Deno.serve(async (req) => {
     if (subError) throw new Error('Failed to create subscription');
     createdResources.subscription = true;
 
-    const { error: entError } = await supabase.from('user_entitlements_data').insert({
+    // The subscription trigger owns canonical plan features; retain its row if present.
+    const { error: entError } = await supabase.from('user_entitlements_data').upsert({
       user_id: userId,
       plan_slug: 'guard_starter',
       plan_name: 'Free Starter',
@@ -468,15 +494,13 @@ Deno.serve(async (req) => {
       features: ['guard.apply_job', 'guard.view_jobs', 'guard.create_profile', 'guard.advanced_alerts'],
       monthly_price_pence: 0,
       subscription_status: 'active',
-      is_free_tier: true,
-      is_active: true,
       created_at: now,
       updated_at: now,
-    });
+    }, { onConflict: 'user_id', ignoreDuplicates: true });
     if (entError) throw new Error('Failed to create entitlements');
     createdResources.entitlement = true;
 
-    const { error: notifError } = await supabase.from('notification_preferences').insert({
+    const { error: notifError } = await supabase.from('notification_preferences').upsert({
       user_id: userId,
       job_matches: true,
       application_updates: true,
@@ -493,11 +517,11 @@ Deno.serve(async (req) => {
       sms_notifications: false,
       created_at: now,
       updated_at: now,
-    });
+    }, { onConflict: 'user_id', ignoreDuplicates: true });
     if (notifError) throw new Error('Failed to create notification preferences');
     createdResources.notificationPrefs = true;
 
-    await supabase.from('notifications').insert({
+    await bestEffort('Provisioning notification failed', () => supabase.from('notifications').insert({
       user_id: userId,
       user_type: 'guard',
       type: 'account_created',
@@ -506,10 +530,11 @@ Deno.serve(async (req) => {
       is_read: false,
       link: '/guard/dashboard',
       created_at: now,
-    }).catch(() => {});
+    }));
 
     await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
       method: 'POST',
+      signal: AbortSignal.timeout(10000),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${supabaseServiceKey}`,
@@ -522,7 +547,7 @@ Deno.serve(async (req) => {
       }),
     }).catch(() => {});
 
-    await supabase.from('admin_activity_log').insert({
+    await bestEffort('Provisioning activity log failed', () => supabase.from('admin_activity_log').insert({
       admin_user_id: adminUser.id,
       admin_username: adminUser.email,
       admin_name: adminUser.full_name,
@@ -539,7 +564,7 @@ Deno.serve(async (req) => {
         result: 'success',
       },
       created_at: now,
-    }).catch(() => {});
+    }));
 
     const result = {
       success: true,
@@ -550,7 +575,7 @@ Deno.serve(async (req) => {
       message: 'Guard created. They will appear in Guard Verifications for review.',
     };
 
-    await supabase.from('admin_guard_creation_requests').insert({
+    await bestEffort('Provisioning request log failed', () => supabase.from('admin_guard_creation_requests').insert({
       idempotency_key: idempotencyKey,
       admin_user_id: adminUser.id,
       email,
@@ -560,7 +585,7 @@ Deno.serve(async (req) => {
       result,
       created_at: now,
       updated_at: now,
-    }).catch(() => {});
+    }));
 
     return json(result, 200, corsHeaders);
   } catch (err) {
