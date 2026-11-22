@@ -463,16 +463,27 @@ serve(async (req) => {
           if (subRecordError) throw new Error(`Subscription reload failed: ${subRecordError.message}`);
           const subscriptionDbId = subRecord?.id || null;
 
-          const amountForPayment = isPaidUpfront ? ((planAmount || 0) / 100) : 0;
-          if (isPaidUpfront && amountForPayment > 0 && subscriptionDbId) {
-            const { data: existingPayment, error: existingPaymentError } = await appSupabase.from('subscription_payments').select('id').eq('stripe_invoice_id', stripeSub.latest_invoice as string).maybeSingle();
+          // The first invoice may include a one-time token discount, an annual
+          // price or tax. Catalogue price describes the plan, not money received.
+          const paymentInvoiceId = stripeId(session.invoice) || stripeId(stripeSub.latest_invoice);
+          const paidInvoice = isPaidUpfront && paymentInvoiceId ? await stripe.invoices.retrieve(paymentInvoiceId) : null;
+          if (isPaidUpfront && (!paidInvoice || invoiceOutcome(paidInvoice) !== 'succeeded'
+            || invoiceReferences(paidInvoice).subscriptionId !== stripeSubId
+            || !Number.isSafeInteger(paidInvoice.amount_paid) || paidInvoice.amount_paid < 0)) {
+            throw new Error('Checkout subscription invoice payment could not be verified');
+          }
+          const amountForPayment = paidInvoice ? paidInvoice.amount_paid / 100 : 0;
+          if (paidInvoice && amountForPayment > 0 && subscriptionDbId) {
+            const { data: existingPayment, error: existingPaymentError } = await appSupabase.from('subscription_payments').select('id').eq('stripe_invoice_id', paidInvoice.id).maybeSingle();
             if (existingPaymentError) throw new Error(`Subscription payment lookup failed: ${existingPaymentError.message}`);
-            if (!existingPayment) {
-              const { error: paymentInsertError } = await appSupabase.from('subscription_payments').insert({ subscription_id: subscriptionDbId, user_id: userId, stripe_payment_intent_id: session.payment_intent as string || null, stripe_invoice_id: stripeSub.latest_invoice as string || null, amount: amountForPayment, currency: stripeSub.currency || 'gbp', status: 'succeeded', billing_reason: 'subscription_create', period_start: periodStart, period_end: periodEnd, paid_at: new Date().toISOString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-              // A concurrent duplicate delivery may already have recorded this invoice (unique index).
-              if (paymentInsertError && (paymentInsertError as any).code !== '23505') throw new Error(`Subscription payment insert failed: ${paymentInsertError.message}`);
-              console.log(`[EnhancedWebhook] Created subscription_payments record for checkout, user=${userId}`);
-            }
+            const references = invoiceReferences(paidInvoice);
+            const payment = { subscription_id: subscriptionDbId, user_id: userId, stripe_payment_intent_id: references.paymentIntentId, stripe_charge_id: references.chargeId, stripe_invoice_id: paidInvoice.id, amount: amountForPayment, currency: paidInvoice.currency, status: 'succeeded', billing_reason: paidInvoice.billing_reason || 'subscription_create', period_start: periodStart, period_end: periodEnd, paid_at: new Date((paidInvoice.status_transitions.paid_at || paidInvoice.created) * 1000).toISOString(), updated_at: new Date().toISOString() };
+            // Reconcile the same invoice on retry; never append a second payment.
+            const { error: paymentWriteError } = await (existingPayment
+              ? appSupabase.from('subscription_payments').update(payment).eq('id', existingPayment.id)
+              : appSupabase.from('subscription_payments').insert({ ...payment, created_at: new Date().toISOString() }));
+            if (paymentWriteError && paymentWriteError.code !== '23505') throw new Error(`Subscription payment write failed: ${paymentWriteError.message}`);
+            console.log(`[EnhancedWebhook] Recorded subscription invoice payment for user=${userId}`);
           }
 
           const profileUpdate = subscriptionProfileUpdate(accountType, { status: subStatus, planSlug, planName, customerId: stripeCustomerId, subscriptionId: stripeSubId, currentPeriodEnd: periodEnd, activateProfile: true });
