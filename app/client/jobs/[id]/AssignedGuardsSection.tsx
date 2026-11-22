@@ -100,7 +100,7 @@ export default function AssignedGuardsSection({
       try {
         const { data: reviews, error } = await supabase
           .from('reviews')
-          .select('*')
+          .select('id, guard_id, rating, review_text, review_status, issue_reported, punctuality, professionalism, communication, appearance, reliability, created_at')
           .eq('job_id', jobId);
         if (cancelled) return;
         if (error) throw error;
