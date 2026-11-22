@@ -2,6 +2,25 @@
 
 Continue the authorised QuickGuard admin repairs from this repository. Production project: `vnywjfpkepjgclkbcmsj`. The separate approved recovery target is `dnbvybmulsppfjntbsxz` in Frankfurt; its private `qg_recovery_20261122` schema is a core-data drill, not a live application database.
 
+## Subscription worker wording and Basic renewal trace, 15:12 UTC
+
+HAL subscription workflow `pGoacDSUO4i4dNMN` now describes the Elite incident as active paid-tier access without linked Stripe billing evidence. The original incident code `PAID_SUBSCRIPTION_MISSING_STRIPE_ID`, P1 severity, and trigger condition were preserved. The Basic stale-sync alert was unchanged. The patch changed one string in Subscription Reasoning and preserved the workflow ID, five-minute schedule, active state, credentials, queries, and downstream contracts.
+
+The new version `68e8eb33-b22f-4089-8f0d-17583f44aa5d` was published at 15:07:16.352 UTC on 22 November. All four focused tests passed on Node 22. Scheduled run `378989` succeeded and wrote AMBER snapshot `2c42ddba-396f-47e6-91c5-c01b07194f47` at 15:12:04.623 UTC. The snapshot contains the revised Elite wording and both P1 findings, with 19 warnings. Billing, entitlements, and webhook destinations were left in place.
+
+### Basic renewal and customer mapping
+
+- QuickGuard subscription `58ea2b87-c8e7-484b-a97e-e8d0eccfdaae` and its entitlement still show a period end of 5 November 2026, 18:30:50 UTC. The original paid GBP 10 Checkout Session links sandbox subscription [`sub_1UNGf0IMkpwfAEDTfSohHVse`](https://dashboard.stripe.com/acct_1SYmuoIMkpwfAEDT/test/subscriptions/sub_1UNGf0IMkpwfAEDTfSohHVse) and sandbox customer `cus_VO2jzA0T87Gutg` to the same QuickGuard user.
+- Stripe sandbox shows a paid GBP 10 renewal invoice `in_1UYVRqIMkpwfAEDTE5wg03Vk` and a subscription item period end of 5 December 2026, 18:30:50 UTC. Stripe emitted `invoice.payment_succeeded` event `evt_1UYWOXIMkpwfAEDT1OgjhUxa` at 19:32:21 UTC on 5 November. Stripe listed one pending webhook delivery when inspected. The production event ledger had no matching processing receipt and the renewal invoice was absent from production subscription payments.
+- The current sandbox endpoint configuration routes invoice and subscription events to projects `alfwwggavmyerjyqumuo` and `dnbvybmulsppfjntbsxz`. The production project `vnywjfpkepjgclkbcmsj` has a sandbox bank-payout endpoint, which does not subscribe to renewal invoices. This supports a routing gap. The endpoint list and pending count do not establish the historical delivery outcome for each destination.
+- The guard profile points to `cus_VcfannyExX18cO`, a live Stripe customer tagged with the same QuickGuard user ID. Stripe returned zero subscriptions for that live customer. The sandbox and live IDs refer to different Stripe environments. An authorised billing owner needs to decide how this sandbox UAT subscription and its entitlement should be represented in QuickGuard before any routing, mapping, or reconciliation change.
+
+Elite subscription `676905df-1efb-4c27-ad17-453cb82d3581` still grants an active paid tier without a linked billing reference. An authorised reviewer still needs to establish whether this is an intentional non-billed grant or an incorrect entitlement.
+
+### Subscription worker rollback
+
+The private API export is on HAL at `~/Documents/Codex/2026-11-22/continue-quickguard-admin-repairs-from-dfpatlas/work/subscription-wording/backup-20261122T150657Z/pGoacDSUO4i4dNMN.json`. Its original active version is `d9d98d81-0056-4ef1-9ae3-fada9693ca94`. The parent work directory contains the checksum manifest, diff, focused test log, and verified heartbeat evidence. Check for intervening changes before restoring the workflow to the same ID through the supported n8n API or UI, then verify the next scheduled snapshot.
+
 ## Client Selection and Job Funding repair, 13:57 UTC
 
 The 13:52 UTC RED snapshots had two Client Selection critical findings and eight Job Funding critical findings, all on the same two October chargeback fixtures. Fresh production read-back confirmed that job `726f86b4-e8a5-4a3e-907e-3a2d1facbd25` had a lost chargeback and job `626f86b4-e8a5-4a3e-907e-3a2d1facbd25` had a won chargeback. Both remain confirmed, funded and dispute-flagged, with no assignment or application. Each has a completed GBP 88 original payment, an agreed amount of GBP 80 and a recorded client charge total of zero. The audit requires finance review for both outcomes.
