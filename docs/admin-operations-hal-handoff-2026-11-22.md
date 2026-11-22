@@ -2,6 +2,32 @@
 
 Continue the authorised QuickGuard admin repairs from this repository. Production project: `vnywjfpkepjgclkbcmsj`. The separate approved recovery target is `dnbvybmulsppfjntbsxz` in Frankfurt; its private `qg_recovery_20261122` schema is a core-data drill, not a live application database.
 
+## Client Selection and Job Funding repair, 13:57 UTC
+
+The 13:52 UTC RED snapshots had two Client Selection critical findings and eight Job Funding critical findings, all on the same two October chargeback fixtures. Fresh production read-back confirmed that job `726f86b4-e8a5-4a3e-907e-3a2d1facbd25` had a lost chargeback and job `626f86b4-e8a5-4a3e-907e-3a2d1facbd25` had a won chargeback. Both remain confirmed, funded and dispute-flagged, with no assignment or application. Each has a completed GBP 88 original payment, an agreed amount of GBP 80 and a recorded client charge total of zero. The audit requires finance review for both outcomes.
+
+Both monitors now classify recorded dispute holds before applying active-booking selection and assignment rules. The hold findings retain the outcome and record counts. Funding emits one missing-assignment finding per undisputed active job and continues to check a held booking for genuine payment issues. It uses a positive recorded client charge total and comparable currency and amount for reconciliation. A missing client total is a warning requiring evidence. A mismatch against a recorded total, currency mismatch, duplicate payment, and a funded job without completed payment evidence still raise findings.
+
+| Workflow ID | Published version | Published UTC, 22 Nov | Scheduled run | Snapshot ID | Snapshot UTC, 22 Nov | Verified counts |
+| --- | --- | --- | --- | --- | --- | --- |
+| Client Selection `HkKkrBniZ8R5g3q3` | `29b37736-816c-4ef7-8870-8d2a9469a418` | 13:54:39.040 | `378754` | `1d78d224-c031-45e6-bd99-56a957479ce1` | 13:57:03.630 | AMBER, 5 jobs, 13 applications, 17 assignments, 22 guards, 2 hold warnings, 0 critical |
+| Job Funding `aBj0Oc0NBWlzYCuh` | `673079dc-03cd-42ff-8768-0ec7a6b76a9c` | 13:54:39.175 | `378759` | `adac063b-c927-4c58-acd5-0ccbb54a63b7` | 13:57:04.143 | AMBER, 5 jobs, 12 selected applications, 17 assignments, 19 transactions, 2 hold warnings, 2 reconciliation warnings, 0 critical |
+
+Nine focused tests passed on Node 22. Fixtures covered won and lost holds, real undisputed selection gaps, missing and duplicate payment evidence, genuine amount and currency mismatches, failed job reads, and preservation of workflow wiring and schedules. Both scheduled job reads returned HTTP 200. Other reader outputs matched the persisted counts. The runs saved fresh rows in `app.agent_state_snapshots`.
+
+Finance still needs the original checkout or payment-provider evidence to establish the intended client charge on each job. The GBP 8 difference between the recorded payment and agreed amount remains unreconciled. Operations and finance still need to decide the disposition of both bookings. The repair left the dispute holds and original payment records in place.
+
+### Selection and funding rollback
+
+Private API exports are on HAL in `~/Documents/Codex/2026-11-22/continue-quickguard-admin-repairs-from-dfpatlas/work/selection-funding/backup-20261122T135401Z/`.
+
+| Export | Original active version |
+| --- | --- |
+| `HkKkrBniZ8R5g3q3.json` | `9b364846-24f3-4953-9338-042d2eabcd75` |
+| `aBj0Oc0NBWlzYCuh.json` | `1f1b8995-eddb-4c93-bb15-0db21117bc21` |
+
+The parent directory contains `manifest.json` with backup checksums, per-workflow diffs, `focused.log` and `verification.json`. Check for intervening changes before restoring the affected workflow definition to the same ID through the supported n8n API or UI. Verify the active version and the next scheduled snapshot.
+
 ## Worker query and Master telemetry repair, 13:42 UTC
 
 The four published versions below retained their workflow IDs, active state, five-minute schedules, credential references and downstream contracts. The repairs changed monitoring reads and reasoning. No payment, dispute, assignment, guard verification or eligibility record was edited.
@@ -16,7 +42,7 @@ The four published versions below retained their workflow IDs, active state, fiv
 All ten focused tests passed on Node 22. Fixtures covered valid inputs, empty HTTP 200 responses, PostgREST errors, invalid response shapes, stale and missing telemetry, canonical URLs, and preserved schedules and downstream nodes. Direct read-only checks and normal scheduled executions confirmed the repaired queries. Each affected scheduled input returned HTTP 200 and its count matched the persisted snapshot. The saved executions contained no SQLSTATE `42703` errors.
 
 - Review uses `rating`, `total_reviews`, and `total_jobs_completed` from the guard record. Unavailable reputation dimensions stay unknown. The run retained six closed jobs without reviews and two guard reputation drift warnings.
-- Diagnostics and Master read `name` and `enabled` from the registry and derive health from snapshots for `quickguard.uk`. Master uses the latest snapshot per monitored agent from the latest 500 site rows and a 15-minute freshness threshold. It warns on the empty registry separately from failed reads, missing or stale telemetry. It saw 13 agents with fresh telemetry, three GREEN, eight AMBER and two RED. The Client Selection and Job Funding RED findings remain open. Master also retained the warning about five failed email queue items.
+- Diagnostics and Master read `name` and `enabled` from the registry and derive health from snapshots for `quickguard.uk`. Master uses the latest snapshot per monitored agent from the latest 500 site rows and a 15-minute freshness threshold. It warns on the empty registry separately from failed reads, missing or stale telemetry. It saw 13 agents with fresh telemetry, three GREEN, eight AMBER and two RED. At 13:42 UTC, Client Selection and Job Funding were RED. Their 13:57 UTC follow-up and remaining finance decisions are recorded above. Master also retained the warning about five failed email queue items.
 - SIA uses `assigned_at` for assignment age and validates the response before counting rows. The four real assignments replace the earlier invalid count of one error item. No critical SIA finding appeared after the corrected read. Five incidents, 11 warnings and one historical expiry finding remain for the authorised reviewer, as described below.
 - Read-back confirmed that the three overdue assignments are still confirmed and funded without attendance or completion evidence, the client dispute is still open, and the reconciled £80 reversal is still failed. The booking disposition, chargeback review, and SIA decisions remain open.
 
