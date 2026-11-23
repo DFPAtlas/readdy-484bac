@@ -4,7 +4,7 @@ Target: public launch and advertising by 30 November 2026.
 
 ## Controlled personas
 
-The suite creates three clients and four guards. Every user is marked with `uat_run_id=launch-2026-11` in Supabase Auth metadata and can be removed with the guarded cleanup command.
+The suite creates three clients and four guards. Every identity has protected Auth `app_metadata.uat_run_id=launch-2026-11` and `uat_persona` markers. All guard profiles, including trigger-created guard shells for client personas, are marked `is_test_account=true`. Reuse requires matching protected markers and email before any password reset or profile writes. The guarded cleanup command remains scoped to this run.
 
 | Persona | State | Purpose |
 |---|---|---|
