@@ -188,7 +188,7 @@ export default function SystemStatusClient() {
   const [cleanupInventory, setCleanupInventory] = useState<CleanupInventory | null>(null);
   const [cleanupInventoryLoading, setCleanupInventoryLoading] = useState(true);
   const [cleanupInventoryError, setCleanupInventoryError] = useState<string | null>(null);
-  const inventoryRequest = useRef(0);
+  const inventoryRequest = useRef({ id: 0, active: true });
 
   const [cleanupRunning, setCleanupRunning] = useState(false);
   const [cleanupResult, setCleanupResult] = useState<{ ok: number; fail: number } | null>(null);
@@ -410,22 +410,25 @@ export default function SystemStatusClient() {
 
   // ── Read the inventory of the actual scheduled cleanup targets ─────────
   const fetchCleanupInventory = useCallback(async () => {
-    const request = ++inventoryRequest.current;
+    const request = ++inventoryRequest.current.id;
     setCleanupInventoryLoading(true);
     setCleanupInventoryError(null);
     setCleanupInventory(null);
     try {
       const inventory = await loadAdminCleanupInventory();
-      if (request === inventoryRequest.current) setCleanupInventory(inventory);
+      if (inventoryRequest.current.active && request === inventoryRequest.current.id) setCleanupInventory(inventory);
     } catch {
-      if (request === inventoryRequest.current) {
+      if (inventoryRequest.current.active && request === inventoryRequest.current.id) {
         setCleanupInventoryError('Unable to verify cleanup inventory. Please retry.');
       }
     } finally {
-      if (request === inventoryRequest.current) setCleanupInventoryLoading(false);
+      if (inventoryRequest.current.active && request === inventoryRequest.current.id) setCleanupInventoryLoading(false);
     }
   }, []);
-  useEffect(() => () => { inventoryRequest.current++; }, []);
+  useEffect(() => {
+    inventoryRequest.current.active = true;
+    return () => { inventoryRequest.current.active = false; };
+  }, []);
 
   // ── Run cleanup ──────────────────────────────────────────────────────
   const runCleanup = useCallback(async () => {

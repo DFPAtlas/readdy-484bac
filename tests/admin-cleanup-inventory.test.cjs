@@ -76,9 +76,9 @@ test('inventory endpoint read failures stay unavailable and method/preflight req
  for(const options of [{error:true},{throws:true}]){const f=endpoint(options);const response=await f.call();assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:'Unable to verify cleanup inventory'});}
  for(const [method,status] of [['OPTIONS',200],['POST',405],['DELETE',405]]){const f=endpoint();assert.equal((await f.call(method)).status,status);assert.equal(f.calls.length,0);}
 });
-function uiFixture(){
+function uiFixture(harness=hooksHarness){
  const f={fail:true,calls:0,queue:[],data:inventory()};
- f.h=hooksHarness('app/admin/system-status/SystemStatusClient.tsx',{
+ f.h=harness('app/admin/system-status/SystemStatusClient.tsx',{
   'next/link':{__esModule:true,default:()=>null},'@/components/admin/StorageUsageWidget':{__esModule:true,default:()=>null},
   '@/lib/supabase':{supabase:{auth:{getSession:async()=>({data:{session:null}})},from:()=>{throw Error('Browser table counts must not be queried');}}},
   '@/lib/adminMaintenance':{loadAdminCleanupLogs:async()=>({logs:[],totalCount:0})},
@@ -100,4 +100,16 @@ test('late inventory retries cannot overwrite a newer confirmed read or restore 
  older.reject(Error('stale private error'));await a;assert.match(content(row(f.h,'email_send_log')),/90 days801/);assert.doesNotMatch(content(f.h.render()),/Unable to verify cleanup inventory/);
  f.h.unmount();
  const g=uiFixture();g.h.render();await g.h.effects();await flush();const wait=deferred();g.queue.push(wait);const pending=nodes(g.h.render()).find(n=>n.type==='button'&&content(n)==='Retry cleanup inventory').props.onClick();g.h.unmount();const writes=g.h.writes;wait.resolve(inventory());await pending;assert.equal(g.h.writes,writes);
+});
+
+// React development Strict Mode replays effect setup/cleanup on the same component.
+function replayHarness(file,mocks,globals){
+ const slots=[],effects=[];let cursor=0,cleanups=[];
+ const react={...require('react'),useState(initial){const i=cursor++;if(!(i in slots))slots[i]=initial;return[slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value;}];},useRef(initial){const i=cursor++;if(!(i in slots))slots[i]={current:initial};return slots[i];},useCallback:fn=>fn,useEffect:fn=>{effects.push(fn);}};
+ const Component=load(file,{react,...mocks},globals).default;
+ return {render(){cursor=0;return Component();},async effects(){const setup=effects.splice(0);cleanups=setup.map(fn=>fn());cleanups.forEach(fn=>fn?.());cleanups=setup.map(fn=>fn());await flush();},unmount(){cleanups.forEach(fn=>fn?.());}};
+}
+test('Strict Mode effect replay accepts the initial inventory instead of leaving loading stuck until another polling cycle',async()=>{
+ const f=uiFixture(replayHarness);f.fail=false;f.h.render();await f.h.effects();await flush();
+ assert.equal(f.calls,1);assert.match(content(row(f.h,'email_send_log')),/public.email_send_log · table90 days21/);assert.match(content(f.h.render()),/Inventory checked/);f.h.unmount();
 });
