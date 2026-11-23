@@ -1,0 +1,40 @@
+# Staging examples only. Launch only the approved profile on each host.
+x-hardened: &hardened
+  image: ${IDENTITY_IMAGE:?set a reviewed image digest}
+  user: "65532:65532"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 32
+  mem_limit: 512m
+  cpus: 1.0
+  init: true
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,noexec,size=8m,mode=1777
+  ulimits:
+    core: 0
+  logging:
+    driver: local
+    options:
+      max-size: "1m"
+      max-file: "2"
+
+services:
+  worker:
+    <<: *hardened
+    profiles: [hal-staging]
+    env_file: [worker.staging.env]
+    volumes:
+      # Mount directories so atomic access-token replacement is visible.
+      - ./worker-auth:/run/identity/auth:ro
+      - ./worker-tls:/run/identity/tls:ro
+  inference-gateway:
+    <<: *hardened
+    profiles: [tron-staging]
+    env_file: [gateway.staging.env]
+    network_mode: host
+    volumes:
+      - ./gateway-tls:/run/identity/tls:ro
+    command: ["python", "-m", "doc_verify.gateway"]
+    healthcheck:
+      disable: true

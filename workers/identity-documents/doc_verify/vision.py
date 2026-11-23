@@ -1,21 +1,8 @@
-"""
-Reads documents with a vision model running in Ollama on HAL, so the
-documents never leave your network.
-
-Default model: qwen2.5vl:7b (fits HAL's 12GB GPU). Try qwen3-vl:8b too and
-keep whichever reads your test documents best - set VISION_MODEL in .env.
-"""
+"""Only the mutually authenticated, digest-pinned local gateway handles inference."""
 import base64
-import json
-import os
-
-import httpx
-from pydantic import BaseModel, ValidationError
 
 from .models import POA_TYPES, DlExtract, PoaExtract
-
-OLLAMA_URL = os.getenv("OLLAMA_URL", "").rstrip("/")
-VISION_MODEL = os.getenv("VISION_MODEL", "qwen3-vl:8b")
+from .transport import RENDER_LIMIT, RESPONSE_LIMIT, exchange, inference_client, inference_url, model_pin
 
 RULES = """Copy every value exactly as it is printed on the document.
 If a value is not clearly visible, use null. Never guess or fill in a value.
@@ -42,40 +29,31 @@ The fields are numbered on the card:
 {RULES}"""
 
 
-class VisionError(Exception):
-    """Ollama unreachable or the model gave unusable output. Retryable."""
+def payload() -> dict:
+    model, digest = model_pin()
+    return {"model": model, "digest": digest}
 
 
-async def _ask(images: list[bytes], prompt: str, schema: type[BaseModel]) -> BaseModel:
-    body = {
-        "model": VISION_MODEL,
-        "stream": False,
-        "keep_alive": "10m",
-        "format": schema.model_json_schema(),
-        "options": {"temperature": 0},
-        "messages": [{"role": "user", "content": prompt,
-                      "images": [base64.b64encode(i).decode() for i in images]}],
-    }
-    last = None
-    async with httpx.AsyncClient(timeout=httpx.Timeout(80, connect=10), trust_env=False) as client:
-        for _ in range(2):
-            try:
-                r = await client.post(f"{OLLAMA_URL}/api/chat", json=body)
-                r.raise_for_status()
-                content = r.json()["message"]["content"]
-                return schema.model_validate(json.loads(content))
-            except (httpx.HTTPError, KeyError, json.JSONDecodeError, ValidationError) as e:
-                last = e
-    raise VisionError(f"{type(last).__name__}: local inference unavailable")
+async def ready() -> bool:
+    async with inference_client() as client:
+        status, _ = await exchange(client, "POST", inference_url() + "/ready", json=payload(),
+                                   limit=RESPONSE_LIMIT, deadline=10)
+    return status == 204
 
 
-async def read_poa(images: list[bytes], text_layer: str = "") -> PoaExtract:
-    prompt = POA_PROMPT
-    if text_layer.strip():
-        prompt += ("\n\nThe PDF also has this text layer. Use it to read values accurately, "
-                   "but only for things you can see on the page:\n" + text_layer)
-    return await _ask(images, prompt, PoaExtract)
+async def _ask(images, kind, schema):
+    if len(images) != 1 or len(images[0]) > RENDER_LIMIT:
+        raise ValueError("Invalid rendered document")
+    body = {**payload(), "kind": kind, "image": base64.b64encode(images[0]).decode()}
+    async with inference_client() as client:
+        _, data = await exchange(client, "POST", inference_url() + "/infer", json=body,
+                                 limit=RESPONSE_LIMIT, deadline=70)
+    return schema.model_validate_json(data)
 
 
-async def read_dl(images: list[bytes]) -> DlExtract:
-    return await _ask(images, DL_PROMPT, DlExtract)
+async def read_poa(images):
+    return await _ask(images, "proof", PoaExtract)
+
+
+async def read_dl(images):
+    return await _ask(images, "licence", DlExtract)

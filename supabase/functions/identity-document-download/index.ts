@@ -1,20 +1,28 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.47.0';
-import { bucket, MAX_DOCUMENT_SIZE, sha256 } from '../_shared/identity-object.ts';
+import { bucket, MAX_DOCUMENT_SIZE, matchesCapturedDocument, readBrokerBody } from '../_shared/identity-object.ts';
 
 Deno.serve(async (req) => {
-  if (req.method !== 'POST') return new Response(null, { status: 405 });
-  const authorization = req.headers.get('Authorization');
-  if (!authorization?.match(/^Bearer\s+\S+$/i)) return new Response(null, { status: 401 });
   const headers = { 'Cache-Control': 'no-store' };
+  if (req.method !== 'POST') return new Response(null, { status: 405, headers });
+  const authorization = req.headers.get('Authorization');
+  if (!authorization?.match(/^Bearer\s+\S+$/i)) return new Response(null, { status: 401, headers });
 
   try {
+    const body = await readBrokerBody(req);
+    if (!body) return new Response(null, { status: 400, headers });
+    const boundedFetch: typeof fetch = (input, init) => fetch(input, {
+      ...init,
+      redirect: 'error',
+      signal: AbortSignal.any([req.signal, AbortSignal.timeout(12_000), ...(init?.signal ? [init.signal] : [])]),
+    });
     const url = Deno.env.get('SUPABASE_URL')!;
     const client = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
       db: { schema: 'app' },
-      global: { headers: { Authorization: authorization } },
+      global: { headers: { Authorization: authorization }, fetch: boundedFetch },
     });
-    const storage = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!).storage;
-    const body = await req.json();
+    const storage = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+      global: { fetch: boundedFetch },
+    }).storage;
     if (body?.ready === true) {
       const ready = await client.rpc('identity_document_queue_ready');
       if (ready.error || ready.data !== true) return new Response(null, { status: 403, headers });
@@ -32,7 +40,7 @@ Deno.serve(async (req) => {
     }
     const data = await file.arrayBuffer();
     const current = await client.rpc('identity_document_access', args);
-    if (current.error || current.data?.sha256 !== ref.sha256 || await sha256(data) !== ref.sha256) {
+    if (!await matchesCapturedDocument(data, ref.sha256, current.error ? null : current.data?.sha256)) {
       return new Response(null, { status: 409, headers });
     }
     return new Response(data, {
