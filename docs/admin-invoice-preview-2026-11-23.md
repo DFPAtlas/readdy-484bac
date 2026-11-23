@@ -1,0 +1,11 @@
+# Read-only subscription invoice preview
+
+The admin Payments action previously labelled “Check Subscription Invoices” invokes the global reconciliation endpoint with an empty body and can insert ledger rows or update subscription payment summaries. The page did not expose the endpoint's existing scoped dry-run support.
+
+Subscription payment details now offer “Preview latest invoice”. It sends only the local subscription UUID and `dry_run: true` through the signed-in Supabase client. The result must contain exactly one response for that same subscription. Recorded, missing, zero-value and skipped invoices are distinct; denied, incomplete, malformed or mismatched results remain errors with Retry. Previous evidence clears during another request, duplicate clicks are blocked and closed/changed details reject late responses. The panel explains that it checks the subscription's latest invoice, which may differ from the historical payment opened.
+
+The existing batch action is labelled “Reconcile all invoices”. Its behaviour and authenticated backend contract are preserved. Preview uses the deployed dry-run endpoint; this change needs no database migration, Edge deployment or HAL access. No live reconciliation, refund, payout or entitlement change was executed while preparing this repair.
+
+After merge and Readdy publication, open Admin → Payments, filter to Subscriptions and open a known controlled fixture's payment. Run “Preview latest invoice” only. Verify the recorded/missing/error result and independently compare the fixture's ledger and subscription summary before and after. A sandbox/live provider mismatch must remain a visible review error. Do not use “Reconcile all invoices” as a read-only smoke test. Missing-first-payment subscriptions without a history row still require a separate scoped investigation; this panel is reached through existing payment details.
+
+Validation: all 1,121 unit/regression tests passed, including 14 focused invoice-preview/backfill tests. Repository and admin TypeScript checks passed. Full lint passed with zero errors and the same ten existing warnings; both changed frontend files pass focused lint without warnings. Production build passed with 214 pages, using an unreachable placeholder Supabase URL. Generated next-env changes were restored. Live acceptance remains pending merge and publication.
