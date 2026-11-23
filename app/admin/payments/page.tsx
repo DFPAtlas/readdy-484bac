@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { paymentAmounts } from '@/lib/financeAmounts';
 import RefundRequestQueue from '../payments-jobs/RefundRequestQueue';
 import { supabase } from '@/lib/supabase';
+import SubscriptionInvoicePreview from './SubscriptionInvoicePreview';
 
 interface UnifiedPayment {
   id: string;
@@ -21,6 +22,8 @@ interface UnifiedPayment {
   client_name?: string;
   gateway?: string;
   metadata?: unknown;
+  subscription_id?: string | null;
+  currency?: string | null;
 }
 
 export default function AdminPaymentsPage() {
@@ -178,6 +181,8 @@ export default function AdminPaymentsPage() {
             client_name: client?.company_name || client?.contact_name,
             gateway: 'Stripe',
             metadata: s,
+            subscription_id: s.subscription_id,
+            currency: s.currency,
           };
         }),
       ];
@@ -310,7 +315,7 @@ export default function AdminPaymentsPage() {
                   <div className="w-5 h-5 flex items-center justify-center">
                     <i className={`${backfilling ? 'ri-loader-4-line animate-spin' : 'ri-tools-line'}`}></i>
                   </div>
-                  {backfilling ? 'Checking invoices...' : missingCount > 0 ? `Backfill Missing (${missingCount})` : 'Check Subscription Invoices'}
+                  {backfilling ? 'Reconciling invoices...' : `Reconcile all invoices${missingCount > 0 ? ` (${missingCount} without history)` : ''}`}
                 </button>
               )}
               <button
@@ -443,7 +448,7 @@ export default function AdminPaymentsPage() {
       {/* Detail Modal */}
       {showDetailModal && selectedPayment && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-[#111d35] rounded-2xl max-w-lg w-full shadow-xl border border-[#1a2b4a] overflow-hidden">
+          <div className="bg-[#111d35] rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl border border-[#1a2b4a]">
             <div className="px-6 py-4 border-b border-[#1a2b4a] flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-white">Payment Details</h2>
@@ -473,6 +478,9 @@ export default function AdminPaymentsPage() {
                 {selectedPayment.guard_name && (<div className="flex justify-between"><span className="text-sm text-slate-400">Guard</span><span className="text-sm font-medium text-white">{selectedPayment.guard_name}</span></div>)}
                 <div className="flex justify-between"><span className="text-sm text-slate-400">Gateway</span><span className="text-sm font-medium text-white">{selectedPayment.gateway}</span></div>
               </div>
+              {selectedPayment.type === 'subscription' && (
+                <SubscriptionInvoicePreview key={selectedPayment.id} subscriptionId={selectedPayment.subscription_id} currency={selectedPayment.currency} />
+              )}
               <button onClick={closeDetail} className="w-full bg-[#1a2b4a] text-slate-400 py-3 rounded-xl font-semibold hover:bg-[#1e2d4d] hover:text-white transition-colors whitespace-nowrap cursor-pointer">Close</button>
             </div>
           </div>
