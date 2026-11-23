@@ -51,3 +51,12 @@ grant execute on function app.request_document_check(uuid,text),app.claim_docume
 create function app.sync_document_check_to_guard() returns trigger language plpgsql as $$ begin return new; end $$;
 create trigger document_checks_sync_guard after insert or update of status on app.document_checks
   for each row execute function app.sync_document_check_to_guard();
+
+-- Existing history predates the migration.
+create table app.guard_verification_audit (id integer primary key, action text not null);
+insert into app.guards(id,user_id,profile_completed)
+  values ('00000000-0000-0000-0000-000000000100','00000000-0000-0000-0000-000000000101',true);
+insert into app.document_checks(id,guard_id,status,attempts,decision,reasons)
+  values ('00000000-0000-0000-0000-000000000102','00000000-0000-0000-0000-000000000100',
+    'done',2,'review','["legacy_review"]');
+insert into app.guard_verification_audit values (100,'legacy_document_review');

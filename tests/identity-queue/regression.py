@@ -58,13 +58,28 @@ sql("insert into auth.users values " + ",".join(f"('{u}')" for u in
     + ",".join(f"('guard-documents','{u}/{name}','{u}','fixture-v1')"
                for u in (customer, applicant) for name in ("poa-1.pdf", "front-1.png")) + ";")
 assert run_as(worker, "select app.identity_document_queue_ready();") == "t"
-assert sql("select count(*) from app.document_checks;") == "0"
+assert sql("select count(*) from app.document_checks where submission_version is null and status='done' "
+           "and attempts=2 and decision='review' and reasons='[\"legacy_review\"]'::jsonb;") == "1"
+assert sql("select action from app.guard_verification_audit where id=100;") == "legacy_document_review"
+print("PASS migration preserves legacy check and audit evidence")
 
 with ThreadPoolExecutor(2) as pool:
     duplicates = list(pool.map(lambda _: enqueue(), range(2)))
 assert duplicates[0] == duplicates[1]
-assert sql("select count(*) from app.document_checks;") == "1"
+assert sql("select count(*) from app.document_checks where submission_version is not null;") == "1"
 print("PASS duplicate submissions")
+
+for mutation in (
+    "proof_reference = jsonb_set(proof_reference, '{sha256}', to_jsonb(repeat('e',64)))",
+    "licence_reference = jsonb_set(licence_reference, '{path}', to_jsonb('fixture'::text))",
+    f"submission_owner = '{applicant}'",
+    "submission_version = submission_version + 100",
+    f"guard_id = '{other_guard}'",
+):
+    sql(f"update app.document_checks set {mutation} where id='{duplicates[0]}';",
+        role="service_role", denied=True)
+print("PASS submitted owner, version, guard, object references and checksums are immutable")
+
 
 with ThreadPoolExecutor(2) as pool:
     claimed = list(pool.map(lambda _: job(), range(2)))
@@ -98,6 +113,10 @@ assert json.loads(sql(f"select app.identity_document_sources('{applicant}');", r
 print("PASS cross-account storage and cross-worker token isolation")
 
 sql(f"update app.document_checks set lease_expires_at=clock_timestamp()-interval '1 second' where id='{first['id']}';")
+finish(first, denied=True)
+run_as(worker, access, denied=True)
+assert sql(f"select status from app.document_checks where id='{first['id']}';") == "processing"
+print("PASS expired lease cannot read documents or publish before reclaim")
 second = job()
 assert second["id"] == first["id"] and second["token"] != first["token"]
 finish(first, denied=True)

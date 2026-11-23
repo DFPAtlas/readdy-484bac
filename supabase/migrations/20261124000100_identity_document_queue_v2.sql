@@ -102,6 +102,26 @@ as $$
     and o.archived_at is null and not coalesce(o.is_delete_marker,false)
 $$;
 
+-- Submitted references are append-only. A replacement gets a new queue row.
+create function identity_queue_private.protect_submission_snapshot() returns trigger
+language plpgsql set search_path = ''
+as $$
+begin
+  if (old.submission_version is not null or new.submission_version is not null) and
+      (old.guard_id, old.submission_version, old.submission_owner, old.proof_reference, old.licence_reference)
+      is distinct from
+      (new.guard_id, new.submission_version, new.submission_owner, new.proof_reference, new.licence_reference) then
+    raise exception 'submitted document references are immutable' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger identity_queue_protect_submission_snapshot
+before update of guard_id, submission_version, submission_owner, proof_reference, licence_reference
+on app.document_checks
+for each row execute function identity_queue_private.protect_submission_snapshot();
+
 create function identity_queue_private.references_current(p_guard app.guards, p_job app.document_checks)
 returns boolean language sql volatile security definer set search_path = ''
 as $$

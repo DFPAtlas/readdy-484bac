@@ -19,7 +19,10 @@ begin
   if exists (select 1 from identity_queue_private.workers where enabled) or
      has_function_privilege('service_role','app.enqueue_identity_document_check(uuid,uuid,jsonb,jsonb)','EXECUTE') or
      has_function_privilege('authenticated','app.claim_identity_document_check()','EXECUTE') or
-     (select count(*) from app.document_checks) <> 4 then
+     (select count(*) from app.document_checks) <> 5 or
+     (select count(*) from app.document_checks where submission_version is null and status='done'
+        and attempts=2 and decision='review' and reasons='["legacy_review"]'::jsonb) <> 1 or
+     (select count(*) from app.guard_verification_audit where id=100 and action='legacy_document_review') <> 1 then
     raise exception 'roll back did not fence the worker or retain queue rows';
   end if;
 end $$;
