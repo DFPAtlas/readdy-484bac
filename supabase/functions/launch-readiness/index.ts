@@ -238,6 +238,45 @@ function auto(
   return { id, category, label, status, method: "auto", notes, instruction: null, lastChecked: nowIso() };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+async function assessRuntimeHealth(probe: (signal: AbortSignal) => Promise<Response>): Promise<Pick<Check, 'status' | 'notes'>> {
+  const unverified = (notes: string): Pick<Check, 'status' | 'notes'> => ({ status: 'not_verified', notes });
+  try {
+    const response = await probe(AbortSignal.timeout(8000));
+    if (!response.ok) return unverified(`system-health returned HTTP ${response.status}; runtime health is unverified.`);
+    const data: unknown = await response.json();
+    if (!isRecord(data)) {
+      return unverified('system-health returned an invalid health response.');
+    }
+    const timestamp = typeof data.timestamp === 'string' ? Date.parse(data.timestamp) : NaN;
+    const age = Date.now() - timestamp;
+    if (!Number.isFinite(timestamp) || age > 300000 || age < -60000) {
+      return unverified('system-health returned missing, stale or future-dated evidence.');
+    }
+    if (data.status === 'critical' || data.status === 'unhealthy') {
+      return { status: 'fail', notes: 'The core runtime probe reports a critical or unhealthy state.' };
+    }
+    if (data.status === 'degraded') return unverified('The core runtime probe reports degraded health. Resolve its service or configuration warnings before sign-off.');
+    if (data.status !== 'healthy' || !isRecord(data.checks)) {
+      return unverified('system-health did not return complete healthy runtime evidence.');
+    }
+    const checks = data.checks;
+    for (const service of ['database', 'stripe', 'email', 'environment']) {
+      const check = checks[service];
+      if (!isRecord(check) || typeof check.status !== 'string' ||
+          !(service === 'email' ? ['healthy', 'configured'] : ['healthy']).includes(check.status)) {
+        return unverified(`The ${service} runtime check is missing or does not confirm a healthy configuration.`);
+      }
+    }
+    return { status: 'pass', notes: 'The fresh core runtime probe reports healthy services. Individual Edge Function deployments and authorisation require separate checks.' };
+  } catch {
+    return unverified('system-health could not be checked; runtime health is unverified.');
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -297,16 +336,23 @@ Deno.serve(async (req: Request) => {
 
   const isSuperAdmin = admin.role === "super_admin";
   const supabaseQ = createClient(supabaseUrl, serviceKey, { db: { schema: "app" } });
+  const invocationHeaders = { Authorization: `Bearer ${jwt}`, apikey: serviceKey, "Content-Type": "application/json" };
 
-  async function invokeFunction(slug: string, body: Record<string, unknown>) {
+  async function recordActivity(entry: Record<string, unknown>) {
+    try {
+      const { error } = await supabaseQ.from("admin_activity_log").insert(entry);
+      if (error) console.error("Launch readiness activity log could not be saved");
+    } catch {
+      console.error("Launch readiness activity log could not be saved");
+    }
+  }
+
+  async function invokeFunction(slug: string, body: Record<string, unknown>, signal?: AbortSignal) {
     const res = await fetch(`${supabaseUrl}/functions/v1/${slug}`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-        apikey: serviceKey,
-        "Content-Type": "application/json",
-      },
+      headers: invocationHeaders,
       body: JSON.stringify(body),
+      signal,
     });
     return res;
   }
@@ -399,26 +445,8 @@ Deno.serve(async (req: Request) => {
       schedActive ? "A scheduled maintenance window is currently active." :
         (schedStart && schedEnd ? "No maintenance window currently active." : "No scheduled maintenance configured.")));
 
-    let healthOk = false;
-    let healthNote = "system-health function did not respond.";
-    try {
-      const res = await invokeFunction("system-health", {});
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.status && ["healthy", "degraded"].includes(data.status)) {
-          healthOk = true;
-          healthNote = `Core runtime healthy (status: ${data.status}).`;
-        } else {
-          healthNote = `Core runtime reported status: ${data?.status || "unknown"}.`;
-        }
-      } else {
-        healthNote = `system-health returned HTTP ${res.status}.`;
-      }
-    } catch (e) {
-      healthNote = "system-health unreachable: " + (e as Error).message;
-    }
-    checks.push(auto("edge_functions", "critical", "Required Edge Functions deployed & healthy",
-      healthOk ? "pass" : "fail", healthNote));
+    const runtime = await assessRuntimeHealth(signal => invokeFunction("system-health", {}, signal));
+    checks.push(auto("edge_functions", "critical", "Core runtime health probe", runtime.status, runtime.notes));
 
     let rlsStatus: Check["status"] = "not_verified";
     let rlsNote = "RLS table inventory could not be verified automatically.";
@@ -621,13 +649,13 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      await supabaseQ.from("admin_activity_log").insert({
+      await recordActivity({
         admin_username: admin.email,
         admin_name: admin.full_name || admin.email,
         action_type: "edge_function_retirement_approved",
         action_description: `Edge function retirement approved: ${record.slug} -> ${decision}`,
         ip_address: req.headers.get("x-forwarded-for") || "unknown",
-      }).catch(() => {});
+      });
 
       return new Response(JSON.stringify({ success: true, id: inserted?.id || null }), {
         status: 200,
@@ -669,13 +697,13 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      await supabaseQ.from("admin_activity_log").insert({
+      await recordActivity({
         admin_username: admin.email,
         admin_name: admin.full_name || admin.email,
         action_type: "launch_check_signed_off",
         action_description: `Launch check signed off: ${check_id} -> ${status}`,
         ip_address: req.headers.get("x-forwarded-for") || "unknown",
-      }).catch(() => {});
+      });
 
       return new Response(JSON.stringify({ success: true, id: upserted?.id || null, check_id, status }), {
         status: 200,
@@ -691,7 +719,7 @@ Deno.serve(async (req: Request) => {
         });
       }
       const { decision, notes, results, confirmed } = body;
-      if (!confirmed) {
+      if (confirmed !== true) {
         return new Response(JSON.stringify({ error: "You must confirm the launch decision" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -703,13 +731,16 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const resultsArr = Array.isArray(results) ? results : [];
-      if (decision === "GO") {
-        const blockers = resultsArr.filter((c: any) =>
-          c.category === "critical" && (c.status === "fail" || c.status === "not_verified"));
-        if (blockers.length > 0) {
+      let resultsArr: Check[] = Array.isArray(results) ? results : [];
+      if (decision !== "NO-GO") {
+        // Browser snapshots can be stale, incomplete or altered. Re-evaluate any positive launch decision.
+        const [autoChecks, manualOnes] = await Promise.all([evaluateAutoChecks(), manualChecks()]);
+        resultsArr = await applySignoffs([...autoChecks, ...manualOnes]);
+        const blockers = resultsArr.filter(c => c.category === "critical" && !['pass', 'warning'].includes(c.status));
+        const warnings = resultsArr.filter(c => c.status === 'warning');
+        if (blockers.length > 0 || (decision === "GO" && warnings.length > 0)) {
           return new Response(JSON.stringify({
-            error: `Cannot approve GO — ${blockers.length} critical check(s) are failing or unverified.`,
+            error: `Cannot approve ${decision} — current server checks have ${blockers.length} failing or unverified critical check(s) and ${warnings.length} warning(s). Refresh the checklist and review the current evidence.`,
           }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
       }
@@ -731,13 +762,13 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      await supabaseQ.from("admin_activity_log").insert({
+      await recordActivity({
         admin_username: admin.email,
         admin_name: admin.full_name || admin.email,
         action_type: "launch_decision_saved",
         action_description: `Launch decision saved: ${decision}`,
         ip_address: req.headers.get("x-forwarded-for") || "unknown",
-      }).catch(() => {});
+      });
 
       return new Response(JSON.stringify({ success: true, id: inserted?.id || null }), {
         status: 200,
