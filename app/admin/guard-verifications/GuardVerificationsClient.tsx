@@ -621,8 +621,8 @@ export default function GuardVerificationsClient() {
               )}
 
               {(() => {
-                const siaBadge = getSiaCheckStatusBadge(selectedGuard.sia_check_status, selectedGuard.verification_status);
-                const siaText = getSiaCheckStatusText(selectedGuard.sia_check_status, selectedGuard.verification_status);
+                const siaBadge = getSiaCheckStatusBadge(selectedGuard.sia_check_status, selectedGuard.verification_status, selectedGuard);
+                const siaText = getSiaCheckStatusText(selectedGuard.sia_check_status, selectedGuard.verification_status, selectedGuard);
                 return (
                   <div className="bg-[#0a1628] border border-[#1a2b4a] rounded-xl p-5">
                     <div className="flex items-center justify-between mb-3">
