@@ -17,8 +17,8 @@ async function fixture(){
  grant usage on schema app,cron to service_role;grant select on public.cleanup_log,cron.job,cron.job_run_details to service_role;
  grant usage on schema app to anon,authenticated;
  insert into cron.job values(1,'unrelated','0 * * * *',true,'PRIVATE COMMAND');`);
- for(const table of targets)await db.exec(`create table public.${table}(id int primary key,created_at timestamptz,processed_at timestamptz,attempted_at timestamptz,status text,read boolean,is_read boolean);
- insert into public.${table} values(1,now()-interval '400 days',now()-interval '400 days',now()-interval '400 days','sent',true,false),(2,now()-interval '1 day',now()-interval '1 day',now()-interval '1 day','sent',true,false);`);
+ for(const table of targets){const schema=['email_queue','notifications','processed_stripe_events'].includes(table)?'app':'public';await db.exec(`create table ${schema}.${table}(id int primary key,created_at timestamptz,processed_at timestamptz,attempted_at timestamptz,status text,read boolean,is_read boolean);
+ insert into ${schema}.${table} values(1,now()-interval '400 days',now()-interval '400 days',now()-interval '400 days','sent',true,false),(2,now()-interval '1 day',now()-interval '1 day',now()-interval '1 day','sent',true,false);`);if(schema==='app')await db.exec(`create view public.${table} as select * from app.${table}`);}
  await db.exec("insert into public.email_queue values(3,now()-interval '400 days',now(),now(),'pending',true,false);insert into public.notifications values(3,now()-interval '400 days',now(),now(),'sent',false,false)");
  return db;
 }
@@ -94,5 +94,14 @@ test('the operational verification refuses any eligible deletion and only commit
   await db.exec(verification);
   assert.equal((await db.query('select count(*)::int n from public.cleanup_log where status=\'completed\' and rows_removed=0')).rows[0].n,6);
   assert.equal((await db.query('select count(*)::int n from public.notifications')).rows[0].n,3);
+ }finally{await db.close();}
+});
+
+test('zero-removal verification also rejects DELETE statement triggers on the underlying compatibility-view targets',async()=>{
+ const db=await fixture();try{
+  await db.exec(sql);for(const table of targets)await db.exec('update public.'+table+' set created_at=now(),processed_at=now(),attempted_at=now()');
+  await db.exec("create function app.reject_delete_statement() returns trigger language plpgsql as $$begin raise exception 'unexpected delete dispatch'; end$$;create trigger reject_delete_statement before delete on app.notifications for each statement execute function app.reject_delete_statement()");
+  await assert.rejects(db.exec(fs.readFileSync('scripts/ops/20261123-verify-cleanup-zero-deletions.sql','utf8')),/Unexpected trigger or rule/);await db.exec('rollback');
+  assert.equal((await db.query('select count(*)::int n from public.cleanup_log')).rows[0].n,0);
  }finally{await db.close();}
 });

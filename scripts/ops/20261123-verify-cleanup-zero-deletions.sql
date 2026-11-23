@@ -6,8 +6,9 @@ begin;
 set local lock_timeout = '5s';
 lock table public.admin_registration_audit, public.email_queue, public.email_send_log,
   public.notifications, public.processed_stripe_events, public.rate_limit_events,
-  public.cleanup_log in share row exclusive mode;
-lock table cron.job in share mode;
+  public.cleanup_log, app.email_queue, app.notifications, app.processed_stripe_events
+  in share row exclusive mode;
+-- Supabase owns cron.job: compare its configuration without requiring write/lock privileges.
 
 do $verify$
 declare
@@ -30,16 +31,40 @@ begin
     where t.tgrelid in ('public.admin_registration_audit'::regclass, 'public.email_queue'::regclass,
       'public.email_send_log'::regclass, 'public.notifications'::regclass,
       'public.processed_stripe_events'::regclass, 'public.rate_limit_events'::regclass,
-      'public.cleanup_log'::regclass) and not t.tgisinternal
+      'public.cleanup_log'::regclass, 'app.email_queue'::regclass,
+      'app.notifications'::regclass, 'app.processed_stripe_events'::regclass)
+      and not t.tgisinternal and ((t.tgtype & 8) <> 0 or t.tgrelid = 'public.cleanup_log'::regclass)
   ) or exists (
     select 1 from pg_catalog.pg_rewrite r where r.ev_class in (
       'public.admin_registration_audit'::regclass, 'public.email_queue'::regclass,
       'public.email_send_log'::regclass, 'public.notifications'::regclass,
       'public.processed_stripe_events'::regclass, 'public.rate_limit_events'::regclass,
-      'public.cleanup_log'::regclass)
+      'public.cleanup_log'::regclass, 'app.email_queue'::regclass,
+      'app.notifications'::regclass, 'app.processed_stripe_events'::regclass)
+      and not (r.rulename = '_RETURN' and r.ev_type = '1' and r.is_instead
+        and r.ev_class in ('public.email_queue'::regclass, 'public.notifications'::regclass,
+          'public.processed_stripe_events'::regclass))
   ) then
     raise exception 'Unexpected trigger or rule: verification refused';
   end if;
+  -- These three public compatibility views must still reference only their matching
+  -- app table. Do not broaden retention onto a different relation or a function-backed view.
+  for target in select * from (values
+    ('email_queue'), ('notifications'), ('processed_stripe_events')
+  ) as views(table_name) loop
+    if not exists (select 1 from pg_catalog.pg_class c where c.oid = format('public.%I', target.table_name)::regclass and c.relkind = 'v')
+      or not exists (select 1 from pg_catalog.pg_rewrite r join pg_catalog.pg_depend d on d.classid = 'pg_rewrite'::regclass and d.objid = r.oid
+        where r.ev_class = format('public.%I', target.table_name)::regclass
+          and d.refclassid = 'pg_class'::regclass and d.refobjid = format('app.%I', target.table_name)::regclass)
+      or exists (select 1 from pg_catalog.pg_rewrite r join pg_catalog.pg_depend d on d.classid = 'pg_rewrite'::regclass and d.objid = r.oid
+        where r.ev_class = format('public.%I', target.table_name)::regclass
+          and (d.refclassid = 'pg_proc'::regclass or (d.refclassid = 'pg_class'::regclass
+            and d.refobjid not in (r.ev_class, format('app.%I', target.table_name)::regclass)))) then
+      raise exception 'Unexpected compatibility view mapping: %', target.table_name;
+    end if;
+    execute format('select md5(coalesce(string_agg(md5(to_jsonb(t)::text), '''' order by md5(to_jsonb(t)::text)), '''')) from app.%I t', target.table_name) into fingerprint;
+    before_targets := before_targets || jsonb_build_object('app.' || target.table_name, fingerprint);
+  end loop;
   select count(*) into before_logs from public.cleanup_log;
   select md5(coalesce(string_agg(to_jsonb(j)::text, '' order by jobid), ''))
     into before_cron from cron.job j;
@@ -81,6 +106,12 @@ begin
       and l.table_name = target.table_name and l.retention_days = target.retention_days
       and l.status = 'completed' and l.rows_removed = 0) <> 1 then
       raise exception 'Expected one actual zero-removal completion: %', target.table_name;
+    end if;
+  end loop;
+  for target in select * from (values ('email_queue'), ('notifications'), ('processed_stripe_events')) as views(table_name) loop
+    execute format('select md5(coalesce(string_agg(md5(to_jsonb(t)::text), '''' order by md5(to_jsonb(t)::text)), '''')) from app.%I t', target.table_name) into fingerprint;
+    if fingerprint is distinct from before_targets ->> ('app.' || target.table_name) then
+      raise exception 'Underlying app data changed: %', target.table_name;
     end if;
   end loop;
   if (select count(*) from public.cleanup_log) <> before_logs + 6 then
