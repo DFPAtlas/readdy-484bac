@@ -56,3 +56,14 @@ test('server-side MFA and review errors stay visible without claiming an approva
  const toast=f.events.find(e=>e[0]==='toast');assert.match(toast[1],/MFA required: Verify your admin session/);
  assert.equal(f.events.some(e=>e[0]==='closed'||e[0]==='refresh'),false);
 });
+test('a missing-reviewer conflict stays visible in both approval flows without closing or refreshing the review',async()=>{
+ for(const override of [false,true]){
+  const f=fixture({error:'Existing approval has no recorded reviewer; an authorised provenance review is required. No approval data was changed',code:'APPROVAL_REVIEWER_MISSING',guard_id:'fixture-guard',status:'approved'},{ok:false});
+  await (override?f.confirmOverrideApprove():f.confirmApprove());
+  assert.equal(f.requests.length,1);
+  const toast=f.events.find(e=>e[0]==='toast');assert.equal(toast[2],'error');
+  assert.match(toast[1],/Approval not confirmed:.*recorded reviewer.*provenance review/);
+  assert.equal(f.events.some(e=>['closed','refresh','counts'].includes(e[0])),false);
+  assert.equal(f.refs.run.current,false);
+ }
+});

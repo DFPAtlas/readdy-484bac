@@ -150,7 +150,10 @@ Deno.serve(async function(req) {
         return new Response(JSON.stringify({ error: 'An active admin with MFA must approve the guard' }), { status: 403, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
       }
       if (guard.verification_status === 'approved' || guard.verification_status === 'verified') {
-        if (!guard.verified_by) await updateGuard(supabaseQ, guardId, { verified_by: reviewerId, verified_at: now });
+        // A retry is not evidence of who made the existing approval decision.
+        if (!guard.verified_by) {
+          return new Response(JSON.stringify({ error: 'Existing approval has no recorded reviewer; an authorised provenance review is required. No approval data was changed', code: 'APPROVAL_REVIEWER_MISSING', guard_id: guardId, status: guard.verification_status }), { status: 409, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
+        }
         return new Response(JSON.stringify({ success: true, guard_id: guardId, status: guard.verification_status, action: 'approved', already_approved: true, notification_status: 'not_requested' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
       }
       await updateGuard(supabaseQ, guardId, { verified_by: reviewerId, verification_status: 'approved', is_active: true, sia_verified: true, sia_verified_at: now, verified_at: now, dashboard_access: true, profile_completed: true, rejection_reason: null, rejected_at: null, updated_at: now });
