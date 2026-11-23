@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import StorageUsageWidget from '@/components/admin/StorageUsageWidget';
 import { loadAdminCleanupLogs, type CleanupLog } from '@/lib/adminMaintenance';
+import { loadAdminCleanupInventory, type CleanupInventory } from '@/lib/adminCleanupInventory';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vnywjfpkepjgclkbcmsj.supabase.co';
 const WEBSITE_URL = 'https://quickguard.uk';
@@ -184,8 +185,10 @@ export default function SystemStatusClient() {
   const [cleanupLogsLoading, setCleanupLogsLoading] = useState(true);
   const [cleanupLogsError, setCleanupLogsError] = useState<string | null>(null);
 
-  const [tableSizes, setTableSizes] = useState<Record<string, string>>();
-  const [tableSizesLoading, setTableSizesLoading] = useState(true);
+  const [cleanupInventory, setCleanupInventory] = useState<CleanupInventory | null>(null);
+  const [cleanupInventoryLoading, setCleanupInventoryLoading] = useState(true);
+  const [cleanupInventoryError, setCleanupInventoryError] = useState<string | null>(null);
+  const inventoryRequest = useRef({ id: 0, active: true });
 
   const [cleanupRunning, setCleanupRunning] = useState(false);
   const [cleanupResult, setCleanupResult] = useState<{ ok: number; fail: number } | null>(null);
@@ -405,26 +408,27 @@ export default function SystemStatusClient() {
     }
   }, []);
 
-  // ── Fetch table sizes ────────────────────────────────────────────────
-  const fetchTableSizes = useCallback(async () => {
-    setTableSizesLoading(true);
-    const tables = [
-      'email_send_log', 'admin_registration_audit', 'email_queue',
-      'rate_limit_events', 'notifications', 'processed_stripe_events',
-    ];
-    const results: Record<string, string> = {};
-    await Promise.all(
-      tables.map(async (table) => {
-        try {
-          const { count } = await supabase.from(table).select('*', { count: 'exact', head: true });
-          results[table] = count !== null ? `${count.toLocaleString('en-GB')} rows` : '? rows';
-        } catch {
-          results[table] = '? rows';
-        }
-      })
-    );
-    setTableSizes(results);
-    setTableSizesLoading(false);
+  // ── Read the inventory of the actual scheduled cleanup targets ─────────
+  const fetchCleanupInventory = useCallback(async () => {
+    const request = ++inventoryRequest.current.id;
+    setCleanupInventoryLoading(true);
+    setCleanupInventoryError(null);
+    setCleanupInventory(null);
+    try {
+      const inventory = await loadAdminCleanupInventory();
+      if (inventoryRequest.current.active && request === inventoryRequest.current.id) setCleanupInventory(inventory);
+    } catch {
+      if (inventoryRequest.current.active && request === inventoryRequest.current.id) {
+        setCleanupInventoryError('Unable to verify cleanup inventory. Please retry.');
+      }
+    } finally {
+      if (inventoryRequest.current.active && request === inventoryRequest.current.id) setCleanupInventoryLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    const scope = inventoryRequest.current;
+    scope.active = true;
+    return () => { scope.active = false; };
   }, []);
 
   // ── Run cleanup ──────────────────────────────────────────────────────
@@ -476,13 +480,13 @@ export default function SystemStatusClient() {
       pingWebsite(),
       pingEdgeFunctions(),
       fetchCleanupLogs(),
-      fetchTableSizes(),
+      fetchCleanupInventory(),
     ]);
 
     setLastRefreshed(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     refreshingRef.current = false;
     setIsRefreshing(false);
-  }, [fetchAdminStatus, pingWebsite, pingEdgeFunctions, fetchCleanupLogs, fetchTableSizes]);
+  }, [fetchAdminStatus, pingWebsite, pingEdgeFunctions, fetchCleanupLogs, fetchCleanupInventory]);
 
   // ── Effects ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1072,6 +1076,13 @@ export default function SystemStatusClient() {
               </div>
             </div>
 
+            <p className="text-[11px] text-slate-500 mb-3">Counts cover the scheduled cleanup targets, which can differ from application logs. Eligible records meet the existing retention and status rules.</p>
+            {cleanupInventoryError && (
+              <div role="alert" className="text-xs text-amber-400 mb-3">
+                <p>{cleanupInventoryError}</p>
+                <button onClick={fetchCleanupInventory} className="underline mt-1">Retry cleanup inventory</button>
+              </div>
+            )}
             <div className="bg-[#111d35] rounded-2xl border border-[#1a2b4a] overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
@@ -1079,7 +1090,8 @@ export default function SystemStatusClient() {
                     <tr className="border-b border-[#1a2b4a] bg-[#0a1628]">
                       <th className="text-left px-4 py-3 font-semibold text-slate-400">Table</th>
                       <th className="text-left px-4 py-3 font-semibold text-slate-400">Retention</th>
-                      <th className="text-right px-4 py-3 font-semibold text-slate-400">Size</th>
+                      <th className="text-right px-4 py-3 font-semibold text-slate-400">Records</th>
+                      <th className="text-right px-4 py-3 font-semibold text-slate-400">Eligible</th>
                       <th className="text-right px-4 py-3 font-semibold text-slate-400">Last Run</th>
                     </tr>
                   </thead>
@@ -1092,6 +1104,7 @@ export default function SystemStatusClient() {
                       { table: 'notifications', retention: '180 days', icon: 'ri-notification-line' },
                       { table: 'processed_stripe_events', retention: '365 days', icon: 'ri-bank-card-line' },
                     ].map((row) => {
+                      const target = cleanupInventory?.targets.find(item => item.table_name === row.table);
                       const log = cleanupLogs.find(l => l.table_name === row.table && l.status === 'completed');
                       const failLog = cleanupLogs.find(l => l.table_name === row.table && l.status === 'failed');
                       return (
@@ -1101,14 +1114,20 @@ export default function SystemStatusClient() {
                               <div className="w-6 h-6 flex items-center justify-center rounded-md bg-[#0a1628] text-teal-400">
                                 <i className={`${row.icon} text-[11px]`}></i>
                               </div>
-                              <span className="text-white font-mono text-[11px]">{row.table}</span>
+                              <div>
+                                <span className="text-white font-mono text-[11px]">{row.table}</span>
+                                {target && <p className="text-[10px] text-slate-500">{target.target_relation} · {target.relation_type}</p>}
+                              </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3"><span className="text-slate-400 text-[11px]">{row.retention}</span></td>
+                          <td className="px-4 py-3"><span className="text-slate-400 text-[11px]">{target ? `${target.retention_days} days` : row.retention}</span></td>
                           <td className="px-4 py-3 text-right">
                             <span className="text-slate-400 text-[11px]">
-                              {tableSizesLoading ? '…' : (tableSizes?.[row.table] || '-')}
+                              {cleanupInventoryLoading ? '…' : target ? target.total_rows.toLocaleString('en-GB') : 'Not verified'}
                             </span>
+                          </td>
+                          <td className="px-4 py-3 text-right text-slate-400">
+                            {cleanupInventoryLoading ? '…' : target ? target.eligible_rows.toLocaleString('en-GB') : 'Not verified'}
                           </td>
                           <td className="px-4 py-3 text-right">
                             {failLog ? (
@@ -1128,6 +1147,8 @@ export default function SystemStatusClient() {
                 </table>
               </div>
             </div>
+
+            {cleanupInventory && <p className="text-[10px] text-slate-500 mt-2">Inventory checked {new Date(cleanupInventory.sampled_at).toLocaleTimeString('en-GB')}</p>}
 
             {/* Recent Cleanup Activity */}
             <div className="mt-4 bg-[#111d35] rounded-2xl border border-[#1a2b4a] p-4">
