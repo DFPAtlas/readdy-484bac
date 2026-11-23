@@ -24,11 +24,11 @@ serve(async (req) => {
   if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   try {
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    const configuredStripeKey = Deno.env.get('STRIPE_SECRET_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!stripeSecretKey || !supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || !supabaseKey) {
       return new Response(JSON.stringify({ error: 'Missing config' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -51,6 +51,24 @@ serve(async (req) => {
     const subscriptionId: unknown = Object.getOwnPropertyDescriptor(body, 'subscription_id')?.value;
     const dryRun = Object.getOwnPropertyDescriptor(body, 'dry_run')?.value === true;
     if (subscriptionId !== undefined && (typeof subscriptionId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subscriptionId))) throw new Error('Invalid subscription ID');
+    const stripeEnvironment: unknown = Object.getOwnPropertyDescriptor(body, 'stripe_environment')?.value;
+    if (stripeEnvironment !== undefined && stripeEnvironment !== 'configured' && stripeEnvironment !== 'sandbox') {
+      return new Response(JSON.stringify({ error: 'Invalid Stripe environment' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const sandboxPreview = stripeEnvironment === 'sandbox';
+    if (sandboxPreview && (!dryRun || typeof subscriptionId !== 'string')) {
+      return new Response(JSON.stringify({ error: 'Sandbox access requires a scoped read-only preview' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    // Sandbox credentials never participate in the existing reconciliation path.
+    const stripeSecretKey = sandboxPreview ? Deno.env.get('STRIPE_SANDBOX_READ_KEY') : configuredStripeKey;
+    if (sandboxPreview && (!stripeSecretKey || !/^(sk|rk)_test_/.test(stripeSecretKey))) {
+      return new Response(JSON.stringify({ success: false, stripe_environment: 'sandbox', results: [{
+        sub_id: subscriptionId, action: 'error', error_code: !stripeSecretKey ? 'sandbox_not_configured' : 'invalid_sandbox_key',
+      }] }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    if (!stripeSecretKey) {
+      return new Response(JSON.stringify({ error: 'Missing config' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     let query = appSupabase.from('subscriptions').select('*').not('stripe_subscription_id', 'is', null).order('created_at', { ascending: false });
     if (typeof subscriptionId === 'string') query = query.eq('id', subscriptionId);
     const { data: subs, error: subscriptionError } = await query;
@@ -64,6 +82,7 @@ serve(async (req) => {
 
       try {
         const stripeSub = await stripe.subscriptions.retrieve(stripeSubId);
+        if (sandboxPreview && stripeSub.livemode !== false) throw new Error('Sandbox preview did not return a sandbox subscription');
         console.log(`Fetched Stripe sub ${stripeSubId}, status=${stripeSub.status}, latest_invoice=${stripeSub.latest_invoice}`);
 
         const latestInvoiceId = stripeId(stripeSub.latest_invoice);
@@ -92,7 +111,7 @@ serve(async (req) => {
           if (invoiceReadError) throw invoiceReadError;
           if (existingInvoicePmt && (existingInvoicePmt.subscription_id !== sub.id || existingInvoicePmt.user_id !== sub.user_id)) throw new Error('Invoice is linked to a different subscription or user');
           if (existingInvoicePmt && (existingInvoicePmt.status !== 'succeeded' || Number(existingInvoicePmt.amount) !== amountPaid || existingInvoicePmt.currency !== invoice.currency)) throw new Error('Existing invoice ledger conflicts with Stripe; review required');
-          if (dryRun) { results.push({ sub_id: sub.id, action: 'preview', invoice_id: latestInvoiceId, amount: amountPaid, already_recorded: !!existingInvoicePmt, period_start: period.start, period_end: period.end, paid_at: paidAt }); continue; }
+          if (dryRun) { results.push({ sub_id: sub.id, action: 'preview', invoice_id: latestInvoiceId, amount: amountPaid, already_recorded: !!existingInvoicePmt, period_start: period.start, period_end: period.end, paid_at: paidAt, ...(sandboxPreview ? { livemode: false } : {}) }); continue; }
 
           let backfilled = false;
           if (!existingInvoicePmt && amountPaid > 0) {
@@ -143,7 +162,8 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ success: !results.some(result => result.action === 'error'), results }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ success: !results.some(result => result.action === 'error'), results,
+      ...(sandboxPreview ? { stripe_environment: 'sandbox' } : {}) }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error: any) {
     console.error('Backfill error:', error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
