@@ -2,14 +2,16 @@
 import asyncio
 from datetime import date
 import logging
+import shutil
 from pathlib import Path
 import sys
 import time
 
 from . import vision
 from .decoder import decode
+from .extraction import extract
 from .transport import inference_client, inference_url, model_pin
-from .models import DlExtract, PoaExtract, RuleInput
+from .models import RuleInput
 from .rules import evaluate, parse_doc_date
 from .store import DocStore
 
@@ -27,10 +29,11 @@ async def check(store: DocStore, job: dict) -> tuple[str, list[str]]:
     poa = await decode(await store.download(job, "proof"), "poa")
     licence = await decode(await store.download(job, "licence"), "dl")
     context.poa_flags, context.dl_flags = poa.flags, licence.flags
-    context.poa = (PoaExtract(readable=False, is_proof_of_address_document=False) if poa.unreadable
-                   else await vision.read_poa(poa.images))
-    context.dl = (DlExtract(readable=False, is_uk_driving_licence=False) if licence.unreadable
-                  else await vision.read_dl(licence.images))
+    proof = await extract(poa, "proof")
+    driving = await extract(licence, "licence")
+    if proof.reasons or driving.reasons:
+        return "review", proof.reasons + driving.reasons
+    context.poa, context.dl = proof.fields, driving.fields
     result = evaluate(context)
     # The models have not passed extraction acceptance.
     if result.decision == "approve":
@@ -69,6 +72,8 @@ async def run() -> None:
     HEARTBEAT.unlink(missing_ok=True)
     inference_url()
     model_pin()
+    if shutil.which("tesseract") is None:
+        raise RuntimeError("OCR executable unavailable")
     async with inference_client():
         pass
     store = DocStore()

@@ -1,13 +1,17 @@
 """Shapes for what the vision model reads off each document, and for the result."""
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
 POA_TYPES = ["utility_bill", "council_tax", "bank_statement", "building_society_statement",
              "broadband_bill", "mortgage_statement", "hmrc_letter", "benefits_letter",
              "mobile_phone_bill", "tenancy_agreement", "other"]
+
+
+class Classification(BaseModel):
+    kind: Literal["licence", "proof", "unsupported", "uncertain"]
 
 
 class PoaExtract(BaseModel):

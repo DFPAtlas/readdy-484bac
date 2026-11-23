@@ -60,5 +60,5 @@ def inference_client() -> httpx.AsyncClient:
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ctx.load_cert_chain(os.environ["IDENTITY_INFERENCE_CERT_FILE"], os.environ["IDENTITY_INFERENCE_KEY_FILE"])
     return httpx.AsyncClient(verify=ctx, trust_env=False, follow_redirects=False,
-                             timeout=httpx.Timeout(35, connect=5),
+                             timeout=httpx.Timeout(67, connect=5),
                              headers={"Accept-Encoding": "identity"})

@@ -15,6 +15,7 @@ import pymupdf
 from PIL import Image, ImageOps
 
 from .transport import DOCUMENT_LIMIT, RENDER_LIMIT
+from .evidence import Line
 
 MAX_SIDE = 1200
 MAX_IMAGE_PIXELS = 12_000_000
@@ -36,6 +37,8 @@ class LoadedDoc:
     sha256: str
     kind: str                                   # pdf | image
     images: list[bytes] = field(default_factory=list)   # PNG bytes, first page / photo
+    extra_pages: list[bytes] = field(default_factory=list)
+    lines: list[Line] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)      # review reasons
     unreadable: bool = False
 
@@ -74,6 +77,8 @@ def load(data: bytes, filename: str, role: str) -> LoadedDoc:
             _load_image(data, doc, role)
     except Exception:  # corrupt file, wrong format
         doc.unreadable = True
+        doc.images.clear()
+        doc.extra_pages.clear()
     return doc
 
 
@@ -89,14 +94,14 @@ def _load_pdf(data: bytes, doc: LoadedDoc, role: str) -> None:
             doc.flags.append(f"{role}_pdf_modified_later")
         if data.count(b"%%EOF") > 1:
             doc.flags.append(f"{role}_pdf_incremental_edit")
-        page = pdf[0]
-        if not 0 < page.rect.width <= 4000 or not 0 < page.rect.height <= 4000:
-            raise ValueError("Unsupported PDF page size")
-        zoom = min(2.0, MAX_SIDE / max(page.rect.width, page.rect.height))
-        rendered = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom)).tobytes("png")
-        if len(rendered) > RENDER_LIMIT:
-            raise ValueError("Render too large")
-        doc.images.append(rendered)
+        for number, page in enumerate(pdf):
+            if not 0 < page.rect.width <= 4000 or not 0 < page.rect.height <= 4000:
+                raise ValueError("Unsupported PDF page size")
+            zoom = min(2.0, MAX_SIDE / max(page.rect.width, page.rect.height))
+            rendered = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom)).tobytes("png")
+            if len(rendered) > RENDER_LIMIT:
+                raise ValueError("Render too large")
+            (doc.images if number == 0 else doc.extra_pages).append(rendered)
 
 
 def _load_image(data: bytes, doc: LoadedDoc, role: str) -> None:

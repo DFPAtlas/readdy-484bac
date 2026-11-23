@@ -11,7 +11,7 @@ import time
 
 import httpx
 
-from .models import DlExtract, PoaExtract
+from .models import Classification, DlExtract, PoaExtract
 from .transport import RENDER_LIMIT, REQUEST_LIMIT, RESPONSE_LIMIT, exchange, model_pin, private_ipv4
 
 LOCAL_OLLAMA = "http://127.0.0.1:11434"
@@ -37,9 +37,16 @@ async def handle(path, request):
         await require_pin(client, model, digest)
         if path == "/ready":
             return 204, b""
-        from .vision import DL_PROMPT, POA_PROMPT
+        from .vision import CLASSIFY_PROMPT, DL_PROMPT, POA_PROMPT, SYSTEM
         kind = request["kind"]
         schema = SCHEMAS[kind]
+        phase = request["phase"]
+        if phase == "classification":
+            schema, prompt = Classification, CLASSIFY_PROMPT
+        elif phase == "fields":
+            prompt = POA_PROMPT if kind == "proof" else DL_PROMPT
+        else:
+            raise ValueError("Unknown inference phase")
         image = request["image"]
         if not isinstance(image, str) or not image or len(image) > 2_800_000:
             raise ValueError("Invalid image")
@@ -49,8 +56,8 @@ async def handle(path, request):
         body = {
             "model": model, "stream": False, "keep_alive": 0, "format": schema.model_json_schema(),
             "options": {"temperature": 0, "num_predict": 768, "num_ctx": 4096},
-            "messages": [{"role": "user", "content": POA_PROMPT if kind == "proof" else DL_PROMPT,
-                          "images": [image]}],
+            "messages": [{"role": "system", "content": SYSTEM},
+                         {"role": "user", "content": prompt, "images": [image]}],
         }
         _, raw = await exchange(client, "POST", LOCAL_OLLAMA + "/api/chat", json=body,
                                 limit=RESPONSE_LIMIT, deadline=55)

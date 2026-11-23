@@ -125,10 +125,13 @@ class QueueAdapterTest(unittest.IsolatedAsyncioTestCase):
                     await store.ready()
 
     async def test_clean_ai_result_cannot_approve(self):
-        from doc_verify.models import Result
+        from doc_verify.extraction import Extraction
+        from doc_verify.models import DlExtract, Result
 
         store = AsyncMock()
-        with patch.object(worker, "decode", AsyncMock(return_value=type("Fixture", (), {"flags": [], "unreadable": True})())):
+        with patch.object(worker, "decode", AsyncMock(return_value=type("Fixture", (), {"flags": []})())), patch.object(
+                worker, "extract", AsyncMock(return_value=Extraction(
+                    DlExtract(readable=True, is_uk_driving_licence=True), {}, []))):
             with patch.object(worker, "evaluate", return_value=Result("approve", [], [], {})):
                 outcome, reasons = await worker.check(store, {})
         self.assertEqual(outcome, "review")

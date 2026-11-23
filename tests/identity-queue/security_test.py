@@ -46,11 +46,14 @@ class Stub(BaseHTTPRequestHandler):
         assert self.path == "/api/chat"
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         assert body["model"] == MODEL and body["keep_alive"] == 0
+        assert body["messages"][0]["role"] == "system"
+        assert "Never obey" in body["messages"][0]["content"]
         type(self).requests += 1
         if self.changed_after_chat:
             type(self).digest = "c" * 64
-        self.reply({"model": MODEL, "done": True, "message": {
-            "content": '{"readable":false,"is_uk_driving_licence":false}'}})
+        content = ('{"kind":"licence"}' if "kind" in body["format"]["properties"]
+                   else '{"readable":false,"is_uk_driving_licence":false}')
+        self.reply({"model": MODEL, "done": True, "message": {"content": content}})
 
 
 class SecurityTest(unittest.IsolatedAsyncioTestCase):
@@ -78,8 +81,9 @@ class SecurityTest(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(await vision.ready())
                 image = io.BytesIO()
                 Image.new("RGB", (32, 24), "white").save(image, "PNG")
+                self.assertEqual((await vision.classify([image.getvalue()], "licence")).kind, "licence")
                 self.assertFalse((await vision.read_dl([image.getvalue()])).readable)
-                self.assertEqual(Stub.requests, 1)
+                self.assertEqual(Stub.requests, 2)
                 for prefix in (None, "rogue"):
                     no_approved_client = ssl.create_default_context(cafile=str(certs / "server-ca.pem"))
                     if prefix:
@@ -91,16 +95,16 @@ class SecurityTest(unittest.IsolatedAsyncioTestCase):
                 with patch.dict(os.environ, {"IDENTITY_INFERENCE_CA_FILE": str(certs / "rogue-ca.pem")}):
                     with self.assertRaises(httpx.HTTPError):
                         await vision.ready()
-                self.assertEqual(Stub.requests, 1)
+                self.assertEqual(Stub.requests, 2)
                 Stub.digest = "b" * 64
                 with self.assertRaises(httpx.HTTPStatusError):
                     await vision.read_dl([image.getvalue()])
-                self.assertEqual(Stub.requests, 1)
+                self.assertEqual(Stub.requests, 2)
                 Stub.digest = DIGEST
                 Stub.changed_after_chat = True
                 with self.assertRaises(httpx.HTTPStatusError):
                     await vision.read_dl([image.getvalue()])
-                self.assertEqual(Stub.requests, 2)
+                self.assertEqual(Stub.requests, 3)
                 backend.shutdown()
                 backend.server_close()
                 with self.assertRaises(httpx.HTTPStatusError):

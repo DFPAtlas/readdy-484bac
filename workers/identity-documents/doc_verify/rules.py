@@ -237,6 +237,10 @@ def evaluate(inp: RuleInput) -> Result:
     if inp.poa_duplicate:
         review.append("poa_used_on_another_account")
 
+    if dl and poa and dl.address_first_line and poa.address_first_line:
+        if normalise(dl.address_first_line) != normalise(poa.address_first_line):
+            review.append("address_mismatch_dl_poa")
+
     detail = inp.poa_flag_detail + inp.dl_flag_detail
     if detail:
         extracted["flag_detail"] = detail
