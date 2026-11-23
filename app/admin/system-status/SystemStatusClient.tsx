@@ -426,8 +426,9 @@ export default function SystemStatusClient() {
     }
   }, []);
   useEffect(() => {
-    inventoryRequest.current.active = true;
-    return () => { inventoryRequest.current.active = false; };
+    const scope = inventoryRequest.current;
+    scope.active = true;
+    return () => { scope.active = false; };
   }, []);
 
   // ── Run cleanup ──────────────────────────────────────────────────────
