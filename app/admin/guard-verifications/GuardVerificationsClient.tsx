@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { GuardVerification, GuardStatus, matchesSearch, getSiaCheckStatusBadge, getSiaCheckStatusText, getApprovalBlockers } from './types';
 import RequestInfoModal from './RequestInfoModal';
@@ -71,6 +71,15 @@ export default function GuardVerificationsClient() {
   const [counts, setCounts] = useState<Record<string, number>>({ pending: 0, approved: 0, rejected: 0, suspended: 0, incomplete: 0, all: 0 });
   const [detailLoading, setDetailLoading] = useState(false);
   const [requestInfoGuard, setRequestInfoGuard] = useState<GuardVerification | null>(null);
+  const approvalRunRef = useRef(false);
+  const approvalActiveRef = useRef(true);
+  const approvalGuardRef = useRef<string | null>(null);
+  const approvalReviewRef = useRef(0);
+
+  useEffect(() => {
+    approvalActiveRef.current = true;
+    return () => { approvalActiveRef.current = false; };
+  }, []);
 
   const fetchGuards = useCallback(async (status: GuardStatus) => {
     try {
@@ -192,6 +201,8 @@ export default function GuardVerificationsClient() {
   const filteredGuards = guards.filter((g) => matchesSearch(g, searchQuery));
 
   const openGuardDetails = (guard: GuardVerification) => {
+    approvalReviewRef.current++;
+    approvalGuardRef.current = guard.id;
     setDetailLoading(true);
     setSelectedGuard(guard);
     setVerificationChecks({...defaultChecks, ...guard.verification_checks});
@@ -200,6 +211,8 @@ export default function GuardVerificationsClient() {
   };
 
   const closeGuardDetails = () => {
+    approvalReviewRef.current++;
+    approvalGuardRef.current = null;
     setSelectedGuard(null);
     setVerificationChecks({ ...defaultChecks });
   };
@@ -229,15 +242,20 @@ export default function GuardVerificationsClient() {
     setShowOverrideModal(true);
   };
 
-  const confirmOverrideApprove = async () => {
-    if (!selectedGuard) return;
-    setShowOverrideModal(false);
+  const submitApproval = async (override: boolean) => {
+    if (!selectedGuard || processing || approvalRunRef.current || !approvalActiveRef.current) return;
+    const guardId = selectedGuard.id;
+    const review = approvalReviewRef.current;
+    const isCurrent = () => approvalActiveRef.current && approvalGuardRef.current === guardId && approvalReviewRef.current === review;
+    approvalRunRef.current = true;
+    if (override) setShowOverrideModal(false);
+    else setShowApproveModal(false);
     setProcessing(true);
     try {
-      const adminUsername = admin.username || 'admin';
-      const adminName = admin.name || adminUsername;
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || '';
+      const adminName = admin.name || admin.username || 'admin';
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) throw new Error('Your admin session is unavailable. Sign in again.');
+      if (!isCurrent()) return;
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/admin-verify-guard`,
         {
@@ -245,80 +263,48 @@ export default function GuardVerificationsClient() {
           headers: {
             'Content-Type': 'application/json',
             'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({
-            guardId: selectedGuard.id,
-            action: 'approve',
-            adminName,
-            override: true,
-          }),
+          body: JSON.stringify({ guardId, action: 'approve', adminName, ...(override ? { override: true } : {}) }),
         }
       );
-
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-        const detail = result.details ? ': ' + result.details : '';
-        throw new Error((result.error || `Server returned ${response.status}`) + detail);
+      const result: unknown = await response.json();
+      if (!isCurrent()) return;
+      if (!response.ok) {
+        const message = result && typeof result === 'object' && 'error' in result
+          && typeof result.error === 'string' && result.error.trim() ? result.error : `Server returned ${response.status}`;
+        const detail = result && typeof result === 'object' && 'details' in result
+          && typeof result.details === 'string' && result.details.trim() ? `: ${result.details}` : '';
+        throw new Error(`${message}${detail}. Refresh the guard status before retrying.`);
       }
-
-      showToast('Guard force-approved via override!', 'success');
+      if (!response.ok || !result || typeof result !== 'object' || !('success' in result) || result.success !== true
+          || !('guard_id' in result) || result.guard_id !== guardId || !('action' in result) || result.action !== 'approved'
+          || !('status' in result) || (result.status !== 'approved' && result.status !== 'verified')) {
+        throw new Error('The server did not confirm this guard approval. Refresh its status before retrying.');
+      }
+      const savedMessage = override ? 'Guard approved via override.' : 'Guard approved.';
+      if ('already_approved' in result && result.already_approved === true) {
+        showToast('Guard approval was already recorded. Email status was not checked; review the email log.', 'error');
+      } else if ('notification_status' in result && result.notification_status === 'accepted') {
+        showToast(`${savedMessage} Approval email accepted for sending.`, 'success');
+      } else if ('notification_status' in result && result.notification_status === 'already_sent') {
+        showToast(`${savedMessage} An approval email was already sent within the last 24 hours.`, 'success');
+      } else {
+        showToast(`${savedMessage} Approval email could not be confirmed. Review the email log for email-only recovery.`, 'error');
+      }
       closeGuardDetails();
       fetchGuards(activeTab);
       fetchAllCounts();
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Override approval error:', msg);
-      showToast('Override failed: ' + msg, 'error');
+    } catch (error: unknown) {
+      if (isCurrent()) showToast('Approval not confirmed: ' + (error instanceof Error ? error.message : 'Refresh the guard status before retrying.'), 'error');
     } finally {
-      setProcessing(false);
+      approvalRunRef.current = false;
+      if (approvalActiveRef.current) setProcessing(false);
     }
   };
 
-  const confirmApprove = async () => {
-    if (!selectedGuard) return;
-    setShowApproveModal(false);
-    setProcessing(true);
-    try {
-      const adminUsername = admin.username || 'admin';
-      const adminName = admin.name || adminUsername;
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || '';
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/admin-verify-guard`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            guardId: selectedGuard.id,
-            action: 'approve',
-            adminName,
-          }),
-        }
-      );
-
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-        const detail = result.details ? ': ' + result.details : '';
-        throw new Error((result.error || `Server returned ${response.status}`) + detail);
-      }
-
-      showToast('Guard approved successfully!', 'success');
-      closeGuardDetails();
-      fetchGuards(activeTab);
-      fetchAllCounts();
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Approval error:', msg);
-      showToast('Approval failed: ' + msg, 'error');
-    } finally {
-      setProcessing(false);
-    }
-  };
+  const confirmOverrideApprove = () => submitApproval(true);
+  const confirmApprove = () => submitApproval(false);
 
   const handleReject = async () => {
     if (!selectedGuard) return;

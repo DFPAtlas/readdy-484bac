@@ -18,7 +18,7 @@ export default function ApproveConfirmModal({ open, guardName, onCancel, onConfi
         </div>
         <h3 className="text-xl font-bold text-white text-center mb-2">Approve Guard Application</h3>
         <p className="text-slate-400 text-center mb-6">
-          Are you sure you want to approve <strong className="text-white">{guardName}</strong>? They will receive a welcome email and gain full access to the platform.
+          Are you sure you want to approve <strong className="text-white">{guardName}</strong>? This grants approved guard access. The approval email result will be reported separately.
         </p>
         <div className="flex items-center gap-3">
           <button

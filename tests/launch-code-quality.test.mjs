@@ -199,3 +199,41 @@ test('guard approval requires and records a human admin reviewer', async () => {
   assert.equal(h.writes[0].verification_status, 'approved');
   assert.equal(h.writes[0].verified_by, guardReviewAdminId);
 });
+
+test('guard approval reports confirmed email acceptance only after its saved decision', async () => {
+  const h = guardAdminHarness();
+  const response = await h.call('approve', guardReviewAdminToken);
+  const result = await response.json();
+  assert.equal(response.status, 200); assert.equal(result.notification_status, 'accepted');
+  assert.equal(result.guard_id, 'guard-id'); assert.equal(result.status, 'approved');
+  assert.equal(h.writes.length, 1); assert.equal(h.writes[0].verified_by, guardReviewAdminId);
+  const emails = h.emails.filter(e => e.url.endsWith('/send-guard-approval-email'));
+  assert.equal(emails.length, 1); assert.equal(JSON.parse(emails[0].body).approved, true);
+  assert.equal(JSON.parse(emails[0].body).guardId, 'guard-id'); assert.ok(emails[0].signal instanceof AbortSignal);
+});
+test('failed, rejected, malformed or unacknowledged approval email leaves the approval saved and visible as unconfirmed', async () => {
+  for (const emailResponse of [
+    () => new Response(JSON.stringify({ success: true, email_id: 'message-id' }), { status: 502 }),
+    () => { throw Error('Network unavailable'); }, () => new Response('not json'),
+    () => new Response(JSON.stringify({ success: true })),
+    () => new Response(JSON.stringify({ success: false, email_id: 'invalid' })),
+    () => new Response(JSON.stringify({ success: true, email_id: ' ' })),
+  ]) {
+    const h = guardAdminHarness({ emailResponse }); const response = await h.call('approve', guardReviewAdminToken);
+    const result = await response.json(); assert.equal(response.status, 200); assert.equal(result.success, true);
+    assert.equal(result.status, 'approved'); assert.equal(result.notification_status, 'failed');
+    assert.equal(h.writes.length, 1); assert.equal(h.writes[0].verification_status, 'approved');
+    assert.equal(h.emails.filter(e => e.url.endsWith('/send-guard-approval-email')).length, 1);
+  }
+  const duplicate = guardAdminHarness({ emailResponse: () => new Response(JSON.stringify({ success: true, skipped: true })) });
+  assert.equal((await (await duplicate.call('approve', guardReviewAdminToken)).json()).notification_status, 'already_sent');
+});
+test('already recorded approval does not claim an email was checked or request approval side effects again', async () => {
+  for (const status of ['approved', 'verified']) {
+    const h = guardAdminHarness({ status }); const result = await (await h.call('approve', guardReviewAdminToken)).json();
+    assert.equal(result.already_approved, true); assert.equal(result.notification_status, 'not_requested');
+    assert.equal(h.emails.length, 0); assert.ok(h.writes.every(w => !('verification_status' in w)));
+  }
+  const service = guardAdminHarness(); assert.equal((await service.call('approve')).status, 403);
+  assert.equal(service.writes.length, 0); assert.equal(service.emails.length, 0);
+});
