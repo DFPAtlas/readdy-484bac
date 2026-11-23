@@ -151,7 +151,7 @@ Deno.serve(async function(req) {
       }
       if (guard.verification_status === 'approved' || guard.verification_status === 'verified') {
         if (!guard.verified_by) await updateGuard(supabaseQ, guardId, { verified_by: reviewerId, verified_at: now });
-        return new Response(JSON.stringify({ success: true, guard_id: guardId, status: guard.verification_status, action: 'approved' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
+        return new Response(JSON.stringify({ success: true, guard_id: guardId, status: guard.verification_status, action: 'approved', already_approved: true, notification_status: 'not_requested' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
       }
       await updateGuard(supabaseQ, guardId, { verified_by: reviewerId, verification_status: 'approved', is_active: true, sia_verified: true, sia_verified_at: now, verified_at: now, dashboard_access: true, profile_completed: true, rejection_reason: null, rejected_at: null, updated_at: now });
       if (guard.user_id) {
@@ -165,12 +165,27 @@ Deno.serve(async function(req) {
       await safeExecute(async function() {
         await supabaseQ.from('notifications').insert({ user_id: guard.user_id, user_type: 'guard', title: 'Application Approved', message: 'Congratulations! Your guard application has been approved. You can now start accepting jobs.', type: 'success', read: false, link: '/guard/dashboard', created_at: now });
       });
-      await safeExecute(async function() {
-        await fetch(supabaseUrl + '/functions/v1/send-guard-approval-email', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + supabaseServiceKey }, body: JSON.stringify({ guardId: guard.id, guardName: guard.full_name, guardEmail: guard.email, approved: true }) });
-      });
+      // A saved approval stays saved if its separate email cannot be confirmed.
+      let notificationStatus: 'accepted' | 'already_sent' | 'failed' = 'failed';
+      try {
+        const emailResponse = await fetch(supabaseUrl + '/functions/v1/send-guard-approval-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + supabaseServiceKey },
+          body: JSON.stringify({ guardId: guard.id, guardName: guard.full_name, guardEmail: guard.email, approved: true }),
+          signal: AbortSignal.timeout(10000),
+        });
+        const emailResult: unknown = await emailResponse.json();
+        if (emailResponse.ok && emailResult && typeof emailResult === 'object' && 'success' in emailResult && emailResult.success === true) {
+          if ('skipped' in emailResult && emailResult.skipped === true) notificationStatus = 'already_sent';
+          else if ('email_id' in emailResult && typeof emailResult.email_id === 'string' && emailResult.email_id.trim()) notificationStatus = 'accepted';
+        }
+        if (notificationStatus === 'failed') console.error('[admin-verify-guard] Approval email was not confirmed', emailResponse.status);
+      } catch {
+        console.error('[admin-verify-guard] Approval email request failed');
+      }
       await safeExecute(async function() { await handleQGReferralOnApproval(supabaseQ, guard); });
       await safeExecute(async function() { await handlePreAccountVerification(supabaseQ, guard); });
-      return new Response(JSON.stringify({ success: true, guard_id: guardId, status: 'approved', message: 'Guard approved successfully', action: 'approved' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
+      return new Response(JSON.stringify({ success: true, guard_id: guardId, status: 'approved', message: 'Guard approved successfully', action: 'approved', notification_status: notificationStatus }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
     }
     if (action === 'reject') {
       if (typeof rejectionReason !== 'string' || !rejectionReason.trim() || rejectionReason.trim().length > 500) {
