@@ -7,7 +7,7 @@ const sub={id:localId,user_id:'user',stripe_subscription_id:'sub_fixture',stripe
 const remote={id:'sub_fixture',customer:'cus_fixture',livemode:false,status:'active',latest_invoice:'in_new',items:{data:[{price:{id:'price_fixture'}}]}};
 const invoice={id:'in_new',customer:'cus_fixture',livemode:false,parent:{subscription_details:{subscription:'sub_fixture'}},amount_paid:1000,currency:'gbp',status:'paid',billing_reason:'subscription_cycle',created:1793900000,status_transitions:{paid_at:1793907137},period_start:1791225050,period_end:1793903450,lines:{has_more:false,data:[{parent:{subscription_item_details:{subscription:'sub_fixture',proration:false}},period:{start:1793903450,end:1796495450}}]}};
 function backend(options={}) {
- let handler;const calls=[],writes=[],payments=[{id:'older',subscription_id:localId,user_id:'user',stripe_invoice_id:'in_old'}];
+ let handler;const keys=[],calls=[],writes=[],payments=[{id:'older',subscription_id:localId,user_id:'user',stripe_invoice_id:'in_old'}];
  if(options.conflictingInvoice) payments.push({id:'conflict',subscription_id:localId,user_id:'user',stripe_invoice_id:'in_new',status:'failed',amount:10,currency:'gbp'});
  const local={...sub},provider={...remote,...options.remote},bill={...invoice,...options.invoice};
  const db={auth:{async getUser(){return {data:{user:options.invalidUser?null:{id:'admin'}},error:null};}},from(table){let method='read',body,single=false;const filters=[];const q={select(){return q;},not(){return q;},order(){return q;},eq(k,v){filters.push([k,v]);return q;},maybeSingle(){single=true;return q;},insert(v){method='insert';body=v;return q;},update(v){method='update';body=v;return q;},then(resolve,reject){
@@ -23,10 +23,10 @@ function backend(options={}) {
    }
    return Promise.resolve({data:single?data[0]||null:data,error}).then(resolve,reject);
  }};return q;}};
- class Stripe {constructor(){this.subscriptions={retrieve:async id=>{calls.push(['subscription',id]);if(options.providerError)throw new Error('Object belongs to another Stripe environment');return provider;}};this.invoices={retrieve:async id=>{calls.push(['invoice',id]);return bill;}};}}
- load('supabase/functions/backfill-subscription-payments/index.ts',{'https://deno.land/std@0.168.0/http/server.ts':{serve:fn=>handler=fn},'https://esm.sh/stripe@14.10.0?target=deno':{__esModule:true,default:Stripe},'https://esm.sh/@supabase/supabase-js@2.39.3':{createClient:()=>db}},{Deno:{env:{get:()=> 'fixture-service'}}});
+ class Stripe {constructor(key){keys.push(key);this.subscriptions={retrieve:async id=>{calls.push(['subscription',id]);if(options.providerError)throw new Error('Object belongs to another Stripe environment');return provider;}};this.invoices={retrieve:async id=>{calls.push(['invoice',id]);return bill;}};}}
+ load('supabase/functions/backfill-subscription-payments/index.ts',{'https://deno.land/std@0.168.0/http/server.ts':{serve:fn=>handler=fn},'https://esm.sh/stripe@14.10.0?target=deno':{__esModule:true,default:Stripe},'https://esm.sh/@supabase/supabase-js@2.39.3':{createClient:()=>db}},{Deno:{env:{get:name=>name==='STRIPE_SANDBOX_READ_KEY'?options.sandboxKey:name==='STRIPE_SECRET_KEY'?(options.configuredKey===null?undefined:options.configuredKey||'fixture-configured'):'fixture-service'}}});
  const token='h.'+Buffer.from(JSON.stringify({aal:options.aal||'aal2'})).toString('base64url')+'.s';
- return {calls,writes,payments,async request(body={},auth='Bearer '+token){const res=await handler(new Request('https://example.test/backfill',{method:'POST',headers:auth?{Authorization:auth}:{},body:JSON.stringify(body)}));return {status:res.status,body:await res.json()};}};
+ return {keys,calls,writes,payments,async request(body={},auth='Bearer '+token){const res=await handler(new Request('https://example.test/backfill',{method:'POST',headers:auth?{Authorization:auth}:{},body:JSON.stringify(body)}));return {status:res.status,body:await res.json()};}};
 }
 test('renewal backfill checks the invoice rather than skipping users with an older payment; replay is safe',async()=>{
  const h=backend(),first=await h.request();assert.equal(first.body.success,true);assert.equal(first.body.results[0].action,'backfilled');
@@ -58,4 +58,36 @@ test('admin invoice control never reports a denied or malformed reconciliation a
 test('admin invoice control prevents overlapping requests and ignores results after unmount',async()=>{
  let resolve;const waiting=new Promise(r=>resolve=r),f=frontend(()=>waiting);f.h.render();await f.h.effects();const click=f.button().props.onClick;const first=click();await flush();await click();assert.equal(f.invocations,1);f.h.unmount();const writes=f.h.writes;resolve({data:{success:true,results:[{action:'backfilled'}]},error:null});await first;assert.equal(f.h.writes,writes);
  const good=frontend({data:{success:true,results:[{action:'backfilled'},{action:'skipped'}]},error:null});good.h.render();await good.h.effects();await good.button().props.onClick();assert.match(content(good.h.render()),/Invoice check complete: 1 payment/);
+});
+
+const sandboxBody = { subscription_id: localId, dry_run: true, stripe_environment: 'sandbox' };
+test('sandbox lookup requires one subscription and a real dry-run flag before provider access', async () => {
+ for (const body of [{stripe_environment:'sandbox'}, {...sandboxBody,dry_run:false}, {...sandboxBody,dry_run:'true'}, {stripe_environment:'sandbox',dry_run:true}, {...sandboxBody,stripe_environment:'live'}]) {
+  const h=backend({sandboxKey:'rk_test_fixture'}),r=await h.request(body);assert.equal(r.status,400);assert.equal(h.keys.length,0);assert.equal(h.calls.length,0);assert.equal(h.writes.length,0);
+ }
+});
+test('missing or non-sandbox credentials fail closed without falling back to configured billing', async () => {
+ for(const sandboxKey of [undefined,'rk_live_fixture','sk_live_fixture','fixture-invalid']) {
+  const h=backend({sandboxKey}),r=await h.request(sandboxBody);assert.equal(r.body.success,false);assert.equal(r.body.stripe_environment,'sandbox');assert.equal(r.body.results[0].sub_id,localId);assert.equal(r.body.results[0].error_code,sandboxKey?'invalid_sandbox_key':'sandbox_not_configured');assert.equal(h.keys.length,0);assert.equal(h.calls.length,0);assert.equal(h.writes.length,0);
+ }
+});
+test('sandbox preview uses only its own test credential and never writes ledger or subscription summaries', async () => {
+ for(const sandboxKey of ['rk_test_fixture','sk_test_fixture']) {
+  const h=backend({sandboxKey,configuredKey:null}),r=await h.request(sandboxBody);assert.equal(r.body.success,true);assert.equal(r.body.stripe_environment,'sandbox');assert.equal(r.body.results[0].action,'preview');assert.equal(r.body.results[0].livemode,false);assert.deepEqual(h.keys,[sandboxKey]);assert.equal(h.calls.length,2);assert.equal(h.writes.length,0);
+ }
+});
+test('live subscription, mixed-mode invoice, owner mismatch and failed sandbox lookup remain errors without writes or retries to billing account', async () => {
+ for(const options of [{remote:{livemode:true}},{invoice:{livemode:true}},{remote:{customer:'foreign'}},{providerError:true},{readError:true}]) {
+  const h=backend({...options,sandboxKey:'rk_test_fixture'}),r=await h.request(sandboxBody);assert.equal(r.body.success,false);assert.equal(r.body.results[0].action,'error');assert.deepEqual(h.keys,['rk_test_fixture']);assert.equal(h.writes.length,0);
+ }
+});
+test('existing reconciliation and configured previews keep the original credential even when a sandbox key exists', async () => {
+ for(const body of [{},{subscription_id:localId,dry_run:true},{stripe_environment:'configured'}]) {
+  const h=backend({sandboxKey:'rk_test_fixture'}),r=await h.request(body);assert.equal(r.body.success,true);assert.deepEqual(h.keys,['fixture-configured']);assert.equal('stripe_environment' in r.body,false);assert.equal(h.writes.length,body.dry_run?0:2);
+ }
+});
+test('sandbox access preserves active-admin and MFA requirements before any provider key is used', async () => {
+ for(const options of [{invalidUser:true},{active:false},{role:'support_admin'},{aal:'aal1'}]) {
+  const h=backend({...options,sandboxKey:'rk_test_fixture'}),r=await h.request(sandboxBody);assert.ok([401,403].includes(r.status));assert.equal(h.keys.length,0);assert.equal(h.calls.length,0);assert.equal(h.writes.length,0);
+ }
 });

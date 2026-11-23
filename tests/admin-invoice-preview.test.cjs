@@ -80,3 +80,35 @@ test('payment details expose preview for subscriptions only, using the local sub
   const preview = nodes(h.render()).find(n => typeof n.type === 'function' && n.type.name === 'SubscriptionInvoicePreview');
   assert.equal(preview.props.subscriptionId, id); assert.equal(preview.props.currency, 'gbp');
 });
+function sandboxResponse(changes = {}) {
+  const r = response({ livemode: false, ...changes }); r.data.stripe_environment = 'sandbox'; return r;
+}
+async function chooseSandbox(f) {
+  nodes(f.render()).find(n => n.type === 'select').props.onChange({ target: { value: 'sandbox' } });
+  f.render(); await f.h.effects();
+}
+test('explicit sandbox selection sends scoped read-only intent and requires server-confirmed sandbox evidence', async () => {
+  const f = setup(sandboxResponse()); f.render(); await f.h.effects(); await chooseSandbox(f); await f.click();
+  assert.deepEqual(f.calls, [{ name: 'backfill-subscription-payments', body: { subscription_id: id, dry_run: true, stripe_environment: 'sandbox' } }]);
+  assert.match(content(f.render()), /Already recorded/); assert.match(content(f.render()), /Sandbox preview only/);
+});
+test('an old server, wrong account response or missing/live mode cannot be presented as sandbox success', async () => {
+  for (const result of [response(), { ...sandboxResponse(), data: { ...sandboxResponse().data, stripe_environment: 'configured' } }, sandboxResponse({ livemode: true }), sandboxResponse({ livemode: undefined })]) {
+    const f = setup(result); f.render(); await f.h.effects(); await chooseSandbox(f); await f.click();
+    assert.ok(nodes(f.render()).some(n => n.props?.role === 'alert')); assert.doesNotMatch(content(f.render()), /Already recorded/);
+  }
+});
+test('sandbox configuration errors explain the specific missing or invalid server setup without accepting provider error details', async () => {
+  for (const [error_code, expected] of [['sandbox_not_configured', /must add the QuickGuard sandbox read key/], ['invalid_sandbox_key', /A sandbox key is required/]]) {
+    const f = setup({ data: { success: false, stripe_environment: 'sandbox', results: [{ sub_id: id, action: 'error', error_code, error: 'private provider information' }] }, error: null });
+    f.render(); await f.h.effects(); await chooseSandbox(f); await f.click();
+    assert.match(content(f.render()), expected); assert.doesNotMatch(content(f.render()), /private provider information|Already recorded/);
+  }
+});
+test('switching invoice accounts clears prior results and locks account selection while a preview is pending', async () => {
+  let resolve, count = 0; const waiting = new Promise(r => resolve = r);
+  const f = setup(() => ++count === 1 ? response() : waiting); f.render(); await f.h.effects(); await f.click();
+  assert.match(content(f.render()), /Already recorded/); await chooseSandbox(f); assert.doesNotMatch(content(f.render()), /Already recorded|in_fixture/);
+  const pending = f.click(); await flush(); assert.equal(nodes(f.render()).find(n => n.type === 'select').props.disabled, true);
+  resolve(sandboxResponse()); await pending; assert.match(content(f.render()), /Already recorded/);
+});
