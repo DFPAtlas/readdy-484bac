@@ -78,6 +78,7 @@ export interface GuardVerification {
   total_reviews?: number | null;
   // Activity
   is_active?: boolean | null;
+  is_test_account?: boolean | null;
   dashboard_access?: boolean | null;
   verified_by?: string | null;
   // Promo / Other
@@ -200,46 +201,79 @@ export function getStatusBadge(verification_status: string): { label: string; co
   }
 }
 
-export function getSiaCheckStatusBadge(sia_check_status: string | null, verification_status: string): { label: string; color: string; icon: string } {
-  if (!sia_check_status || sia_check_status === 'pending') {
-    if (verification_status === 'manual_review') {
-      return { label: 'Automated SIA: Webhook Missing', color: 'bg-orange-500/10 text-orange-400 ring-orange-500/30', icon: 'ri-link-unlink' };
-    }
-    return { label: 'Automated SIA: Pending', color: 'bg-blue-500/10 text-blue-400 ring-blue-500/30', icon: 'ri-loader-4-line' };
-  }
-  switch (sia_check_status) {
-    case 'passed':
-      return { label: 'Automated SIA: Passed', color: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30', icon: 'ri-check-double-line' };
-    case 'failed':
-      return { label: 'Automated SIA: Failed', color: 'bg-red-500/10 text-red-400 ring-red-500/30', icon: 'ri-close-circle-line' };
-    case 'webhook_missing':
-      return { label: 'Automated SIA: Webhook Missing', color: 'bg-orange-500/10 text-orange-400 ring-orange-500/30', icon: 'ri-link-unlink' };
-    case 'webhook_error':
-      return { label: 'Automated SIA: Webhook Error', color: 'bg-amber-500/10 text-amber-400 ring-amber-500/30', icon: 'ri-alert-line' };
-    default:
-      return { label: 'Automated SIA: Pending', color: 'bg-slate-500/10 text-slate-400 ring-slate-500/30', icon: 'ri-time-line' };
-  }
+interface SiaStatusContext {
+  is_test_account?: boolean | null;
+  sia_mismatch_reason?: string | null;
 }
 
-export function getSiaCheckStatusText(sia_check_status: string | null, verification_status: string): string {
-  if (!sia_check_status || sia_check_status === 'pending') {
-    if (verification_status === 'manual_review') {
-      return 'The automated SIA check webhook is not configured. A manual admin review is required.';
+function getSiaCheckDisplay(rawStatus: string | null, verificationStatus: string, context: SiaStatusContext) {
+  const status = (rawStatus || '').trim().toLowerCase();
+  let label = 'Unknown status';
+  let color = 'bg-slate-500/10 text-slate-400 ring-slate-500/30';
+  let icon = 'ri-question-line';
+  let text = `Unrecognised stored SIA status: ${status || 'not recorded'}. Review the register evidence.`;
+  const positive = ['passed', 'verified', 'valid'].includes(status);
+  if (!status) {
+    label = 'Not recorded';
+    text = 'No SIA check status is recorded on this profile.';
+    if (verificationStatus === 'manual_review') text += ' The profile awaits manual admin review.';
+  } else if (positive) {
+    label = status.charAt(0).toUpperCase() + status.slice(1);
+    color = 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30';
+    icon = 'ri-check-double-line';
+    text = `A completed SIA result is recorded as ${status}. Review its date and matching licence evidence before approval.`;
+  } else if (['pending', 'queued', 'processing', 'claimed'].includes(status)) {
+    label = status === 'pending' || status === 'queued' ? 'Pending' : 'In progress';
+    color = 'bg-blue-500/10 text-blue-400 ring-blue-500/30';
+    icon = 'ri-loader-4-line';
+    text = `The stored SIA check status is ${status}. Check the queue and register evidence for its latest progress.`;
+  } else if (['failed', 'rejected', 'not_found', 'expired', 'invalid_licence_format'].includes(status)) {
+    const labels: Record<string, string> = { failed: 'Failed', rejected: 'Rejected', not_found: 'Not found', expired: 'Expired', invalid_licence_format: 'Invalid licence format' };
+    label = labels[status];
+    color = 'bg-red-500/10 text-red-400 ring-red-500/30';
+    icon = 'ri-close-circle-line';
+    text = `The recorded SIA result is ${label.toLowerCase()}. Review the licence and register evidence.`;
+  } else if (['webhook_missing', 'webhook_error', 'queue_error', 'error', 'review', 'manual_review', 'name_mismatch'].includes(status)) {
+    const labels: Record<string, string> = { webhook_missing: 'Webhook Missing', webhook_error: 'Webhook Error', queue_error: 'Queue error', error: 'Check error', review: 'Review required', manual_review: 'Review required', name_mismatch: 'Name mismatch' };
+    label = labels[status];
+    color = 'bg-amber-500/10 text-amber-400 ring-amber-500/30';
+    icon = 'ri-alert-line';
+    text = status === 'webhook_missing'
+      ? 'The stored SIA result reports a missing webhook configuration. Manual admin review is required.'
+      : `The stored SIA result reports ${label.toLowerCase()}. Review the recorded error or register evidence.`;
+  } else if (status === 'verified_test') {
+    label = 'Recorded result';
+    text = 'A test verification result is recorded. Review the original register evidence separately.';
+  }
+
+  const mismatch = context.sia_mismatch_reason?.trim();
+  if (mismatch && /\bmanual[\s_-]+override\b/i.test(mismatch)) {
+    label = 'Manual override';
+    color = 'bg-amber-500/10 text-amber-400 ring-amber-500/30';
+    icon = 'ri-user-voice-line';
+    text = `A manual override is recorded. Stored check status: ${status.replace(/_/g, ' ') || 'not recorded'}. Review the override and original register evidence.`;
+  } else if (mismatch) {
+    if (positive) {
+      label = 'Evidence needs review';
+      color = 'bg-amber-500/10 text-amber-400 ring-amber-500/30';
+      icon = 'ri-alert-line';
     }
-    return 'Automated SIA check is pending or in progress.';
+    text += ` Recorded mismatch: ${mismatch}.`;
   }
-  switch (sia_check_status) {
-    case 'passed':
-      return 'The automated SIA check passed successfully. Licence verified.';
-    case 'failed':
-      return 'The automated SIA check could not verify this licence. Review required.';
-    case 'webhook_missing':
-      return 'The N8N webhook for automated SIA checks is not configured. Manual admin review required.';
-    case 'webhook_error':
-      return 'The automated SIA check encountered an error. Manual admin review required.';
-    default:
-      return 'SIA check status unknown.';
+  const testResult = context.is_test_account === true || status === 'verified_test';
+  if (testResult) {
+    if (positive || status === 'verified_test') color = 'bg-amber-500/10 text-amber-400 ring-amber-500/30';
+    text = `Test account/result. ${text}`;
   }
+  return { label: `${testResult ? 'SIA test' : 'SIA'}: ${label}`, color, icon, text };
+}
+
+export function getSiaCheckStatusBadge(sia_check_status: string | null, verification_status: string, context: SiaStatusContext = {}): { label: string; color: string; icon: string } {
+  return getSiaCheckDisplay(sia_check_status, verification_status, context);
+}
+
+export function getSiaCheckStatusText(sia_check_status: string | null, verification_status: string, context: SiaStatusContext = {}): string {
+  return getSiaCheckDisplay(sia_check_status, verification_status, context).text;
 }
 
 export function formatDate(dateStr: string | null | undefined): string {

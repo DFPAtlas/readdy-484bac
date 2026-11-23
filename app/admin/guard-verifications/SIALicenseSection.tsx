@@ -10,7 +10,7 @@ interface SIALicenseSectionProps {
 }
 
 export default function SIALicenseSection({ guard, hasLicenceImages, onViewLicence }: SIALicenseSectionProps) {
-  const siaBadge = getSiaCheckStatusBadge(guard.sia_check_status, guard.verification_status);
+  const siaBadge = getSiaCheckStatusBadge(guard.sia_check_status, guard.verification_status, guard);
 
   return (
     <>
@@ -44,7 +44,6 @@ export default function SIALicenseSection({ guard, hasLicenceImages, onViewLicen
         </div>
       </div>
 
-      {(guard.sia_check_status || guard.sia_confidence_score != null) && (
         <div className="bg-[#0a1628] border border-[#1a2b4a] rounded-lg p-4 mb-4">
           <div className="flex items-center gap-2 mb-2">
             <span className={`px-2.5 py-1 rounded-full text-xs font-medium ring-1 ${siaBadge.color} inline-flex items-center gap-1.5`}>
@@ -72,7 +71,6 @@ export default function SIALicenseSection({ guard, hasLicenceImages, onViewLicen
             <p className="text-xs text-slate-500 mt-1">Last checked: {new Date(guard.sia_checked_at).toLocaleString()}</p>
           )}
         </div>
-      )}
 
       <SiaRegisterCheckPanel guard={guard} />
 

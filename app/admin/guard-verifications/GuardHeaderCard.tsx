@@ -10,7 +10,7 @@ interface GuardHeaderCardProps {
 }
 
 export default function GuardHeaderCard({ guard, hasLicenceImages }: GuardHeaderCardProps) {
-  const siaBadge = getSiaCheckStatusBadge(guard.sia_check_status, guard.verification_status);
+  const siaBadge = getSiaCheckStatusBadge(guard.sia_check_status, guard.verification_status, guard);
 
   return (
     <div className="bg-gradient-to-r from-[#111d35] to-[#162036] rounded-xl p-6 border border-[#1a2b4a]">
