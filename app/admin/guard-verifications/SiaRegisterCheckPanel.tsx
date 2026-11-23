@@ -58,7 +58,10 @@ function isInProgress(check: SiaCheckRecord | null | undefined): boolean {
 }
 
 function decisionBadge(check: SiaCheckRecord | null | undefined) {
-  if (!check || (!check.decision && isInProgress(check))) {
+  if (!check) {
+    return { label: 'No check recorded', color: 'bg-slate-500/10 text-slate-400 ring-slate-500/30', icon: 'ri-question-line' };
+  }
+  if (!check.decision && isInProgress(check)) {
     return { label: 'Check in progress', color: 'bg-blue-500/10 text-blue-400 ring-blue-500/30', icon: 'ri-loader-4-line' };
   }
   const raw = (check.decision || '').toLowerCase();
@@ -117,10 +120,12 @@ export default function SiaRegisterCheckPanel({ guard }: { guard: GuardVerificat
     if (!isMountedRef.current) return [];
 
     if (fetchError) {
+      setChecks([]);
       setError(fetchError.message);
       return [];
     }
     const list = (data as SiaCheckRecord[]) || [];
+    setError(null);
     setChecks(list);
     return list;
   }, [guard.id]);
@@ -185,7 +190,17 @@ export default function SiaRegisterCheckPanel({ guard }: { guard: GuardVerificat
   };
 
   const latest = checks[0] || null;
-  const badge = decisionBadge(latest);
+  const currentLicence = (guard.sia_licence_number || '').replace(/\s+/g, '');
+  const checkedLicence = (latest?.licence_number || '').replace(/\s+/g, '');
+  const matchesCurrentLicence = /^\d{16}$/.test(currentLicence) && currentLicence === checkedLicence;
+  const historical = !!latest && !matchesCurrentLicence;
+  const badge = loading
+    ? { label: 'Loading checks', color: 'bg-slate-500/10 text-slate-400 ring-slate-500/30', icon: 'ri-loader-4-line' }
+    : error
+      ? { label: 'Check unavailable', color: 'bg-red-500/10 text-red-400 ring-red-500/30', icon: 'ri-error-warning-line' }
+      : historical
+        ? { label: 'Historical check', color: 'bg-amber-500/10 text-amber-400 ring-amber-500/30', icon: 'ri-history-line' }
+        : decisionBadge(latest);
   const inProgress = isInProgress(latest);
 
   const enteredFirst = latest?.expected_first_name || '';
@@ -237,15 +252,27 @@ export default function SiaRegisterCheckPanel({ guard }: { guard: GuardVerificat
       </div>
 
       {error && (
-        <div className="mb-3 text-xs text-red-400 bg-red-500/10 ring-1 ring-red-500/20 rounded-lg px-3 py-2">{error}</div>
+        <div role="alert" className="mb-3 text-xs text-red-400 bg-red-500/10 ring-1 ring-red-500/20 rounded-lg px-3 py-2">{error}</div>
       )}
 
       {loading ? (
         <p className="text-xs text-slate-500">Loading register checks…</p>
+      ) : error ? (
+        <p className="text-xs text-slate-500">Register check evidence is unavailable.</p>
       ) : !latest ? (
         <p className="text-xs text-slate-500">No register checks recorded for this guard yet.</p>
       ) : (
         <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 text-sm">
+            <div><p className="text-xs text-slate-400">Current profile licence</p><p className="font-mono text-slate-200">{guard.sia_licence_number || 'Not provided'}</p></div>
+            <div><p className="text-xs text-slate-400">Licence submitted for this check</p><p className="font-mono text-slate-200">{latest.licence_number || 'Not recorded'}</p></div>
+            <div><p className="text-xs text-slate-400">Current profile licence type</p><p className="text-slate-200">{licenceType || 'Not provided'}</p></div>
+          </div>
+          {historical && (
+            <div role="alert" className="mb-3 text-sm text-amber-300 bg-amber-500/10 rounded-lg px-3 py-2">
+              This check does not verify the current profile licence. Check the recorded details and re-run the SIA check for the current licence.
+            </div>
+          )}
           <div className="flex items-center gap-3 mb-3 text-xs text-slate-500">
             <span>{new Date(latest.created_at).toLocaleString('en-GB')}</span>
             <span className="text-slate-600">·</span>
@@ -261,14 +288,12 @@ export default function SiaRegisterCheckPanel({ guard }: { guard: GuardVerificat
           <div className="rounded-lg border border-[#1a2b4a] overflow-hidden mb-3">
             <div className="grid grid-cols-12 gap-2 bg-[#111d35] px-3 py-2 border-b border-[#1a2b4a]">
               <div className="col-span-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Field</div>
-              <div className="col-span-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Guard entered</div>
+              <div className="col-span-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Submitted for check</div>
               <div className="col-span-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">SIA register shows</div>
             </div>
             <div className="px-3">
               <CompareRow label="First name" entered={enteredFirst} register={registerFirst} mismatch={firstMismatch} />
               <CompareRow label="Last name" entered={enteredLast} register={registerSurname} mismatch={lastMismatch} />
-              <CompareRow label="Licence number" entered={latest.licence_number || guard.sia_licence_number || ''} register={latest.licence_number || guard.sia_licence_number || ''} />
-              <CompareRow label="Licence type" entered={licenceType} register={latest.sia_sector || ''} />
               <CompareRow label="Sector / Role" entered={''} register={[latest.sia_sector, latest.sia_role].filter(Boolean).join(' · ')} />
               <CompareRow label="Status" entered={''} register={latest.sia_status || ''} />
               <CompareRow label="Expiry" entered={''} register={latest.sia_expiry ? new Date(latest.sia_expiry).toLocaleDateString('en-GB') : ''} />
