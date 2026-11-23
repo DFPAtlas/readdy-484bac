@@ -111,7 +111,7 @@ export default function AdminPaymentsPage() {
       const transGuardIds = [...new Set(transactions.map((t: any) => t.guard_id).filter(Boolean))];
       const subUserIds = [...new Set(subscriptions.map((s: any) => s.user_id).filter(Boolean))];
 
-      const [assignRes, clientsForTransRes, guardsRes, clientsForSubRes] = await Promise.all([
+      const [assignRes, clientsForTransRes, guardsRes, clientsForSubRes, guardsForSubRes] = await Promise.all([
         assignmentIds.length > 0
           ? supabase.from('job_assignments').select('id, jobs(job_title, client_id), guards(full_name)').in('id', assignmentIds)
           : Promise.resolve({ data: [] }),
@@ -124,6 +124,9 @@ export default function AdminPaymentsPage() {
         subUserIds.length > 0
           ? supabase.from('clients').select('user_id, company_name, contact_name').in('user_id', subUserIds)
           : Promise.resolve({ data: [] }),
+        subUserIds.length > 0
+          ? supabase.from('guards').select('user_id, full_name').in('user_id', subUserIds)
+          : Promise.resolve({ data: [] }),
       ]);
 
       if (!isCurrent()) return;
@@ -131,6 +134,7 @@ export default function AdminPaymentsPage() {
       const transClientMap = new Map((clientsForTransRes.data ?? []).map((c: any) => [c.id, c]));
       const guardMap = new Map((guardsRes.data ?? []).map((g: any) => [g.id, g]));
       const subClientMap = new Map((clientsForSubRes.data ?? []).map((c: any) => [c.user_id, c]));
+      const subGuardMap = new Map((guardsForSubRes.data ?? []).map(g => [g.user_id, g.full_name?.trim()]));
 
       const unified: UnifiedPayment[] = [
         ...transactions.map((t: any) => {
@@ -168,7 +172,7 @@ export default function AdminPaymentsPage() {
             status: s.status,
             created_at: s.created_at,
             description: s.billing_reason || 'Subscription',
-            payer: client?.company_name || client?.contact_name || 'Unknown',
+            payer: client?.company_name || client?.contact_name || subGuardMap.get(s.user_id) || 'Unknown',
             job_title: undefined,
             guard_name: undefined,
             client_name: client?.company_name || client?.contact_name,

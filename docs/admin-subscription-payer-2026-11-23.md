@@ -1,0 +1,9 @@
+# Admin subscription payer names
+
+The live admin Payments page displayed `Unknown` for the Basic guard's £10 renewal even though the same user has a named guard profile and no client profile. The read-only production check confirmed this relationship without changing the ledger. The frontend resolved subscription payers from client profiles only.
+
+The page now also reads `user_id, full_name` from guards, restricted to the user IDs in the loaded subscription payments. Existing client company/contact names retain precedence. A matching nonblank guard name supplies the fallback for the table, existing search and detail modal; unavailable or blank names remain `Unknown`. The existing request ordering and unmount protection still apply. Amounts, statuses, dates, provider references, invoice reconciliation, refund controls and database access rules are unchanged.
+
+The component regression reproduced the unknown guard payer before the fix. Focused checks cover the guard name in the table/search/details, exact account-scoped lookup, unrelated profile exclusion, preservation of client/company/contact names and job payment amounts/statuses, and missing/blank/unreadable name fallbacks. All 11 focused payer/invoice/dependency tests passed. The full repository suite passed 1,103 tests with concurrency two. Repository and admin/financial TypeScript passed. Lint had zero errors and ten existing warnings. The production build passed using unreachable placeholder Supabase settings; the generated next-env reference was restored. git diff --check passed. No test or build used production credentials or made a database write.
+
+After merge, pull main into Readdy and publish the frontend. Retest the guard subscription row, search and details on the published site. No migration, Edge Function deployment, HAL change, billing action or account change is required. Live acceptance and full admin sign-off remain separate from local validation.
