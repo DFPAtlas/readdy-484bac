@@ -617,6 +617,16 @@ function GuardCompleteProfileWizardContent() {
         }
       }
 
+      // Advisory checks must not make an already-saved profile submission fail.
+      if (finalDrivingFrontPath && finalPoaPath) {
+        const { error: documentCheckError } = await supabase.functions.invoke('request-document-check', {
+          body: { guard_id: saved.id, queue_version: 2 },
+        });
+        if (documentCheckError) {
+          console.warn('[ProfileWizard] Could not queue the identity document check');
+        }
+      }
+
       if (saved.sia_licence_number) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.access_token) {

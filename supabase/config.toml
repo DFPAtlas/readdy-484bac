@@ -91,3 +91,9 @@ verify_jwt = true
 [functions.manage-client-documents]
 # Auth.getUser verifies the bearer in-handler, supporting current signing keys.
 verify_jwt = false
+
+[functions.request-document-check]
+verify_jwt = true
+
+[functions.identity-document-download]
+verify_jwt = true
