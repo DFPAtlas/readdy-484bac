@@ -73,7 +73,7 @@ test('old, partial, future and failed cleanup evidence cannot make private maint
  const db=await fixture();try{
   await db.exec(sql);assert.equal((await db.query('select app.get_admin_maintenance_snapshot() data')).rows[0].data.cleanup.status,'degraded');
   for(const table of targets)await db.query("insert into public.cleanup_log(id,table_name,status,started_at,finished_at) values(gen_random_uuid(),$1,'completed',now()-interval '90 days',now()-interval '90 days')",[table]);
-  let data=(await db.query('select app.get_admin_maintenance_snapshot() data')).rows[0].data;assert.equal(data.cleanup.recent_completed_tables,0);assert.equal(data.cleanup.status,'degraded');
+  const data=(await db.query('select app.get_admin_maintenance_snapshot() data')).rows[0].data;assert.equal(data.cleanup.recent_completed_tables,0);assert.equal(data.cleanup.status,'degraded');
   await db.exec("update public.cleanup_log set started_at=now(),finished_at=now() where table_name!='rate_limit_events'");
   assert.equal((await db.query('select app.get_admin_maintenance_snapshot() data')).rows[0].data.cleanup.recent_completed_tables,5);
   await db.exec("update public.cleanup_log set started_at=now()+interval '1 day',finished_at=now()+interval '1 day' where table_name='rate_limit_events'");
