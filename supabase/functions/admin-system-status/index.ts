@@ -111,6 +111,20 @@ Deno.serve(async (req: Request) => {
 
   const app = createClient(supabaseUrl, serviceKey, { db: { schema: "app" } });
 
+  if (new URL(req.url).searchParams.get("section") === "cleanup-inventory") {
+    try {
+      const { data, error } = await app.rpc("get_admin_cleanup_inventory").abortSignal(AbortSignal.timeout(8000));
+      if (error || !data) throw new Error("Inventory not confirmed");
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
+      });
+    } catch {
+      return new Response(JSON.stringify({ error: "Unable to verify cleanup inventory" }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
+      });
+    }
+  }
+
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const since72h = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
 
