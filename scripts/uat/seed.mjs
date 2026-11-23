@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { DEFAULT_RUN_ID, personas, plusAddress } from './personas.mjs';
+import { assertOwnedUatUser, markUatGuardProfiles } from './identity.mjs';
 
 const EXPECTED_PROJECT = 'vnywjfpkepjgclkbcmsj';
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -53,6 +54,7 @@ async function ensureAuthUser(persona) {
     app_metadata: { uat_run_id: runId, uat_persona: persona.key },
   };
   if (existing) {
+    assertOwnedUatUser(existing, persona, runId);
     const { data, error } = await supabase.auth.admin.updateUserById(existing.id, attributes);
     if (error) throw error;
     return data.user;
@@ -78,6 +80,7 @@ function entitlement(persona, userId) {
 const summary = [];
 for (const persona of resolved) {
   const user = await ensureAuthUser(persona);
+  assertOwnedUatUser(user, persona, runId);
   // UAT personas are intentionally reusable. Reset only their metered feature
   // rows so repeated launch-gate runs cannot exhaust a monthly posting or
   // application allowance and fail before exercising the journey under test.
@@ -144,6 +147,7 @@ for (const persona of resolved) {
       full_name: persona.fullName,
       email: persona.email,
       phone: '07000000000',
+      is_test_account: true,
       bio: `Synthetic QuickGuard UAT persona ${persona.key}`,
       sia_licence_number: `UAT-${persona.key.toUpperCase()}`,
       sia_licence_type: persona.licenceType,
@@ -169,6 +173,7 @@ for (const persona of resolved) {
       bank_account_verified: false,
     }, { onConflict: 'user_id' }));
   }
+  await markUatGuardProfiles(supabase, user, persona, runId);
   summary.push({ key: persona.key, kind: persona.kind, userId: user.id, email: persona.email });
 }
 
