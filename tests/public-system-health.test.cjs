@@ -3,32 +3,40 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
 const { load } = require('./helpers/enterprise-module.cjs');
-function harness({counts={},errors=[],throws=[],cleanupEmpty=false,cleanupFailure=false,stripeCode=200,stripeThrow=false,env={}}={}){
- let handler;const reads=[],clients=[],requests=[];
+function harness({counts={},errors=[],throws=[],cleanupEmpty=false,cleanupFailure=false,cleanupOverride,stripeCode=200,stripeThrow=false,env={}}={}){
+ let handler;const reads=[],clients=[],requests=[],rpcs=[];
  const environment={SUPABASE_URL:'https://fixture.invalid',SUPABASE_SERVICE_ROLE_KEY:'fixture-service-secret',STRIPE_SECRET_KEY:'fixture-stripe-secret',RESEND_API_KEY:'fixture-resend-secret',...env};
  const createClient=(url,key,options)=>{
   const schema=options?.db?.schema||'public';clients.push({schema,key});
-  return {from:table=>{
-   let filter;const q={select:()=>q,eq:(column,value)=>{if(column==='status')filter=value;return q;},gte:()=>q,order:()=>q,limit:()=>q,abortSignal:signal=>{assert.ok(signal instanceof AbortSignal);return q;},
+  return {rpc:(name,args)=>{
+   rpcs.push({schema,name,args});const q={abortSignal:signal=>{assert.ok(signal instanceof AbortSignal);return q;},then:(resolve,reject)=>{
+    if(throws.includes('maintenance'))return Promise.reject(Error('private query detail')).then(resolve,reject);
+    const at=new Date().toISOString();const cleanup={status:cleanupEmpty||cleanupFailure?'degraded':'healthy',recent_completed_tables:cleanupEmpty?0:6,required_tables:6,
+     last_run:cleanupEmpty?null:{table:'fixture_table',at,rows_removed:0},last_failure:cleanupFailure?{table:'fixture_table',at,error:'PRIVATE CLEANUP ERROR'}:null,
+     logs:[{error_message:'PRIVATE CLEANUP ERROR',id:'PRIVATE LOG ID'}],...cleanupOverride};
+    return Promise.resolve({data:{cron_jobs:[{command:'PRIVATE CRON COMMAND'}],cleanup},error:errors.includes('maintenance')?{message:'private query detail'}:null}).then(resolve,reject);
+   }};return q;
+  },from:table=>{
+   const q={select:()=>q,eq:()=>q,gte:()=>q,order:()=>q,limit:()=>q,abortSignal:signal=>{assert.ok(signal instanceof AbortSignal);return q;},
     then:(resolve,reject)=>{
-     const id=table==='cleanup_log'?table+':'+filter:table;reads.push({schema,table,id});
+     const id=table;reads.push({schema,table,id});
      if(throws.includes(id))return Promise.reject(Error('private query detail')).then(resolve,reject);
      const error=errors.includes(id)?{message:'private query detail'}:null;
-     const data=table==='cleanup_log'?(cleanupEmpty?[]:filter==='completed'?[{table_name:'fixture_table',started_at:new Date().toISOString(),rows_removed:0}]:cleanupFailure?[{table_name:'fixture_table',started_at:new Date().toISOString()}]:[]):[];
+     const data=[];
      return Promise.resolve({data,count:Object.hasOwn(counts,table)?counts[table]:0,error}).then(resolve,reject);
     }};return q;
   }};
  };
  load('supabase/functions/system-health/index.ts',{'https://esm.sh/@supabase/supabase-js@2.39.3':{createClient}},
   {Deno:{serve:fn=>{handler=fn;},env:{get:key=>environment[key]}},fetch:async(url,options)=>{requests.push({url,options});if(stripeThrow)throw Error('private Stripe error');return new Response('private Stripe detail',{status:stripeCode});}});
- return {reads,clients,requests,call:async(method='GET')=>{const response=await handler(new Request('https://fixture.invalid/system-health',{method}));return {response,data:method==='HEAD'||response.status===204?null:await response.json()};}};
+ return {reads,clients,requests,rpcs,call:async(method='GET')=>{const response=await handler(new Request('https://fixture.invalid/system-health',{method}));return {response,data:method==='HEAD'||response.status===204?null:await response.json()};}};
 }
 test('Resend-only configuration is recognised and a fully confirmed public read returns healthy without exposing secrets',async()=>{
  const h=harness();const {response,data}=await h.call();assert.equal(response.status,200);
  assert.equal(data.checks.email.provider,'Resend API');assert.equal(data.checks.email.status,'configured');assert.equal(data.checks.environment.status,'healthy');assert.equal(data.status,'healthy');
  assert.equal(data.metrics.failed_emails_24h,0);assert.equal(data.cleanup.last_run.rows_removed,0);
- assert.equal(response.headers.get('cache-control'),'no-store');assert.doesNotMatch(JSON.stringify(data),/fixture-.*secret|private Stripe detail/);
- assert.ok(h.reads.filter(r=>r.table!=='cleanup_log').every(r=>r.schema==='app'));assert.ok(h.reads.filter(r=>r.table==='cleanup_log').every(r=>r.schema==='public'));
+ assert.equal(response.headers.get('cache-control'),'no-store');assert.doesNotMatch(JSON.stringify(data),/fixture-.*secret|private Stripe detail|PRIVATE CLEANUP ERROR|PRIVATE LOG ID|PRIVATE CRON COMMAND/);
+ assert.ok(h.reads.length>0);assert.ok(h.reads.every(r=>r.schema==='app'));assert.deepEqual(h.clients.map(c=>c.schema),['app']);assert.deepEqual(h.rpcs,[{schema:'app',name:'get_admin_maintenance_snapshot',args:{p_offset:0,p_limit:1}}]);
 });
 test('failed or unconfirmed count reads stay null, never fabricated zeros or partial payment totals',async()=>{
  for(const table of ['email_send_log','subscription_payments','transactions','admin_alerts'])for(const mode of ['error','throw','null','invalid']){
@@ -42,8 +50,8 @@ test('known failure counts degrade health while unread alerts remain information
  const h=harness({counts:{email_send_log:1,transactions:2,subscription_payments:3}});const {data}=await h.call();assert.equal(data.status,'degraded');assert.equal(data.metrics.failed_payments_24h,5);
  assert.equal((await harness({counts:{admin_alerts:2}}).call()).data.status,'healthy');
 });
-test('missing cleanup evidence and either cleanup query failure are unknown, while recorded failure stays degraded',async()=>{
- for(const options of [{cleanupEmpty:true},{errors:['cleanup_log:failed']},{throws:['cleanup_log:completed']}]){
+test('missing cleanup evidence and maintenance RPC failures are unknown, while recorded failure stays degraded',async()=>{
+ for(const options of [{cleanupEmpty:true},{errors:['maintenance']},{throws:['maintenance']}]){
   const {data}=await harness(options).call();assert.equal(data.cleanup.status,'unknown');assert.notEqual(data.status,'healthy');assert.doesNotMatch(JSON.stringify(data),/private query detail/);
  }
  const {data}=await harness({cleanupFailure:true}).call();assert.equal(data.cleanup.status,'degraded');assert.equal(data.status,'degraded');assert.equal(data.cleanup.last_failure.table,'fixture_table');
@@ -71,4 +79,15 @@ test('the public response is compatible with the repaired launch runtime assesso
   const {response,data}=await harness(options).call();const result=await assess(async()=>Response.json(data,{status:response.status}));
   assert.equal(result.status,Object.keys(options).length?'not_verified':'pass');
  }
+});
+
+test('stale, partial, malformed and contradictory maintenance evidence never reports a healthy cleanup',async()=>{
+ for(const cleanupOverride of [
+  {recent_completed_tables:5},{required_tables:5},{recent_completed_tables:'6'},
+  {last_run:{table:'fixture_table',at:new Date(Date.now()-49*3600000).toISOString(),rows_removed:0}},
+  {last_run:{table:'fixture_table',at:new Date(Date.now()+3600000).toISOString(),rows_removed:0}},
+  {last_run:{table:'fixture_table',at:new Date().toISOString(),rows_removed:-1}},
+  {last_run:null},{last_run:{}},{last_failure:{}},{status:'unknown'},
+ ]){const {data}=await harness({cleanupOverride}).call();assert.equal(data.cleanup.status,'unknown');assert.notEqual(data.status,'healthy');}
+ const {data}=await harness({cleanupOverride:{status:'degraded'}}).call();assert.equal(data.cleanup.status,'degraded');
 });

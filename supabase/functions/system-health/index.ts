@@ -11,10 +11,12 @@ type CleanupHealth = {
   last_run: { table_name: string; started_at: string; rows_removed: number | null } | null;
   last_failure: { table: string; at: string } | null;
 };
-function isCleanupRow(value: unknown): value is { table_name: string; started_at: string; rows_removed?: unknown } {
-  return value !== null && typeof value === 'object' && 'table_name' in value &&
-    typeof value.table_name === 'string' && !!value.table_name.trim() && 'started_at' in value &&
-    typeof value.started_at === 'string' && Number.isFinite(Date.parse(value.started_at));
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+function isCleanupEntry(value: unknown): value is { table: string; at: string; rows_removed?: unknown } {
+  return isRecord(value) && typeof value.table === 'string' && !!value.table.trim() &&
+    typeof value.at === 'string' && Number.isFinite(Date.parse(value.at));
 }
 
 Deno.serve(async (req: Request) => {
@@ -33,9 +35,8 @@ Deno.serve(async (req: Request) => {
       cleanup: { status: 'unknown', last_run: null, last_failure: null } }, 503);
   }
 
-  // Retain the deployed app/public schema split; never substitute public business tables.
+  // Public is deliberately outside the Data API. Read maintenance through its service-only app RPC.
   const app = createClient(supabaseUrl, serviceRoleKey, { db: { schema: 'app' }, auth: { persistSession: false } });
-  const pub = createClient(supabaseUrl, serviceRoleKey, { db: { schema: 'public' }, auth: { persistSession: false } });
   const signal = AbortSignal.timeout(8000);
   const since24h = new Date(Date.now() - 86400000).toISOString();
   async function databaseHealth(): Promise<ServiceHealth> {
@@ -60,18 +61,21 @@ Deno.serve(async (req: Request) => {
   async function cleanupHealth(): Promise<CleanupHealth> {
     const unknown: CleanupHealth = { status: 'unknown', last_run: null, last_failure: null };
     try {
-      const [failed, completed] = await Promise.all([
-        pub.from('cleanup_log').select('table_name, started_at').eq('status', 'failed').order('started_at', { ascending: false }).limit(1).abortSignal(signal),
-        pub.from('cleanup_log').select('table_name, started_at, rows_removed').eq('status', 'completed').order('started_at', { ascending: false }).limit(1).abortSignal(signal),
-      ]);
-      if (failed.error || completed.error || !Array.isArray(failed.data) || !Array.isArray(completed.data)) return unknown;
-      const failure: unknown = failed.data[0];
-      const run: unknown = completed.data[0];
-      if ((failed.data.length && !isCleanupRow(failure)) || (completed.data.length && !isCleanupRow(run))) return unknown;
-      const lastRun = isCleanupRow(run) ? { table_name: run.table_name, started_at: run.started_at,
+      const { data, error } = await app.rpc('get_admin_maintenance_snapshot', { p_offset: 0, p_limit: 1 }).abortSignal(signal);
+      if (error || !isRecord(data) || !isRecord(data.cleanup)) return unknown;
+      const cleanup = data.cleanup;
+      if (!['healthy', 'degraded'].includes(String(cleanup.status))) return unknown;
+      const failure = cleanup.last_failure;
+      const run = cleanup.last_run;
+      if ((failure !== null && !isCleanupEntry(failure)) || (run !== null && !isCleanupEntry(run))) return unknown;
+      const lastRun = isCleanupEntry(run) ? { table_name: run.table, started_at: run.at,
         rows_removed: typeof run.rows_removed === 'number' && Number.isSafeInteger(run.rows_removed) && run.rows_removed >= 0 ? run.rows_removed : null } : null;
-      const lastFailure = isCleanupRow(failure) ? { table: failure.table_name, at: failure.started_at } : null;
-      return { status: lastFailure ? 'degraded' : lastRun ? 'healthy' : 'unknown', last_run: lastRun, last_failure: lastFailure };
+      const lastFailure = isCleanupEntry(failure) ? { table: failure.table, at: failure.at } : null;
+      const age = lastRun ? Date.now() - Date.parse(lastRun.started_at) : NaN;
+      const confirmed = cleanup.required_tables === 6 && cleanup.recent_completed_tables === 6 &&
+        lastRun?.rows_removed !== null && Number.isFinite(age) && age >= 0 && age <= 48 * 60 * 60 * 1000;
+      return { status: lastFailure ? 'degraded' : confirmed ? cleanup.status === 'healthy' ? 'healthy' : 'degraded' : 'unknown',
+        last_run: lastRun, last_failure: lastFailure };
     } catch { return unknown; }
   }
 
