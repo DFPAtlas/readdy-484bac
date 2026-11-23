@@ -50,7 +50,7 @@ test('configured consent fields do not duplicate the canonical guard consent con
 const guardReviewAdminId = 'admin-user-id';
 const guardReviewAdminToken = 'header.' + Buffer.from(JSON.stringify({ aal: 'aal2' })).toString('base64url') + '.signature';
 
-function guardAdminHarness({ updateError = null, updated = true, status = 'pending', emailResponse = () => new Response(JSON.stringify({ success: true, email_id: 'message-id' }), { status: 200 }) } = {}) {
+function guardAdminHarness({ updateError = null, updated = true, status = 'pending', verifiedBy = status === 'suspended' ? guardReviewAdminId : null, emailResponse = () => new Response(JSON.stringify({ success: true, email_id: 'message-id' }), { status: 200 }) } = {}) {
   let handler;
   const writes = [];
   const emails = [];
@@ -59,7 +59,7 @@ function guardAdminHarness({ updateError = null, updated = true, status = 'pendi
     user_id: null,
     email: 'guard@example.invalid',
     verification_status: status,
-    verified_by: status === 'suspended' ? guardReviewAdminId : null,
+    verified_by: verifiedBy,
   };
   const db = {
     auth: {
@@ -230,10 +230,28 @@ test('failed, rejected, malformed or unacknowledged approval email leaves the ap
 });
 test('already recorded approval does not claim an email was checked or request approval side effects again', async () => {
   for (const status of ['approved', 'verified']) {
-    const h = guardAdminHarness({ status }); const result = await (await h.call('approve', guardReviewAdminToken)).json();
+    const h = guardAdminHarness({ status, verifiedBy: 'original-reviewer-id' }); const response = await h.call('approve', guardReviewAdminToken); const result = await response.json();
+    assert.equal(response.status, 200);
     assert.equal(result.already_approved, true); assert.equal(result.notification_status, 'not_requested');
-    assert.equal(h.emails.length, 0); assert.ok(h.writes.every(w => !('verification_status' in w)));
+    assert.equal(h.emails.length, 0); assert.equal(h.writes.length, 0);
   }
   const service = guardAdminHarness(); assert.equal((await service.call('approve')).status, 403);
   assert.equal(service.writes.length, 0); assert.equal(service.emails.length, 0);
+});
+
+test('approval retries cannot manufacture a missing historical reviewer, including an override request', async () => {
+  for (const status of ['approved', 'verified']) for (const override of [false, true]) {
+    const h = guardAdminHarness({ status });
+    const response = await h.call('approve', guardReviewAdminToken, { override });
+    const result = await response.json();
+    assert.equal(response.status, 409);
+    assert.equal(result.code, 'APPROVAL_REVIEWER_MISSING');
+    assert.equal(result.guard_id, 'guard-id'); assert.equal(result.status, status);
+    assert.match(result.error, /recorded reviewer.*provenance review/i);
+    assert.notEqual(result.success, true);
+    assert.equal(h.writes.length, 0); assert.equal(h.emails.length, 0);
+    const service = guardAdminHarness({ status });
+    assert.equal((await service.call('approve', 'service-secret', { override })).status, 403);
+    assert.equal(service.writes.length, 0); assert.equal(service.emails.length, 0);
+  }
 });
