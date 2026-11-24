@@ -36,9 +36,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     async function verifyAdmin() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // A cached JWT can outlive its server session after sign-out or revocation.
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (cancelled) return;
-        if (!session?.user) {
+        if (authError || !user) {
+          clearAdminAuthCache();
+          await supabase.auth.signOut({ scope: 'local' });
+          if (cancelled) return;
           setLoading(false);
           router.push('/admin/login');
           return;
@@ -49,7 +53,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const { data: adminCheck } = await supabase
           .from('admin_users')
           .select('id, role, is_active, full_name, email')
-          .eq('user_id', session.user.id)
+          .eq('user_id', user.id)
           .maybeSingle();
 
         if (cancelled) return;
@@ -167,7 +171,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const { data: adminLookup } = await supabase
           .from('admin_users')
           .select('id, email')
-          .eq('user_id', session.user.id)
+          .eq('user_id', user.id)
           .maybeSingle();
         if (adminLookup) {
           setAdminUser({ id: adminLookup.id, email: adminLookup.email });
