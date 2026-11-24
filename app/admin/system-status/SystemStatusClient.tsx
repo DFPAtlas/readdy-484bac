@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import StorageUsageWidget from '@/components/admin/StorageUsageWidget';
 import AdminCleanupControl from '@/components/admin/AdminCleanupControl';
+import AdminEdgeChecks from '@/components/admin/AdminEdgeChecks';
+import { loadAdminEdgePings, type AdminEdgePing } from '@/lib/adminEdgeHealth';
 import { loadAdminCleanupLogs, type CleanupLog } from '@/lib/adminMaintenance';
 import { loadAdminCleanupInventory, type CleanupInventory } from '@/lib/adminCleanupInventory';
 
@@ -72,16 +74,6 @@ interface CronJobData {
     return_message: string;
   } | null;
   run_count_7d: number;
-}
-
-interface EdgeFunctionPing {
-  name: string;
-  slug: string;
-  status: 'healthy' | 'degraded' | 'offline';
-  latency: number;
-  httpStatus: number;
-  error?: string;
-  checkedAt: string;
 }
 
 interface WebsitePing {
@@ -157,18 +149,6 @@ function getPaymentStatusLabel(status: string): string {
   return labels[status] || status;
 }
 
-// ── Edge functions to ping ─────────────────────────────────────────────
-
-const EDGE_FUNCTIONS: { name: string; slug: string; type: string; retired?: boolean }[] = [
-  { name: 'Create Job Payment', slug: 'create-job-payment', type: 'payment' },
-  { name: 'Create Guard Payout', slug: 'create-guard-payout', type: 'payment' },
-  { name: 'Release Guard Payment (Retired)', slug: 'release-guard-payment', type: 'payment', retired: true },
-  { name: 'Overdue Guard Payout Worker', slug: 'process-overdue-guard-payouts', type: 'payment' },
-  { name: 'Enhanced Stripe Webhook', slug: 'enhanced-stripe-webhook', type: 'stripe' },
-  { name: 'Get Storage Usage', slug: 'get-storage-usage', type: 'storage' },
-  { name: 'Admin Cleanup', slug: 'admin-run-cleanup', type: 'maintenance' },
-];
-
 // ── Main Component ─────────────────────────────────────────────────────
 
 export default function SystemStatusClient() {
@@ -179,8 +159,9 @@ export default function SystemStatusClient() {
   const [websitePing, setWebsitePing] = useState<WebsitePing | null>(null);
   const [websiteLoading, setWebsiteLoading] = useState(true);
 
-  const [edgePings, setEdgePings] = useState<EdgeFunctionPing[]>([]);
+  const [edgePings, setEdgePings] = useState<AdminEdgePing[]>([]);
   const [edgeLoading, setEdgeLoading] = useState(true);
+  const edgeRequest = useRef<{ id: number; active: boolean; controller: AbortController | null }>({ id: 0, active: true, controller: null });
 
   const [cleanupLogs, setCleanupLogs] = useState<CleanupLog[]>([]);
   const [cleanupLogsLoading, setCleanupLogsLoading] = useState(true);
@@ -265,130 +246,29 @@ export default function SystemStatusClient() {
     }
   }, []);
 
-  // ── Ping edge functions ──────────────────────────────────────────────
+  // ── Read-only endpoint reachability; retired/worker routes are never invoked ──
   const pingEdgeFunctions = useCallback(async () => {
+    edgeRequest.current.controller?.abort();
+    const controller = new AbortController();
+    const request = ++edgeRequest.current.id;
+    edgeRequest.current.controller = controller;
     setEdgeLoading(true);
-    const pings: EdgeFunctionPing[] = [];
-
-    let token = '';
-    const { data: { session } } = await supabase.auth.getSession();
-    token = session?.access_token || '';
-
-    await Promise.all(
-      EDGE_FUNCTIONS.map(async (fn) => {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-        const start = performance.now();
-        try {
-          const isRetired = fn.retired === true;
-          const method = isRetired ? 'POST' : 'GET';
-          const headers: Record<string, string> = {};
-          if (isRetired && token) {
-            headers['Authorization'] = `Bearer ${token}`;
-            headers['Content-Type'] = 'application/json';
-          }
-
-          const res = await fetch(`${SUPABASE_URL}/functions/v1/${fn.slug}`, {
-            method,
-            signal: controller.signal,
-            cache: 'no-store',
-            headers: Object.keys(headers).length ? headers : undefined,
-            body: isRetired ? '' : undefined,
-          });
-          clearTimeout(timeout);
-          const latency = Math.round(performance.now() - start);
-
-          if (isRetired) {
-            if (!token) {
-              pings.push({
-                name: fn.name,
-                slug: fn.slug,
-                status: 'degraded',
-                latency,
-                httpStatus: 0,
-                error: 'Auth required for verification — sign in as admin',
-                checkedAt: new Date().toISOString(),
-              });
-            } else if (res.status === 410) {
-              pings.push({
-                name: fn.name,
-                slug: fn.slug,
-                status: 'healthy',
-                latency,
-                httpStatus: 410,
-                error: 'Retired: returns 410 as expected',
-                checkedAt: new Date().toISOString(),
-              });
-            } else if (res.status === 403) {
-              pings.push({
-                name: fn.name,
-                slug: fn.slug,
-                status: 'degraded',
-                latency,
-                httpStatus: res.status,
-                error: 'Auth check passed but role denied 403',
-                checkedAt: new Date().toISOString(),
-              });
-            } else if (res.status === 401) {
-              pings.push({
-                name: fn.name,
-                slug: fn.slug,
-                status: 'degraded',
-                latency,
-                httpStatus: res.status,
-                error: 'JWT validation failed 401',
-                checkedAt: new Date().toISOString(),
-              });
-            } else if (res.status >= 500) {
-              pings.push({
-                name: fn.name,
-                slug: fn.slug,
-                status: 'offline',
-                latency,
-                httpStatus: res.status,
-                error: `Unexpected HTTP ${res.status} — retired function should return 410`,
-                checkedAt: new Date().toISOString(),
-              });
-            } else {
-              pings.push({
-                name: fn.name,
-                slug: fn.slug,
-                status: 'degraded',
-                latency,
-                httpStatus: res.status,
-                error: `Expected 410, got HTTP ${res.status}`,
-                checkedAt: new Date().toISOString(),
-              });
-            }
-          } else {
-            const isError = res.status >= 500;
-            pings.push({
-              name: fn.name,
-              slug: fn.slug,
-              status: isError ? 'degraded' : 'healthy',
-              latency,
-              httpStatus: res.status,
-              error: isError ? `HTTP ${res.status}` : undefined,
-              checkedAt: new Date().toISOString(),
-            });
-          }
-        } catch (e: any) {
-          clearTimeout(timeout);
-          pings.push({
-            name: fn.name,
-            slug: fn.slug,
-            status: 'offline',
-            latency: Math.round(performance.now() - start),
-            httpStatus: 0,
-            error: e.name === 'AbortError' ? 'Timed out' : e.message,
-            checkedAt: new Date().toISOString(),
-          });
-        }
-      })
-    );
-
-    setEdgePings(pings);
-    setEdgeLoading(false);
+    setEdgePings([]);
+    try {
+      const pings = await loadAdminEdgePings(SUPABASE_URL, fetch, controller.signal);
+      if (edgeRequest.current.active && request === edgeRequest.current.id) setEdgePings(pings);
+    } finally {
+      if (edgeRequest.current.active && request === edgeRequest.current.id) setEdgeLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    const scope = edgeRequest.current;
+    scope.active = true;
+    return () => {
+      scope.active = false;
+      // Strict Mode immediately replays setup; only an actual unmount cancels the read.
+      queueMicrotask(() => { if (!scope.active) scope.controller?.abort(); });
+    };
   }, []);
 
   // ── Fetch cleanup logs ───────────────────────────────────────────────
@@ -465,9 +345,11 @@ export default function SystemStatusClient() {
       fetchCleanupInventory(),
     ]);
 
-    setLastRefreshed(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     refreshingRef.current = false;
-    setIsRefreshing(false);
+    if (edgeRequest.current.active) {
+      setLastRefreshed(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      setIsRefreshing(false);
+    }
   }, [fetchAdminStatus, pingWebsite, pingEdgeFunctions, fetchCleanupLogs, fetchCleanupInventory]);
 
   // ── Effects ──────────────────────────────────────────────────────────
@@ -482,7 +364,7 @@ export default function SystemStatusClient() {
     if (adminLoading) return { label: 'Checking...', color: 'text-slate-400', icon: 'ri-loader-4-line animate-spin' };
     if (adminError || !adminData) return { label: 'Unreachable', color: 'text-red-400', icon: 'ri-close-circle-line' };
     switch (adminData.status) {
-      case 'healthy': return { label: 'All Systems Operational', color: 'text-emerald-400', icon: 'ri-check-double-line' };
+      case 'healthy': return { label: 'Core Services Healthy', color: 'text-emerald-400', icon: 'ri-check-double-line' };
       case 'degraded': return { label: 'Degraded Service', color: 'text-amber-400', icon: 'ri-error-warning-line' };
       default: return { label: 'Service Disruption', color: 'text-red-400', icon: 'ri-close-circle-line' };
     }
@@ -699,73 +581,8 @@ export default function SystemStatusClient() {
           </div>
         </section>
 
-        {/* Edge Functions Health */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Edge Functions</h2>
-            {edgeLoading && (
-              <span className="text-[11px] text-slate-600 flex items-center gap-1.5">
-                <i className="ri-loader-4-line animate-spin text-xs"></i>
-                Pinging…
-              </span>
-            )}
-          </div>
-          {edgeLoading && !edgePings.length ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="bg-[#111d35] rounded-2xl border border-[#1a2b4a] p-5 animate-pulse">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-32 h-4 bg-[#1a2b4a] rounded"></div>
-                    <div className="w-14 h-5 bg-[#1a2b4a] rounded-full"></div>
-                  </div>
-                  <div className="w-20 h-3 bg-[#1a2b4a] rounded"></div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {EDGE_FUNCTIONS.map((fn) => {
-                const ping = edgePings.find((p) => p.slug === fn.slug);
-                const badge = getStatusBadge(ping?.status);
-                return (
-                  <div key={fn.slug} className="bg-[#111d35] rounded-2xl border border-[#1a2b4a] p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#0a1628] text-slate-400">
-                          <i className={`${
-                            fn.type === 'payment' ? 'ri-money-pound-circle-line' :
-                            fn.type === 'stripe' ? 'ri-bank-card-line' :
-                            fn.type === 'storage' ? 'ri-database-2-line' :
-                            'ri-tools-line'
-                          } text-lg`}></i>
-                        </div>
-                        <span className="text-sm font-bold text-white">{fn.name}</span>
-                      </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${badge.color}`}>
-                        {badge.label}
-                      </span>
-                    </div>
-                    {ping && (
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <div className="w-3 h-3 flex items-center justify-center">
-                          <i className="ri-timer-line text-[10px]"></i>
-                        </div>
-                        <span>{ping.latency}ms · HTTP {ping.httpStatus || '—'}</span>
-                      </div>
-                    )}
-                    {ping?.error && (
-                      <p className={`text-[10px] mt-2 leading-relaxed ${
-                        fn.retired && ping.status === 'healthy' ? 'text-emerald-400' :
-                        fn.retired && ping.status === 'degraded' ? 'text-amber-400' :
-                        'text-red-400'
-                      }`}>{ping.error}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+        {/* Edge function reachability is separate from authenticated operation health. */}
+        <AdminEdgeChecks pings={edgePings} loading={edgeLoading} />
 
         {/* Payment Pipeline */}
         <section>
