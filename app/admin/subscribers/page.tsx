@@ -2,6 +2,7 @@
 
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 import { supabase } from '@/lib/supabase';
 
@@ -38,11 +39,9 @@ export default function SubscribersPage() {
   const [subscribers, setSubscribers] = useState<GuardSubscriber[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processingId, setProcessingId] = useState<string | null>(null);
   const [filter, setFilter] = useState('pending');
   const [selectedSubscriber, setSelectedSubscriber] = useState<GuardSubscriber | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     fetchSubscribers();
@@ -71,124 +70,6 @@ export default function SubscribersPage() {
       setError(err?.message || 'Failed to load subscribers. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const approveSubscriber = async (subscriberId: string) => {
-    if (!confirm('Are you sure you want to approve this subscriber and activate their guard account?')) {
-      return;
-    }
-
-    setProcessingId(subscriberId);
-    try {
-      const subscriber = subscribers.find(s => s.id === subscriberId);
-
-      const { error: updateError } = await supabase
-        .from('guards')
-        .update({
-          verification_status: 'approved',
-          is_active: true,
-          verified_at: new Date().toISOString()
-        })
-        .eq('id', subscriberId);
-
-      if (updateError) throw updateError;
-
-      if (subscriber && subscriber.user_id) {
-        try {
-          const { error: notificationError } = await supabase
-            .from('notifications')
-            .insert({
-              user_id: subscriber.user_id,
-              title: 'Application Approved',
-              message: 'Congratulations! Your guard application has been approved. You can now start accepting jobs.',
-              type: 'success',
-              is_read: false,
-              link: '/guard/dashboard',
-              created_at: new Date().toISOString()
-            });
-
-          if (notificationError) {
-            console.error('Notification error:', notificationError);
-          }
-        } catch (notifError) {
-          console.error('Failed to send notification:', notifError);
-        }
-      }
-
-      await fetchSubscribers();
-      setShowDetailModal(false);
-      setSelectedSubscriber(null);
-
-      setToast({ message: 'Guard approved successfully and moved to Verified tab!', type: 'success' });
-      setTimeout(() => setToast(null), 3000);
-
-    } catch (error: any) {
-      console.error('Error approving subscriber:', error);
-
-      setToast({ message: 'Failed to approve subscriber. Please try again.', type: 'error' });
-      setTimeout(() => setToast(null), 3000);
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const rejectSubscriber = async (subscriberId: string) => {
-    const reason = prompt('Please provide a reason for rejection:');
-    if (!reason) return;
-
-    setProcessingId(subscriberId);
-    try {
-      const subscriber = subscribers.find(s => s.id === subscriberId);
-
-      const { error: updateError } = await supabase
-        .from('guards')
-        .update({
-          verification_status: 'rejected',
-          is_active: false,
-          rejection_reason: reason,
-          rejected_at: new Date().toISOString()
-        })
-        .eq('id', subscriberId);
-
-      if (updateError) throw updateError;
-
-      if (subscriber && subscriber.user_id) {
-        try {
-          const { error: notificationError } = await supabase
-            .from('notifications')
-            .insert({
-              user_id: subscriber.user_id,
-              title: 'Application Rejected',
-              message: `Unfortunately, your guard application has been rejected. Reason: ${reason}. Please contact support for more information.`,
-              type: 'warning',
-              is_read: false,
-              link: '/guard/dashboard',
-              created_at: new Date().toISOString()
-            });
-
-          if (notificationError) {
-            console.error('Notification error:', notificationError);
-          }
-        } catch (notifError) {
-          console.error('Failed to send notification:', notifError);
-        }
-      }
-
-      await fetchSubscribers();
-      setShowDetailModal(false);
-      setSelectedSubscriber(null);
-
-      setToast({ message: 'Guard rejected and moved to Rejected tab.', type: 'success' });
-      setTimeout(() => setToast(null), 3000);
-
-    } catch (error: any) {
-      console.error('Error rejecting subscriber:', error);
-
-      setToast({ message: 'Failed to reject subscriber. Please try again.', type: 'error' });
-      setTimeout(() => setToast(null), 3000);
-    } finally {
-      setProcessingId(null);
     }
   };
 
@@ -227,13 +108,12 @@ export default function SubscribersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
-          {toast.message}
-        </div>
-      )}
-
       <div className="max-w-7xl mx-auto px-6 py-8">
+        <section aria-label="Guard application reviews" className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-5">
+          <h2 className="text-lg font-semibold text-blue-950">Review guard applications</h2>
+          <p className="mt-1 text-sm text-blue-900">Approve or reject guards in Guard Verifications after reviewing their application. Select the guard there to complete the review; use the All tab if it is not in Pending.</p>
+          <Link href="/admin/guard-verifications" className="mt-3 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Open Guard Verifications</Link>
+        </section>
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
             <div className="w-5 h-5 flex items-center justify-center mt-0.5 flex-shrink-0">
@@ -421,29 +301,9 @@ export default function SubscribersPage() {
                       Quick View
                     </button>
                     {status === 'pending' && (
-                      <>
-                        <button
-                          onClick={() => approveSubscriber(subscriber.id)}
-                          disabled={processingId === subscriber.id}
-                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm whitespace-nowrap disabled:opacity-50 cursor-pointer"
-                        >
-                          {processingId === subscriber.id ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-2"></div>
-                              Processing...
-                            </>
-                          ) : (
-                            'Approve'
-                          )}
-                        </button>
-                        <button
-                          onClick={() => rejectSubscriber(subscriber.id)}
-                          disabled={processingId === subscriber.id}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm whitespace-nowrap disabled:opacity-50 cursor-pointer"
-                        >
-                          Reject
-                        </button>
-                      </>
+                      <Link href="/admin/guard-verifications" className="inline-flex px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm whitespace-nowrap">
+                        Review application
+                      </Link>
                     )}
                   </div>
                 </div>
@@ -470,6 +330,7 @@ export default function SubscribersPage() {
               <h3 className="text-2xl font-semibold text-gray-900">Subscriber Details</h3>
               <button
                 onClick={() => setShowDetailModal(false)}
+                aria-label="Close subscriber details"
                 className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
               >
                 <i className="ri-close-line text-2xl text-gray-600 w-6 h-6 flex items-center justify-center"></i>
@@ -577,28 +438,10 @@ export default function SubscribersPage() {
               )}
 
               {(!selectedSubscriber.verification_status || selectedSubscriber.verification_status === 'pending') && (
-                <div className="flex gap-3 pt-4 border-t">
-                  <button
-                    onClick={() => approveSubscriber(selectedSubscriber.id)}
-                    disabled={processingId === selectedSubscriber.id}
-                    className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium whitespace-nowrap disabled:opacity-50 cursor-pointer"
-                  >
-                    {processingId === selectedSubscriber.id ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-2"></div>
-                        Processing...
-                      </>
-                    ) : (
-                      'Approve Subscriber'
-                    )}
-                  </button>
-                  <button
-                    onClick={() => rejectSubscriber(selectedSubscriber.id)}
-                    disabled={processingId === selectedSubscriber.id}
-                    className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium whitespace-nowrap disabled:opacity-50 cursor-pointer"
-                  >
-                    Reject Subscriber
-                  </button>
+                <div className="pt-4 border-t">
+                  <Link href="/admin/guard-verifications" className="inline-flex px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium whitespace-nowrap">
+                    Review application in Guard Verifications
+                  </Link>
                 </div>
               )}
             </div>
