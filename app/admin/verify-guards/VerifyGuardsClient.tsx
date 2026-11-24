@@ -5,6 +5,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { logAdminAction } from '@/lib/admin-logger';
 import SIALicenceImage from '@/components/SIALicenceImage';
+import { GuardListError, loadAdminGuardList, guardDisplayPage } from '@/lib/admin-guard-list';
+import GuardListPagination from '@/components/admin/GuardListPagination';
 
 interface Guard {
   id: string;
@@ -52,6 +54,8 @@ interface BulkConfirmModal {
 export default function VerifyGuardsClient() {
   const [guards, setGuards] = useState<Guard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [listPage, setListPage] = useState(1);
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -67,6 +71,7 @@ export default function VerifyGuardsClient() {
 
   const scopeRef = useRef<{ filter: string } | null>(null);
   const requestRef = useRef(0);
+  const listRequestRef = useRef<AbortController | null>(null);
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     const id = Date.now();
@@ -88,39 +93,28 @@ export default function VerifyGuardsClient() {
     if (!scope || scope.filter !== filter) return;
     const request = ++requestRef.current;
     const isCurrent = () => scopeRef.current === scope && requestRef.current === request;
+    listRequestRef.current?.abort();
+    const controller = new AbortController();
+    listRequestRef.current = controller;
     setLoading(true);
+    setLoadError(null);
+    setGuards([]);
+    setSelectedIds(new Set());
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (!isCurrent()) return;
-      const token = sessionData.session?.access_token || '';
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-guards?status=${filter}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: 'Network error' }));
-        throw new Error(err.error || `HTTP ${response.status}`);
-      }
-
-      const result = await response.json();
+      const token = sessionData.session?.access_token;
+      if (sessionError || !token) throw new GuardListError('Your admin session has expired. Sign in again.', true);
+      const records = await loadAdminGuardList<Guard>({ status: filter, token, signal: controller.signal });
       if (!isCurrent()) return;
-      setGuards(result.data || []);
-    } catch (error: any) {
+      setGuards(records);
+    } catch (error) {
       if (!isCurrent()) return;
-      console.error('Error fetching guards:', error);
-      showToast('Failed to load guards', 'error');
+      setLoadError(error instanceof GuardListError ? error.message : 'Unable to load guards. Please retry.');
     } finally {
       if (isCurrent()) setLoading(false);
     }
-  }, [filter, showToast]);
+  }, [filter]);
 
   useEffect(() => {
     const scope = { filter };
@@ -128,8 +122,12 @@ export default function VerifyGuardsClient() {
     setGuards([]);
     setSelectedIds(new Set());
     void fetchGuards();
-    return () => { if (scopeRef.current === scope) scopeRef.current = null; };
+    return () => {
+      if (scopeRef.current === scope) { scopeRef.current = null; listRequestRef.current?.abort(); }
+    };
   }, [filter, fetchGuards]);
+
+  const visiblePage = guardDisplayPage(guards, listPage);
 
   const openConfirmModal = (guardId: string, status: 'approved' | 'rejected') => {
     const guard = guards.find(g => g.id === guardId);
@@ -467,7 +465,7 @@ export default function VerifyGuardsClient() {
   };
 
   const selectAll = () => {
-    setSelectedIds(new Set(guards.map(g => g.id)));
+    setSelectedIds(new Set(visiblePage.items.map(g => g.id)));
   };
 
   const deselectAll = () => {
@@ -775,7 +773,7 @@ export default function VerifyGuardsClient() {
 
       <div className="flex gap-3">
         <button
-          onClick={() => { setFilter('pending'); deselectAll(); }}
+          onClick={() => { setFilter('pending'); setListPage(1); deselectAll(); }}
           className={`px-6 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
             filter === 'pending'
               ? 'bg-yellow-500 text-white'
@@ -786,7 +784,7 @@ export default function VerifyGuardsClient() {
           Pending
         </button>
         <button
-          onClick={() => { setFilter('approved'); deselectAll(); }}
+          onClick={() => { setFilter('approved'); setListPage(1); deselectAll(); }}
           className={`px-6 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
             filter === 'approved'
               ? 'bg-green-500 text-white'
@@ -797,7 +795,7 @@ export default function VerifyGuardsClient() {
           Approved
         </button>
         <button
-          onClick={() => { setFilter('rejected'); deselectAll(); }}
+          onClick={() => { setFilter('rejected'); setListPage(1); deselectAll(); }}
           className={`px-6 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
             filter === 'rejected'
               ? 'bg-red-500 text-white'
@@ -815,7 +813,7 @@ export default function VerifyGuardsClient() {
             onClick={selectAll}
             className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors whitespace-nowrap text-sm"
           >
-            Select All
+            Select this page
           </button>
           <button
             onClick={deselectAll}
@@ -872,6 +870,12 @@ export default function VerifyGuardsClient() {
           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Loading guards...</p>
         </div>
+      ) : loadError ? (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-900">
+          <p className="font-semibold">Guard list unavailable</p>
+          <p>{loadError}</p>
+          <button type="button" onClick={() => void fetchGuards()} className="mt-3 rounded-lg bg-red-700 px-4 py-2 text-white">Retry loading guards</button>
+        </div>
       ) : guards.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <i className="ri-user-search-line text-6xl text-gray-300 mb-4"></i>
@@ -880,7 +884,7 @@ export default function VerifyGuardsClient() {
         </div>
       ) : (
         <div className="space-y-4">
-          {guards.map((guard) => {
+          {visiblePage.items.map((guard) => {
             const licenceTypes = guard.licence_types || [];
             const guardName = getGuardName(guard);
             const experienceYears = guard.years_experience || guard.experience_years || 0;
@@ -1073,6 +1077,10 @@ export default function VerifyGuardsClient() {
           })}
         </div>
       )}
+
+      {!loading && !loadError && <GuardListPagination page={visiblePage.page} totalItems={guards.length}
+        disabled={bulkProcessing || processingId !== null || confirmModal.show || bulkConfirmModal.show}
+        onPageChange={page => { setListPage(page); setSelectedIds(new Set()); }} />}
 
       <style jsx>{`
         @keyframes slide-in {
