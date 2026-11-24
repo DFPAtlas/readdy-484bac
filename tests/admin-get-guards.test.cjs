@@ -118,6 +118,10 @@ test('get-guards uses an explicit field allowlist and exact count with the defau
   assert.equal(selection[2].split(',').includes('password'), false);
   assert.deepEqual(selection[3], { count: 'exact' });
   assert.deepEqual(f.calls.find(c => c[0] === 'guards' && c[1] === 'range'), ['guards', 'range', 0, 49]);
+  assert.deepEqual(f.calls.filter(c => c[0] === 'guards' && c[1] === 'order'), [
+    ['guards', 'order', 'created_at', { ascending: false }],
+    ['guards', 'order', 'id', { ascending: false }],
+  ]);
   assert.deepEqual(f.calls.find(c => c[0] === 'guards' && c[1] === 'in'), ['guards', 'in', 'verification_status', ['pending', 'manual_review', 'pending_sia_check']]);
 });
 
