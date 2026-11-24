@@ -1,11 +1,20 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { Buffer } from 'node:buffer';
 import { PNG } from 'npm:pngjs@7.0.0';
 
 const MAX = 10 * 1024 * 1024;
-const cors = { 'Access-Control-Allow-Origin': 'https://quickguard.uk', 'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Vary': 'Origin' };
-const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+const corsFor = (req: Request) => {
+  const origin = req.headers.get('origin');
+  // Local browser UAT is permitted only on this isolated sandbox project.
+  const sandbox = Deno.env.get('SUPABASE_URL') === 'https://alfwwggavmyerjyqumuo.supabase.co';
+  const allowed = origin === 'https://quickguard.uk' || (sandbox && origin === 'http://localhost:3000');
+  return { ...{ 'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Vary': 'Origin' }, ...(allowed && origin ? {'Access-Control-Allow-Origin':origin} : {}) };
+};
 
-Deno.serve(async (req) => {
+
+Deno.serve(async (req: Request) => {
+  const cors = corsFor(req);
+  const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   if (req.method !== 'POST') return reply(405, { error: 'Method not allowed' });
   try {
@@ -51,7 +60,7 @@ Deno.serve(async (req) => {
     if (entry.recommended_width && entry.recommended_height && width * entry.recommended_height !== height * entry.recommended_width) return reply(422, { error: 'Image aspect ratio must match the slot' });
     let clean: Uint8Array;
     try {
-      const decoded = PNG.sync.read(bytes, { checkCRC: true });
+      const decoded = PNG.sync.read(Buffer.from(bytes), { checkCRC: true });
       if (decoded.width !== width || decoded.height !== height) throw new Error('Dimension mismatch');
       clean = new Uint8Array(PNG.sync.write(decoded));
     } catch { return reply(422, { error: 'Image decoding failed' }); }
