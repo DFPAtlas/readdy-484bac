@@ -6,8 +6,8 @@ import FocusTrap from 'focus-trap-react';
 import { GuardVerification, GuardStatus, matchesSearch, getSiaCheckStatusBadge, getSiaCheckStatusText, getApprovalBlockers } from './types';
 import RequestInfoModal from './RequestInfoModal';
 import Toast from './Toast';
-import GuardTable from './GuardTable';
-import GuardMobileCard from './GuardMobileCard';
+import GuardCardGrid from './GuardCardGrid';
+import GuardCardSkeleton from './GuardCardSkeleton';
 import GuardHeaderCard from './GuardHeaderCard';
 import ReviewTabs from './ReviewTabs';
 import OverviewTab from './OverviewTab';
@@ -569,19 +569,8 @@ export default function GuardVerificationsClient() {
           </div>
 
           {loading ? (
-            <div className="p-8">
-              <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-4 p-4 bg-[#0a1628] rounded-xl border border-[#1a2b4a] animate-pulse">
-                    <div className="w-10 h-10 rounded-full bg-[#1a2b4a] flex-shrink-0"></div>
-                    <div className="flex-1 space-y-2">
-                      <div className="w-32 h-4 bg-[#1a2b4a] rounded"></div>
-                      <div className="w-48 h-3 bg-[#1a2b4a] rounded"></div>
-                    </div>
-                    <div className="w-20 h-8 bg-[#1a2b4a] rounded-lg"></div>
-                  </div>
-                ))}
-              </div>
+            <div aria-label="Loading guard applications" aria-busy="true" className="grid grid-cols-1 gap-4 bg-[#0a1628]/40 p-4 sm:p-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {Array.from({ length: 6 }).map((_, i) => <GuardCardSkeleton key={i} />)}
             </div>
           ) : loadError ? (
             <div role="alert" className="p-8 text-center">
@@ -604,18 +593,7 @@ export default function GuardVerificationsClient() {
               </p>
             </div>
           ) : (
-            <>
-              <div className="hidden md:block">
-                <GuardTable guards={filteredGuards} onReview={openGuardDetails} onRequestInfo={handleRequestInfo} />
-              </div>
-              <div className="md:hidden">
-                <div className="divide-y divide-[#1a2b4a]">
-                  {filteredGuards.map((guard) => (
-                    <GuardMobileCard key={guard.id} guard={guard} onReview={() => openGuardDetails(guard)} onRequestInfo={() => handleRequestInfo(guard)} />
-                  ))}
-                </div>
-              </div>
-            </>
+            <GuardCardGrid guards={filteredGuards} onReview={openGuardDetails} onRequestInfo={handleRequestInfo} />
           )}
         </div>
       </div>
