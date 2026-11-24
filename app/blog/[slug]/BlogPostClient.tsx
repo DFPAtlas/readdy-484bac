@@ -1,4 +1,5 @@
 'use client';
+import BlogCoverImage from '@/components/blog/BlogCoverImage';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -6,7 +7,6 @@ import NavSidebar from '@/components/NavSidebar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/lib/supabase';
 import {
-  COVER_FALLBACK,
   audienceLabel,
   audienceStyle,
   formatBlogDate,
@@ -133,8 +133,8 @@ export default function BlogPostClient({ slug }: { slug: string }) {
 
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="rounded-2xl overflow-hidden border border-slate-700/50 mb-10">
-              <img
-                src={post.cover_image_url || COVER_FALLBACK}
+              <BlogCoverImage
+                cover={post.cover_image_url}
                 alt={post.title}
                 className="w-full aspect-[16/9] object-cover object-top"
               />
