@@ -23,7 +23,7 @@ function publications(): Promise<Publication[]> {
   return pending;
 }
 
-export default function PublicMediaImage({ slot, src, onError, ...props }: Props) {
+export function usePublicMediaSource(slot: string, src: string) {
   const [replacement, setReplacement] = useState<{ slot: string; url: string } | null>(null);
   useEffect(() => {
     let active = true;
@@ -34,8 +34,13 @@ export default function PublicMediaImage({ slot, src, onError, ...props }: Props
     return () => { active = false; };
   }, [slot, src]);
   const chosen = replacement?.slot === slot ? replacement.url : src;
+  return { chosen, reset: () => setReplacement(null) };
+}
+
+export default function PublicMediaImage({ slot, src, onError, ...props }: Props) {
+  const { chosen, reset } = usePublicMediaSource(slot, src);
   return <QuickGuardImage {...props} src={chosen} onError={event => {
-    if (chosen !== src) setReplacement(null);
+    if (chosen !== src) reset();
     else onError?.(event);
   }} />;
 }
