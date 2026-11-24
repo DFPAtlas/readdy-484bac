@@ -95,3 +95,7 @@ verify_jwt = false
 # Manual cleanup verifies the signed-in admin and MFA before any request.
 [functions.admin-run-cleanup]
 verify_jwt = true
+
+# The handler verifies the bearer token, active admin MFA and content role.
+[functions.stage-site-media]
+verify_jwt = false
