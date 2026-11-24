@@ -5,7 +5,7 @@ const JOURNEY = [
   { title: 'Review your booking total', desc: 'See the agreed guard pay, your plan\u2019s service fee, any eligible promotion, and the final booking total.' },
   { title: 'Pay securely through Stripe', desc: 'Payment is taken through Stripe before the booking is confirmed.' },
   { title: 'Funds remain with Stripe', desc: 'Your payment is held pending completion and the applicable release checks.' },
-  { title: 'Guard payment is released', desc: 'After completion, guard pay is released under the existing confirmation, dispute and payout process.' },
+  { title: 'Guard payment is released', desc: 'After completion approval and the applicable payment, dispute and account checks, eligible guard pay is released to the connected Stripe account. Stripe then processes the bank deposit according to its schedule and account requirements.' },
 ];
 
 export default function ClientBookingJourney() {

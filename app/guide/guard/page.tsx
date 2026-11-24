@@ -4,6 +4,7 @@ import NavSidebar from '@/components/NavSidebar';
 import GuideNavPanel from './GuideNavPanel';
 import GuardGuideSchema from './GuardGuideSchema';
 import type { Metadata } from 'next';
+import { GUARD_PAYMENT_STEPS, GUARD_PAYOUT_SUPPORT_GUIDANCE } from '@/lib/guard-payment-guidance';
 
 export const metadata: Metadata = {
   title: 'Security Guard Jobs UK',
@@ -102,13 +103,8 @@ const steps = [
     number: '04',
     icon: 'ri-money-pound-circle-line',
     title: 'Complete Jobs & Get Paid',
-    description: 'Work your shift and receive secure payment directly to your bank account.',
-    paymentSteps: [
-      { icon: 'ri-briefcase-line', label: 'Complete the Shift', desc: 'Finish your assigned security duties professionally' },
-      { icon: 'ri-bank-card-line', label: 'Client Processes Payment', desc: 'Client pays securely through QuickGuard before the booking is confirmed' },
-      { icon: 'ri-lock-line', label: 'Secure Bank Transfer', desc: 'Payment is transferred to your registered bank account' },
-      { icon: 'ri-mail-check-line', label: 'Email Confirmation', desc: 'You receive a payment confirmation with full details' },
-    ],
+    description: 'Set up Stripe, submit shift completion and track payment release separately from your bank deposit.',
+    paymentSteps: GUARD_PAYMENT_STEPS,
   },
 ];
 
@@ -380,7 +376,7 @@ export default function GuardGuidePage() {
                   <h2 className="text-2xl font-bold text-white">Complete Jobs & Get Paid</h2>
                 </div>
               </div>
-              <p className="text-slate-400 mb-6">Work your shift and receive secure payment directly to your registered bank account.</p>
+              <p className="text-slate-400 mb-6">{steps[3].description} You keep your full agreed pay on new bookings, with no guard booking commission. Membership is billed separately and standard payout costs are covered by the client service fee.</p>
               <div className="space-y-4">
                 {steps[3].paymentSteps!.map((ps, i) => (
                   <div key={i} className="flex items-start gap-4">
@@ -403,6 +399,15 @@ export default function GuardGuidePage() {
               </div>
             </div>
             <div className="space-y-4">
+              <div className="bg-[#0e1628] rounded-2xl p-6 border border-slate-700/50">
+                <h3 className="font-bold text-white mb-2">If completion or payment is delayed</h3>
+                <p className="text-slate-400 text-sm">{GUARD_PAYOUT_SUPPORT_GUIDANCE}</p>
+                <div className="mt-4 flex flex-wrap gap-4 text-sm text-teal-400">
+                  <Link href="/guard/bank-settings" className="underline">Bank Settings</Link>
+                  <Link href="/guard/earnings" className="underline">Earnings and bank deposits</Link>
+                  <Link href="/contact" className="underline">Contact support</Link>
+                </div>
+              </div>
               <div className="bg-[#0e1628] rounded-2xl p-6 border border-slate-700/50">
                 <div className="flex items-start gap-3">
                   <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 mt-0.5">
