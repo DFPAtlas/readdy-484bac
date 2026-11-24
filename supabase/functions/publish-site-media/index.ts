@@ -23,10 +23,12 @@ Deno.serve(async req=>{
     const {data:slot,error:slotError}=await db.from('site_media_slots').select('slot_key').eq('slot_key',body.slot).maybeSingle();
     if(slotError)return reply(503,{error:'Registry unavailable'});
     if(!slot)return reply(404,{error:'Unknown slot'});
+    if(body.version!==null && ['brand-symbol-light','brand-symbol-dark'].includes(body.slot))return reply(409,{error:'Public image integration not enabled for this slot'});
     if(body.version!==null){
       const {data:v,error}=await db.from('site_media_versions').select('object_path,sha256,byte_size,mime_type').eq('slot_key',body.slot).eq('id',body.version).maybeSingle();
       if(error)return reply(503,{error:'Registry unavailable'});
       if(!v)return reply(404,{error:'Version not found'});
+      if(v.mime_type!=='image/png'||v.object_path!==body.slot+'/'+body.version+'.png')return reply(422,{error:'Invalid stored image reference'});
       const {data:blob,error:downloadError}=await db.storage.from('site-media-staging').download(v.object_path);
       if(downloadError||!blob||blob.size!==v.byte_size||blob.size>10485760)return reply(422,{error:'Stored image unavailable or invalid'});
       const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join('');
