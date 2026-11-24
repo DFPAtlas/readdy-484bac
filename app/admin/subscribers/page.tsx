@@ -1,10 +1,12 @@
 'use client';
 
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 
 import { supabase } from '@/lib/supabase';
+import { GuardListError, loadAdminGuardList, guardDisplayPage } from '@/lib/admin-guard-list';
+import GuardListPagination from '@/components/admin/GuardListPagination';
 
 interface GuardSubscriber {
   id: string;
@@ -43,35 +45,39 @@ export default function SubscribersPage() {
   const [selectedSubscriber, setSelectedSubscriber] = useState<GuardSubscriber | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  useEffect(() => {
-    fetchSubscribers();
-  }, []);
+  const [listPage, setListPage] = useState(1);
+  const activeRef = useRef(true);
+  const requestRef = useRef<AbortController | null>(null);
 
-  const fetchSubscribers = async () => {
+  const fetchSubscribers = useCallback(async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const isCurrent = () => activeRef.current && requestRef.current === controller && !controller.signal.aborted;
     setLoading(true);
     setError(null);
+    setSubscribers([]);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || '';
-      const edgeUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-guards?status=all`;
-      const response = await fetch(edgeUrl, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || result.details || 'Failed to load subscribers');
-      }
-
-      setSubscribers(result.data || []);
-    } catch (err: any) {
-      console.error('Error fetching subscribers:', err?.message || err);
-      setError(err?.message || 'Failed to load subscribers. Please try again.');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (!isCurrent()) return;
+      if (sessionError || !session?.access_token) throw new GuardListError('Your admin session has expired. Sign in again.', true);
+      const records = await loadAdminGuardList<GuardSubscriber>({ status: 'all', token: session.access_token, signal: controller.signal });
+      if (!isCurrent()) return;
+      setSubscribers(records);
+      setListPage(1);
+    } catch (err) {
+      if (!isCurrent()) return;
+      setError(err instanceof GuardListError ? err.message : 'Unable to load subscribers. Please retry.');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    activeRef.current = true;
+    void fetchSubscribers();
+    return () => { activeRef.current = false; requestRef.current?.abort(); };
+  }, [fetchSubscribers]);
 
   const openDetailModal = (subscriber: GuardSubscriber) => {
     setSelectedSubscriber(subscriber);
@@ -85,6 +91,8 @@ export default function SubscribersPage() {
     if (filter === 'rejected') return sub.verification_status === 'rejected';
     return true;
   });
+
+  const visiblePage = guardDisplayPage(filteredSubscribers, listPage);
 
   const pendingCount = subscribers.filter(s => !s.verification_status || s.verification_status === 'pending').length;
   const verifiedCount = subscribers.filter(s => s.verification_status === 'approved' || s.verification_status === 'verified').length;
@@ -142,7 +150,7 @@ export default function SubscribersPage() {
                 Pending
               </span>
             </div>
-            <h3 className="text-3xl font-bold text-gray-900 mb-1">{pendingCount}</h3>
+            <h3 className="text-3xl font-bold text-gray-900 mb-1">{error ? '—' : pendingCount}</h3>
             <p className="text-sm text-gray-600">Awaiting Verification</p>
           </div>
 
@@ -155,7 +163,7 @@ export default function SubscribersPage() {
                 Verified
               </span>
             </div>
-            <h3 className="text-3xl font-bold text-gray-900 mb-1">{verifiedCount}</h3>
+            <h3 className="text-3xl font-bold text-gray-900 mb-1">{error ? '—' : verifiedCount}</h3>
             <p className="text-sm text-gray-600">Approved Guards</p>
           </div>
 
@@ -168,7 +176,7 @@ export default function SubscribersPage() {
                 Rejected
               </span>
             </div>
-            <h3 className="text-3xl font-bold text-gray-900 mb-1">{rejectedCount}</h3>
+            <h3 className="text-3xl font-bold text-gray-900 mb-1">{error ? '—' : rejectedCount}</h3>
             <p className="text-sm text-gray-600">Declined Applications</p>
           </div>
         </div>
@@ -176,36 +184,36 @@ export default function SubscribersPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 flex items-center justify-between flex-wrap gap-3">
           <div className="flex gap-2">
             <button
-              onClick={() => setFilter('pending')}
+              onClick={() => { setFilter('pending'); setListPage(1); }}
               className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
                 filter === 'pending' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              Pending ({pendingCount})
+              Pending ({error ? '—' : pendingCount})
             </button>
             <button
-              onClick={() => setFilter('verified')}
+              onClick={() => { setFilter('verified'); setListPage(1); }}
               className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
                 filter === 'verified' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              Verified ({verifiedCount})
+              Verified ({error ? '—' : verifiedCount})
             </button>
             <button
-              onClick={() => setFilter('rejected')}
+              onClick={() => { setFilter('rejected'); setListPage(1); }}
               className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
                 filter === 'rejected' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              Rejected ({rejectedCount})
+              Rejected ({error ? '—' : rejectedCount})
             </button>
             <button
-              onClick={() => setFilter('all')}
+              onClick={() => { setFilter('all'); setListPage(1); }}
               className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
                 filter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              All ({subscribers.length})
+              All ({error ? '—' : subscribers.length})
             </button>
           </div>
           <button
@@ -220,7 +228,7 @@ export default function SubscribersPage() {
         </div>
 
         <div className="space-y-4">
-          {filteredSubscribers.map((subscriber) => {
+          {visiblePage.items.map((subscriber) => {
             const status = subscriber.verification_status || 'pending';
             const statusColors: Record<string, string> = {
               pending: 'bg-orange-100 text-orange-700',
@@ -321,6 +329,7 @@ export default function SubscribersPage() {
             </div>
           )}
         </div>
+        {!error && <GuardListPagination page={visiblePage.page} totalItems={filteredSubscribers.length} onPageChange={setListPage} />}
       </div>
 
       {showDetailModal && selectedSubscriber && (

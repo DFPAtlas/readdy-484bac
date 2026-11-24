@@ -1,3 +1,4 @@
+const { guardPage } = require('./helpers/admin-guard-pages.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { hooksHarness, nodes, content } = require('./helpers/guard-ui-fixture.cjs');
@@ -23,11 +24,12 @@ async function page({ ok = true } = {}) {
     confirm() { throw new Error('A native confirm must not approve a guard'); },
     prompt() { throw new Error('A native prompt must not reject a guard'); },
     fetch: async (url, options) => {
-      assert.equal(url, 'https://fixture.invalid/functions/v1/get-guards?status=all');
+      assert.equal(url, 'https://fixture.invalid/functions/v1/get-guards');
+      assert.equal(JSON.parse(options.body).status, 'all');
       assert.equal(options.headers.Authorization, 'Bearer synthetic-session');
-      assert(options.method === undefined || options.method === 'GET');
+      assert.equal(options.method, 'POST');
       reads.push(url);
-      return { ok, json: async () => ok ? { success: true, data: records } : { success: false, error: 'Unable to load subscribers' } };
+      return { ok, json: async () => ok ? guardPage(records, options) : { success: false, error: 'Unable to load subscribers' } };
     },
   });
   h.render(); await h.effects();
