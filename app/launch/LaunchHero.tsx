@@ -1,14 +1,17 @@
+'use client';
+import { usePublicMediaBackground } from '@/hooks/usePublicMediaBackground';
 import Link from 'next/link';
 
 const HERO_IMAGE =
   'https://readdy.ai/api/search-image?query=Two%20professional%20SIA%20licensed%20security%20officers%20in%20smart%20black%20uniforms%20standing%20confidently%20outside%20a%20softly%20lit%20UK%20high%20street%20venue%20at%20dusk%2C%20subtle%20warm%20golden%20fairy%20lights%20and%20a%20light%20dusting%20of%20snow%20in%20the%20background%2C%20deep%20navy%20blue%20and%20teal%20colour%20grade%2C%20wide%20cinematic%20composition%20with%20the%20left%20third%20kept%20dark%20and%20clean%20for%20text%20overlay%2C%20premium%20editorial%20photography%2C%20sharp%20realistic%20detail%2C%20calm%20and%20trustworthy%20atmosphere&width=1600&height=900&seq=launch_hero_dec_2026&orientation=landscape';
 
 export default function LaunchHero() {
+  const managed = usePublicMediaBackground('launch-hero', HERO_IMAGE);
   return (
     <section
       className="relative w-full min-h-[620px] flex items-center bg-cover bg-center bg-no-repeat"
       style={{
-        backgroundImage: `linear-gradient(to right, rgba(11, 25, 51, 0.97) 0%, rgba(11, 25, 51, 0.9) 48%, rgba(11, 25, 51, 0.55) 100%), url('${HERO_IMAGE}')`,
+        backgroundImage: `linear-gradient(to right, rgba(11, 25, 51, 0.97) 0%, rgba(11, 25, 51, 0.9) 48%, rgba(11, 25, 51, 0.55) 100%), url('${managed}')`,
       }}
     >
       <div className="w-full max-w-7xl mx-auto px-6 md:px-8 py-20">
