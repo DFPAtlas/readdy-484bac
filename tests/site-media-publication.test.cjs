@@ -22,7 +22,7 @@ async function fixture(){
  REVOKE ALL ON FUNCTION public.is_active_admin() FROM PUBLIC;
  GRANT EXECUTE ON FUNCTION public.is_active_admin() TO authenticated,service_role;
  `);
- for(const name of fs.readdirSync('supabase/migrations').filter(x=>/^20261124190[0-6]00_site_media_.*\.sql$/.test(x)).sort())await db.exec(fs.readFileSync('supabase/migrations/'+name,'utf8'));
+ for(const name of fs.readdirSync('supabase/migrations').filter(x=>/^20261124190[0-7]00_site_media_.*\.sql$/.test(x)).sort())await db.exec(fs.readFileSync('supabase/migrations/'+name,'utf8'));
  await db.query("insert into public.site_media_versions(id,slot_key,object_path,width,height,byte_size,mime_type,sha256,created_by) values ($1,'homepage-hero',$2,1600,900,100,'image/png',repeat('a',64),$3),($4,'homepage-hero',$5,1600,900,100,'image/png',repeat('b',64),$3),($6,'homepage-logo',$7,600,200,100,'image/png',repeat('c',64),$3)",[a,'homepage-hero/'+a+'.png',actor,b,'homepage-hero/'+b+'.png',other,'homepage-logo/'+other+'.png']);
  await db.exec("insert into storage.objects values ('site-media-staging','draft.png'),('other-bucket','unrelated.png')");
  return db;
@@ -37,9 +37,9 @@ async function publish(db,version,expected,slot='homepage-hero'){
  return (await db.query('select public.change_site_media_publication($1,$2,$3,$4) as ok',[slot,version,expected,actor])).rows[0].ok;
 }
 async function count(db,table){return (await db.query('select count(*)::int n from public.'+table)).rows[0].n;}
-test('all 38 slots migrate; anonymous and ordinary sessions cannot read drafts or mutate publications; restrictive storage policy survives a broad policy',async()=>{
+test('all 51 slots migrate; anonymous and ordinary sessions cannot read drafts or mutate publications; restrictive storage policy survives a broad policy',async()=>{
  const db=await fixture();try{
- assert.equal(await count(db,'site_media_slots'),38);
+ assert.equal(await count(db,'site_media_slots'),51);
  assert.equal((await db.query("select public from storage.buckets where id='site-media-staging'")).rows[0].public,false);
  await role(db,'anon');
  await assert.rejects(count(db,'site_media_versions'),/permission denied/);
