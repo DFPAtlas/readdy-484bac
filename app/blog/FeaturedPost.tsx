@@ -1,6 +1,6 @@
+import BlogCoverImage from '@/components/blog/BlogCoverImage';
 import Link from 'next/link';
 import {
-  COVER_FALLBACK,
   audienceLabel,
   audienceStyle,
   formatBlogDate,
@@ -20,8 +20,8 @@ export default function FeaturedPost({ post }: { post: BlogPost }) {
           prefetch={false}
           className="block relative aspect-[16/10] lg:aspect-auto lg:h-full overflow-hidden"
         >
-          <img
-            src={post.cover_image_url || COVER_FALLBACK}
+          <BlogCoverImage
+            cover={post.cover_image_url}
             alt={post.title}
             className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.03]"
           />
