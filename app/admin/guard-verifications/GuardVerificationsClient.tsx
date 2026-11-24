@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import FocusTrap from 'focus-trap-react';
 import { GuardVerification, GuardStatus, matchesSearch, getSiaCheckStatusBadge, getSiaCheckStatusText, getApprovalBlockers } from './types';
 import RequestInfoModal from './RequestInfoModal';
 import Toast from './Toast';
-import GuardTable from './GuardTable';
-import GuardMobileCard from './GuardMobileCard';
+import GuardCardGrid from './GuardCardGrid';
+import GuardCardSkeleton from './GuardCardSkeleton';
 import GuardHeaderCard from './GuardHeaderCard';
 import ReviewTabs from './ReviewTabs';
 import OverviewTab from './OverviewTab';
@@ -24,6 +25,11 @@ import { supabase } from '@/lib/supabase';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 
 type DetailTab = 'overview' | 'licence' | 'documents' | 'professional' | 'availability' | 'account';
+interface GuardLoadError { message: string; signIn: boolean }
+
+class GuardRequestError extends Error {
+  constructor(message: string, readonly signIn = false) { super(message); }
+}
 
 interface VerificationChecks {
   [key: string]: boolean;
@@ -57,6 +63,7 @@ export default function GuardVerificationsClient() {
   const admin = useAdminAuth();
   const [guards, setGuards] = useState<GuardVerification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<GuardLoadError | null>(null);
   const [activeTab, setActiveTab] = useState<GuardStatus>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGuard, setSelectedGuard] = useState<GuardVerification | null>(null);
@@ -73,9 +80,11 @@ export default function GuardVerificationsClient() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showOverrideModal, setShowOverrideModal] = useState(false);
-  const [counts, setCounts] = useState<Record<string, number>>({ pending: 0, approved: 0, rejected: 0, suspended: 0, incomplete: 0, all: 0 });
+  const [counts, setCounts] = useState<Record<string, number | null>>({ pending: null, approved: null, rejected: null, suspended: null, incomplete: null, all: null });
   const [detailLoading, setDetailLoading] = useState(false);
   const [requestInfoGuard, setRequestInfoGuard] = useState<GuardVerification | null>(null);
+  const reviewBodyRef = useRef<HTMLDivElement | null>(null);
+  const reviewPaused = showRejectModal || showApproveModal || showOverrideModal || requestInfoGuard !== null;
   const approvalRunRef = useRef(false);
   const approvalActiveRef = useRef(true);
   const approvalGuardRef = useRef<string | null>(null);
@@ -86,11 +95,27 @@ export default function GuardVerificationsClient() {
     return () => { approvalActiveRef.current = false; };
   }, []);
 
+  useEffect(() => {
+    if (!selectedGuard || typeof document === 'undefined') return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [selectedGuard]);
+
+  useEffect(() => {
+    reviewBodyRef.current?.scrollTo({ top: 0 });
+    reviewBodyRef.current?.focus({ preventScroll: true });
+  }, [selectedGuard?.id, detailTab]);
+
   const fetchGuards = useCallback(async (status: GuardStatus) => {
     try {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || '';
+      setLoadError(null);
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.access_token) {
+        throw new GuardRequestError('Your admin session has expired. Sign in again to review guards.', true);
+      }
+      const token = session.access_token;
       const edgeUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-guards`;
       const isIncomplete = status === 'incomplete';
       const apiStatus = status === 'incomplete' || status === 'all' ? 'all' : status;
@@ -105,8 +130,13 @@ export default function GuardVerificationsClient() {
       });
 
       if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(errorBody || `Edge Function returned ${response.status}`);
+        if (response.status === 401) {
+          throw new GuardRequestError('Your admin session has expired. Sign in again to review guards.', true);
+        }
+        if (response.status === 403) {
+          throw new GuardRequestError('Unable to verify your admin access. Sign in again and complete MFA.', true);
+        }
+        throw new GuardRequestError('Unable to load guard applications. Please retry.');
       }
 
       const result = await response.json();
@@ -116,7 +146,8 @@ export default function GuardVerificationsClient() {
           ? result.data
           : Array.isArray(result?.guards)
             ? result.guards
-            : [];
+            : null;
+      if (!normalizedGuards) throw new GuardRequestError('Unable to load guard applications. Please retry.');
 
       const allGuards = normalizedGuards.map((guard: any) => ({
         ...guard,
@@ -131,8 +162,10 @@ export default function GuardVerificationsClient() {
         setGuards(allGuards);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch guards';
-      showToast(message, 'error');
+      setLoadError({
+        message: err instanceof GuardRequestError ? err.message : 'Unable to load guard applications. Please retry.',
+        signIn: err instanceof GuardRequestError && err.signIn,
+      });
       setGuards([]);
     } finally {
       setLoading(false);
@@ -141,8 +174,9 @@ export default function GuardVerificationsClient() {
 
   const fetchAllCounts = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || '';
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.access_token) throw new Error('Admin session unavailable');
+      const token = session.access_token;
       const edgeUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-guards`;
       const statuses = ['pending', 'approved', 'rejected', 'suspended', 'all'];
       const results = await Promise.all(
@@ -156,14 +190,14 @@ export default function GuardVerificationsClient() {
             },
             body: JSON.stringify({ status: s }),
           });
-          if (!res.ok) return { status: s, count: 0 };
+          if (!res.ok) return { status: s, count: null };
           const data = await res.json();
-          const guards = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
-          return { status: s, count: guards.length };
+          const guards = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : null;
+          return { status: s, count: guards ? guards.length : null };
         })
       );
 
-      const newCounts: Record<string, number> = { pending: 0, approved: 0, rejected: 0, suspended: 0, incomplete: 0, all: 0 };
+      const newCounts: Record<string, number | null> = { pending: null, approved: null, rejected: null, suspended: null, incomplete: null, all: null };
       results.forEach((r) => {
         if (r.status === 'all') {
           newCounts.all = r.count;
@@ -183,13 +217,13 @@ export default function GuardVerificationsClient() {
       });
       if (incompleteRes.ok) {
         const data = await incompleteRes.json();
-        const incompleteGuards = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
-        newCounts.incomplete = incompleteGuards.length;
+        const incompleteGuards = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : null;
+        newCounts.incomplete = incompleteGuards ? incompleteGuards.length : null;
       }
 
       setCounts(newCounts);
     } catch {
-      // silently fail counts
+      setCounts({ pending: null, approved: null, rejected: null, suspended: null, incomplete: null, all: null });
     }
   }, []);
 
@@ -515,7 +549,7 @@ export default function GuardVerificationsClient() {
                     <span className={`ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                       activeTab === tab.key ? 'bg-teal-500/10 text-teal-400' : 'bg-[#0a1628] text-slate-400'
                     }`}>
-                      {counts[tab.countKey] || 0}
+                      {counts[tab.countKey] ?? '—'}
                     </span>
                   </button>
                 ))}
@@ -545,24 +579,23 @@ export default function GuardVerificationsClient() {
           </div>
 
           <div className="px-4 sm:px-6 py-3 bg-[#0a1628] border-b border-[#1a2b4a] flex items-center justify-between">
-            <p className="text-sm text-slate-400">{loading ? 'Loading...' : `${filteredGuards.length} result${filteredGuards.length !== 1 ? 's' : ''}`}</p>
+            <p className="text-sm text-slate-400">{loading ? 'Loading...' : loadError ? 'Guard list unavailable' : `${filteredGuards.length} result${filteredGuards.length !== 1 ? 's' : ''}`}</p>
             <p className="text-xs text-slate-500 hidden sm:block">Tab: {statusTabs.find((t) => t.key === activeTab)?.label}</p>
           </div>
 
           {loading ? (
-            <div className="p-8">
-              <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-4 p-4 bg-[#0a1628] rounded-xl border border-[#1a2b4a] animate-pulse">
-                    <div className="w-10 h-10 rounded-full bg-[#1a2b4a] flex-shrink-0"></div>
-                    <div className="flex-1 space-y-2">
-                      <div className="w-32 h-4 bg-[#1a2b4a] rounded"></div>
-                      <div className="w-48 h-3 bg-[#1a2b4a] rounded"></div>
-                    </div>
-                    <div className="w-20 h-8 bg-[#1a2b4a] rounded-lg"></div>
-                  </div>
-                ))}
-              </div>
+            <div aria-label="Loading guard applications" aria-busy="true" className="grid grid-cols-1 gap-4 bg-[#0a1628]/40 p-4 sm:p-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {Array.from({ length: 6 }).map((_, i) => <GuardCardSkeleton key={i} />)}
+            </div>
+          ) : loadError ? (
+            <div role="alert" className="p-8 text-center">
+              <h3 className="text-lg font-semibold text-white mb-2">Unable to load guard applications</h3>
+              <p className="text-sm text-slate-400 mb-4">{loadError.message}</p>
+              {loadError.signIn ? (
+                <Link href="/admin/login" className="inline-flex px-4 py-2 rounded-xl bg-teal-600 text-white text-sm font-semibold">Sign in again</Link>
+              ) : (
+                <button onClick={() => { fetchGuards(activeTab); fetchAllCounts(); }} className="px-4 py-2 rounded-xl bg-teal-600 text-white text-sm font-semibold">Retry loading guards</button>
+              )}
             </div>
           ) : filteredGuards.length === 0 ? (
             <div className="p-12 text-center">
@@ -575,38 +608,42 @@ export default function GuardVerificationsClient() {
               </p>
             </div>
           ) : (
-            <>
-              <div className="hidden md:block">
-                <GuardTable guards={filteredGuards} onReview={openGuardDetails} onRequestInfo={handleRequestInfo} />
-              </div>
-              <div className="md:hidden">
-                <div className="divide-y divide-[#1a2b4a]">
-                  {filteredGuards.map((guard) => (
-                    <GuardMobileCard key={guard.id} guard={guard} onReview={() => openGuardDetails(guard)} onRequestInfo={() => handleRequestInfo(guard)} />
-                  ))}
-                </div>
-              </div>
-            </>
+            <GuardCardGrid guards={filteredGuards} onReview={openGuardDetails} onRequestInfo={handleRequestInfo} />
           )}
         </div>
       </div>
 
       {selectedGuard && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#111d35] rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto border border-[#1a2b4a]">
-            <div className="sticky top-0 bg-[#111d35] border-b border-[#1a2b4a] px-6 sm:px-8 py-5 flex items-center justify-between z-10">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white">Verify Guard Application</h2>
+        <FocusTrap paused={reviewPaused} focusTrapOptions={{
+          initialFocus: () => reviewBodyRef.current ?? false,
+          fallbackFocus: () => reviewBodyRef.current ?? document.body,
+          escapeDeactivates: false,
+          returnFocusOnDeactivate: true,
+        }}>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && !reviewPaused) {
+              event.stopPropagation();
+              closeGuardDetails();
+            }
+          }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="guard-review-title"
+            className="bg-[#111d35] rounded-2xl max-w-5xl w-full max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden border border-[#1a2b4a]">
+            <div className="shrink-0 bg-[#111d35] border-b border-[#1a2b4a] px-4 sm:px-8 py-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 id="guard-review-title" className="text-xl sm:text-2xl font-bold text-white">Verify Guard Application</h2>
                 <p className="text-sm text-slate-400 mt-1">Review each section and confirm the information</p>
               </div>
-              <button onClick={closeGuardDetails} className="text-slate-400 hover:text-white transition-colors cursor-pointer">
+              <button onClick={closeGuardDetails} aria-label="Close guard details" className="shrink-0 text-slate-400 hover:text-white transition-colors cursor-pointer">
                 <div className="w-8 h-8 flex items-center justify-center"><i className="ri-close-line text-2xl"></i></div>
               </button>
             </div>
 
             <ReviewTabs activeTab={detailTab} hasLicenceImages={!!hasLicenceImages} hasDocuments={!!hasDocuments} onTabChange={setDetailTab} />
 
-            <div className="px-6 sm:px-8 py-6 space-y-6">
+            <div ref={reviewBodyRef} role="region" aria-label="Guard application details" tabIndex={0}
+              className="min-h-0 flex-1 overflow-y-scroll overscroll-contain px-4 sm:px-8 py-6 space-y-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500"
+              style={{ scrollbarGutter: 'stable', WebkitOverflowScrolling: 'touch' }}>
               <GuardHeaderCard guard={selectedGuard} hasLicenceImages={!!hasLicenceImages} />
               {detailLoading ? (
                 <VerificationSkeleton />
@@ -735,6 +772,7 @@ export default function GuardVerificationsClient() {
             </div>
           </div>
         </div>
+        </FocusTrap>
       )}
 
       <RejectModal open={showRejectModal} processing={processing} reason={rejectionReason} onReasonChange={setRejectionReason} onCancel={() => { setShowRejectModal(false); setRejectionReason(''); }} onConfirm={handleReject} />

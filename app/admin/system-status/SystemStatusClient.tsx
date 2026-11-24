@@ -4,7 +4,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import StorageUsageWidget from '@/components/admin/StorageUsageWidget';
+import AdminCleanupControl from '@/components/admin/AdminCleanupControl';
+import AdminEdgeChecks from '@/components/admin/AdminEdgeChecks';
+import { loadAdminEdgePings, type AdminEdgePing } from '@/lib/adminEdgeHealth';
 import { loadAdminCleanupLogs, type CleanupLog } from '@/lib/adminMaintenance';
+import { loadAdminCleanupInventory, type CleanupInventory } from '@/lib/adminCleanupInventory';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vnywjfpkepjgclkbcmsj.supabase.co';
 const WEBSITE_URL = 'https://quickguard.uk';
@@ -70,16 +74,6 @@ interface CronJobData {
     return_message: string;
   } | null;
   run_count_7d: number;
-}
-
-interface EdgeFunctionPing {
-  name: string;
-  slug: string;
-  status: 'healthy' | 'degraded' | 'offline';
-  latency: number;
-  httpStatus: number;
-  error?: string;
-  checkedAt: string;
 }
 
 interface WebsitePing {
@@ -155,18 +149,6 @@ function getPaymentStatusLabel(status: string): string {
   return labels[status] || status;
 }
 
-// ── Edge functions to ping ─────────────────────────────────────────────
-
-const EDGE_FUNCTIONS: { name: string; slug: string; type: string; retired?: boolean }[] = [
-  { name: 'Create Job Payment', slug: 'create-job-payment', type: 'payment' },
-  { name: 'Create Guard Payout', slug: 'create-guard-payout', type: 'payment' },
-  { name: 'Release Guard Payment (Retired)', slug: 'release-guard-payment', type: 'payment', retired: true },
-  { name: 'Overdue Guard Payout Worker', slug: 'process-overdue-guard-payouts', type: 'payment' },
-  { name: 'Enhanced Stripe Webhook', slug: 'enhanced-stripe-webhook', type: 'stripe' },
-  { name: 'Get Storage Usage', slug: 'get-storage-usage', type: 'storage' },
-  { name: 'Run Cleanup Now', slug: 'run-cleanup-now', type: 'maintenance' },
-];
-
 // ── Main Component ─────────────────────────────────────────────────────
 
 export default function SystemStatusClient() {
@@ -177,18 +159,18 @@ export default function SystemStatusClient() {
   const [websitePing, setWebsitePing] = useState<WebsitePing | null>(null);
   const [websiteLoading, setWebsiteLoading] = useState(true);
 
-  const [edgePings, setEdgePings] = useState<EdgeFunctionPing[]>([]);
+  const [edgePings, setEdgePings] = useState<AdminEdgePing[]>([]);
   const [edgeLoading, setEdgeLoading] = useState(true);
+  const edgeRequest = useRef<{ id: number; active: boolean; controller: AbortController | null }>({ id: 0, active: true, controller: null });
 
   const [cleanupLogs, setCleanupLogs] = useState<CleanupLog[]>([]);
   const [cleanupLogsLoading, setCleanupLogsLoading] = useState(true);
   const [cleanupLogsError, setCleanupLogsError] = useState<string | null>(null);
 
-  const [tableSizes, setTableSizes] = useState<Record<string, string>>();
-  const [tableSizesLoading, setTableSizesLoading] = useState(true);
-
-  const [cleanupRunning, setCleanupRunning] = useState(false);
-  const [cleanupResult, setCleanupResult] = useState<{ ok: number; fail: number } | null>(null);
+  const [cleanupInventory, setCleanupInventory] = useState<CleanupInventory | null>(null);
+  const [cleanupInventoryLoading, setCleanupInventoryLoading] = useState(true);
+  const [cleanupInventoryError, setCleanupInventoryError] = useState<string | null>(null);
+  const inventoryRequest = useRef({ id: 0, active: true });
 
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [logPage, setLogPage] = useState(0);
@@ -264,130 +246,29 @@ export default function SystemStatusClient() {
     }
   }, []);
 
-  // ── Ping edge functions ──────────────────────────────────────────────
+  // ── Read-only endpoint reachability; retired/worker routes are never invoked ──
   const pingEdgeFunctions = useCallback(async () => {
+    edgeRequest.current.controller?.abort();
+    const controller = new AbortController();
+    const request = ++edgeRequest.current.id;
+    edgeRequest.current.controller = controller;
     setEdgeLoading(true);
-    const pings: EdgeFunctionPing[] = [];
-
-    let token = '';
-    const { data: { session } } = await supabase.auth.getSession();
-    token = session?.access_token || '';
-
-    await Promise.all(
-      EDGE_FUNCTIONS.map(async (fn) => {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-        const start = performance.now();
-        try {
-          const isRetired = fn.retired === true;
-          const method = isRetired ? 'POST' : 'GET';
-          const headers: Record<string, string> = {};
-          if (isRetired && token) {
-            headers['Authorization'] = `Bearer ${token}`;
-            headers['Content-Type'] = 'application/json';
-          }
-
-          const res = await fetch(`${SUPABASE_URL}/functions/v1/${fn.slug}`, {
-            method,
-            signal: controller.signal,
-            cache: 'no-store',
-            headers: Object.keys(headers).length ? headers : undefined,
-            body: isRetired ? '' : undefined,
-          });
-          clearTimeout(timeout);
-          const latency = Math.round(performance.now() - start);
-
-          if (isRetired) {
-            if (!token) {
-              pings.push({
-                name: fn.name,
-                slug: fn.slug,
-                status: 'degraded',
-                latency,
-                httpStatus: 0,
-                error: 'Auth required for verification — sign in as admin',
-                checkedAt: new Date().toISOString(),
-              });
-            } else if (res.status === 410) {
-              pings.push({
-                name: fn.name,
-                slug: fn.slug,
-                status: 'healthy',
-                latency,
-                httpStatus: 410,
-                error: 'Retired: returns 410 as expected',
-                checkedAt: new Date().toISOString(),
-              });
-            } else if (res.status === 403) {
-              pings.push({
-                name: fn.name,
-                slug: fn.slug,
-                status: 'degraded',
-                latency,
-                httpStatus: res.status,
-                error: 'Auth check passed but role denied 403',
-                checkedAt: new Date().toISOString(),
-              });
-            } else if (res.status === 401) {
-              pings.push({
-                name: fn.name,
-                slug: fn.slug,
-                status: 'degraded',
-                latency,
-                httpStatus: res.status,
-                error: 'JWT validation failed 401',
-                checkedAt: new Date().toISOString(),
-              });
-            } else if (res.status >= 500) {
-              pings.push({
-                name: fn.name,
-                slug: fn.slug,
-                status: 'offline',
-                latency,
-                httpStatus: res.status,
-                error: `Unexpected HTTP ${res.status} — retired function should return 410`,
-                checkedAt: new Date().toISOString(),
-              });
-            } else {
-              pings.push({
-                name: fn.name,
-                slug: fn.slug,
-                status: 'degraded',
-                latency,
-                httpStatus: res.status,
-                error: `Expected 410, got HTTP ${res.status}`,
-                checkedAt: new Date().toISOString(),
-              });
-            }
-          } else {
-            const isError = res.status >= 500;
-            pings.push({
-              name: fn.name,
-              slug: fn.slug,
-              status: isError ? 'degraded' : 'healthy',
-              latency,
-              httpStatus: res.status,
-              error: isError ? `HTTP ${res.status}` : undefined,
-              checkedAt: new Date().toISOString(),
-            });
-          }
-        } catch (e: any) {
-          clearTimeout(timeout);
-          pings.push({
-            name: fn.name,
-            slug: fn.slug,
-            status: 'offline',
-            latency: Math.round(performance.now() - start),
-            httpStatus: 0,
-            error: e.name === 'AbortError' ? 'Timed out' : e.message,
-            checkedAt: new Date().toISOString(),
-          });
-        }
-      })
-    );
-
-    setEdgePings(pings);
-    setEdgeLoading(false);
+    setEdgePings([]);
+    try {
+      const pings = await loadAdminEdgePings(SUPABASE_URL, fetch, controller.signal);
+      if (edgeRequest.current.active && request === edgeRequest.current.id) setEdgePings(pings);
+    } finally {
+      if (edgeRequest.current.active && request === edgeRequest.current.id) setEdgeLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    const scope = edgeRequest.current;
+    scope.active = true;
+    return () => {
+      scope.active = false;
+      // Strict Mode immediately replays setup; only an actual unmount cancels the read.
+      queueMicrotask(() => { if (!scope.active) scope.controller?.abort(); });
+    };
   }, []);
 
   // ── Fetch cleanup logs ───────────────────────────────────────────────
@@ -405,47 +286,32 @@ export default function SystemStatusClient() {
     }
   }, []);
 
-  // ── Fetch table sizes ────────────────────────────────────────────────
-  const fetchTableSizes = useCallback(async () => {
-    setTableSizesLoading(true);
-    const tables = [
-      'email_send_log', 'admin_registration_audit', 'email_queue',
-      'rate_limit_events', 'notifications', 'processed_stripe_events',
-    ];
-    const results: Record<string, string> = {};
-    await Promise.all(
-      tables.map(async (table) => {
-        try {
-          const { count } = await supabase.from(table).select('*', { count: 'exact', head: true });
-          results[table] = count !== null ? `${count.toLocaleString('en-GB')} rows` : '? rows';
-        } catch {
-          results[table] = '? rows';
-        }
-      })
-    );
-    setTableSizes(results);
-    setTableSizesLoading(false);
+  // ── Read the inventory of the actual scheduled cleanup targets ─────────
+  const fetchCleanupInventory = useCallback(async () => {
+    const request = ++inventoryRequest.current.id;
+    setCleanupInventoryLoading(true);
+    setCleanupInventoryError(null);
+    setCleanupInventory(null);
+    try {
+      const inventory = await loadAdminCleanupInventory();
+      if (inventoryRequest.current.active && request === inventoryRequest.current.id) setCleanupInventory(inventory);
+    } catch {
+      if (inventoryRequest.current.active && request === inventoryRequest.current.id) {
+        setCleanupInventoryError('Unable to verify cleanup inventory. Please retry.');
+      }
+    } finally {
+      if (inventoryRequest.current.active && request === inventoryRequest.current.id) setCleanupInventoryLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    const scope = inventoryRequest.current;
+    scope.active = true;
+    return () => { scope.active = false; };
   }, []);
 
-  // ── Run cleanup ──────────────────────────────────────────────────────
-  const runCleanup = useCallback(async () => {
-    setCleanupRunning(true);
-    setCleanupResult(null);
-    try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/run-cleanup-now`, { method: 'POST' });
-      const data = await res.json();
-      const results = data.results as Record<string, { status: string }>;
-      const ok = Object.values(results).filter((r: any) => r.status === 'completed').length;
-      const fail = Object.values(results).filter((r: any) => r.status === 'failed').length;
-      setCleanupResult({ ok, fail });
-      // Immediate refresh
-      await fetchCleanupLogs();
-    } catch {
-      setCleanupResult({ ok: 0, fail: 6 });
-    } finally {
-      setCleanupRunning(false);
-    }
-  }, [fetchCleanupLogs]);
+  const refreshCleanupEvidence = useCallback(async () => {
+    await Promise.all([fetchCleanupLogs(), fetchCleanupInventory()]);
+  }, [fetchCleanupLogs, fetchCleanupInventory]);
 
   // ── Open full log modal ──────────────────────────────────────────────
   const openFullLog = useCallback(async (page: number) => {
@@ -476,13 +342,15 @@ export default function SystemStatusClient() {
       pingWebsite(),
       pingEdgeFunctions(),
       fetchCleanupLogs(),
-      fetchTableSizes(),
+      fetchCleanupInventory(),
     ]);
 
-    setLastRefreshed(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     refreshingRef.current = false;
-    setIsRefreshing(false);
-  }, [fetchAdminStatus, pingWebsite, pingEdgeFunctions, fetchCleanupLogs, fetchTableSizes]);
+    if (edgeRequest.current.active) {
+      setLastRefreshed(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      setIsRefreshing(false);
+    }
+  }, [fetchAdminStatus, pingWebsite, pingEdgeFunctions, fetchCleanupLogs, fetchCleanupInventory]);
 
   // ── Effects ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -496,7 +364,7 @@ export default function SystemStatusClient() {
     if (adminLoading) return { label: 'Checking...', color: 'text-slate-400', icon: 'ri-loader-4-line animate-spin' };
     if (adminError || !adminData) return { label: 'Unreachable', color: 'text-red-400', icon: 'ri-close-circle-line' };
     switch (adminData.status) {
-      case 'healthy': return { label: 'All Systems Operational', color: 'text-emerald-400', icon: 'ri-check-double-line' };
+      case 'healthy': return { label: 'Core Services Healthy', color: 'text-emerald-400', icon: 'ri-check-double-line' };
       case 'degraded': return { label: 'Degraded Service', color: 'text-amber-400', icon: 'ri-error-warning-line' };
       default: return { label: 'Service Disruption', color: 'text-red-400', icon: 'ri-close-circle-line' };
     }
@@ -713,73 +581,8 @@ export default function SystemStatusClient() {
           </div>
         </section>
 
-        {/* Edge Functions Health */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Edge Functions</h2>
-            {edgeLoading && (
-              <span className="text-[11px] text-slate-600 flex items-center gap-1.5">
-                <i className="ri-loader-4-line animate-spin text-xs"></i>
-                Pinging…
-              </span>
-            )}
-          </div>
-          {edgeLoading && !edgePings.length ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="bg-[#111d35] rounded-2xl border border-[#1a2b4a] p-5 animate-pulse">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-32 h-4 bg-[#1a2b4a] rounded"></div>
-                    <div className="w-14 h-5 bg-[#1a2b4a] rounded-full"></div>
-                  </div>
-                  <div className="w-20 h-3 bg-[#1a2b4a] rounded"></div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {EDGE_FUNCTIONS.map((fn) => {
-                const ping = edgePings.find((p) => p.slug === fn.slug);
-                const badge = getStatusBadge(ping?.status);
-                return (
-                  <div key={fn.slug} className="bg-[#111d35] rounded-2xl border border-[#1a2b4a] p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#0a1628] text-slate-400">
-                          <i className={`${
-                            fn.type === 'payment' ? 'ri-money-pound-circle-line' :
-                            fn.type === 'stripe' ? 'ri-bank-card-line' :
-                            fn.type === 'storage' ? 'ri-database-2-line' :
-                            'ri-tools-line'
-                          } text-lg`}></i>
-                        </div>
-                        <span className="text-sm font-bold text-white">{fn.name}</span>
-                      </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${badge.color}`}>
-                        {badge.label}
-                      </span>
-                    </div>
-                    {ping && (
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <div className="w-3 h-3 flex items-center justify-center">
-                          <i className="ri-timer-line text-[10px]"></i>
-                        </div>
-                        <span>{ping.latency}ms · HTTP {ping.httpStatus || '—'}</span>
-                      </div>
-                    )}
-                    {ping?.error && (
-                      <p className={`text-[10px] mt-2 leading-relaxed ${
-                        fn.retired && ping.status === 'healthy' ? 'text-emerald-400' :
-                        fn.retired && ping.status === 'degraded' ? 'text-amber-400' :
-                        'text-red-400'
-                      }`}>{ping.error}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+        {/* Edge function reachability is separate from authenticated operation health. */}
+        <AdminEdgeChecks pings={edgePings} loading={edgeLoading} />
 
         {/* Payment Pipeline */}
         <section>
@@ -1053,25 +856,16 @@ export default function SystemStatusClient() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Database Maintenance</h2>
-              <div className="flex items-center gap-2">
-                {cleanupResult && (
-                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${cleanupResult.fail > 0 ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20' : 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'}`}>
-                    {cleanupResult.ok} done{cleanupResult.fail > 0 ? ` / ${cleanupResult.fail} failed` : ''}
-                  </span>
-                )}
-                <button
-                  onClick={runCleanup}
-                  disabled={cleanupRunning}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-500 transition-all cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="w-3 h-3 flex items-center justify-center">
-                    <i className={`${cleanupRunning ? 'ri-loader-4-line animate-spin' : 'ri-play-line'} text-xs`}></i>
-                  </div>
-                  {cleanupRunning ? 'Running…' : 'Run Cleanup Now'}
-                </button>
-              </div>
+              <AdminCleanupControl onCompleted={refreshCleanupEvidence} />
             </div>
 
+            <p className="text-[11px] text-slate-500 mb-3">Counts cover the scheduled cleanup targets, which can differ from application logs. Eligible records meet the existing retention and status rules.</p>
+            {cleanupInventoryError && (
+              <div role="alert" className="text-xs text-amber-400 mb-3">
+                <p>{cleanupInventoryError}</p>
+                <button onClick={fetchCleanupInventory} className="underline mt-1">Retry cleanup inventory</button>
+              </div>
+            )}
             <div className="bg-[#111d35] rounded-2xl border border-[#1a2b4a] overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
@@ -1079,7 +873,8 @@ export default function SystemStatusClient() {
                     <tr className="border-b border-[#1a2b4a] bg-[#0a1628]">
                       <th className="text-left px-4 py-3 font-semibold text-slate-400">Table</th>
                       <th className="text-left px-4 py-3 font-semibold text-slate-400">Retention</th>
-                      <th className="text-right px-4 py-3 font-semibold text-slate-400">Size</th>
+                      <th className="text-right px-4 py-3 font-semibold text-slate-400">Records</th>
+                      <th className="text-right px-4 py-3 font-semibold text-slate-400">Eligible</th>
                       <th className="text-right px-4 py-3 font-semibold text-slate-400">Last Run</th>
                     </tr>
                   </thead>
@@ -1092,6 +887,7 @@ export default function SystemStatusClient() {
                       { table: 'notifications', retention: '180 days', icon: 'ri-notification-line' },
                       { table: 'processed_stripe_events', retention: '365 days', icon: 'ri-bank-card-line' },
                     ].map((row) => {
+                      const target = cleanupInventory?.targets.find(item => item.table_name === row.table);
                       const log = cleanupLogs.find(l => l.table_name === row.table && l.status === 'completed');
                       const failLog = cleanupLogs.find(l => l.table_name === row.table && l.status === 'failed');
                       return (
@@ -1101,14 +897,20 @@ export default function SystemStatusClient() {
                               <div className="w-6 h-6 flex items-center justify-center rounded-md bg-[#0a1628] text-teal-400">
                                 <i className={`${row.icon} text-[11px]`}></i>
                               </div>
-                              <span className="text-white font-mono text-[11px]">{row.table}</span>
+                              <div>
+                                <span className="text-white font-mono text-[11px]">{row.table}</span>
+                                {target && <p className="text-[10px] text-slate-500">{target.target_relation} · {target.relation_type}</p>}
+                              </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3"><span className="text-slate-400 text-[11px]">{row.retention}</span></td>
+                          <td className="px-4 py-3"><span className="text-slate-400 text-[11px]">{target ? `${target.retention_days} days` : row.retention}</span></td>
                           <td className="px-4 py-3 text-right">
                             <span className="text-slate-400 text-[11px]">
-                              {tableSizesLoading ? '…' : (tableSizes?.[row.table] || '-')}
+                              {cleanupInventoryLoading ? '…' : target ? target.total_rows.toLocaleString('en-GB') : 'Not verified'}
                             </span>
+                          </td>
+                          <td className="px-4 py-3 text-right text-slate-400">
+                            {cleanupInventoryLoading ? '…' : target ? target.eligible_rows.toLocaleString('en-GB') : 'Not verified'}
                           </td>
                           <td className="px-4 py-3 text-right">
                             {failLog ? (
@@ -1128,6 +930,8 @@ export default function SystemStatusClient() {
                 </table>
               </div>
             </div>
+
+            {cleanupInventory && <p className="text-[10px] text-slate-500 mt-2">Inventory checked {new Date(cleanupInventory.sampled_at).toLocaleTimeString('en-GB')}</p>}
 
             {/* Recent Cleanup Activity */}
             <div className="mt-4 bg-[#111d35] rounded-2xl border border-[#1a2b4a] p-4">
@@ -1154,7 +958,7 @@ export default function SystemStatusClient() {
               ) : cleanupLogs.length === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-[11px] text-slate-600">No cleanup activity logged yet.</p>
-                  <p className="text-[10px] text-slate-700 mt-1">Run Cleanup Now to populate this section.</p>
+                  <p className="text-[10px] text-slate-700 mt-1">Completed scheduled or confirmed manual runs appear here.</p>
                 </div>
               ) : (
                 <div className="space-y-2">

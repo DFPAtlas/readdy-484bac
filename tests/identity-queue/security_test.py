@@ -90,8 +90,12 @@ class SecurityTest(unittest.IsolatedAsyncioTestCase):
                         no_approved_client.load_cert_chain(str(certs / f"{prefix}.pem"),
                                                            str(certs / f"{prefix}.key"))
                     async with httpx.AsyncClient(verify=no_approved_client, trust_env=False) as client:
-                        with self.assertRaises(httpx.HTTPError):
+                        with self.assertRaises((httpx.ConnectError, httpx.ReadError, ssl.SSLError)) as rejected:
                             await client.post(env["IDENTITY_INFERENCE_URL"] + "/ready", json=vision.payload())
+                        if isinstance(rejected.exception, ssl.SSLError):
+                            self.assertIn(rejected.exception.reason, {
+                                "TLSV13_ALERT_CERTIFICATE_REQUIRED", "TLSV1_ALERT_UNKNOWN_CA",
+                            })
                 with patch.dict(os.environ, {"IDENTITY_INFERENCE_CA_FILE": str(certs / "rogue-ca.pem")}):
                     with self.assertRaises(httpx.HTTPError):
                         await vision.ready()

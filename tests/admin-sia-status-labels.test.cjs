@@ -57,7 +57,7 @@ function guard(status, context = {}) {
     sia_confidence_score: null, sia_mismatch_reason: null, profile_completed: false, ...context };
 }
 async function modal(profile) {
-  const stubs = Object.fromEntries(['RequestInfoModal','Toast','GuardTable','GuardMobileCard','GuardHeaderCard','ReviewTabs','OverviewTab','LicenceReviewPanel','ProfessionalTab','AvailabilityTab','VerificationFooter','RejectModal','ApproveConfirmModal','OverrideApproveModal','VerificationSkeleton','DocumentsReviewPanel','AccountTab'].map(name => ['./'+name, { __esModule: true, default: () => null }]));
+  const stubs = Object.fromEntries(['RequestInfoModal','Toast','GuardCardGrid','GuardHeaderCard','ReviewTabs','OverviewTab','LicenceReviewPanel','ProfessionalTab','AvailabilityTab','VerificationFooter','RejectModal','ApproveConfirmModal','OverrideApproveModal','VerificationSkeleton','DocumentsReviewPanel','AccountTab'].map(name => ['./'+name, { __esModule: true, default: () => null }]));
   const h = hooksHarness('app/admin/guard-verifications/GuardVerificationsClient.tsx', {
     ...stubs, 'next/link': { __esModule: true, default: () => null },
     '@/hooks/useAdminAuth': { useAdminAuth: () => ({ username: 'QA' }) },

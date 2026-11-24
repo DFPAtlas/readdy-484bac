@@ -4,23 +4,23 @@ import { SkeletonCircle, SkeletonLine, SkeletonBadge } from './SkeletonPrimitive
 
 export default function GuardCardSkeleton() {
   return (
-    <div className="bg-[#111d35] rounded-xl border border-[#1a2b4a] p-6">
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-4 flex-1">
-          <SkeletonCircle size="w-16 h-16" />
-          <div className="flex-1 space-y-3">
-            <SkeletonLine width="w-48" height="h-5" />
-            <div className="space-y-2">
-              <SkeletonLine width="w-56" height="h-4" />
-              <SkeletonLine width="w-40" height="h-4" />
-              <SkeletonLine width="w-64" height="h-4" />
-              <SkeletonLine width="w-36" height="h-4" />
-            </div>
-            <SkeletonBadge count={2} />
-          </div>
+    <div aria-hidden="true" className="min-w-0 rounded-2xl border border-[#1a2b4a] bg-[#111d35] p-4 space-y-4">
+      <div className="flex gap-3">
+        <SkeletonCircle />
+        <div className="flex-1 min-w-0 space-y-2">
+          <SkeletonLine width="w-3/4" />
+          <SkeletonLine height="h-3" />
+          <SkeletonLine width="w-1/2" height="h-3" />
         </div>
-        <SkeletonLine width="w-36" height="h-10" />
       </div>
+      <SkeletonBadge count={2} />
+      <div className="space-y-3 rounded-xl bg-[#0a1628] p-3">
+        <SkeletonLine width="w-3/4" />
+        <SkeletonLine />
+        <SkeletonLine />
+        <SkeletonLine width="w-2/3" />
+      </div>
+      <div className="grid grid-cols-2 gap-2 pt-3"><SkeletonLine height="h-10" /><SkeletonLine height="h-10" /></div>
     </div>
   );
 }

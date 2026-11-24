@@ -1,0 +1,9 @@
+# Legacy subscriber review routing — 24 November 2026
+
+The older /admin/subscribers page still had independent approval/rejection handlers. They directly updated guards and inserted browser notifications, bypassing the main review screen and its protected decision/email workflow. They also claimed success without the authoritative service acknowledgement or email outcome used by the repaired primary flow.
+
+That page now retains its existing read, status counts/filters, refresh and Quick View, while its decision shortcuts open Guard Verifications. The page explains that the administrator must select the guard there and complete the review. Both card and Quick View links use the existing admin route; no private identifier or contact detail is placed in a URL. This replaces the unsafe shortcut rather than introducing another one-click caller that skips the review checklist. The previous direct-write and notification handlers are removed. All actual approvals/rejections remain deliberate actions in the full review workflow; this change does not make a decision for any guard.
+
+Three behavioral regressions render the page with immutable synthetic records. They verify card and Quick View routing, absence of direct decision controls, retained filters/details/refresh and the read-error path. The database-write APIs and native confirmation/prompt shortcuts fail the tests if used, and the only network request allowed is the existing read-only get-guards request. Existing verification, approval/rejection feedback and scrolling regressions also run.
+
+No database, Edge Function, permission, billing or package change is required. The API's existing list-pagination limit and other legacy admin routes are separate findings, not repaired here. Merge and publish latest main through Readdy, then check the subscriber links and the full verification workflow without changing a real guard's status.
