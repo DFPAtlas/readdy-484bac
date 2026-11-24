@@ -23,13 +23,11 @@ import DocumentsReviewPanel from './DocumentsReviewPanel';
 import AccountTab from './AccountTab';
 import { supabase } from '@/lib/supabase';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { GuardListError, loadAdminGuardList, loadAdminGuardCount, guardDisplayPage } from '@/lib/admin-guard-list';
+import GuardListPagination from '@/components/admin/GuardListPagination';
 
 type DetailTab = 'overview' | 'licence' | 'documents' | 'professional' | 'availability' | 'account';
 interface GuardLoadError { message: string; signIn: boolean }
-
-class GuardRequestError extends Error {
-  constructor(message: string, readonly signIn = false) { super(message); }
-}
 
 interface VerificationChecks {
   [key: string]: boolean;
@@ -66,6 +64,9 @@ export default function GuardVerificationsClient() {
   const [loadError, setLoadError] = useState<GuardLoadError | null>(null);
   const [activeTab, setActiveTab] = useState<GuardStatus>('pending');
   const [searchQuery, setSearchQuery] = useState('');
+  const [listPage, setListPage] = useState(1);
+  const listRequestRef = useRef<AbortController | null>(null);
+  const countRequestRef = useRef<AbortController | null>(null);
   const [selectedGuard, setSelectedGuard] = useState<GuardVerification | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>('overview');
   const [verificationChecks, setVerificationChecks] = useState<VerificationChecks>({ ...defaultChecks });
@@ -87,7 +88,11 @@ export default function GuardVerificationsClient() {
 
   useEffect(() => {
     approvalActiveRef.current = true;
-    return () => { approvalActiveRef.current = false; };
+    return () => {
+      approvalActiveRef.current = false;
+      listRequestRef.current?.abort();
+      countRequestRef.current?.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -103,122 +108,66 @@ export default function GuardVerificationsClient() {
   }, [selectedGuard?.id, detailTab]);
 
   const fetchGuards = useCallback(async (status: GuardStatus) => {
+    listRequestRef.current?.abort();
+    const controller = new AbortController();
+    listRequestRef.current = controller;
+    const isCurrent = () => approvalActiveRef.current && listRequestRef.current === controller && !controller.signal.aborted;
+    setLoading(true);
+    setLoadError(null);
+    setGuards([]);
     try {
-      setLoading(true);
-      setLoadError(null);
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (!isCurrent()) return;
       if (sessionError || !session?.access_token) {
-        throw new GuardRequestError('Your admin session has expired. Sign in again to review guards.', true);
+        throw new GuardListError('Your admin session has expired. Sign in again to review guards.', true);
       }
-      const token = session.access_token;
-      const edgeUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-guards`;
-      const isIncomplete = status === 'incomplete';
-      const apiStatus = status === 'incomplete' || status === 'all' ? 'all' : status;
-      const response = await fetch(edgeUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: apiStatus, incompleteOnly: isIncomplete }),
+      const allGuards = await loadAdminGuardList<GuardVerification>({
+        status: status === 'incomplete' ? 'all' : status,
+        incompleteOnly: status === 'incomplete',
+        token: session.access_token,
+        signal: controller.signal,
       });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new GuardRequestError('Your admin session has expired. Sign in again to review guards.', true);
-        }
-        if (response.status === 403) {
-          throw new GuardRequestError('Unable to verify your admin access. Sign in again and complete MFA.', true);
-        }
-        throw new GuardRequestError('Unable to load guard applications. Please retry.');
-      }
-
-      const result = await response.json();
-      const normalizedGuards = Array.isArray(result)
-        ? result
-        : Array.isArray(result?.data)
-          ? result.data
-          : Array.isArray(result?.guards)
-            ? result.guards
-            : null;
-      if (!normalizedGuards) throw new GuardRequestError('Unable to load guard applications. Please retry.');
-
-      const allGuards = normalizedGuards.map((guard: any) => ({
-        ...guard,
-        verification_checks: { ...defaultChecks },
-      }));
-
-      if (status === 'all') {
-        setGuards(allGuards);
-      } else if (status === 'incomplete') {
-        setGuards(allGuards.filter((g: GuardVerification) => g.profile_completed !== true));
-      } else {
-        setGuards(allGuards);
-      }
+      if (!isCurrent()) return;
+      setGuards(allGuards.map(guard => ({ ...guard, verification_checks: { ...defaultChecks } })));
     } catch (err) {
+      if (!isCurrent()) return;
       setLoadError({
-        message: err instanceof GuardRequestError ? err.message : 'Unable to load guard applications. Please retry.',
-        signIn: err instanceof GuardRequestError && err.signIn,
+        message: err instanceof GuardListError ? err.message : 'Unable to load guard applications. Please retry.',
+        signIn: err instanceof GuardListError && err.signIn,
       });
       setGuards([]);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, []);
 
   const fetchAllCounts = useCallback(async () => {
+    countRequestRef.current?.abort();
+    const controller = new AbortController();
+    countRequestRef.current = controller;
+    const isCurrent = () => approvalActiveRef.current && countRequestRef.current === controller && !controller.signal.aborted;
+    const unknownCounts = { pending: null, approved: null, rejected: null, suspended: null, incomplete: null, all: null };
+    setCounts(unknownCounts);
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (!isCurrent()) return;
       if (sessionError || !session?.access_token) throw new Error('Admin session unavailable');
-      const token = session.access_token;
-      const edgeUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-guards`;
-      const statuses = ['pending', 'approved', 'rejected', 'suspended', 'all'];
-      const results = await Promise.all(
-        statuses.map(async (s) => {
-          const res = await fetch(edgeUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({ status: s }),
+      const results = await Promise.all(statusTabs.map(async ({ key }) => {
+        try {
+          const count = await loadAdminGuardCount({
+            status: key === 'incomplete' ? 'all' : key,
+            incompleteOnly: key === 'incomplete',
+            token: session.access_token,
+            signal: controller.signal,
           });
-          if (!res.ok) return { status: s, count: null };
-          const data = await res.json();
-          const guards = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : null;
-          return { status: s, count: guards ? guards.length : null };
-        })
-      );
-
-      const newCounts: Record<string, number | null> = { pending: null, approved: null, rejected: null, suspended: null, incomplete: null, all: null };
-      results.forEach((r) => {
-        if (r.status === 'all') {
-          newCounts.all = r.count;
-        } else {
-          newCounts[r.status] = r.count;
+          return [key, count] as const;
+        } catch {
+          return [key, null] as const;
         }
-      });
-
-      const incompleteRes = await fetch(edgeUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: 'all', incompleteOnly: true }),
-      });
-      if (incompleteRes.ok) {
-        const data = await incompleteRes.json();
-        const incompleteGuards = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : null;
-        newCounts.incomplete = incompleteGuards ? incompleteGuards.length : null;
-      }
-
-      setCounts(newCounts);
+      }));
+      if (isCurrent()) setCounts(Object.fromEntries(results));
     } catch {
-      setCounts({ pending: null, approved: null, rejected: null, suspended: null, incomplete: null, all: null });
+      if (isCurrent()) setCounts(unknownCounts);
     }
   }, []);
 
@@ -233,6 +182,7 @@ export default function GuardVerificationsClient() {
   };
 
   const filteredGuards = guards.filter((g) => matchesSearch(g, searchQuery));
+  const visiblePage = guardDisplayPage(filteredGuards, listPage);
 
   const openGuardDetails = (guard: GuardVerification) => {
     approvalReviewRef.current++;
@@ -525,7 +475,7 @@ export default function GuardVerificationsClient() {
                 {statusTabs.map((tab) => (
                   <button
                     key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
+                    onClick={() => { setActiveTab(tab.key); setListPage(1); }}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                       activeTab === tab.key ? 'bg-[#111d35] text-white shadow-sm' : 'text-slate-400 hover:text-white'
                     }`}
@@ -548,12 +498,12 @@ export default function GuardVerificationsClient() {
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setListPage(1); }}
                   placeholder="Search name, email, SIA, phone..."
                   className="block w-full pl-9 pr-3 py-2.5 border border-[#1a2b4a] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition bg-[#0a1628] text-white placeholder-slate-500"
                 />
                 {searchQuery && (
-                  <button onClick={() => setSearchQuery('')} className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer">
+                  <button onClick={() => { setSearchQuery(''); setListPage(1); }} className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer">
                     <div className="w-4 h-4 flex items-center justify-center">
                       <i className="ri-close-line text-slate-400 text-sm"></i>
                     </div>
@@ -593,7 +543,10 @@ export default function GuardVerificationsClient() {
               </p>
             </div>
           ) : (
-            <GuardCardGrid guards={filteredGuards} onReview={openGuardDetails} onRequestInfo={handleRequestInfo} />
+            <>
+              <GuardCardGrid guards={visiblePage.items} onReview={openGuardDetails} onRequestInfo={handleRequestInfo} />
+              <GuardListPagination page={visiblePage.page} totalItems={filteredGuards.length} onPageChange={setListPage} />
+            </>
           )}
         </div>
       </div>

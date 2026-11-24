@@ -1,3 +1,4 @@
+const { guardPage } = require('./helpers/admin-guard-pages.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { hooksHarness, nodes } = require('./helpers/guard-ui-fixture.cjs');
@@ -20,10 +21,10 @@ async function review() {
     '@/lib/supabase': { supabase: { auth: { async getSession() {
       return { data: { session: { access_token: 'fixture' } }, error: null };
     } } } },
-  }, { document: { body }, setTimeout: fn => { fn(); return 0; },
+  }, { document: { body }, setTimeout: (fn, delay) => { if (delay !== 20000) fn(); return 0; },
     process: { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://fixture.invalid' } },
-    fetch: async url => { requests.push(url); assert.match(url, /\/get-guards$/);
-      return { ok: true, json: async () => ({ data: [guard] }) }; } });
+    fetch: async (url, options) => { requests.push(url); assert.match(url, /\/get-guards$/);
+      return { ok: true, json: async () => guardPage([guard], options) }; } });
   h.render(); await h.effects();
   const table = nodes(h.render()).find(n => n.props?.onReview && n.props?.guards);
   table.props.onReview(guard);
