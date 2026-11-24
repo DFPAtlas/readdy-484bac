@@ -4,7 +4,7 @@ const {PGlite}=require('@electric-sql/pglite');
 const {load}=require('./helpers/enterprise-module.cjs');
 const {readAdminSidebarCounts}=load('supabase/functions/_shared/admin-sidebar-counts.ts');
 const tables=['transactions','guards','sia_verifications','guard_payouts','contact_submissions','complaints'];
-const expected={failedPayments:1,guardVerifications:2,siaVerifications:1,heldPayments:1,contactSubmissions:1,complaints:2};
+const expected={failedPayments:1,guardVerifications:11,siaVerifications:1,heldPayments:1,contactSubmissions:1,complaints:2};
 
 function countDatabase(resolve, auth={}) {
   const calls=[];
@@ -21,7 +21,7 @@ test('sidebar counts use the real SIA status column and actual unresolved compla
   const pg=new PGlite();try {
     await pg.exec(`create schema app;
       create table app.transactions(id int,status text);insert into app.transactions values(1,'failed'),(2,'completed');
-      create table app.guards(id int,verification_status text);insert into app.guards values(1,'manual_review'),(2,'pending_sia_check'),(3,'approved');
+      create table app.guards(id int,verification_status text);insert into app.guards values(1,'manual_review'),(2,'pending_sia_check'),(3,'approved'),(4,'manual_review'),(5,'pending'),(6,'pending'),(7,'pending'),(8,'pending'),(9,'pending'),(10,'pending'),(11,'pending'),(12,'pending'),(13,'verified'),(14,'rejected'),(15,'suspended'),(16,null);
       create table app.sia_verifications(id int,verification_status text);insert into app.sia_verifications values(1,'pending'),(2,'verified');
       create table app.guard_payouts(id int,status text);insert into app.guard_payouts values(1,'held'),(2,'paid_out');
       create table app.contact_submissions(id int,status text);insert into app.contact_submissions values(1,'new'),(2,'resolved');
