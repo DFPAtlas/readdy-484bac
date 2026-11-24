@@ -7,6 +7,7 @@ import { INDUSTRY_MEDIA_ORIGINALS } from '@/lib/industry-media-originals';
 import { BRAND_LOGO } from '@/lib/brand';
 import { supabase } from '@/lib/supabase';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { normalizeMediaUpload } from '@/lib/site-media-upload';
 
 const originals: Record<string,string> = {
   ...INDUSTRY_MEDIA_ORIGINALS,
@@ -48,13 +49,13 @@ function MediaCard({slot,versions,current,onStaged}:{slot:Slot;versions:Version[
     if(!file||lock.current)return;
     lock.current=true;setBusy(true);setMessage('');
     try{
-      if(file.type!=='image/png'||file.size>10485760)throw new Error('Select a PNG up to 10 MB.');
+      const normalized = await normalizeMediaUpload(file);
       const {data:{session}}=await supabase.auth.getSession();
       if(!session)throw new Error('Sign in again.');
       const base=process.env.NEXT_PUBLIC_SUPABASE_URL;
       const anon=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       if(!base||!anon)throw new Error('Service configuration unavailable.');
-      const response=await fetch(base+'/functions/v1/stage-site-media?slot='+encodeURIComponent(slot.slot_key),{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:anon,'Content-Type':'image/png'},body:file});
+      const response=await fetch(base+'/functions/v1/stage-site-media?slot='+encodeURIComponent(slot.slot_key),{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:anon,'Content-Type':'image/png'},body:normalized});
       if(!response.ok){const body=await response.json().catch(()=>null);throw new Error(typeof body?.error==='string'?body.error:'Upload failed.');}
       setMessage('Draft stored. Live image unchanged.');setFile(null);onStaged();
     }catch(e){setMessage(e instanceof Error?e.message:'Upload failed.');}
@@ -88,7 +89,7 @@ function MediaCard({slot,versions,current,onStaged}:{slot:Slot;versions:Version[
       if(blob.type!=='image/png'||blob.size>10485760)throw new Error('Unexpected image response.');
       if(downloadFile){
         const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=slot.slot_key+'-'+version+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-      }else setStoredPreview({id:version,blob});
+      }else {setFile(null);setStoredPreview({id:version,blob});}
     }catch(e){setMessage(e instanceof Error?e.message:'Image retrieval failed.');}
     finally{lock.current=false;setBusy(false);}
   }
@@ -143,7 +144,7 @@ function MediaCard({slot,versions,current,onStaged}:{slot:Slot;versions:Version[
         {src&&!metadata&&<button type="button" className={btn} disabled={busy} onClick={()=>void inspectOriginal()}>Inspect original file</button>}
       </dl>
       {src&&<div className="flex flex-wrap gap-2"><button type="button" className={btn} disabled={busy} onClick={download}>Download original</button><a className={btn} href={src} target="_blank" rel="noopener noreferrer">Open original</a></div>}
-      <label className="block text-sm text-slate-300">Replacement PNG (max 10 MB)<input type="file" accept="image/png" disabled={busy} className="block w-full mt-2 text-xs" onChange={e=>{setFile(e.target.files?.[0]??null);setMessage('');}} /></label>
+      <label className="block text-sm text-slate-300">Replacement image (max 10 MB; stored as PNG)<input type="file" accept="image/png,image/jpeg,image/webp,image/avif" disabled={busy} className="block w-full mt-2 text-xs" onChange={e=>{setFile(e.target.files?.[0]??null);setStoredPreview(null);setMessage('');e.target.value='';}} /></label>
       {(preview||storedUrl)&&<div className="space-y-2">
         <p className="text-xs text-slate-300">Crop simulation (not a live page preview)</p>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Preview viewport">
