@@ -209,7 +209,8 @@ Deno.serve(async (req) => {
       query = query.eq('profile_completed', false);
     }
 
-    query = query.order('created_at', { ascending: false });
+    // Break timestamp ties so adjacent API pages cannot reshuffle equal-date guards.
+    query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
 
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
