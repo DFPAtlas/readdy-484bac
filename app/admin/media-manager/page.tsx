@@ -3,11 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import AdminPageShell from '@/components/admin/AdminPageShell';
 import QuickGuardImage from '@/components/QuickGuardImage';
+import { INDUSTRY_MEDIA_ORIGINALS } from '@/lib/industry-media-originals';
 import { BRAND_LOGO } from '@/lib/brand';
 import { supabase } from '@/lib/supabase';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 
 const originals: Record<string,string> = {
+  ...INDUSTRY_MEDIA_ORIGINALS,
   'homepage-hero': "https://readdy.ai/api/search-image?query=Professional%20male%20security%20guard%20in%20sharp%20black%20uniform%20with%20visible%20SIA%20badge%20standing%20confidently%20beside%20a%20sleek%20modern%20laptop%20displaying%20a%20dashboard%20interface%20with%20job%20match%20listings%20in%20a%20modern%20urban%20London%20night%20setting%20with%20subtle%20city%20lights%20and%20blurred%20skyline%20background%2C%20high-end%20cinematic%20lighting%20with%20sharp%20realistic%20details%2C%20dark%20navy%20blue%20and%20teal%20color%20palette%2C%20left%20side%20features%20a%20clean%20dark%20gradient%20background%20perfect%20for%20text%20overlay%2C%20right%20side%20shows%20the%20guard%20and%20technology%20scene%2C%20ultra%20clean%20premium%20corporate%20composition%2C%20modern%20minimalist%20web%20design%20aesthetic%2C%20excellent%20contrast%20ensuring%20white%20text%20readability%20on%20the%20left%2C%20professional%20studio-quality%20lighting%20with%20soft%20shadows%2C%20simple%20background%20highlighting%20the%20subject&width=1600&height=900&seq=hero_quickguard_main_20260503&orientation=landscape",
   'homepage-logo': "https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/5b8bf6ae-e0fb-4726-93c3-167ed96d0716_compressed_quickguard-home-transparent-600-1.webp",
   'brand-full-light': BRAND_LOGO.fullLight,
@@ -96,7 +98,7 @@ function MediaCard({slot,versions,current,onStaged}:{slot:Slot;versions:Version[
       <button type="button" className={btn} disabled={!file||busy} onClick={stage}>{busy?'Working…':'Upload draft'}</button>
       <p role="status" className="text-sm text-teal-200">{message}</p>
       <details className="text-sm text-slate-300"><summary>Stored versions ({versions.length})</summary>{versions.map(v=><p key={v.id} className="py-2 break-words">{v.width} × {v.height} px · {ratio(v.width,v.height)} · {fmt(v.byte_size)} · {v.mime_type} · {new Date(v.created_at).toLocaleDateString('en-GB')}</p>)}</details>
-      {['homepage-hero','homepage-logo'].includes(slot.slot_key)?<div className="space-y-2 border-t border-slate-700 pt-3">
+      {(['homepage-hero','homepage-logo'].includes(slot.slot_key)||Object.prototype.hasOwnProperty.call(INDUSTRY_MEDIA_ORIGINALS,slot.slot_key))?<div className="space-y-2 border-t border-slate-700 pt-3">
         <p className="text-xs text-slate-300">{current?'Replacement selected for public delivery':'Original image selected'}</p>
         {current&&<QuickGuardImage key={current} src={process.env.NEXT_PUBLIC_SUPABASE_URL+'/functions/v1/public-site-media?slot='+encodeURIComponent(slot.slot_key)+'&v='+current} alt="Currently published replacement" className="w-full h-36 object-contain bg-slate-800 rounded-lg"/>}
         {versions.map(v=><div key={v.id} className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-slate-300">{new Date(v.created_at).toLocaleString('en-GB')} · {v.width} × {v.height}</span><button type="button" className={btn} disabled={busy||current===v.id} onClick={()=>void publish(v.id)}>{current===v.id?'Selected':'Publish version'}</button></div>)}
@@ -132,7 +134,7 @@ export default function MediaManager(){
   return <AdminPageShell title="Image & Media Manager" description="Review image specifications, stage replacements and manage homepage publications." >
     {!allowed?<p className="text-slate-300">{admin.role?'Content management permission required.':'Checking permissions…'}</p>:<>
       <label className="block text-sm text-slate-300 mb-4">Search images<input className="block mt-2 rounded-lg bg-slate-800 border border-slate-600 p-2 w-full text-white" value={search} onChange={e=>setSearch(e.target.value)}/></label>
-      <p className="text-sm text-amber-300 mb-4">Initial inventory: homepage and branding. Publication controls are enabled only for the two integrated homepage slots.</p>
+      <p className="text-sm text-amber-300 mb-4">Initial inventory: homepage, industries and branding. Publication controls are enabled for homepage and industry banners.</p>
       {error?<div role="alert" className="text-red-300">{error} <button className={btn} onClick={()=>setRefresh(x=>x+1)}>Retry</button></div>:loading?<p className="text-slate-300">Loading images…</p>:<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{slots.filter(s=>(s.page_label+' '+s.section_label).toLowerCase().includes(search.toLowerCase())).map(s=><MediaCard key={s.slot_key} slot={s} current={publications[s.slot_key]??null} versions={versions.filter(v=>v.slot_key===s.slot_key)} onStaged={()=>setRefresh(x=>x+1)}/>)}</div>}
     </>}
   </AdminPageShell>;
