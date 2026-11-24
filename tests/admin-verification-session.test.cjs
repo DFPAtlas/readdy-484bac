@@ -1,3 +1,4 @@
+const { guardPage } = require('./helpers/admin-guard-pages.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { hooksHarness, nodes, content } = require('./helpers/guard-ui-fixture.cjs');
@@ -13,11 +14,11 @@ function guardsPage(response, session = { access_token: 'fixture' }) {
     ...stubs, 'next/link': { __esModule: true, default: () => null },
     '@/hooks/useAdminAuth': { useAdminAuth: () => ({ username: 'QA' }) },
     '@/lib/supabase': { supabase: { auth: { async getSession() { return { data: { session }, error: null }; } } } },
-  }, { fetch: async () => { calls++; return typeof result === 'function' ? result() : result; },
+  }, { fetch: async (_url, options) => { calls++; return typeof result === 'function' ? result(options) : result; },
     setTimeout: () => 0, process: { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://fixture.invalid' } } });
   return { h, setResult(value) { result = value; }, get calls() { return calls; } };
 }
-const response = (status, data = []) => ({ ok: status === 200, status, json: async () => ({ data }),
+const response = (status, data = []) => options => ({ ok: status === 200, status, json: async () => guardPage(data, options),
   text: async () => 'private provider diagnostics' });
 
 test('guard-list authorization failures stay visible and never claim an empty queue', async () => {
