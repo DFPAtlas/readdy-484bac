@@ -1127,7 +1127,7 @@ export default function GuardDashboardClient() {
         userId={guardUserId}
         collapsible={true}
       />
-      <div className={`flex-1 min-h-screen pt-16 lg:pt-8 pb-24 px-3 sm:px-4 lg:px-6 lg:pb-8 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'}`}>
+      <div className={`flex-1 min-w-0 min-h-screen pt-16 lg:pt-8 pb-24 px-3 sm:px-4 lg:px-6 lg:pb-8 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'}`}>
         {isAdmin && (
           <div className="max-w-7xl mx-auto mb-6 bg-amber-500/5 border border-amber-500/15 rounded-2xl px-5 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2 text-amber-400 text-sm">
