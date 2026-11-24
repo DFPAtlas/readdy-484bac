@@ -18,6 +18,7 @@ export default function IndustryPage({ data }: { data: IndustryData }) {
     <div className="min-h-screen bg-[#0B1933]">
       <NavSidebar />
       <IndustryHero
+        mediaSlot={data.slug + '-hero'}
         eyebrow={data.eyebrow}
         headline={data.headline}
         subheadline={data.subheadline}
@@ -31,7 +32,7 @@ export default function IndustryPage({ data }: { data: IndustryData }) {
       <IndustryRoles title={data.rolesTitle} intro={data.rolesIntro} roles={data.roles} />
       <IndustryUseCases useCases={data.useCases} />
       {data.example && <IndustryExample example={data.example} />}
-      <IndustryFeatureBanner message={data.featureMessage} sub={data.featureSub} image={data.featureImage} />
+      <IndustryFeatureBanner mediaSlot={data.slug + '-feature'} message={data.featureMessage} sub={data.featureSub} image={data.featureImage} />
       <IndustryHowItWorks />
       <IndustryCompliance note={data.complianceNote} />
       <IndustryFaq faqs={data.faqs} />
