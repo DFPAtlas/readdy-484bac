@@ -2,7 +2,7 @@ import { HUMAN_SUPPORT_HOURS } from '@/lib/customer-guidance';
 import Link from 'next/link';
 import CookieSettingsButton from '@/components/CookieSettingsButton';
 import FooterExitPopupTestIcon from '@/components/qg-rewards/FooterExitPopupTestIcon';
-import BrandLogo from '@/components/BrandLogo';
+import PublicBrandLogo from '@/components/PublicBrandLogo';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -13,7 +13,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-12 mb-12">
           <div className="lg:col-span-1">
             <div className="flex items-center mb-4">
-              <BrandLogo variant="full" theme="dark" imgClassName="h-10 w-auto" />
+              <PublicBrandLogo variant="full" theme="dark" imgClassName="h-10 w-auto" />
             </div>
             <p className="text-slate-400 mb-6 leading-relaxed text-sm">
               QuickGuard connects SIA-licensed security professionals with UK businesses that need cover, shift by shift.
