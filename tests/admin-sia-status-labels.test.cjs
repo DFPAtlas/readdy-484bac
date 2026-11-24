@@ -1,3 +1,4 @@
+const { guardPage } = require('./helpers/admin-guard-pages.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./helpers/enterprise-module.cjs');
@@ -62,8 +63,8 @@ async function modal(profile) {
     ...stubs, 'next/link': { __esModule: true, default: () => null },
     '@/hooks/useAdminAuth': { useAdminAuth: () => ({ username: 'QA' }) },
     '@/lib/supabase': { supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'fixture' } } }) } } },
-  }, { fetch: async url => { assert.match(url, /\/get-guards$/); return { ok: true, json: async () => [profile] }; },
-    setTimeout: fn => { fn(); return 0; }, process: { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://fixture.invalid' } } });
+  }, { fetch: async (url, options) => { assert.match(url, /\/get-guards$/); return { ok: true, json: async () => guardPage([profile], options) }; },
+    setTimeout: (fn, delay) => { if (delay !== 20000) fn(); return 0; }, process: { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://fixture.invalid' } } });
   h.render(); await h.effects();
   nodes(h.render()).find(n => n.props?.onReview && Array.isArray(n.props.guards)).props.onReview(profile);
   return h.render();
