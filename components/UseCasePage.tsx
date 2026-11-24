@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePublicMediaBackground } from '@/hooks/usePublicMediaBackground';
 
 interface Step {
   icon: string;
@@ -27,6 +28,7 @@ interface UseCaseData {
 }
 
 export default function UseCasePage({ data }: { data: UseCaseData }) {
+  const background = usePublicMediaBackground(data.slug + '-hero', data.heroImage);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [jsEnabled, setJsEnabled] = useState(false);
   const [isVisible, setIsVisible] = useState<Record<string, boolean>>({});
@@ -52,7 +54,7 @@ export default function UseCasePage({ data }: { data: UseCaseData }) {
       <section
         className="relative min-h-[560px] md:min-h-[640px] flex items-center bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: `linear-gradient(to right, rgba(11, 26, 51, 0.95) 0%, rgba(11, 26, 51, 0.85) 50%, rgba(11, 26, 51, 0.5) 100%), url('${data.heroImage}')`,
+          backgroundImage: `linear-gradient(to right, rgba(11, 26, 51, 0.95) 0%, rgba(11, 26, 51, 0.85) 50%, rgba(11, 26, 51, 0.5) 100%), url('${background}')`,
         }}
       >
         <div className="w-full max-w-7xl mx-auto px-6 md:px-8 py-20">
