@@ -20,13 +20,13 @@ const tabs: { key: Tab; label: string; icon: string }[] = [
 
 export default function ReviewTabs({ activeTab, hasLicenceImages, hasDocuments, onTabChange }: ReviewTabsProps) {
   return (
-    <div className="sticky top-[88px] bg-[#111d35] border-b border-[#1a2b4a] px-8 z-10">
-      <div className="flex items-center gap-1">
+    <div className="shrink-0 bg-[#111d35] border-b border-[#1a2b4a] px-4 sm:px-8">
+      <div className="flex items-center gap-1 overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => onTabChange(tab.key)}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap relative ${
+            className={`shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap relative ${
               activeTab === tab.key
                 ? 'border-teal-500 text-teal-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'

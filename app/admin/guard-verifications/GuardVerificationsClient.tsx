@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import FocusTrap from 'focus-trap-react';
 import { GuardVerification, GuardStatus, matchesSearch, getSiaCheckStatusBadge, getSiaCheckStatusText, getApprovalBlockers } from './types';
 import RequestInfoModal from './RequestInfoModal';
 import Toast from './Toast';
@@ -77,6 +78,8 @@ export default function GuardVerificationsClient() {
   const [counts, setCounts] = useState<Record<string, number | null>>({ pending: null, approved: null, rejected: null, suspended: null, incomplete: null, all: null });
   const [detailLoading, setDetailLoading] = useState(false);
   const [requestInfoGuard, setRequestInfoGuard] = useState<GuardVerification | null>(null);
+  const reviewBodyRef = useRef<HTMLDivElement | null>(null);
+  const reviewPaused = showRejectModal || showApproveModal || showOverrideModal || requestInfoGuard !== null;
   const approvalRunRef = useRef(false);
   const approvalActiveRef = useRef(true);
   const approvalGuardRef = useRef<string | null>(null);
@@ -86,6 +89,18 @@ export default function GuardVerificationsClient() {
     approvalActiveRef.current = true;
     return () => { approvalActiveRef.current = false; };
   }, []);
+
+  useEffect(() => {
+    if (!selectedGuard || typeof document === 'undefined') return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [selectedGuard]);
+
+  useEffect(() => {
+    reviewBodyRef.current?.scrollTo({ top: 0 });
+    reviewBodyRef.current?.focus({ preventScroll: true });
+  }, [selectedGuard?.id, detailTab]);
 
   const fetchGuards = useCallback(async (status: GuardStatus) => {
     try {
@@ -606,21 +621,36 @@ export default function GuardVerificationsClient() {
       </div>
 
       {selectedGuard && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#111d35] rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto border border-[#1a2b4a]">
-            <div className="sticky top-0 bg-[#111d35] border-b border-[#1a2b4a] px-6 sm:px-8 py-5 flex items-center justify-between z-10">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white">Verify Guard Application</h2>
+        <FocusTrap paused={reviewPaused} focusTrapOptions={{
+          initialFocus: () => reviewBodyRef.current ?? false,
+          fallbackFocus: () => reviewBodyRef.current ?? document.body,
+          escapeDeactivates: false,
+          returnFocusOnDeactivate: true,
+        }}>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && !reviewPaused) {
+              event.stopPropagation();
+              closeGuardDetails();
+            }
+          }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="guard-review-title"
+            className="bg-[#111d35] rounded-2xl max-w-5xl w-full max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden border border-[#1a2b4a]">
+            <div className="shrink-0 bg-[#111d35] border-b border-[#1a2b4a] px-4 sm:px-8 py-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 id="guard-review-title" className="text-xl sm:text-2xl font-bold text-white">Verify Guard Application</h2>
                 <p className="text-sm text-slate-400 mt-1">Review each section and confirm the information</p>
               </div>
-              <button onClick={closeGuardDetails} className="text-slate-400 hover:text-white transition-colors cursor-pointer">
+              <button onClick={closeGuardDetails} aria-label="Close guard details" className="shrink-0 text-slate-400 hover:text-white transition-colors cursor-pointer">
                 <div className="w-8 h-8 flex items-center justify-center"><i className="ri-close-line text-2xl"></i></div>
               </button>
             </div>
 
             <ReviewTabs activeTab={detailTab} hasLicenceImages={!!hasLicenceImages} hasDocuments={!!hasDocuments} onTabChange={setDetailTab} />
 
-            <div className="px-6 sm:px-8 py-6 space-y-6">
+            <div ref={reviewBodyRef} role="region" aria-label="Guard application details" tabIndex={0}
+              className="min-h-0 flex-1 overflow-y-scroll overscroll-contain px-4 sm:px-8 py-6 space-y-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500"
+              style={{ scrollbarGutter: 'stable', WebkitOverflowScrolling: 'touch' }}>
               <GuardHeaderCard guard={selectedGuard} hasLicenceImages={!!hasLicenceImages} />
               {detailLoading ? (
                 <VerificationSkeleton />
@@ -748,6 +778,7 @@ export default function GuardVerificationsClient() {
             </div>
           </div>
         </div>
+        </FocusTrap>
       )}
 
       <RejectModal open={showRejectModal} processing={processing} reason={rejectionReason} onReasonChange={setRejectionReason} onCancel={() => { setShowRejectModal(false); setRejectionReason(''); }} onConfirm={handleReject} />
