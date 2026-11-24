@@ -28,6 +28,16 @@ function MediaCard({slot,versions,current,onStaged}:{slot:Slot;versions:Version[
   const src=originals[slot.slot_key];
   const [dimensions,setDimensions]=useState<{w:number;h:number}|null>(null);
   const [failed,setFailed]=useState(false);
+  const [metadata,setMetadata]=useState<{size:number;type:string}|null>(null);
+  const [storedPreview,setStoredPreview]=useState<{id:string;blob:Blob}|null>(null);
+  const [storedUrl,setStoredUrl]=useState('');
+  const [device,setDevice]=useState<'desktop'|'tablet'|'mobile'>('desktop');
+  useEffect(()=>{
+    if(!storedPreview){setStoredUrl('');return;}
+    const url=URL.createObjectURL(storedPreview.blob);
+    setStoredUrl(url);
+    return()=>URL.revokeObjectURL(url);
+  },[storedPreview]);
   const [file,setFile]=useState<File|null>(null);
   const [preview,setPreview]=useState('');
   const [message,setMessage]=useState('');
@@ -65,6 +75,44 @@ function MediaCard({slot,versions,current,onStaged}:{slot:Slot;versions:Version[
     }catch(e){setMessage(e instanceof Error?e.message:'Publication failed.');}
     finally{lock.current=false;setBusy(false);}
   }
+  async function readVersion(version:string,downloadFile:boolean){
+    if(lock.current)return;
+    lock.current=true;setBusy(true);setMessage('');
+    try{
+      const {data:{session}}=await supabase.auth.getSession();
+      const base=process.env.NEXT_PUBLIC_SUPABASE_URL,anon=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if(!session||!base||!anon)throw new Error('Session or media service unavailable.');
+      const res=await fetch(base+'/functions/v1/admin-read-site-media?slot='+encodeURIComponent(slot.slot_key)+'&version='+encodeURIComponent(version),{headers:{Authorization:'Bearer '+session.access_token,apikey:anon},cache:'no-store'});
+      if(!res.ok)throw new Error('Stored version unavailable.');
+      const blob=await res.blob();
+      if(blob.type!=='image/png'||blob.size>10485760)throw new Error('Unexpected image response.');
+      if(downloadFile){
+        const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=slot.slot_key+'-'+version+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      }else setStoredPreview({id:version,blob});
+    }catch(e){setMessage(e instanceof Error?e.message:'Image retrieval failed.');}
+    finally{lock.current=false;setBusy(false);}
+  }
+  async function inspectOriginal(){
+    if(!src||lock.current)return;
+    lock.current=true;setBusy(true);setMessage('');
+    try{
+      const res=await fetch(src,{credentials:'omit',signal:AbortSignal.timeout(10000)});
+      if(!res.ok)throw new Error();
+      const reader=res.body?.getReader();
+      if(!reader)throw new Error();
+      let size=0;
+      while(true){
+        const {done,value}=await reader.read();
+        if(done)break;
+        size+=value.byteLength;
+        if(size>20*1024*1024){await reader.cancel();throw new Error();}
+      }
+      const type=res.headers.get('content-type')?.split(';')[0]??'';
+      if(!['image/png','image/jpeg','image/webp','image/avif','image/gif','image/svg+xml'].includes(type))throw new Error();
+      setMetadata({size,type});
+    }catch{setMessage('Original file metadata unavailable: the host may block cross-origin requests or the image exceeds the inspection limit.');}
+    finally{lock.current=false;setBusy(false);}
+  }
   async function download(){
     if(!src||lock.current)return;
     lock.current=true;setBusy(true);setMessage('');
@@ -72,6 +120,7 @@ function MediaCard({slot,versions,current,onStaged}:{slot:Slot;versions:Version[
       const res=await fetch(src,{credentials:'omit'});
       if(!res.ok)throw new Error();
       const blob=await res.blob();
+      setMetadata({size:blob.size,type:blob.type});
       const ext=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/avif':'avif'} as Record<string,string>)[blob.type];
       if(!ext)throw new Error();
       const url=URL.createObjectURL(blob);
@@ -90,14 +139,24 @@ function MediaCard({slot,versions,current,onStaged}:{slot:Slot;versions:Version[
         <div>Original ratio: {dimensions?ratio(dimensions.w,dimensions.h):'Unknown'}</div>
         <div>Resolution: {dimensions?((dimensions.w*dimensions.h)/1e6).toFixed(2)+' MP':'Unknown'}</div>
         <div>Recommended: {slot.recommended_width&&slot.recommended_height?slot.recommended_width+' × '+slot.recommended_height+' px ('+ratio(slot.recommended_width,slot.recommended_height)+')':'Not yet measured'}</div>
-        <div>Original file size / format: not verified</div>
+        <div>Original file size / format: {metadata?fmt(metadata.size)+' · '+metadata.type:'Not verified'}</div>
+        {src&&!metadata&&<button type="button" className={btn} disabled={busy} onClick={()=>void inspectOriginal()}>Inspect original file</button>}
       </dl>
       {src&&<div className="flex flex-wrap gap-2"><button type="button" className={btn} disabled={busy} onClick={download}>Download original</button><a className={btn} href={src} target="_blank" rel="noopener noreferrer">Open original</a></div>}
-      <label className="block text-sm text-slate-300">Replacement PNG (max 10 MB)<input type="file" accept="image/png" disabled={busy} className="block w-full mt-2 text-xs" onChange={e=>{setFile(e.target.files?.[0]??null);setMessage('');}} key={file?'selected':'empty'}/></label>
-      {preview&&<QuickGuardImage src={preview} alt="Selected replacement preview" className="w-full h-36 object-contain bg-slate-800 rounded-lg"/>}
+      <label className="block text-sm text-slate-300">Replacement PNG (max 10 MB)<input type="file" accept="image/png" disabled={busy} className="block w-full mt-2 text-xs" onChange={e=>{setFile(e.target.files?.[0]??null);setMessage('');}} /></label>
+      {(preview||storedUrl)&&<div className="space-y-2">
+        <p className="text-xs text-slate-300">Crop simulation (not a live page preview)</p>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Preview viewport">
+          {(['desktop','tablet','mobile'] as const).map(d=><button type="button" key={d} aria-pressed={device===d} className={btn} onClick={()=>setDevice(d)}>{d}</button>)}
+        </div>
+        <div className="mx-auto overflow-hidden rounded-lg bg-slate-800" style={{width:device==='desktop'?'100%':device==='tablet'?'75%':'45%',aspectRatio:device==='desktop'?'16/9':device==='tablet'?'4/3':'9/16'}}>
+          <QuickGuardImage src={preview||storedUrl} alt={preview?'Selected upload preview':'Stored version preview'} className="w-full h-full object-cover"/>
+        </div>
+        {storedUrl&&<button type="button" className={btn} onClick={()=>setStoredPreview(null)}>Close stored preview</button>}
+      </div>}
       <button type="button" className={btn} disabled={!file||busy} onClick={stage}>{busy?'Working…':'Upload draft'}</button>
       <p role="status" className="text-sm text-teal-200">{message}</p>
-      <details className="text-sm text-slate-300"><summary>Stored versions ({versions.length})</summary>{versions.map(v=><p key={v.id} className="py-2 break-words">{v.width} × {v.height} px · {ratio(v.width,v.height)} · {fmt(v.byte_size)} · {v.mime_type} · {new Date(v.created_at).toLocaleDateString('en-GB')}</p>)}</details>
+      <details className="text-sm text-slate-300"><summary>Stored versions ({versions.length})</summary>{versions.map(v=><div key={v.id} className="py-2 space-y-2 break-words"><p>{v.width} × {v.height} px · {ratio(v.width,v.height)} · {fmt(v.byte_size)} · {v.mime_type} · {new Date(v.created_at).toLocaleDateString('en-GB')}</p><div className="flex flex-wrap gap-2"><button type="button" className={btn} disabled={busy} onClick={()=>void readVersion(v.id,false)}>Preview version</button><button type="button" className={btn} disabled={busy} onClick={()=>void readVersion(v.id,true)}>Download version</button></div></div>)}</details>
       {(['homepage-hero','homepage-logo','brand-full-light','brand-full-dark'].includes(slot.slot_key)||Object.prototype.hasOwnProperty.call(INDUSTRY_MEDIA_ORIGINALS,slot.slot_key))?<div className="space-y-2 border-t border-slate-700 pt-3">
         <p className="text-xs text-slate-300">{current?'Replacement selected for public delivery':'Original image selected'}</p>
         {current&&<QuickGuardImage key={current} src={process.env.NEXT_PUBLIC_SUPABASE_URL+'/functions/v1/public-site-media?slot='+encodeURIComponent(slot.slot_key)+'&v='+current} alt="Currently published replacement" className="w-full h-36 object-contain bg-slate-800 rounded-lg"/>}
