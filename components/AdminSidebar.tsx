@@ -179,6 +179,7 @@ export default function AdminSidebar() {
       items: [
         { href: '/admin/announcements', icon: 'ri-megaphone-line', label: 'Announcements' },
         { href: '/admin/blog', icon: 'ri-article-line', label: 'Blog & Newsletter' },
+        { href: '/admin/media-manager', icon: 'ri-image-2-line', label: 'Image & Media Manager' },
         { href: '/admin/email-health', icon: 'ri-mail-check-line', label: 'Email Centre' },
         {
           href: '/admin/contact-submissions',
