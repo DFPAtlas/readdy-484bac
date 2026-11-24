@@ -2,7 +2,7 @@
 
 import { CANCELLATION_GUIDANCE, GUARD_CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
 
-import QuickGuardImage from '@/components/QuickGuardImage';
+import PublicMediaImage from '@/components/PublicMediaImage';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -32,18 +32,21 @@ const visualGuides = [
   {
     title: 'Client Dashboard',
     description: 'See where to find jobs, payments, profile setup and QuickGuard AI support.',
+    slot: 'help-client-dashboard',
     image: 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/31e07790-0a5d-462a-afc4-cf9a2f6d9199_compressed_Screenshot-2026-10-04-014442.webp',
     href: '/guide/client',
   },
   {
     title: 'Post a Security Job',
     description: 'Follow the guided job-posting flow from job basics through review and posting.',
+    slot: 'help-post-a-security-job',
     image: 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/52d82073-26ad-4e44-b04e-b095eac18b4c_compressed_Screenshot-2026-10-04-014457.webp',
     href: '/guide/client',
   },
   {
     title: 'Manage Your Jobs',
     description: 'Track confirmed bookings, payment status, cancellations and refunds from My Jobs.',
+    slot: 'help-manage-your-jobs',
     image: 'https://storage.helloreaddy.io/project_files/0de8e08a-1549-4fde-a095-32bc66c0db0b/0b10efad-d486-4d54-a57a-66170ddbacc7_compressed_Screenshot-2026-10-04-014544.webp',
     href: '/client/help',
   },
@@ -488,7 +491,8 @@ export default function HelpContent() {
                 <Link key={guide.title} href={guide.href} className="group">
                   <div className="h-full bg-[#111d35] border border-slate-700/50 rounded-2xl overflow-hidden hover:border-teal-500/30 transition-all duration-200">
                     <div className="relative aspect-video bg-[#0e1628]">
-                      <QuickGuardImage
+                      <PublicMediaImage
+                        slot={guide.slot}
                         src={guide.image}
                         alt={guide.title}
                         className="absolute inset-0 w-full h-full object-cover object-top"
