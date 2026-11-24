@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import StorageUsageWidget from '@/components/admin/StorageUsageWidget';
+import AdminCleanupControl from '@/components/admin/AdminCleanupControl';
 import { loadAdminCleanupLogs, type CleanupLog } from '@/lib/adminMaintenance';
 import { loadAdminCleanupInventory, type CleanupInventory } from '@/lib/adminCleanupInventory';
 
@@ -165,7 +166,7 @@ const EDGE_FUNCTIONS: { name: string; slug: string; type: string; retired?: bool
   { name: 'Overdue Guard Payout Worker', slug: 'process-overdue-guard-payouts', type: 'payment' },
   { name: 'Enhanced Stripe Webhook', slug: 'enhanced-stripe-webhook', type: 'stripe' },
   { name: 'Get Storage Usage', slug: 'get-storage-usage', type: 'storage' },
-  { name: 'Run Cleanup Now', slug: 'run-cleanup-now', type: 'maintenance' },
+  { name: 'Admin Cleanup', slug: 'admin-run-cleanup', type: 'maintenance' },
 ];
 
 // ── Main Component ─────────────────────────────────────────────────────
@@ -189,9 +190,6 @@ export default function SystemStatusClient() {
   const [cleanupInventoryLoading, setCleanupInventoryLoading] = useState(true);
   const [cleanupInventoryError, setCleanupInventoryError] = useState<string | null>(null);
   const inventoryRequest = useRef({ id: 0, active: true });
-
-  const [cleanupRunning, setCleanupRunning] = useState(false);
-  const [cleanupResult, setCleanupResult] = useState<{ ok: number; fail: number } | null>(null);
 
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [logPage, setLogPage] = useState(0);
@@ -431,25 +429,9 @@ export default function SystemStatusClient() {
     return () => { scope.active = false; };
   }, []);
 
-  // ── Run cleanup ──────────────────────────────────────────────────────
-  const runCleanup = useCallback(async () => {
-    setCleanupRunning(true);
-    setCleanupResult(null);
-    try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/run-cleanup-now`, { method: 'POST' });
-      const data = await res.json();
-      const results = data.results as Record<string, { status: string }>;
-      const ok = Object.values(results).filter((r: any) => r.status === 'completed').length;
-      const fail = Object.values(results).filter((r: any) => r.status === 'failed').length;
-      setCleanupResult({ ok, fail });
-      // Immediate refresh
-      await fetchCleanupLogs();
-    } catch {
-      setCleanupResult({ ok: 0, fail: 6 });
-    } finally {
-      setCleanupRunning(false);
-    }
-  }, [fetchCleanupLogs]);
+  const refreshCleanupEvidence = useCallback(async () => {
+    await Promise.all([fetchCleanupLogs(), fetchCleanupInventory()]);
+  }, [fetchCleanupLogs, fetchCleanupInventory]);
 
   // ── Open full log modal ──────────────────────────────────────────────
   const openFullLog = useCallback(async (page: number) => {
@@ -1057,23 +1039,7 @@ export default function SystemStatusClient() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Database Maintenance</h2>
-              <div className="flex items-center gap-2">
-                {cleanupResult && (
-                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${cleanupResult.fail > 0 ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20' : 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'}`}>
-                    {cleanupResult.ok} done{cleanupResult.fail > 0 ? ` / ${cleanupResult.fail} failed` : ''}
-                  </span>
-                )}
-                <button
-                  onClick={runCleanup}
-                  disabled={cleanupRunning}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-teal-600 text-white hover:bg-teal-500 transition-all cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="w-3 h-3 flex items-center justify-center">
-                    <i className={`${cleanupRunning ? 'ri-loader-4-line animate-spin' : 'ri-play-line'} text-xs`}></i>
-                  </div>
-                  {cleanupRunning ? 'Running…' : 'Run Cleanup Now'}
-                </button>
-              </div>
+              <AdminCleanupControl onCompleted={refreshCleanupEvidence} />
             </div>
 
             <p className="text-[11px] text-slate-500 mb-3">Counts cover the scheduled cleanup targets, which can differ from application logs. Eligible records meet the existing retention and status rules.</p>
@@ -1175,7 +1141,7 @@ export default function SystemStatusClient() {
               ) : cleanupLogs.length === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-[11px] text-slate-600">No cleanup activity logged yet.</p>
-                  <p className="text-[10px] text-slate-700 mt-1">Run Cleanup Now to populate this section.</p>
+                  <p className="text-[10px] text-slate-700 mt-1">Completed scheduled or confirmed manual runs appear here.</p>
                 </div>
               ) : (
                 <div className="space-y-2">

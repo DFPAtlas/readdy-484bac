@@ -91,3 +91,7 @@ verify_jwt = true
 [functions.manage-client-documents]
 # Auth.getUser verifies the bearer in-handler, supporting current signing keys.
 verify_jwt = false
+
+# Manual cleanup verifies the signed-in admin and MFA before any request.
+[functions.admin-run-cleanup]
+verify_jwt = true

@@ -1,8 +1,8 @@
 import { supabase } from '@/lib/supabase';
 
-const targetNames = ['email_send_log', 'admin_registration_audit', 'email_queue',
+export const cleanupTargetNames = ['email_send_log', 'admin_registration_audit', 'email_queue',
   'rate_limit_events', 'notifications', 'processed_stripe_events'] as const;
-type TargetName = typeof targetNames[number];
+type TargetName = typeof cleanupTargetNames[number];
 export interface CleanupInventoryTarget {
   table_name: TargetName;
   target_relation: string;
@@ -19,15 +19,15 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 const isCount = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-function isInventory(value: unknown): value is CleanupInventory {
+export function isCleanupInventory(value: unknown): value is CleanupInventory {
   if (!isRecord(value) || typeof value.sampled_at !== 'string' || !Array.isArray(value.targets) ||
-      value.targets.length !== targetNames.length) return false;
+      value.targets.length !== cleanupTargetNames.length) return false;
   const age = Date.now() - Date.parse(value.sampled_at);
   if (!Number.isFinite(age) || age < -30000 || age > 5 * 60 * 1000) return false;
   const seen = new Set<string>();
   for (const target of value.targets) {
     if (!isRecord(target) || typeof target.table_name !== 'string' ||
-        !targetNames.some(name => name === target.table_name) || seen.has(target.table_name) ||
+        !cleanupTargetNames.some(name => name === target.table_name) || seen.has(target.table_name) ||
         target.target_relation !== `public.${target.table_name}` ||
         (target.relation_type !== 'table' && target.relation_type !== 'view') ||
         !isCount(target.retention_days) || target.retention_days === 0 ||
@@ -49,7 +49,7 @@ export async function loadAdminCleanupInventory(): Promise<CleanupInventory> {
       signal: AbortSignal.timeout(10000) },
   );
   const data: unknown = await response.json();
-  if (!response.ok || !isInventory(data)) throw new Error('Unable to verify cleanup inventory. Please retry.');
+  if (!response.ok || !isCleanupInventory(data)) throw new Error('Unable to verify cleanup inventory. Please retry.');
   const { data: current, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || current.session?.user?.id !== session.user.id) {
     throw new Error('Admin session changed. Please retry.');
