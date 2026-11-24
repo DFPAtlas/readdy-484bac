@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { hooksHarness, nodes } = require('./helpers/guard-ui-fixture.cjs');
 
-const childNames = ['RequestInfoModal', 'Toast', 'GuardTable', 'GuardMobileCard', 'GuardHeaderCard',
+const childNames = ['RequestInfoModal', 'Toast', 'GuardCardGrid', 'GuardHeaderCard',
   'ReviewTabs', 'OverviewTab', 'LicenceReviewPanel', 'ProfessionalTab', 'AvailabilityTab',
   'VerificationFooter', 'RejectModal', 'ApproveConfirmModal', 'OverrideApproveModal',
   'VerificationSkeleton', 'DocumentsReviewPanel', 'AccountTab'];
