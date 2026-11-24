@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { getMaintenanceMode } from '@/lib/maintenance';
 import { supabase } from '@/lib/supabase';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
-import BrandLogo from '@/components/BrandLogo';
+import PublicBrandLogo from '@/components/PublicBrandLogo';
 
 type UserRole = 'guard' | 'client' | null;
 
@@ -363,7 +363,7 @@ export default function Header() {
         <nav className="w-full px-4 sm:px-6 lg:px-8" aria-label="Main navigation">
           <div className="flex items-center justify-between h-20">
             <Link href="/" prefetch={false} onClick={handleLinkClick} className="flex items-center focus:outline-none rounded-lg" aria-label="QuickGuard home">
-              <BrandLogo variant="full" theme="light" imgClassName="h-10 sm:h-11 w-auto" />
+              <PublicBrandLogo variant="full" theme="light" imgClassName="h-10 sm:h-11 w-auto" />
             </Link>
 
             <ul className="hidden lg:flex items-center space-x-8 list-none m-0 p-0">
