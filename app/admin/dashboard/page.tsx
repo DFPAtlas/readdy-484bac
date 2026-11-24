@@ -263,7 +263,7 @@ export default function AdminDashboard() {
         supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false).gte('created_at', monthStartIso),
         supabase.from('guards').select('*', { count: 'exact', head: true }),
         supabase.from('clients').select('*', { count: 'exact', head: true }),
-        supabase.from('guards').select('*', { count: 'exact', head: true }).in('verification_status', ['manual_review', 'pending_sia_check']),
+        supabase.from('guards').select('*', { count: 'exact', head: true }).in('verification_status', ['pending', 'manual_review', 'pending_sia_check']),
         supabase.from('sia_verifications').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
         supabase.from('complaints').select('*', { count: 'exact', head: true }).in('status', ['open', 'pending']),
         supabase.from('subscription_payments').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
