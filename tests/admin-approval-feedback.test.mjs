@@ -8,7 +8,7 @@ const compiled = ts.transpileModule(handlers+'\nreturn {confirmApprove,confirmOv
 const ack = extra => ({success:true,guard_id:'fixture-guard',status:'approved',action:'approved',...extra});
 function fixture(response = ack({notification_status:'accepted'}), options = {}) {
  const events=[],requests=[];const refs={run:{current:false},active:{current:true},guard:{current:'fixture-guard'},review:{current:0}};
- const deps={selectedGuard:{id:'fixture-guard'},processing:false,approvalRunRef:refs.run,approvalActiveRef:refs.active,approvalGuardRef:refs.guard,approvalReviewRef:refs.review,
+ const deps={documentReview:options.noReview?null:{guard:'fixture-guard',review:'fixture-review'},setDetailTab(){},selectedGuard:{id:'fixture-guard'},processing:false,approvalRunRef:refs.run,approvalActiveRef:refs.active,approvalGuardRef:refs.guard,approvalReviewRef:refs.review,
   setShowOverrideModal(){},setShowApproveModal(){},setProcessing:value=>events.push(['processing',value]),admin:{name:'Fixture admin'},
   supabase:{auth:{getSession:async()=>({data:{session:options.noSession?null:{access_token:'fixture-token'}},error:null})}},
   process:{env:{}},fetch:async(url,request)=>{requests.push(JSON.parse(request.body));const data=typeof response==='function'?await response():response;return {ok:options.ok!==false,json:async()=>{if(options.badJson)throw Error('Invalid JSON');return data;}};},
@@ -19,7 +19,7 @@ function fixture(response = ack({notification_status:'accepted'}), options = {})
 test('normal and override approval distinguish email acceptance, deduplication and unconfirmed sending',async()=>{
  for(const override of [false,true])for(const status of ['accepted','already_sent','failed',undefined,'unknown']){
   const f=fixture(ack({notification_status:status}));await (override?f.confirmOverrideApprove():f.confirmApprove());
-  assert.equal(f.requests.length,1);assert.equal(f.requests[0].guardId,'fixture-guard');assert.equal(f.requests[0].override,override?true:undefined);
+  assert.equal(f.requests.length,1);assert.equal(f.requests[0].guardId,'fixture-guard');assert.equal(f.requests[0].reviewId,'fixture-review');assert.equal(f.requests[0].override,override?true:undefined);
   const toast=f.events.find(e=>e[0]==='toast');assert.ok(toast);assert.equal(f.events.filter(e=>e[0]==='closed').length,1);
   if(status==='accepted'){assert.match(toast[1],/accepted for sending/);assert.equal(toast[2],'success');}
   else if(status==='already_sent')assert.match(toast[1],/already sent within the last 24 hours/);
@@ -65,5 +65,14 @@ test('a missing-reviewer conflict stays visible in both approval flows without c
   assert.match(toast[1],/Approval not confirmed:.*recorded reviewer.*provenance review/);
   assert.equal(f.events.some(e=>['closed','refresh','counts'].includes(e[0])),false);
   assert.equal(f.refs.run.current,false);
+ }
+});
+
+test('normal and override approval require a current review before sending a request',async()=>{
+ for (const override of [false,true]) {
+  const f=fixture(ack(),{noReview:true});
+  await (override?f.confirmOverrideApprove():f.confirmApprove());
+  assert.equal(f.requests.length,0);
+  assert.match(f.events.find(e=>e[0]==='toast')[1],/current document submission/);
  }
 });

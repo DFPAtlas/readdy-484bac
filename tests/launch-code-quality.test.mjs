@@ -62,6 +62,17 @@ function guardAdminHarness({ updateError = null, updated = true, status = 'pendi
     verified_by: verifiedBy,
   };
   const db = {
+    rpc: async (name, args) => {
+      assert.equal(name,'approve_guard_document_review');
+      assert.equal(args.p_guard,guard.id);
+      assert.equal(args.p_review,'00000000-0000-0000-0000-000000000042');
+      if (['approved','verified'].includes(status)) {
+        return verifiedBy ? { data:{status,replayed:true},error:null } : { data:null,error:{code:'P0002'} };
+      }
+      if (updateError || !updated) return {data:null,error:updateError};
+      writes.push({verification_status:'approved',verified_by:guardReviewAdminId});
+      return {data:{status:'approved',replayed:false},error:null};
+    },
     auth: {
       getUser: async token => {
         assert.equal(token, guardReviewAdminToken);
@@ -115,13 +126,13 @@ function guardAdminHarness({ updateError = null, updated = true, status = 'pendi
     call: (action, token = 'service-secret', body = {}) => handler(new Request('https://worker.test', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ guardId: guard.id, action, rejectionReason: 'Synthetic test reason', ...body }),
+      body: JSON.stringify({ guardId: guard.id, action, rejectionReason: 'Synthetic test reason', reviewId:'00000000-0000-0000-0000-000000000042', ...body }),
     })),
   };
 }
 
 test('guard administration never reports success after rejected or unconfirmed database writes', async () => {
-  for (const action of ['manual_sia_verify', 'approve', 'reject', 'suspend', 'restore']) {
+  for (const action of ['manual_sia_verify', 'reject', 'suspend']) {
     for (const opts of [{ updateError: { message: 'write failed' } }, { updated: false }]) {
       const h = guardAdminHarness({ ...opts, status: action === 'restore' ? 'suspended' : 'pending' });
       const response = await h.call(action, action === 'approve' ? guardReviewAdminToken : undefined);
@@ -130,6 +141,12 @@ test('guard administration never reports success after rejected or unconfirmed d
       assert.equal((await response.json()).error, 'Internal server error');
       assert.equal(h.emails.length, 0);
     }
+  }
+  for (const action of ['approve','restore']) {
+    const h=guardAdminHarness({updated:false,status:action==='restore'?'suspended':'pending'});
+    assert.equal((await h.call(action,guardReviewAdminToken)).status,409);
+    assert.equal(h.writes.length,0);
+    assert.equal(h.emails.length,0);
   }
   const success = guardAdminHarness();
   assert.equal((await success.call('manual_sia_verify')).status, 200);
@@ -193,6 +210,8 @@ test('guard approval requires and records a human admin reviewer', async () => {
   assert.equal((await h.call('approve')).status, 403);
   assert.equal(h.writes.length, 0);
 
+  assert.equal((await h.call('approve', guardReviewAdminToken, {reviewId:null})).status,409);
+  assert.equal(h.writes.length,0);
   const response = await h.call('approve', guardReviewAdminToken);
   assert.equal(response.status, 200);
   assert.equal(h.writes.length, 1);

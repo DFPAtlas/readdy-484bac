@@ -74,63 +74,8 @@ export default function SubscribersPage() {
     }
   };
 
-  const approveSubscriber = async (subscriberId: string) => {
-    if (!confirm('Are you sure you want to approve this subscriber and activate their guard account?')) {
-      return;
-    }
-
-    setProcessingId(subscriberId);
-    try {
-      const subscriber = subscribers.find(s => s.id === subscriberId);
-
-      const { error: updateError } = await supabase
-        .from('guards')
-        .update({
-          verification_status: 'approved',
-          is_active: true,
-          verified_at: new Date().toISOString()
-        })
-        .eq('id', subscriberId);
-
-      if (updateError) throw updateError;
-
-      if (subscriber && subscriber.user_id) {
-        try {
-          const { error: notificationError } = await supabase
-            .from('notifications')
-            .insert({
-              user_id: subscriber.user_id,
-              title: 'Application Approved',
-              message: 'Congratulations! Your guard application has been approved. You can now start accepting jobs.',
-              type: 'success',
-              is_read: false,
-              link: '/guard/dashboard',
-              created_at: new Date().toISOString()
-            });
-
-          if (notificationError) {
-            console.error('Notification error:', notificationError);
-          }
-        } catch (notifError) {
-          console.error('Failed to send notification:', notifError);
-        }
-      }
-
-      await fetchSubscribers();
-      setShowDetailModal(false);
-      setSelectedSubscriber(null);
-
-      setToast({ message: 'Guard approved successfully and moved to Verified tab!', type: 'success' });
-      setTimeout(() => setToast(null), 3000);
-
-    } catch (error: any) {
-      console.error('Error approving subscriber:', error);
-
-      setToast({ message: 'Failed to approve subscriber. Please try again.', type: 'error' });
-      setTimeout(() => setToast(null), 3000);
-    } finally {
-      setProcessingId(null);
-    }
+  const approveSubscriber = async () => {
+    window.location.assign('/admin/guard-verifications');
   };
 
   const rejectSubscriber = async (subscriberId: string) => {
@@ -423,7 +368,7 @@ export default function SubscribersPage() {
                     {status === 'pending' && (
                       <>
                         <button
-                          onClick={() => approveSubscriber(subscriber.id)}
+                          onClick={() => approveSubscriber()}
                           disabled={processingId === subscriber.id}
                           className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm whitespace-nowrap disabled:opacity-50 cursor-pointer"
                         >
@@ -579,7 +524,7 @@ export default function SubscribersPage() {
               {(!selectedSubscriber.verification_status || selectedSubscriber.verification_status === 'pending') && (
                 <div className="flex gap-3 pt-4 border-t">
                   <button
-                    onClick={() => approveSubscriber(selectedSubscriber.id)}
+                    onClick={() => approveSubscriber()}
                     disabled={processingId === selectedSubscriber.id}
                     className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium whitespace-nowrap disabled:opacity-50 cursor-pointer"
                   >

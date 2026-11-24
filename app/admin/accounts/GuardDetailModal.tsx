@@ -129,33 +129,8 @@ export default function GuardDetailModal({ guard, onClose, onUpdate }: GuardDeta
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleApproveGuard = async () => {
-    setIsLoading('approve');
-    setShowConfirm(null);
-    try {
-      const { error } = await supabase
-        .from('guards')
-        .update({ verification_status: 'approved', is_active: true })
-        .eq('id', localGuard.id);
-
-      if (error) throw error;
-
-      setLocalGuard(prev => ({ ...prev, verification_status: 'approved', is_active: true }));
-      await logAdminAction({
-        actionType: 'user_status_changed',
-        actionDescription: `Guard approved: ${displayName} (${localGuard.email})`,
-        targetType: 'guard',
-        targetName: displayName,
-        metadata: { guardId: localGuard.id, action: 'approve' },
-      });
-      showToast('Guard approved successfully', 'success');
-      onUpdate?.();
-    } catch (err) {
-      console.error('Error approving guard:', err);
-      showToast('Failed to approve guard', 'error');
-    } finally {
-      setIsLoading(null);
-    }
+  const handleApproveGuard = () => {
+    window.location.assign('/admin/guard-verifications');
   };
 
   const handleRejectGuard = async () => {
@@ -192,6 +167,10 @@ export default function GuardDetailModal({ guard, onClose, onUpdate }: GuardDeta
     setShowConfirm(null);
     try {
       const newActive = !localGuard.is_active;
+    if (newActive && ['approved', 'verified', 'suspended'].includes(localGuard.verification_status)) {
+      window.location.assign('/admin/guard-verifications');
+      return;
+    }
       const { error } = await supabase
         .from('guards')
         .update({ is_active: newActive })

@@ -97,3 +97,6 @@ verify_jwt = true
 
 [functions.identity-document-download]
 verify_jwt = true
+
+[functions.admin-guard-document-review]
+verify_jwt = true
