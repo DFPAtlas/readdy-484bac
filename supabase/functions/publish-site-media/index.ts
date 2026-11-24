@@ -1,8 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-const cors = { 'Access-Control-Allow-Origin': 'https://quickguard.uk', 'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Vary': 'Origin' };
-const reply = (status:number, body:unknown) => new Response(JSON.stringify(body), {status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'no-store'}});
+const corsFor = (req: Request) => {
+  const origin = req.headers.get('origin');
+  // Local browser UAT is permitted only on this isolated sandbox project.
+  const sandbox = Deno.env.get('SUPABASE_URL') === 'https://alfwwggavmyerjyqumuo.supabase.co';
+  const allowed = origin === 'https://quickguard.uk' || (sandbox && origin === 'http://localhost:3000');
+  return { ...{ 'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Vary': 'Origin' }, ...(allowed && origin ? {'Access-Control-Allow-Origin':origin} : {}) };
+};
+
 const uuid = (v:unknown): v is string => typeof v==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-Deno.serve(async req=>{
+Deno.serve(async (req: Request) => {
+  const cors = corsFor(req);
+  const reply = (status:number, body:unknown) => new Response(JSON.stringify(body), {status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'no-store'}});
   if(req.method==='OPTIONS') return new Response(null,{status:204,headers:cors});
   if(req.method!=='POST') return reply(405,{error:'Method not allowed'});
   try{
