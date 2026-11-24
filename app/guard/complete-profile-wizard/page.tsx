@@ -608,6 +608,19 @@ function GuardCompleteProfileWizardContent() {
         throw new Error(body?.error || 'Unable to complete your profile. Please try again.');
       }
 
+      // A saved profile remains saved if the idempotent enqueue needs a retry.
+      let documentCheckNeedsRetry = false;
+      if (finalDrivingFrontPath && finalPoaPath) {
+        try {
+          const { data: queue, error: queueError } = await supabase.functions.invoke('request-document-check', {
+            body: { guard_id: saved.id, queue_version: 2 },
+          });
+          documentCheckNeedsRetry = !!queueError || (!queue?.queued && queue?.reason !== 'disabled');
+        } catch {
+          documentCheckNeedsRetry = true;
+        }
+      }
+
       if (password) {
         const { error: pwdError } = await supabase.auth.updateUser({ password });
         if (pwdError) {
@@ -634,7 +647,7 @@ function GuardCompleteProfileWizardContent() {
         }
       }
 
-      router.push('/guard/onboarding');
+      router.push(documentCheckNeedsRetry ? '/guard/onboarding?documentCheck=retry' : '/guard/onboarding');
     } catch (err: any) {
       const errorMessage = err?.message || (typeof err === 'string' ? err : 'Failed to save profile. Please try again.');
       setError(errorMessage);

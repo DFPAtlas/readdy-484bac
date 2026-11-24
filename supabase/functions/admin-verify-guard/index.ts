@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from 'npm:@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -145,18 +145,35 @@ Deno.serve(async function(req) {
       await updateGuard(supabaseQ, guardId, { sia_check_status: 'passed', sia_verified: true, sia_verified_at: now, sia_confidence_score: 100, sia_mismatch_reason: 'Manual override by admin', sia_checked_at: now, updated_at: now });
       return new Response(JSON.stringify({ success: true, message: 'SIA manually verified', action: 'manual_sia_verified' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
     }
-    if (action === 'approve') {
+    if (action === 'approve' || action === 'restore') {
       if (!reviewerId) {
-        return new Response(JSON.stringify({ error: 'An active admin with MFA must approve the guard' }), { status: 403, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
+        return Response.json({ error: 'An active admin with MFA must approve the guard' }, { status: 403, headers: corsHeaders });
       }
-      if (guard.verification_status === 'approved' || guard.verification_status === 'verified') {
-        // A retry is not evidence of who made the existing approval decision.
-        if (!guard.verified_by) {
-          return new Response(JSON.stringify({ error: 'Existing approval has no recorded reviewer; an authorised provenance review is required. No approval data was changed', code: 'APPROVAL_REVIEWER_MISSING', guard_id: guardId, status: guard.verification_status }), { status: 409, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
-        }
-        return new Response(JSON.stringify({ success: true, guard_id: guardId, status: guard.verification_status, action: 'approved', already_approved: true, notification_status: 'not_requested' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
+      if (typeof body.reviewId !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(body.reviewId)) {
+        return Response.json({ error: 'A current document review attestation is required' }, { status: 409, headers: corsHeaders });
       }
-      await updateGuard(supabaseQ, guardId, { verified_by: reviewerId, verification_status: 'approved', is_active: true, sia_verified: true, sia_verified_at: now, verified_at: now, dashboard_access: true, profile_completed: true, rejection_reason: null, rejected_at: null, updated_at: now });
+      const reviewer = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+        db: { schema: 'app' }, global: { headers: { Authorization: authHeader } },
+      });
+      const { data: approval, error: approvalError } = await reviewer.rpc('approve_guard_document_review', {
+        p_guard: guardId, p_review: body.reviewId, p_action: action,
+      });
+      if (approvalError?.code === 'P0002') {
+        return Response.json({ error: 'Existing approval has no recorded reviewer; an authorised provenance review is required.',
+          code: 'APPROVAL_REVIEWER_MISSING', guard_id: guardId, status: guard.verification_status },
+        { status: 409, headers: corsHeaders });
+      }
+      if (approvalError || !approval) {
+        const status = approvalError?.code === '42501' ? 403 : 409;
+        return Response.json({ error: 'Approval blocked. Refresh and confirm the current document review.' }, { status, headers: corsHeaders });
+      }
+      if (action === 'restore') {
+        return Response.json({ success: true, guard_id: guardId, status: approval.status, action: 'restored' }, { headers: corsHeaders });
+      }
+      if (approval.replayed) {
+        return Response.json({ success: true, guard_id: guardId, status: approval.status, action: 'approved',
+          already_approved: true, notification_status: 'not_requested' }, { headers: corsHeaders });
+      }
       if (guard.user_id) {
         await safeExecute(async function() { await supabaseQ.from('users').update({ verification_status: 'approved', updated_at: now }).eq('id', guard.user_id); });
       }
@@ -232,16 +249,6 @@ Deno.serve(async function(req) {
       const suspendReason = suspensionReason || 'Account suspended by administrator';
       await updateGuard(supabaseQ, guardId, { verification_status: 'suspended', is_active: false, dashboard_access: false, rejection_reason: suspendReason, updated_at: now });
       return new Response(JSON.stringify({ success: true, message: 'Guard suspended successfully', action: 'suspended' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
-    }
-    if (action === 'restore') {
-      if (guard.verification_status !== 'suspended') {
-        return new Response(JSON.stringify({ error: 'Only suspended guards can be restored' }), { status: 400, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
-      }
-      if (!guard.verified_by) {
-        return new Response(JSON.stringify({ error: 'Approve this guard before restoring access' }), { status: 409, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
-      }
-      await updateGuard(supabaseQ, guardId, { verification_status: 'approved', is_active: true, dashboard_access: true, profile_completed: true, rejection_reason: null, updated_at: now });
-      return new Response(JSON.stringify({ success: true, message: 'Guard restored successfully', action: 'restored' }), { status: 200, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
     }
     return new Response(JSON.stringify({ error: 'Unknown action' }), { status: 400, headers: Object.assign({}, corsHeaders, { 'Content-Type': 'application/json' }) });
   } catch (err) {

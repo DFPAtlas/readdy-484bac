@@ -68,6 +68,11 @@ export default function GuardVerificationsClient() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGuard, setSelectedGuard] = useState<GuardVerification | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>('overview');
+  const [documentReview, setDocumentReview] = useState<{ guard: string; review: string } | null>(null);
+  const onAttestation = (guard: string, review: string | null) => {
+    setDocumentReview(previous => review ? { guard, review } : previous?.guard === guard ? null : previous);
+    setVerificationChecks(previous => ({ ...previous, documents: !!review }));
+  };
   const [verificationChecks, setVerificationChecks] = useState<VerificationChecks>({ ...defaultChecks });
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -238,6 +243,7 @@ export default function GuardVerificationsClient() {
     approvalReviewRef.current++;
     approvalGuardRef.current = guard.id;
     setDetailLoading(true);
+    setDocumentReview(null);
     setSelectedGuard(guard);
     setVerificationChecks({...defaultChecks, ...guard.verification_checks});
     setDetailTab('overview');
@@ -247,6 +253,7 @@ export default function GuardVerificationsClient() {
   const closeGuardDetails = () => {
     approvalReviewRef.current++;
     approvalGuardRef.current = null;
+    setDocumentReview(null);
     setSelectedGuard(null);
     setVerificationChecks({ ...defaultChecks });
   };
@@ -278,6 +285,14 @@ export default function GuardVerificationsClient() {
 
   const submitApproval = async (override: boolean) => {
     if (!selectedGuard || processing || approvalRunRef.current || !approvalActiveRef.current) return;
+    const reviewId = documentReview?.guard === selectedGuard.id ? documentReview.review : null;
+    if (!reviewId) {
+      setShowOverrideModal(false);
+      setShowApproveModal(false);
+      setDetailTab('documents');
+      showToast('Record a human review of the current document submission before approval.', 'error');
+      return;
+    }
     const guardId = selectedGuard.id;
     const review = approvalReviewRef.current;
     const isCurrent = () => approvalActiveRef.current && approvalGuardRef.current === guardId && approvalReviewRef.current === review;
@@ -299,7 +314,7 @@ export default function GuardVerificationsClient() {
             'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
             'Authorization': `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ guardId, action: 'approve', adminName, ...(override ? { override: true } : {}) }),
+          body: JSON.stringify({ guardId, action: 'approve', reviewId, adminName, ...(override ? { override: true } : {}) }),
         }
       );
       const result: unknown = await response.json();
@@ -636,7 +651,8 @@ export default function GuardVerificationsClient() {
                 <>
                   {detailTab === 'overview' && (<OverviewTab guard={selectedGuard} checks={verificationChecks} hasLicenceImages={!!hasLicenceImages} onToggle={(s) => toggleCheck(s as keyof VerificationChecks)} onViewLicence={() => setDetailTab('licence')} />)}
                   {detailTab === 'licence' && (<LicenceReviewPanel guard={selectedGuard} hasLicenceImages={!!hasLicenceImages} checked={verificationChecks.sia_license} onToggle={() => toggleCheck('sia_license')} />)}
-                  {detailTab === 'documents' && (<DocumentsReviewPanel guard={selectedGuard} checked={verificationChecks.documents} onToggle={() => toggleCheck('documents')} />)}
+                  {detailTab === 'documents' && (<DocumentsReviewPanel key={selectedGuard.id} guardId={selectedGuard.id} onAttestation={onAttestation}
+                    onRestored={() => { closeGuardDetails(); fetchGuards(activeTab); fetchAllCounts(); }} />)}
                   {detailTab === 'professional' && (<ProfessionalTab guard={selectedGuard} checked={verificationChecks.professional_details} onToggle={() => toggleCheck('professional_details')} />)}
                   {detailTab === 'availability' && (<AvailabilityTab guard={selectedGuard} checked={verificationChecks.availability} onToggle={() => toggleCheck('availability')} />)}
                   {detailTab === 'account' && (<AccountTab guard={selectedGuard} checked={verificationChecks.subscription} onToggle={() => toggleCheck('subscription')} />)}

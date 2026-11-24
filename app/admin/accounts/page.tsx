@@ -130,25 +130,20 @@ export default function AccountsPage() {
 
   const handleBulkGuardAction = async (action: string) => {
     if (selectedGuardIds.length === 0) return;
+    if (['approve', 'reactivate', 'verify_sia'].includes(action)) {
+      window.location.assign('/admin/guard-verifications');
+      return;
+    }
     setIsProcessingBulk(true);
 
     try {
       let updateData: any = {};
       switch (action) {
-        case 'approve':
-          updateData = { verification_status: 'approved', is_active: true };
-          break;
         case 'reject':
           updateData = { verification_status: 'rejected', is_active: false };
           break;
         case 'suspend':
           updateData = { is_active: false };
-          break;
-        case 'reactivate':
-          updateData = { is_active: true };
-          break;
-        case 'verify_sia':
-          updateData = { sia_verified: true, verification_status: 'verified' };
           break;
         case 'unverify_sia':
           updateData = { sia_verified: false, verification_status: 'rejected' };

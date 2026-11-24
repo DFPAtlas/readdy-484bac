@@ -154,7 +154,11 @@ export default function VerifyGuardsClient() {
 
   const handleVerification = async () => {
     const { guardId, status } = confirmModal;
-    
+    if (status === 'approved') {
+      window.location.assign('/admin/guard-verifications');
+      return;
+    }
+
     closeConfirmModal();
     setProcessingId(guardId);
     
@@ -166,10 +170,10 @@ export default function VerifyGuardsClient() {
 
       const updateData: any = {
         verification_status: status,
-        is_active: status === 'approved'
+        is_active: String(status) === 'approved'
       };
 
-      if (status === 'approved') {
+      if (String(status) === 'approved') {
         updateData.verified_at = new Date().toISOString();
         updateData.sia_verified_at = new Date().toISOString();
       } else {
@@ -196,11 +200,11 @@ export default function VerifyGuardsClient() {
         const notificationData = {
           user_id: guard.user_id,
           user_type: 'guard',
-          title: status === 'approved' ? 'Application Approved ✓' : 'Application Update',
-          message: status === 'approved' 
+          title: String(status) === 'approved' ? 'Application Approved ✓' : 'Application Update',
+          message: String(status) === 'approved'
             ? 'Congratulations! Your guard application has been approved. You can now start accepting jobs and will receive email updates about new opportunities.'
             : 'Your guard application requires additional review. Our team will contact you shortly.',
-          type: status === 'approved' ? 'success' : 'warning',
+          type: String(status) === 'approved' ? 'success' : 'warning',
           is_read: false,
           link: '/guard/dashboard',
           created_at: new Date().toISOString()
@@ -223,7 +227,7 @@ export default function VerifyGuardsClient() {
         const emailPayload = {
           guardEmail: guard.email,
           guardName: guardName,
-          approved: status === 'approved'
+          approved: String(status) === 'approved'
         };
 
         const { data: sessionData } = await supabase.auth.getSession();
@@ -249,8 +253,8 @@ export default function VerifyGuardsClient() {
       }
 
       await logAdminAction({
-        actionType: status === 'approved' ? 'guard_verified' : 'guard_rejected',
-        actionDescription: status === 'approved'
+        actionType: String(status) === 'approved' ? 'guard_verified' : 'guard_rejected',
+        actionDescription: String(status) === 'approved'
           ? `Approved guard application for ${guardName}`
           : `Rejected guard application for ${guardName}`,
         targetType: 'guard',
@@ -262,14 +266,14 @@ export default function VerifyGuardsClient() {
       
       if (emailSent) {
         showToast(
-          status === 'approved' 
+          String(status) === 'approved'
             ? `${guardName} approved! Email notification sent successfully.` 
             : `${guardName} rejected and notified via email.`,
           'success'
         );
       } else {
         showToast(
-          status === 'approved' 
+          String(status) === 'approved'
             ? `${guardName} approved! ⚠️ Email notification failed (domain not verified). Guard can still access the platform.` 
             : `${guardName} rejected. ⚠️ Email notification failed.`,
           'success'
@@ -279,7 +283,7 @@ export default function VerifyGuardsClient() {
     } catch (error: any) {
       console.error('Verification failed:', error);
       showToast(
-        `Failed to ${status === 'approved' ? 'approve' : 'reject'} guard: ${error.message || 'Unknown error'}`,
+        `Failed to ${String(status) === 'approved' ? 'approve' : 'reject'} guard: ${error.message || 'Unknown error'}`,
         'error'
       );
       await fetchGuards();
@@ -288,89 +292,8 @@ export default function VerifyGuardsClient() {
     }
   };
 
-  const handleQuickApprove = async (guardId: string) => {
-    setProcessingId(guardId);
-    try {
-      const guard = guards.find(g => g.id === guardId);
-      if (!guard) throw new Error('Guard not found');
-
-      const updateData: any = {
-        verification_status: 'approved',
-        is_active: true,
-        sia_verified: true,
-        verified_at: new Date().toISOString(),
-        sia_verified_at: new Date().toISOString()
-      };
-
-      const { data: updatedData, error: updateError } = await supabase
-        .from('guards')
-        .update(updateData)
-        .eq('id', guardId)
-        .select('*');
-
-      if (updateError) throw new Error(`Update failed: ${updateError.message}`);
-      if (!updatedData || updatedData.length === 0) throw new Error('Record not found');
-
-      if (guard.user_id) {
-        const notificationData = {
-          user_id: guard.user_id,
-          user_type: 'guard',
-          title: 'Application Approved ✓',
-          message: 'Congratulations! Your guard application has been approved. You can now start accepting jobs and will receive email updates about new opportunities.',
-          type: 'success',
-          is_read: false,
-          link: '/guard/dashboard',
-          created_at: new Date().toISOString()
-        };
-
-        const { error: notifError } = await supabase
-          .from('notifications')
-          .insert(notificationData)
-          .select();
-
-        if (notifError) console.error('Notification error:', notifError);
-      }
-
-      const guardName = getGuardName(guard);
-
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token || '';
-
-        await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-guard-approval-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            guardEmail: guard.email,
-            guardName: guardName,
-            approved: true
-          })
-        });
-      } catch (e) {
-        console.error('Email sending error:', e);
-      }
-
-      await logAdminAction({
-        actionType: 'guard_verified',
-        actionDescription: `Quick-approved guard application for ${guardName}`,
-        targetType: 'guard',
-        targetName: guardName,
-        metadata: { guardId: guard.id, email: guard.email, siaLicence: guard.sia_licence_number, quickApprove: true },
-      });
-
-      setGuards(prevGuards => prevGuards.filter(g => g.id !== guardId));
-      setSelectedIds(prev => { const next = new Set(prev); next.delete(guardId); return next; });
-      showToast(`${guardName} quick-approved!`, 'success');
-    } catch (error: any) {
-      console.error('Quick approve failed:', error);
-      showToast(`Quick approve failed: ${error.message || 'Unknown error'}`, 'error');
-      await fetchGuards();
-    } finally {
-      setProcessingId(null);
-    }
+  const handleQuickApprove = async () => {
+    window.location.assign('/admin/guard-verifications');
   };
 
   const handleQuickReject = async (guardId: string) => {
@@ -475,8 +398,7 @@ export default function VerifyGuardsClient() {
   };
 
   const handleBulkQuickApprove = async () => {
-    if (selectedIds.size === 0) return;
-    setBulkConfirmModal({ show: true, action: 'approve', count: selectedIds.size });
+    window.location.assign('/admin/guard-verifications');
   };
 
   const handleBulkQuickReject = async () => {
@@ -497,61 +419,7 @@ export default function VerifyGuardsClient() {
         const guard = guards.find(g => g.id === guardId);
         if (!guard) { failCount++; continue; }
 
-        if (action === 'approve') {
-          const updateData = {
-            verification_status: 'approved',
-            is_active: true,
-            sia_verified: true,
-            verified_at: new Date().toISOString(),
-            sia_verified_at: new Date().toISOString()
-          };
-
-          const { data: updatedData, error: updateError } = await supabase
-            .from('guards')
-            .update(updateData)
-            .eq('id', guardId)
-            .select('*');
-
-          if (updateError || !updatedData || updatedData.length === 0) { failCount++; continue; }
-
-          if (guard.user_id) {
-            const notificationData = {
-              user_id: guard.user_id,
-              user_type: 'guard',
-              title: 'Application Approved ✓',
-              message: 'Congratulations! Your guard application has been approved. You can now start accepting jobs and will receive email updates about new opportunities.',
-              type: 'success',
-              is_read: false,
-              link: '/guard/dashboard',
-              created_at: new Date().toISOString()
-            };
-            await supabase.from('notifications').insert(notificationData).select();
-          }
-
-          const guardName = getGuardName(guard);
-
-          try {
-            const { data: sessionData } = await supabase.auth.getSession();
-            const token = sessionData.session?.access_token || '';
-
-            await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-guard-approval-email`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify({ guardEmail: guard.email, guardName, approved: true })
-            });
-          } catch (e) { console.error('Email error:', e); }
-
-          await logAdminAction({
-            actionType: 'guard_verified',
-            actionDescription: `Bulk quick-approved guard application for ${getGuardName(guard)}`,
-            targetType: 'guard',
-            targetName: getGuardName(guard),
-            metadata: { guardId: guard.id, email: guard.email, siaLicence: guard.sia_licence_number, bulkApprove: true },
-          });
-        } else {
+        if (action === 'approve') { failCount++; continue;         } else {
           const updateData = {
             verification_status: 'rejected',
             is_active: false,
@@ -1021,7 +889,7 @@ export default function VerifyGuardsClient() {
                 {filter === 'pending' && (
                   <div className="grid grid-cols-4 gap-2 pt-4 border-t border-gray-200">
                     <button
-                      onClick={() => handleQuickApprove(guard.id)}
+                      onClick={() => handleQuickApprove()}
                       disabled={processingId === guard.id}
                       className="bg-teal-600 text-white px-3 py-2.5 rounded-lg font-semibold hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap text-sm"
                       title="Quick approve - skips confirmation modal"

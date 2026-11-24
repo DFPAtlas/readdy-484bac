@@ -1,158 +1,189 @@
 'use client';
 
-import DocumentImage from '@/components/DocumentImage';
-import { GuardVerification } from './types';
+import { useEffect, useRef, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
-interface DocumentsReviewPanelProps {
-  guard: GuardVerification;
-  checked: boolean;
-  onToggle: () => void;
-}
+const slots = [
+  ['licence', 'Driving licence front'],
+  ['back', 'Driving licence back'],
+  ['proof', 'Proof of address'],
+] as const;
+type Slot = (typeof slots)[number][0];
+type Review = { id: string; version: string; attested_at: string | null };
+type ReviewState = { version: string | null; status: string | null; advisory: string | null;
+  reasons: string[]; review: Review | null; viewed: Slot[]; can_restore: boolean };
 
-export default function DocumentsReviewPanel({ guard, checked, onToggle }: DocumentsReviewPanelProps) {
-  const hasDrivingLicence = guard.driving_licence_front_url || guard.driving_licence_back_url;
-  const hasPoA = guard.proof_of_address_url;
-  const hasAny = hasDrivingLicence || hasPoA;
+export default function DocumentsReviewPanel({ guardId, onAttestation, onRestored }: {
+  guardId: string;
+  onAttestation: (guardId: string, reviewId: string | null) => void;
+  onRestored: () => void;
+}) {
+  const [state, setState] = useState<ReviewState | null>(null);
+  const [pending, setPending] = useState<string | null>('status');
+  const [error, setError] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+  const [preview, setPreview] = useState<{ slot: Slot; url: string; mime: string } | null>(null);
+  const active = useRef(false);
+  const objectUrl = useRef<string | null>(null);
+  const currentReview = useRef<string | null>(null);
 
+  const request = async (action: string, body: Record<string, unknown> = {}) => {
+    const result = await supabase.functions.invoke('admin-guard-document-review', {
+      body: { guardId, action, ...body },
+    });
+    if (result.error) {
+      const parsed = await result.error.context?.json?.().catch(() => null);
+      throw new Error(typeof parsed?.error === 'string' ? parsed.error : 'Document review is unavailable. Try again.');
+    }
+    return result;
+  };
+
+  const apply = (next: ReviewState) => {
+    if (!active.current) return;
+    if (currentReview.current !== (next.review?.id ?? null)) {
+      if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+      objectUrl.current = null;
+      setPreview(null);
+      setConfirmed(false);
+    }
+    currentReview.current = next.review?.id ?? null;
+    setState(next);
+    onAttestation(guardId, next.review?.attested_at ? next.review.id : null);
+  };
+
+  useEffect(() => {
+    active.current = true;
+    let cancelled = false;
+    async function load() {
+      try {
+        const result = await supabase.functions.invoke('admin-guard-document-review', {
+          body: { guardId, action: 'status' },
+        });
+        if (result.error) throw new Error();
+        if (!cancelled) apply(result.data);
+      } catch {
+        if (!cancelled) setError('Could not load document review. Check your MFA session and retry.');
+      } finally {
+        if (!cancelled) setPending(null);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+      active.current = false;
+      if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+      objectUrl.current = null;
+    };
+    // The panel is keyed by guard ID. Actions reload their own state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guardId]);
+
+  async function refresh() {
+    apply((await request('status')).data);
+  }
+
+  async function act(action: string, kind?: Slot) {
+    if (pending) return;
+    let failure = '';
+    setError('');
+    setPending(action);
+    try {
+      if (action === 'prepare') {
+        onAttestation(guardId, null);
+        setConfirmed(false);
+        if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+        objectUrl.current = null;
+        setPreview(null);
+        await request(action);
+      } else if (action === 'document' && state?.review && kind) {
+        const result = await request(action, { reviewId: state.review.id, kind });
+        const mime = result.response?.headers.get('X-Document-Type') ?? '';
+        if (!(result.data instanceof Blob) || !['image/png', 'image/jpeg', 'image/webp', 'application/pdf'].includes(mime)) {
+          throw new Error('Could not display the verified document.');
+        }
+        if (!active.current) return;
+        if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+        objectUrl.current = URL.createObjectURL(new Blob([result.data], { type: mime }));
+        setPreview({ slot: kind, url: objectUrl.current, mime });
+      } else if (action === 'attest' && state?.review && confirmed) {
+        const result = await supabase.schema('app').rpc('attest_guard_document_review', { p_review: state.review.id });
+        if (result.error) throw new Error('Review could not be recorded. Check the current documents and retry.');
+      } else if (action === 'restore' && state?.review?.attested_at) {
+        const result = await supabase.functions.invoke('admin-verify-guard', {
+          body: { guardId, action: 'restore', reviewId: state.review.id },
+        });
+        if (result.error || result.data?.action !== 'restored') throw new Error('Restoration could not be confirmed.');
+        if (active.current) onRestored();
+        return;
+      }
+      await refresh();
+    } catch (err) {
+      failure = err instanceof Error ? err.message : 'Document review failed.';
+      if (active.current) {
+        onAttestation(guardId, null);
+        setPreview(null);
+        if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+        objectUrl.current = null;
+        setConfirmed(false);
+        try { await refresh(); } catch { setState(null); }
+        if (active.current) setError(failure);
+      }
+    } finally {
+      if (active.current) setPending(null);
+    }
+  }
+
+  const reviewCurrent = !!state?.review;
+  const canAttest = reviewCurrent && state?.viewed.length === slots.length && confirmed;
+  const label = slots.find(([slot]) => slot === preview?.slot)?.[1] ?? 'Identity document';
   return (
-    <div className="space-y-6">
-      <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-5">
-        <h3 className="text-lg font-semibold text-amber-400 mb-3 flex items-center gap-2">
-          <i className="ri-file-list-3-line"></i>
-          Identity Documents
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div className="bg-[#0a1628] rounded-lg p-3 border border-[#1a2b4a]">
-            <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Driving Licence Front</p>
-            <p className={`font-semibold ${guard.driving_licence_front_url ? 'text-emerald-400' : 'text-red-400'}`}>
-              {guard.driving_licence_front_url ? 'Uploaded' : 'Missing'}
-            </p>
-          </div>
-          <div className="bg-[#0a1628] rounded-lg p-3 border border-[#1a2b4a]">
-            <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Driving Licence Back</p>
-            <p className={`font-semibold ${guard.driving_licence_back_url ? 'text-emerald-400' : 'text-red-400'}`}>
-              {guard.driving_licence_back_url ? 'Uploaded' : 'Missing'}
-            </p>
-          </div>
-          <div className="bg-[#0a1628] rounded-lg p-3 border border-[#1a2b4a]">
-            <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Proof of Address</p>
-            <p className={`font-semibold ${guard.proof_of_address_url ? 'text-emerald-400' : 'text-red-400'}`}>
-              {guard.proof_of_address_url ? 'Uploaded' : 'Missing'}
-            </p>
-          </div>
+    <section aria-label="Version-bound document review" className="min-w-0 space-y-4 text-slate-200">
+      <div className="rounded-xl border border-slate-700 p-4">
+        <h3 className="font-semibold text-white">Identity document review</h3>
+        <p className="mt-1 text-sm text-slate-300" aria-live="polite">
+          {pending ? 'Working… ' : ''}Submission {state?.version ?? 'awaiting capture'} · {state?.status ?? 'No check recorded'}
+        </p>
+        <p className="mt-1 text-sm">AI advisory: {state?.advisory ?? 'Pending or unavailable'}. You can review the documents manually.</p>
+        {!!state?.reasons.length && <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+          {state.reasons.map((reason) => <li key={reason}>{reason.replaceAll('_', ' ')}</li>)}
+        </ul>}
+        {error && <p role="alert" className="mt-2 text-sm text-rose-300">{error}</p>}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" disabled={!!pending} onClick={() => void act('status')} className="rounded border px-3 py-2 text-sm">Refresh status</button>
+          <button type="button" disabled={!!pending} onClick={() => void act('prepare')} className="rounded bg-teal-700 px-3 py-2 text-sm text-white">
+            {reviewCurrent ? 'Start a new review' : 'Prepare or retry document review'}
+          </button>
         </div>
-        {guard.driving_licence_uploaded_at && (
-          <p className="text-xs text-amber-400 mt-3">
-            <i className="ri-time-line mr-1"></i>
-            Driving licence uploaded: {new Date(guard.driving_licence_uploaded_at).toLocaleString('en-GB')}
-          </p>
-        )}
-        {guard.proof_of_address_uploaded_at && (
-          <p className="text-xs text-amber-400 mt-1">
-            <i className="ri-time-line mr-1"></i>
-            Proof of address uploaded: {new Date(guard.proof_of_address_uploaded_at).toLocaleString('en-GB')}
-          </p>
-        )}
       </div>
-
-      {hasAny ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Document Review</h3>
-            <button
-              onClick={onToggle}
-              className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
-                checked
-                  ? 'bg-emerald-500/10 text-emerald-400 border-2 border-emerald-500/30'
-                  : 'bg-[#1a2b4a] text-slate-400 border-2 border-[#1a2b4a] hover:bg-[#243452] hover:text-slate-300'
-              }`}
-            >
-              {checked ? '✓ Documents Verified' : 'Confirm Documents'}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {guard.driving_licence_front_url && (
-              <div className="bg-[#0a1628] border border-[#1a2b4a] rounded-xl overflow-hidden">
-                <div className="px-4 py-3 bg-[#111d35] border-b border-[#1a2b4a] flex items-center gap-2">
-                  <div className="w-8 h-8 flex items-center justify-center bg-amber-500/10 rounded-lg">
-                    <i className="ri-car-line text-amber-400"></i>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-white">Driving Licence Front</p>
-                    <p className="text-xs text-slate-500">Primary identification</p>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <DocumentImage path={guard.driving_licence_front_url} label="Driving Licence Front" className="rounded-lg" />
-                </div>
-              </div>
-            )}
-
-            {guard.driving_licence_back_url && (
-              <div className="bg-[#0a1628] border border-[#1a2b4a] rounded-xl overflow-hidden">
-                <div className="px-4 py-3 bg-[#111d35] border-b border-[#1a2b4a] flex items-center gap-2">
-                  <div className="w-8 h-8 flex items-center justify-center bg-amber-500/10 rounded-lg">
-                    <i className="ri-car-line text-amber-400"></i>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-white">Driving Licence Back</p>
-                    <p className="text-xs text-slate-500">Secondary identification</p>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <DocumentImage path={guard.driving_licence_back_url} label="Driving Licence Back" className="rounded-lg" />
-                </div>
-              </div>
-            )}
-
-            {guard.proof_of_address_url && (
-              <div className="bg-[#0a1628] border border-[#1a2b4a] rounded-xl overflow-hidden">
-                <div className="px-4 py-3 bg-[#111d35] border-b border-[#1a2b4a] flex items-center gap-2">
-                  <div className="w-8 h-8 flex items-center justify-center bg-blue-500/10 rounded-lg">
-                    <i className="ri-home-line text-blue-400"></i>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-white">Proof of Address</p>
-                    <p className="text-xs text-slate-500">Address verification</p>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <DocumentImage path={guard.proof_of_address_url} label="Proof of Address" className="rounded-lg" />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <i className="ri-information-line text-amber-400 text-xl w-5 h-5 flex items-center justify-center flex-shrink-0"></i>
-              <div>
-                <p className="text-sm font-medium text-amber-400">Review Guidelines</p>
-                <ul className="text-sm text-amber-400/80 mt-1 space-y-1">
-                  <li>• Verify the driving licence is current and not expired</li>
-                  <li>• Confirm the name on the driving licence matches the guard&apos;s profile</li>
-                  <li>• Check the proof of address is recent (within last 3 months)</li>
-                  <li>• Ensure the address on POA matches the address provided</li>
-                  <li>• Click any image to enlarge for closer inspection</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-8 text-center">
-          <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <i className="ri-file-list-3-line text-3xl text-red-400 w-8 h-8 flex items-center justify-center"></i>
-          </div>
-          <h3 className="text-lg font-semibold text-red-400 mb-2">No Documents Uploaded</h3>
-          <p className="text-red-400/80 text-sm mb-4">This guard has not uploaded their driving licence or proof of address.</p>
-          <div className="bg-[#0a1628] rounded-lg p-4 border border-[#1a2b4a] inline-block text-left">
-            <p className="text-sm font-medium text-white mb-2">Recommended Action:</p>
-            <p className="text-sm text-slate-400">Reject the application and ask the guard to upload their driving licence (front and back) and a recent proof of address before reapplying.</p>
-          </div>
-        </div>
-      )}
-    </div>
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {slots.map(([slot, title]) => <article key={slot} className="min-w-0 rounded-lg border border-slate-700 p-3">
+          <h4 className="text-sm font-medium">{title}</h4>
+          <p className="mt-1 text-xs text-slate-300">{state?.viewed.includes(slot) ? 'Access recorded' : 'Awaiting review'}</p>
+          <button type="button" disabled={!reviewCurrent || !!pending} onClick={() => void act('document', slot)}
+            className="mt-2 rounded border px-3 py-2 text-sm disabled:opacity-50">Open {title.toLowerCase()}</button>
+        </article>)}
+      </div>
+      {preview && <div className="max-h-[60vh] min-w-0 overflow-auto rounded border border-slate-700 p-3" tabIndex={0} aria-label={label}>
+        {preview.mime === 'application/pdf'
+          ? <><iframe title={label} sandbox="" className="h-[48vh] w-full" src={preview.url} />
+              <a className="underline" href={preview.url} download="review-document.pdf">Download PDF for review</a></>
+          // The local blob comes only from the scoped and checksum-verified broker.
+          // eslint-disable-next-line @next/next/no-img-element
+          : <img src={preview.url} alt={label} className="mx-auto max-w-full object-contain" />}
+      </div>}
+      {reviewCurrent && <div className="rounded border border-slate-700 p-3">
+        {state?.review?.attested_at ? <p role="status">Human review recorded for submission {state.review.version}.</p> : <>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+            <span>I examined the current licence front and back and proof of address, and confirm these versions support approval.</span>
+          </label>
+          <button type="button" disabled={!canAttest || !!pending} onClick={() => void act('attest')}
+            className="mt-3 rounded bg-teal-700 px-3 py-2 text-sm text-white disabled:opacity-50">Record human review</button>
+        </>}
+        {state?.review?.attested_at && state.can_restore &&
+          <button type="button" disabled={!!pending} onClick={() => void act('restore')}
+            className="mt-2 rounded border px-3 py-2 text-sm">Restore guard access</button>}
+      </div>}
+    </section>
   );
 }

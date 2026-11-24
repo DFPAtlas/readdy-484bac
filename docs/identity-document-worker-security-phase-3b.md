@@ -1,0 +1,36 @@
+# Identity document worker security · Phase 3B
+
+The Phase 3A migration and rollback SQL remain the queue authority. This follow-up is for isolated validation and review only. Keep the production identity consumer stopped.
+
+## Worker identity and renewal
+
+Use a dedicated Supabase Auth user registered in `identity_queue_private.workers`, with no admin membership, and a publishable project key. The worker uses `QUICKGUARD_SUPABASE_URL`, `QUICKGUARD_PUBLISHABLE_KEY`, `IDENTITY_WORKER_SUBJECT` and `IDENTITY_WORKER_TOKEN_FILE`. It reads the access token before each request and locally rejects wrong issuer, subject or role, malformed tokens, and tokens expiring within 30 seconds. PostgREST and the Edge gateway verify the JWT and RPC permissions. No Supabase refresh token, password, or service-role key belongs in the worker container.
+
+Use an approved host-side session renewer which can maintain and rotate the Supabase Auth refresh token. Protect that state in the host secret store. Refresh ahead of expiry and atomically replace a mode-0400 access-token file in the worker-readable directory, owned by UID 65532 or mapped to it. Mount the directory read-only so replacements are visible. Test revocation, missed renewal, failed file replacement, issuer compatibility and recovery in staging. Upon compromise, disable the worker allowlist entry, revoke its Auth sessions and mTLS certificate, and fence the queue using the existing rollback procedure. No unattended refresh service is installed by this PR.
+
+The worker calls only schema-qualified claim, finish, and readiness endpoints plus the lease-scoped private broker. It cannot read table rows or directly access the bucket. The broker validates the current worker, token, lease and requested document slot before fetching. It rechecks the lease and digest before returning bytes. No signed URL is issued. Admin membership exclusion keeps the worker out of the final approval endpoint. A model pass stays advisory and is routed to human review.
+
+## HAL to TRON inference
+
+On HAL configure `IDENTITY_INFERENCE_URL` as the exact staging TRON private IPv4 HTTPS origin. Set `IDENTITY_INFERENCE_CA_FILE`, `IDENTITY_INFERENCE_CERT_FILE` and `IDENTITY_INFERENCE_KEY_FILE` to files mounted read-only. Use a dedicated server CA and a certificate with the exact gateway IP in its SAN. On TRON configure `IDENTITY_GATEWAY_BIND`, optional `IDENTITY_GATEWAY_PORT` (8445), `IDENTITY_SERVER_CERT_FILE`, `IDENTITY_SERVER_KEY_FILE`, and a separate `IDENTITY_CLIENT_CA_FILE` that issues only the approved HAL identity. Restrict and rotate the private keys outside the images. This setup verifies server identity and requires a client certificate before reading document bytes. It has no plaintext mode.
+
+Both sides require `IDENTITY_MODEL` and a reviewed 64-character `IDENTITY_MODEL_DIGEST` for one supported local model. The gateway uses a fixed loopback Ollama URL and checks its catalogue digest before and after each generation. Client-supplied endpoints, prompts and model options are never forwarded. The gateway has no external or automatic secondary provider fallback. A change in model digest makes readiness or inference fail. Treat the runtime and model manifest as trusted, and prevent concurrent tag mutation. Before activation, stage an isolated Ollama instance with a read-only model catalogue, cloud functionality disabled and external egress blocked. Confirm the actual selected digest and test with synthetic inference. Switching to the backup model requires deliberately changing the pins on both hosts and repeating qualification. No network policy or Ollama setting is applied by this PR.
+
+`workers/identity-documents/compose.security.example.yml` is an opt-in staging example. Review egress allowlists separately. HAL needs only approved Supabase HTTPS and the pinned TRON gateway. TRON's gateway must bind a private interface and reach the dedicated Ollama only on loopback. Run as UID/GID 65532 with a read-only root, no Linux capabilities, no privilege escalation, PID/CPU/memory limits, capped logs, disabled core dumps, and a small tmpfs. Restrict Docker host access and disable swap or use appropriately protected swap before real processing.
+
+## Data and resource controls
+
+- Broker bodies are bounded to 1 KiB and have a deadline. Worker downloads stream with a 5 MiB limit and a total request deadline. HTTP redirects and inherited proxies are disabled on sensitive paths.
+- Decode each document in a separate non-root subprocess with a 12-second wall limit, CPU and address-space limits and no core dump. Cap images at 12 million pixels and reject multi-frame inputs. Cap PDFs at four pages, 1,000 objects, and 4,000-point page bounds. Render only the first page to a bounded PNG. No PDF text layer is sent to the model.
+- The gateway limits body size, handshake concurrency, inference concurrency, response size, token count and request time. It uses fixed prompts and requests no GPU model retention after the request. The worker and gateway do not write document bytes, raw model output, or prompt transcripts to disk. Worker and gateway errors omit personal fields, paths, token values, signed URLs, and provider response bodies. Verify the production Edge, network proxy, container platform and Ollama do not add payload logging or persistence. Memory-only processing still requires consented handling of swap, snapshots and crash capture.
+- Liveness is a process marker. Readiness requires a usable token, queue and private bucket checks, and the authenticated pinned inference endpoint. A failed dependency clears readiness before the worker claims another job.
+
+## Retention and release decisions
+
+Read-only production catalogue inspection confirmed a private 5 MiB bucket, account retention events, and an account retention hold function. The existing private bucket, application-wide retention policy and account closure controls do not establish a document-specific schedule for source objects, derived hashes, queue advice, admin access evidence or backups. The data owner must approve the retention periods, which evidence must survive closure or a hold, authorised access to hold overrides, and validation of deletion across object versions and backups. A purge must preserve active hold material and evaluate storage, queue and audit evidence together. No deletion job or production retention policy change is in scope.
+
+Remaining gates include exact Supabase Auth/Storage/Edge staging, host-side renewal, private CA provisioning and egress enforcement, actual TRON certificate and pinned model qualification with synthetic inputs, protected transport review, and version-bound human approval. Phase 3 model acceptance remains unresolved.
+
+## Rollback
+
+Stop only the isolated worker and inference gateway. Disable the v2 enqueue flag if staging needs to pause further jobs. Revoke staged token and client certificates, remove their mounts, and retain only approved audit metadata. Restore the preceding worker image and configuration for inspection if needed, keeping its consumer stopped. A queue rollback, if separately approved, uses the [existing fail-closed forward migration](identity-document-queue-phase-3a-rollback.sql), preserving document checks and audit rows. Never restore plaintext inference for real documents.
