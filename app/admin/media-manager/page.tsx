@@ -22,7 +22,7 @@ function ratio(w: number,h: number) {
 }
 const fmt = (n:number) => (n/1024).toFixed(1)+' KiB';
 const btn = 'rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-100 hover:bg-slate-700 disabled:opacity-40';
-function MediaCard({slot,versions,onStaged}:{slot:Slot;versions:Version[];onStaged:()=>void}) {
+function MediaCard({slot,versions,current,onStaged}:{slot:Slot;versions:Version[];current:string|null;onStaged:()=>void}) {
   const src=originals[slot.slot_key];
   const [dimensions,setDimensions]=useState<{w:number;h:number}|null>(null);
   const [failed,setFailed]=useState(false);
@@ -46,6 +46,21 @@ function MediaCard({slot,versions,onStaged}:{slot:Slot;versions:Version[];onStag
       if(!response.ok){const body=await response.json().catch(()=>null);throw new Error(typeof body?.error==='string'?body.error:'Upload failed.');}
       setMessage('Draft stored. Live image unchanged.');setFile(null);onStaged();
     }catch(e){setMessage(e instanceof Error?e.message:'Upload failed.');}
+    finally{lock.current=false;setBusy(false);}
+  }
+  async function publish(version:string|null){
+    if(lock.current)return;
+    if(!window.confirm(version===null?'Restore the original website image?':'Publish this stored version to the public website?'))return;
+    lock.current=true;setBusy(true);setMessage('');
+    try{
+      const {data:{session}}=await supabase.auth.getSession();
+      if(!session)throw new Error('Sign in again.');
+      const base=process.env.NEXT_PUBLIC_SUPABASE_URL,anon=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if(!base||!anon)throw new Error('Service configuration unavailable.');
+      const response=await fetch(base+'/functions/v1/publish-site-media',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:anon,'Content-Type':'application/json'},body:JSON.stringify({slot:slot.slot_key,version,expected:current})});
+      if(!response.ok){const body=await response.json().catch(()=>null);throw new Error(typeof body?.error==='string'?body.error:'Publication failed.');}
+      setMessage(version===null?'Original restored.':'Version published.');onStaged();
+    }catch(e){setMessage(e instanceof Error?e.message:'Publication failed.');}
     finally{lock.current=false;setBusy(false);}
   }
   async function download(){
@@ -81,7 +96,12 @@ function MediaCard({slot,versions,onStaged}:{slot:Slot;versions:Version[];onStag
       <button type="button" className={btn} disabled={!file||busy} onClick={stage}>{busy?'Working…':'Upload draft'}</button>
       <p role="status" className="text-sm text-teal-200">{message}</p>
       <details className="text-sm text-slate-300"><summary>Stored versions ({versions.length})</summary>{versions.map(v=><p key={v.id} className="py-2 break-words">{v.width} × {v.height} px · {ratio(v.width,v.height)} · {fmt(v.byte_size)} · {v.mime_type} · {new Date(v.created_at).toLocaleDateString('en-GB')}</p>)}</details>
-      <p className="text-xs text-amber-300">Publishing and restoration not enabled.</p>
+      {['homepage-hero','homepage-logo'].includes(slot.slot_key)?<div className="space-y-2 border-t border-slate-700 pt-3">
+        <p className="text-xs text-slate-300">{current?'Replacement selected for public delivery':'Original image selected'}</p>
+        {current&&<QuickGuardImage key={current} src={process.env.NEXT_PUBLIC_SUPABASE_URL+'/functions/v1/public-site-media?slot='+encodeURIComponent(slot.slot_key)+'&v='+current} alt="Currently published replacement" className="w-full h-36 object-contain bg-slate-800 rounded-lg"/>}
+        {versions.map(v=><div key={v.id} className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-slate-300">{new Date(v.created_at).toLocaleString('en-GB')} · {v.width} × {v.height}</span><button type="button" className={btn} disabled={busy||current===v.id} onClick={()=>void publish(v.id)}>{current===v.id?'Selected':'Publish version'}</button></div>)}
+        <button type="button" className={btn} disabled={busy||!current} onClick={()=>void publish(null)}>Restore original</button>
+      </div>:<p className="text-xs text-amber-300">Public branding integration pending; publication not enabled for this slot.</p>}
     </div>
   </article>;
 }
@@ -90,6 +110,7 @@ export default function MediaManager(){
   const allowed=admin.role==='admin'||admin.role==='super_admin';
   const [slots,setSlots]=useState<Slot[]>([]);
   const [versions,setVersions]=useState<Version[]>([]);
+  const [publications,setPublications]=useState<Record<string,string>>({});
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(true);
   const [refresh,setRefresh]=useState(0);
@@ -101,18 +122,18 @@ export default function MediaManager(){
       setLoading(true);setError('');
       try{
         const db=supabase.schema('public');
-        const [s,v]=await Promise.all([db.from('site_media_slots').select('slot_key,page_label,section_label,recommended_width,recommended_height').order('page_label'),db.from('site_media_versions').select('id,slot_key,width,height,byte_size,mime_type,created_at').order('created_at',{ascending:false})]);
-        if(s.error||v.error)throw new Error('Media registry unavailable. Check the migration and permissions.');
-        if(live){setSlots(s.data??[]);setVersions(v.data??[]);}
+        const [s,v,p]=await Promise.all([db.from('site_media_slots').select('slot_key,page_label,section_label,recommended_width,recommended_height').order('page_label'),db.from('site_media_versions').select('id,slot_key,width,height,byte_size,mime_type,created_at').order('created_at',{ascending:false}),db.from('site_media_publications').select('slot_key,version_id')]);
+        if(s.error||v.error||p.error)throw new Error('Media registry unavailable. Check the migration and permissions.');
+        if(live){setSlots(s.data??[]);setVersions(v.data??[]);setPublications(Object.fromEntries((p.data??[]).map(item=>[item.slot_key,item.version_id])));}
       }catch(e){if(live)setError(e instanceof Error?e.message:'Could not load media.');}finally{if(live)setLoading(false);}
     }
     void load();return()=>{live=false;};
   },[allowed,refresh]);
-  return <AdminPageShell title="Image & Media Manager" description="Review public image specifications and stage replacements. No live changes." >
+  return <AdminPageShell title="Image & Media Manager" description="Review image specifications, stage replacements and manage homepage publications." >
     {!allowed?<p className="text-slate-300">{admin.role?'Content management permission required.':'Checking permissions…'}</p>:<>
       <label className="block text-sm text-slate-300 mb-4">Search images<input className="block mt-2 rounded-lg bg-slate-800 border border-slate-600 p-2 w-full text-white" value={search} onChange={e=>setSearch(e.target.value)}/></label>
-      <p className="text-sm text-amber-300 mb-4">Initial inventory only: homepage and branding. Public pages still use original assets.</p>
-      {error?<div role="alert" className="text-red-300">{error} <button className={btn} onClick={()=>setRefresh(x=>x+1)}>Retry</button></div>:loading?<p className="text-slate-300">Loading images…</p>:<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{slots.filter(s=>(s.page_label+' '+s.section_label).toLowerCase().includes(search.toLowerCase())).map(s=><MediaCard key={s.slot_key} slot={s} versions={versions.filter(v=>v.slot_key===s.slot_key)} onStaged={()=>setRefresh(x=>x+1)}/>)}</div>}
+      <p className="text-sm text-amber-300 mb-4">Initial inventory: homepage and branding. Publication controls are enabled only for the two integrated homepage slots.</p>
+      {error?<div role="alert" className="text-red-300">{error} <button className={btn} onClick={()=>setRefresh(x=>x+1)}>Retry</button></div>:loading?<p className="text-slate-300">Loading images…</p>:<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{slots.filter(s=>(s.page_label+' '+s.section_label).toLowerCase().includes(search.toLowerCase())).map(s=><MediaCard key={s.slot_key} slot={s} current={publications[s.slot_key]??null} versions={versions.filter(v=>v.slot_key===s.slot_key)} onStaged={()=>setRefresh(x=>x+1)}/>)}</div>}
     </>}
   </AdminPageShell>;
 }
