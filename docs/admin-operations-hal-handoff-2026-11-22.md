@@ -2,6 +2,34 @@
 
 Continue the authorised QuickGuard admin repairs from this repository. Production project: `vnywjfpkepjgclkbcmsj`. The separate approved recovery target is `dnbvybmulsppfjntbsxz` in Frankfurt; its private `qg_recovery_20261122` schema is a core-data drill, not a live application database.
 
+## Agent registry repaired, 24 November 2026 at 23:05 UTC
+
+The approved repair populated `app.agent_registry` for `quickguard.uk`. Read-back confirmed all 15 entries. The 13 business monitors are enabled for aggregation. QuickGuard Master and Diagnostics & Recovery are inventory-only (`enabled=false` in the registry), and both workflows continue to run on schedule and publish snapshots.
+
+The 23:07 UTC scheduled cycle produced 15 fresh Supabase snapshots from successful n8n executions on the same active workflow versions. Both supervisors read all 15 registry rows and each aggregated exactly the 13 tracked monitors, excluding themselves and each other. The empty-registry warning cleared. **Ten agents remain AMBER and five remain GREEN**, with no health rating changes in this cycle.
+
+| Agent ID | n8n execution ID | Supabase snapshot ID | Health |
+| --- | ---: | --- | --- |
+| `qg-applicant-ranking-agent-v01` | `389087` | `76baf828-eed6-4cd8-95b3-bf7aa841dca1` | GREEN |
+| `qg-client-selection-agent-v01` | `389079` | `962d0263-5cc7-49de-890c-4280576ab044` | AMBER |
+| `qg-completion-agent-v01` | `389082` | `cb0fb25d-7f85-434d-aa93-42843315d3f5` | GREEN |
+| `qg-diagnostics-recovery-agent-v01` | `389081` | `56c0f059-1c18-4522-a073-105b1037bd48` | AMBER |
+| `qg-dispute-refund-agent-v01` | `389074` | `c3e237e7-e8fd-40a8-86e0-317861bb4c65` | AMBER |
+| `qg-email-notification-agent-v01` | `389077` | `a08544df-b64f-43bd-b596-3efdc61222be` | GREEN |
+| `qg-guard-discovery-agent-v01` | `389080` | `646285fd-647f-4c6e-9988-b1663da2abd5` | GREEN |
+| `qg-job-funding-agent-v01` | `389084` | `aed65fbe-6feb-4b77-b7cd-a16b0d8b0f62` | AMBER |
+| `qg-job-intake-agent-v01` | `389078` | `9817c044-a2bf-44a2-a2bd-dfb72d29794c` | AMBER |
+| `qg-job-monitoring-agent-v01` | `389075` | `1203d59a-216c-4fa8-98d1-88dcd72542a2` | AMBER |
+| `quickguard-master-agent-v01` | `389086` | `3646bd32-bea2-4b9f-8418-089d15a7473e` | AMBER |
+| `qg-payout-agent-v01` | `389083` | `719e4683-0b4c-43fe-b4d4-a01375bc527c` | AMBER |
+| `qg-review-reputation-agent-v01` | `389076` | `65ff4559-f6d6-4db6-a311-a9ec27b31b2c` | GREEN |
+| `qg-sia-verification-agent-v01` | `389085` | `1f954bd5-cdd9-470d-b369-b6a4218c20c1` | AMBER |
+| `qg-subscription-agent-v01` | `389088` | `bd184ef1-34a3-4df8-a676-7544faa863ad` | AMBER |
+
+The pre-change export captured zero rows for this site. It is stored on HAL at `/home/martin/Documents/Codex/2026-11-22/continue-quickguard-admin-repairs-from-dfpatlas/outputs/quickguard-hal-registry-backup-20261124T230526Z.json`. SHA-256: `bb3245b76e42b586a3e7f5a211ec654e3230f0ef35f7d63211f1aef9ed4bc21f`. If rollback is approved, verify the checksum and check for intervening changes before removing only the unchanged rows introduced by this repair. Preserve any later registry edits and all snapshot history.
+
+No workflows, schedules, or workflow versions changed. The Phase 4A collector was left running.
+
 ## Basic QA profile labels reconciled, 22:58 UTC
 
 The designated Basic QA guard `20826398-1bcf-4a93-9b61-493c3e156610` now has `plan_slug=guard-basic`, `subscription_plan=guard-basic` and `plan_name=Guard Basic`, matching its existing subscription and canonical entitlement. One guarded audit records the label-only correction; all other guard fields, all subscriptions, entitlements and subscription payments were preserved. Its separate live profile customer and sandbox billing IDs remain unchanged. See `docs/admin-basic-qa-profile-plan-2026-11-22.md`. The historical blank-Basic-plan finding below is superseded by the database correction; the separate sandbox/live mapping and renewal-routing work remains open.
