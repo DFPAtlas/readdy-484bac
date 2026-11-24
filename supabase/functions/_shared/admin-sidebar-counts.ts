@@ -8,7 +8,7 @@ type CountReader = (table: string, column: string, value: string | string[]) => 
 export async function readAdminSidebarCounts(readCount: CountReader) {
   const results = await Promise.all([
     readCount('transactions', 'status', 'failed'),
-    readCount('guards', 'verification_status', ['manual_review', 'pending_sia_check']),
+    readCount('guards', 'verification_status', ['pending', 'manual_review', 'pending_sia_check']),
     readCount('sia_verifications', 'verification_status', 'pending'),
     readCount('guard_payouts', 'status', 'held'),
     readCount('contact_submissions', 'status', 'new'),

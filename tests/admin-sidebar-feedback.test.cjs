@@ -41,3 +41,17 @@ test('late polls cannot overwrite a newer failure or update an unmounted sidebar
 test('missing sessions leave counts unavailable without invoking a privileged endpoint',async()=>{
   const f=fixture({session:false});f.render();await f.h.effects();assert.equal(f.invocations,0);assert.match(content(f.render()),/Counts unavailable/);f.h.unmount();
 });
+
+test('verification badge counts only guards in its destination queue, not separate SIA checks',async()=>{
+  const f=fixture();f.render();await f.h.effects();
+  const badge=()=>{
+    const link=nodes(f.render()).find(n=>n.props?.href==='/admin/guard-verifications');
+    return nodes(link).find(n=>typeof n.type==='function'&&n.type.name==='Badge');
+  };
+  assert.equal(badge().props.count,2); // Three separate SIA records must not inflate this to five.
+  f.queue.push(Promise.resolve({data:{...counts,guardVerifications:0,siaVerifications:7},error:null}));
+  await f.poll();await flush();
+  assert.equal(badge().props.count,0);
+  assert.equal(badge().type(badge().props),null);
+  f.h.unmount();
+});

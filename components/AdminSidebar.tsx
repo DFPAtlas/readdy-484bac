@@ -123,7 +123,7 @@ export default function AdminSidebar() {
           href: '/admin/guard-verifications',
           icon: 'ri-shield-check-line',
           label: 'Verifications',
-          badge: <Badge count={badges.guardVerifications + badges.siaVerifications} color="yellow" />,
+          badge: <Badge count={badges.guardVerifications} color="yellow" />,
         },
         { href: '/admin/reviews', icon: 'ri-star-line', label: 'Reviews' },
         { href: '/admin/user-provisioning', icon: 'ri-user-settings-line', label: 'Provisioning' },
