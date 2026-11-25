@@ -1,9 +1,23 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import {allAdminRows} from '@/lib/adminData';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { allAdminRows } from '@/lib/adminData';
 import { isCollected, paymentAmounts } from '@/lib/financeAmounts';
 import { supabase } from '@/lib/supabase';
+import {
+  buildFinanceSnapshot,
+  createUnavailableFinanceSnapshot,
+  FINANCE_BASE_QUERY_KEYS as BASE_QUERY_KEYS,
+  financeRows,
+  settleFinanceResults,
+  uniqueRowIds,
+  type FinanceCost,
+  type FinanceData,
+  type FinanceFailure,
+  type FinancePayment,
+} from '@/lib/admin-finance-stats';
+import { createLatestRequestTracker, createTimeoutScope } from '@/lib/admin-dashboard-stats';
+import FinanceUnavailable from './FinanceUnavailable';
 import FinanceOverviewCards from './FinanceOverviewCards';
 import StripePaymentsTable from './StripePaymentsTable';
 import RunningCostsTable from './RunningCostsTable';
@@ -19,6 +33,29 @@ import AlertsPanel from './AlertsPanel';
 import MonthlySnapshots from './MonthlySnapshots';
 import FinancialOperationsPanel from './FinancialOperationsPanel';
 import ConnectPayoutsPanel from './ConnectPayoutsPanel';
+
+const FINANCE_TIMEOUT_MS = 15000;
+
+const ENRICHMENT_QUERY_KEYS = ['paymentClientsByUser', 'transactionClients'] as const;
+
+const OWNER_CLIENT_QUERY_KEYS = ['paymentClients'] as const;
+
+const EMPTY_FINANCE_DATA: FinanceData = {
+  payments: [],
+  costs: [],
+  activeSubscriptionCount: 0,
+  subscriptions: [],
+  plans: [],
+  snapshots: [],
+  guardsThisMonth: 0,
+  guardsLastMonth: 0,
+  clientsThisMonth: 0,
+  clientsLastMonth: 0,
+  trialCount: 0,
+  cancelledCount: 0,
+};
+
+const EMPTY_RESULT = { data: [] as unknown[], error: null };
 
 function getDateRange(filter: string, customStart?: string, customEnd?: string): { start: string; end: string } {
   const now = new Date();
@@ -51,56 +88,6 @@ function getDateRange(filter: string, customStart?: string, customEnd?: string):
   return { start, end };
 }
 
-function estimateStripeFee(amount: number): number {
-  return Math.max(amount * 0.015 + 0.20, 0.20);
-}
-
-interface Payment {
-  id: string;
-  date: string;
-  customer: string;
-  email: string;
-  plan: string;
-  amount: number;
-  stripe_fee: number;
-  net_amount: number;
-  status: string;
-  invoice_id: string;
-  refunded: boolean;
-  refund_amount: number;
-  remaining_amount: number;
-}
-
-interface Cost {
-  id: string;
-  service_name: string;
-  category: string;
-  monthly_cost: number;
-  supplier: string;
-  billing_date: string;
-  notes: string;
-}
-
-interface Subscription {
-  id: string;
-  status: string;
-  plan_amount: number;
-  stripe_price_id: string | null;
-  billing_interval: string | null;
-  created_at: string;
-  cancelled_at: string | null;
-  trial_end_date: string | null;
-  current_period_end: string | null;
-  next_payment_date: string | null;
-}
-
-interface Plan {
-  slug: string;
-  name: string;
-  monthly_price_pence: number;
-  stripe_price_id: string;
-}
-
 interface MonthlyData {
   month: string;
   revenue: number;
@@ -117,30 +104,6 @@ interface MonthlyData {
   conversionRate: number;
 }
 
-interface Snapshot {
-  id: string;
-  snapshot_month: string;
-  gross_revenue: number;
-  net_revenue: number;
-  stripe_fees: number;
-  running_costs: number;
-  vat_estimate: number;
-  estimated_profit: number;
-  refunds: number;
-  failed_payments: number;
-  active_subscriptions: number;
-  new_guards: number;
-  new_clients: number;
-  cancelled_accounts: number;
-  trial_accounts: number;
-  mrr: number;
-  arr: number;
-  arpu: number;
-  churn_rate: number;
-  failed_payment_rate: number;
-  created_at: string;
-}
-
 interface AlertItem {
   id: string;
   type: 'warning' | 'danger' | 'info';
@@ -150,27 +113,46 @@ interface AlertItem {
   actionHref?: string;
 }
 
+function messageOf(err: unknown): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === 'string' && err.trim()) return err.trim();
+  return 'Finance data request failed';
+}
+
 export default function PlatformFinancesClient() {
   const [section, setSection] = useState('payments');
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState('this_month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [allPayments, setAllPayments] = useState<Payment[]>([]);
-  const [costs, setCosts] = useState<Cost[]>([]);
-  const [activeSubscriptions, setActiveSubscriptions] = useState(0);
-  const [allSubscriptions, setAllSubscriptions] = useState<Subscription[]>([]);
-  const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
+  const [data, setData] = useState<FinanceData>(EMPTY_FINANCE_DATA);
+  const [payments, setPayments] = useState<FinancePayment[]>([]);
+  const [failures, setFailures] = useState<FinanceFailure[] | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [costModalOpen, setCostModalOpen] = useState(false);
-  const [editingCost, setEditingCost] = useState<Cost | null>(null);
+  const [editingCost, setEditingCost] = useState<FinanceCost | null>(null);
   const [isSavingCost, setIsSavingCost] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [guardsCount, setGuardsCount] = useState({ thisMonth: 0, lastMonth: 0 });
-  const [clientsCount, setClientsCount] = useState({ thisMonth: 0, lastMonth: 0 });
-  const [trialCount, setTrialCount] = useState(0);
-  const [cancelledCount, setCancelledCount] = useState(0);
-  const [plans, setPlans] = useState<Plan[]>([]);
+
+  const mountedRef = useRef(true);
+  const trackerRef = useRef(createLatestRequestTracker());
+  const timeoutScopeRef = useRef(createTimeoutScope());
+  const fetchDataRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
+  const {
+    payments: allPayments,
+    costs,
+    activeSubscriptionCount,
+    subscriptions: allSubscriptions,
+    plans,
+    snapshots,
+    guardsThisMonth,
+    guardsLastMonth,
+    clientsThisMonth,
+    clientsLastMonth,
+    trialCount,
+    cancelledCount,
+  } = data;
 
   useEffect(() => {
     if (toast) {
@@ -180,7 +162,11 @@ export default function PlatformFinancesClient() {
   }, [toast]);
 
   const fetchData = useCallback(async () => {
+    const requestId = trackerRef.current.begin();
     setLoading(true);
+
+    const isStale = () => !mountedRef.current || !trackerRef.current.isCurrent(requestId);
+
     try {
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -188,193 +174,169 @@ export default function PlatformFinancesClient() {
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
       const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
 
-      const {data: subPayments} = await allAdminRows(() => supabase.from('subscription_payments').select('*').order('created_at', {ascending:false}).order('id'));
-
-      const {data: transactions, error: transactionsError} = await allAdminRows(() => supabase.from('transactions').select('*').order('created_at', {ascending:false}).order('id'));
-
-      if (transactionsError) throw transactionsError;
-
-      const { count: activeSubCount } = await supabase
-        .from('subscriptions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
-
-      const {data: allSubs} = await allAdminRows(() => supabase.from('subscriptions').select('id, status, plan_amount, stripe_price_id, billing_interval, created_at, cancelled_at, trial_end_date, current_period_end, next_payment_date').order('created_at', {ascending:false}).order('id'));
-
-      const { data: plansData } = await supabase
-        .from('plans')
-        .select('slug, name, monthly_price_pence, stripe_price_id');
-
-      const { data: platformCosts } = await supabase
-        .from('platform_costs')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      const { data: snapshotData } = await supabase
-        .from('finance_snapshots')
-        .select('*')
-        .order('snapshot_month', { ascending: false })
-        .limit(24);
-
-      const { count: guardsThisMonth } = await supabase
-        .from('guards')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', monthStart);
-
-      const { count: guardsLastMonth } = await supabase
-        .from('guards')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', lastMonthStart)
-        .lte('created_at', lastMonthEnd);
-
-      const { count: clientsThisMonth } = await supabase
-        .from('clients')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', monthStart);
-
-      const { count: clientsLastMonth } = await supabase
-        .from('clients')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', lastMonthStart)
-        .lte('created_at', lastMonthEnd);
-
-      const { count: trialCount } = await supabase
-        .from('subscriptions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'trialing');
-
-      const { count: cancelledCount } = await supabase
-        .from('subscriptions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'cancelled')
-        .gte('cancelled_at', yearStart);
-
-      const subIds = (subPayments || []).map((p: any) => p.subscription_id).filter(Boolean);
-      const subMap: Record<string, any> = {};
-      const clientMap: Record<string, any> = {};
-
-      if (subIds.length > 0) {
-        const { data: subs } = await supabase
-          .from('subscriptions')
-          .select('id, client_id, plan_name')
-          .in('id', subIds);
-        (subs || []).forEach((s: any) => {
-          subMap[s.id] = s;
-        });
-        const clientIds = (subs || []).map((s: any) => s.client_id).filter(Boolean);
-        if (clientIds.length > 0) {
-          const { data: clients } = await supabase
+      const baseSettlements = await timeoutScopeRef.current.run(
+        Promise.allSettled([
+          allAdminRows(() =>
+            supabase.from('subscription_payments').select('*').order('created_at', { ascending: false }).order('id')
+          ),
+          allAdminRows(() =>
+            supabase.from('transactions').select('*').order('created_at', { ascending: false }).order('id')
+          ),
+          supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+          allAdminRows(() =>
+            supabase
+              .from('subscriptions')
+              .select(
+                'id, client_id, plan_name, status, plan_amount, stripe_price_id, billing_interval, created_at, cancelled_at, trial_end_date, current_period_end, next_payment_date'
+              )
+              .order('created_at', { ascending: false })
+              .order('id')
+          ),
+          supabase.from('plans').select('slug, name, monthly_price_pence, stripe_price_id'),
+          allAdminRows(() =>
+            supabase.from('platform_costs').select('*').order('created_at', { ascending: false }).order('id')
+          ),
+          supabase
+            .schema('app')
+            .from('finance_snapshots')
+            .select('*')
+            .order('snapshot_month', { ascending: false })
+            .limit(24),
+          supabase.from('guards').select('*', { count: 'exact', head: true }).gte('created_at', monthStart),
+          supabase
+            .from('guards')
+            .select('*', { count: 'exact', head: true })
+            .gte('created_at', lastMonthStart)
+            .lte('created_at', lastMonthEnd),
+          supabase.from('clients').select('*', { count: 'exact', head: true }).gte('created_at', monthStart),
+          supabase
             .from('clients')
-            .select('id, company_name, email, contact_name')
-            .in('id', clientIds);
-          (clients || []).forEach((c: any) => {
-            clientMap[c.id] = c;
-          });
-        }
-      }
-
-      const userIds = (subPayments || []).map((p: any) => p.user_id).filter(Boolean);
-      if (userIds.length > 0) {
-        const { data: clientsByUser } = await supabase
-          .from('clients')
-          .select('id, user_id, company_name, email, contact_name')
-          .in('user_id', userIds);
-        (clientsByUser || []).forEach((c: any) => {
-          clientMap[c.user_id] = c;
-        });
-      }
-
-      const transClientIds = (transactions || []).map((t: any) => t.client_id).filter(Boolean);
-      if (transClientIds.length > 0) {
-        const { data: transClients } = await supabase
-          .from('clients')
-          .select('id, company_name, email, contact_name')
-          .in('id', transClientIds);
-        (transClients || []).forEach((c: any) => {
-          clientMap[c.id] = c;
-        });
-      }
-
-      const subRows: Payment[] = (subPayments || []).map((p: any) => {
-        const sub = subMap[p.subscription_id];
-        const client = sub?.client_id ? clientMap[sub.client_id] : clientMap[p.user_id];
-        const fee = estimateStripeFee(Number(p.amount));
-        return {
-          id: p.id,
-          date: p.created_at,
-          customer: client?.company_name || client?.contact_name || 'Unknown',
-          email: client?.email || '-',
-          plan: sub?.plan_name || 'Subscription',
-          amount: Number(p.amount),
-          stripe_fee: fee,
-          net_amount: paymentAmounts(p, fee).net,
-          refund_amount: paymentAmounts(p, fee).refunded,
-          remaining_amount: paymentAmounts(p, fee).remaining,
-          status: p.status,
-          invoice_id: p.stripe_invoice_id || '',
-          refunded: p.refunded || false,
-        };
-      });
-
-      const transRows: Payment[] = (transactions || []).map((t: any) => {
-        const client = t.client_id ? clientMap[t.client_id] : null;
-        const fee = estimateStripeFee(Number(t.amount));
-        return {
-          id: t.id,
-          date: t.created_at,
-          customer: client?.company_name || client?.contact_name || 'Unknown',
-          email: client?.email || '-',
-          plan: t.transaction_type || 'Job Payment',
-          amount: Number(t.amount),
-          stripe_fee: fee,
-          net_amount: paymentAmounts(t, fee).net,
-          refund_amount: paymentAmounts(t, fee).refunded,
-          remaining_amount: paymentAmounts(t, fee).remaining,
-          status: t.status,
-          invoice_id: t.stripe_invoice_id || '',
-          refunded: t.refunded || false,
-        };
-      });
-
-      const all = [...subRows, ...transRows].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+            .select('*', { count: 'exact', head: true })
+            .gte('created_at', lastMonthStart)
+            .lte('created_at', lastMonthEnd),
+          supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'trialing'),
+          supabase
+            .from('subscriptions')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'cancelled')
+            .gte('cancelled_at', yearStart),
+        ]),
+        FINANCE_TIMEOUT_MS,
+        'Finance data request timed out'
       );
-      setAllPayments(all);
-      setCosts(platformCosts || []);
-      setActiveSubscriptions(activeSubCount ?? 0);
-      setAllSubscriptions((allSubs || []).map((s: any) => ({
-        id: s.id,
-        status: s.status,
-        plan_amount: Number(s.plan_amount) || 0,
-        stripe_price_id: s.stripe_price_id || null,
-        billing_interval: s.billing_interval || 'month',
-        created_at: s.created_at,
-        cancelled_at: s.cancelled_at,
-        trial_end_date: s.trial_end_date,
-        current_period_end: s.current_period_end,
-        next_payment_date: s.next_payment_date,
-      })));
-      setPlans((plansData || []).map((p: any) => ({
-        slug: p.slug,
-        name: p.name,
-        monthly_price_pence: Number(p.monthly_price_pence) || 0,
-        stripe_price_id: p.stripe_price_id || '',
-      })));
-      setSnapshots(snapshotData || []);
-      setGuardsCount({ thisMonth: guardsThisMonth ?? 0, lastMonth: guardsLastMonth ?? 0 });
-      setClientsCount({ thisMonth: clientsThisMonth ?? 0, lastMonth: clientsLastMonth ?? 0 });
-      setTrialCount(trialCount ?? 0);
-      setCancelledCount(cancelledCount ?? 0);
+
+      if (isStale()) return;
+
+      const base = settleFinanceResults(
+        baseSettlements.map((settlement, index) => ({ key: BASE_QUERY_KEYS[index], settlement }))
+      );
+
+      if (base.failures.length > 0) {
+        setFailures(base.failures);
+        return;
+      }
+
+      const paymentRows = financeRows(base.values, 'subscriptionPayments');
+      const transactionRows = financeRows(base.values, 'transactions');
+      const subscriptionRows = financeRows(base.values, 'subscriptions');
+      const payerUserIds = uniqueRowIds(paymentRows, ['user_id']);
+      const transactionClientIds = uniqueRowIds(transactionRows, ['client_id']);
+
+      const enrichmentSettlements = await timeoutScopeRef.current.run(
+        Promise.allSettled([
+          payerUserIds.length > 0
+            ? supabase
+                .from('clients')
+                .select('id, user_id, company_name, email, contact_name')
+                .in('user_id', payerUserIds)
+            : Promise.resolve(EMPTY_RESULT),
+          transactionClientIds.length > 0
+            ? supabase
+                .from('clients')
+                .select('id, company_name, email, contact_name')
+                .in('id', transactionClientIds)
+            : Promise.resolve(EMPTY_RESULT),
+        ]),
+        FINANCE_TIMEOUT_MS,
+        'Finance customer lookup timed out'
+      );
+
+      if (isStale()) return;
+
+      const enrichment = settleFinanceResults(
+        enrichmentSettlements.map((settlement, index) => ({ key: ENRICHMENT_QUERY_KEYS[index], settlement }))
+      );
+
+      if (enrichment.failures.length > 0) {
+        setFailures(enrichment.failures);
+        return;
+      }
+
+      const ownerClientIds = uniqueRowIds(subscriptionRows, ['client_id']);
+
+      const ownerClientSettlements = await timeoutScopeRef.current.run(
+        Promise.allSettled([
+          ownerClientIds.length > 0
+            ? supabase
+                .from('clients')
+                .select('id, company_name, email, contact_name')
+                .in('id', ownerClientIds)
+            : Promise.resolve(EMPTY_RESULT),
+        ]),
+        FINANCE_TIMEOUT_MS,
+        'Finance customer lookup timed out'
+      );
+
+      if (isStale()) return;
+
+      const ownerClients = settleFinanceResults(
+        ownerClientSettlements.map((settlement, index) => ({ key: OWNER_CLIENT_QUERY_KEYS[index], settlement }))
+      );
+
+      if (ownerClients.failures.length > 0) {
+        setFailures(ownerClients.failures);
+        return;
+      }
+
+      const snapshot = buildFinanceSnapshot(base.values, {
+        ...enrichment.values,
+        ...ownerClients.values,
+        paymentSubscriptions: { data: subscriptionRows, error: null },
+      });
+
+      if (isStale()) return;
+
+      if (!snapshot.available) {
+        setFailures(snapshot.failures);
+        return;
+      }
+
+      setData(snapshot.data);
+      setFailures(null);
+      setLastUpdated(new Date());
     } catch (err) {
-      console.error('Error fetching finance data:', err);
-      setToast({ message: 'Failed to load finance data', type: 'error' });
+      if (isStale()) return;
+      setFailures(createUnavailableFinanceSnapshot(messageOf(err)).failures);
     } finally {
-      setLoading(false);
+      if (trackerRef.current.isCurrent(requestId) && mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
+  fetchDataRef.current = fetchData;
+
   useEffect(() => {
-    fetchData();
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      trackerRef.current.invalidate();
+      timeoutScopeRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    void fetchData();
   }, [fetchData]);
 
   useEffect(() => {
@@ -391,16 +353,16 @@ export default function PlatformFinancesClient() {
   }, [allPayments, dateFilter, customStart, customEnd]);
 
   const collected = payments.reduce((sum, p) => sum + paymentAmounts(p).collected, 0);
-  const monthlyRevenue = payments.filter(p => p.plan !== 'job_payment' && isCollected(p.status)).reduce((sum,p) => sum + p.remaining_amount, 0);
+  const monthlyRevenue = payments
+    .filter((p) => p.plan !== 'job_payment' && isCollected(p.status))
+    .reduce((sum, p) => sum + p.remaining_amount, 0);
   const monthlyCosts = costs.reduce((sum, c) => sum + Number(c.monthly_cost), 0);
   const stripeFees = payments
     .filter((p) => p.plan !== 'job_payment' && isCollected(p.status))
     .reduce((sum, p) => sum + p.stripe_fee, 0);
   const refunds = payments.reduce((sum, p) => sum + p.refund_amount, 0);
   const remaining = collected - refunds;
-  const failedPayments = payments
-    .filter((p) => p.status === 'failed')
-    .reduce((sum, p) => sum + p.amount, 0);
+  const failedPayments = payments.filter((p) => p.status === 'failed').reduce((sum, p) => sum + p.amount, 0);
   const profitLoss = monthlyRevenue - monthlyCosts - stripeFees;
   const vatEstimate = monthlyRevenue * 0.2;
   const estimatedProfit = monthlyRevenue - stripeFees - vatEstimate - monthlyCosts;
@@ -418,7 +380,10 @@ export default function PlatformFinancesClient() {
       (s) => s.cancelled_at && new Date(s.cancelled_at) >= monthAgo
     ).length;
     const activeMonthAgo = allSubscriptions.filter(
-      (s) => s.created_at && new Date(s.created_at) <= monthAgo && (s.status === 'active' || (s.cancelled_at && new Date(s.cancelled_at) > monthAgo))
+      (s) =>
+        s.created_at &&
+        new Date(s.created_at) <= monthAgo &&
+        (s.status === 'active' || (s.cancelled_at && new Date(s.cancelled_at) > monthAgo))
     ).length;
     const churnRate = activeMonthAgo > 0 ? cancelledLast30 / activeMonthAgo : 0;
     const totalPayments = allPayments.length;
@@ -427,40 +392,61 @@ export default function PlatformFinancesClient() {
     const prevMonthRevenue = allPayments
       .filter((p) => {
         const d = new Date(p.date);
-        return d >= new Date(now.getFullYear(), now.getMonth() - 1, 1) && d <= new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+        return (
+          d >= new Date(now.getFullYear(), now.getMonth() - 1, 1) &&
+          d <= new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59)
+        );
       })
       .filter((p) => isCollected(p.status))
       .reduce((sum, p) => sum + p.amount, 0);
     const mrrGrowth = prevMonthRevenue > 0 ? (monthlyRevenue - prevMonthRevenue) / prevMonthRevenue : 0;
 
     const trialSubs = allSubscriptions.filter((s) => s.status === 'trialing');
-    const trialCount = trialSubs.length;
     const trialPipelineMrr = trialSubs.reduce((sum, s) => {
       if (!s.stripe_price_id) return sum;
       const plan = plans.find((p) => p.stripe_price_id === s.stripe_price_id);
       if (!plan) return sum;
       const monthlyPence = plan.monthly_price_pence;
       const interval = s.billing_interval || 'month';
-      if (interval === 'year') return sum + (monthlyPence / 12 / 100);
-      if (interval === 'week') return sum + (monthlyPence * 4.33 / 100);
-      if (interval === 'day') return sum + (monthlyPence * 30 / 100);
-      return sum + (monthlyPence / 100);
+      if (interval === 'year') return sum + monthlyPence / 12 / 100;
+      if (interval === 'week') return sum + (monthlyPence * 4.33) / 100;
+      if (interval === 'day') return sum + (monthlyPence * 30) / 100;
+      return sum + monthlyPence / 100;
     }, 0);
 
-    return { mrr, arr, clv: 0, arpu, churnRate, failedPaymentRate, mrrGrowth, activeSubscriptions: activeCount, trialCount, trialPipelineMrr };
+    return {
+      mrr,
+      arr,
+      clv: 0,
+      arpu,
+      churnRate,
+      failedPaymentRate,
+      mrrGrowth,
+      activeSubscriptions: activeCount,
+      trialCount: trialSubs.length,
+      trialPipelineMrr,
+    };
   }, [allSubscriptions, allPayments, monthlyRevenue, plans]);
 
   const customerAnalyticsData = useMemo(() => {
     return {
-      newGuards: guardsCount.thisMonth,
-      newClients: clientsCount.thisMonth,
+      newGuards: guardsThisMonth,
+      newClients: clientsThisMonth,
       cancelledAccounts: cancelledCount,
       trialAccounts: trialCount,
-      activeAccounts: activeSubscriptions,
-      guardGrowth: guardsCount.thisMonth - guardsCount.lastMonth,
-      clientGrowth: clientsCount.thisMonth - clientsCount.lastMonth,
+      activeAccounts: activeSubscriptionCount,
+      guardGrowth: guardsThisMonth - guardsLastMonth,
+      clientGrowth: clientsThisMonth - clientsLastMonth,
     };
-  }, [guardsCount, clientsCount, cancelledCount, trialCount, activeSubscriptions]);
+  }, [
+    guardsThisMonth,
+    guardsLastMonth,
+    clientsThisMonth,
+    clientsLastMonth,
+    cancelledCount,
+    trialCount,
+    activeSubscriptionCount,
+  ]);
 
   const healthMetrics = useMemo(() => {
     const now = new Date();
@@ -469,12 +455,12 @@ export default function PlatformFinancesClient() {
     const prevRevenue = allPayments
       .filter((p) => {
         const d = new Date(p.date);
-        return d >= prevMonthStart && d <= prevMonthEnd && (isCollected(p.status));
+        return d >= prevMonthStart && d <= prevMonthEnd && isCollected(p.status);
       })
       .reduce((sum, p) => sum + p.amount, 0);
     const revenueGrowth = prevRevenue > 0 ? (monthlyRevenue - prevRevenue) / prevRevenue : 0;
-    const prevNewUsers = (guardsCount.lastMonth || 0) + (clientsCount.lastMonth || 0);
-    const currentNewUsers = (guardsCount.thisMonth || 0) + (clientsCount.thisMonth || 0);
+    const prevNewUsers = guardsLastMonth + clientsLastMonth;
+    const currentNewUsers = guardsThisMonth + clientsThisMonth;
     const customerGrowth = prevNewUsers > 0 ? (currentNewUsers - prevNewUsers) / prevNewUsers : 0;
     const totalPayments = allPayments.length;
     const successfulPayments = allPayments.filter((p) => isCollected(p.status)).length;
@@ -482,19 +468,29 @@ export default function PlatformFinancesClient() {
     const activeSubs = allSubscriptions.filter((s) => s.status === 'active').length;
     const totalSubs = allSubscriptions.length;
     const subscriptionRetention = totalSubs > 0 ? (activeSubs / totalSubs) * 100 : 0;
-    return { revenueGrowth, customerGrowth, paymentSuccessRate, subscriptionRetention, sufficientHistory: prevRevenue > 0 && prevNewUsers > 0 && totalSubs > 0 && totalPayments > 0 };
-  }, [allPayments, monthlyRevenue, guardsCount, clientsCount, allSubscriptions]);
+    return {
+      revenueGrowth,
+      customerGrowth,
+      paymentSuccessRate,
+      subscriptionRetention,
+      sufficientHistory: prevRevenue > 0 && prevNewUsers > 0 && totalSubs > 0 && totalPayments > 0,
+    };
+  }, [
+    allPayments,
+    monthlyRevenue,
+    guardsThisMonth,
+    guardsLastMonth,
+    clientsThisMonth,
+    clientsLastMonth,
+    allSubscriptions,
+  ]);
 
   const alerts = useMemo(() => {
     const list: AlertItem[] = [];
     const totalSucceeded = allPayments.filter((p) => isCollected(p.status)).length;
     const failedCount = allPayments.filter((p) => p.status === 'failed').length;
-    const totalFees = allPayments
-      .filter((p) => isCollected(p.status))
-      .reduce((sum, p) => sum + p.stripe_fee, 0);
-    const totalRevenue = allPayments
-      .filter((p) => isCollected(p.status))
-      .reduce((sum, p) => sum + p.amount, 0);
+    const totalFees = allPayments.filter((p) => isCollected(p.status)).reduce((sum, p) => sum + p.stripe_fee, 0);
+    const totalRevenue = allPayments.filter((p) => isCollected(p.status)).reduce((sum, p) => sum + p.amount, 0);
 
     if (totalRevenue > 0 && totalFees / totalRevenue > 0.03) {
       list.push({
@@ -522,7 +518,7 @@ export default function PlatformFinancesClient() {
     const prevRevenue = allPayments
       .filter((p) => {
         const d = new Date(p.date);
-        return d >= prevMonthStart && d <= prevMonthEnd && (isCollected(p.status));
+        return d >= prevMonthStart && d <= prevMonthEnd && isCollected(p.status);
       })
       .reduce((sum, p) => sum + p.amount, 0);
     if (prevRevenue > 0 && monthlyRevenue < prevRevenue * 0.9) {
@@ -580,11 +576,9 @@ export default function PlatformFinancesClient() {
     allPayments.forEach((p) => {
       const d = new Date(p.date);
       const key = d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-      if (months[key]) {
-        if (isCollected(p.status)) {
-          if (p.plan !== 'job_payment') months[key].revenue += p.remaining_amount;
-          months[key].stripe_fees += p.stripe_fee;
-        }
+      if (months[key] && isCollected(p.status)) {
+        if (p.plan !== 'job_payment') months[key].revenue += p.remaining_amount;
+        months[key].stripe_fees += p.stripe_fee;
       }
     });
 
@@ -624,7 +618,7 @@ export default function PlatformFinancesClient() {
     setCostModalOpen(true);
   };
 
-  const handleEditCost = (cost: Cost) => {
+  const handleEditCost = (cost: FinanceCost) => {
     setEditingCost(cost);
     setCostModalOpen(true);
   };
@@ -636,27 +630,30 @@ export default function PlatformFinancesClient() {
       setToast({ message: 'Failed to delete cost', type: 'error' });
       return;
     }
-    setCosts(costs.filter((c) => c.id !== id));
+    setData((prev) => ({ ...prev, costs: prev.costs.filter((c) => c.id !== id) }));
     setToast({ message: 'Cost deleted', type: 'success' });
   };
 
-  const handleSaveCost = async (form: Omit<Cost, 'id'> & {id?: string}) => {
+  const handleSaveCost = async (form: Omit<FinanceCost, 'id'> & { id?: string }) => {
     setIsSavingCost(true);
     try {
       if (editingCost) {
-        const { data, error } = await supabase
+        const { data: saved, error } = await supabase
           .from('platform_costs')
           .update(form)
           .eq('id', editingCost.id)
           .select()
           .single();
         if (error) throw error;
-        setCosts(costs.map((c) => (c.id === editingCost.id ? data : c)));
+        setData((prev) => ({
+          ...prev,
+          costs: prev.costs.map((c) => (c.id === editingCost.id ? { ...c, ...saved } : c)),
+        }));
         setToast({ message: 'Cost updated', type: 'success' });
       } else {
-        const { data, error } = await supabase.from('platform_costs').insert(form).select().single();
+        const { data: saved, error } = await supabase.from('platform_costs').insert(form).select().single();
         if (error) throw error;
-        setCosts([data, ...costs]);
+        setData((prev) => ({ ...prev, costs: [{ ...form, ...saved }, ...prev.costs] }));
         setToast({ message: 'Cost added', type: 'success' });
       }
       setCostModalOpen(false);
@@ -678,17 +675,36 @@ export default function PlatformFinancesClient() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-white">Platform Finances</h1>
-                <p className="text-xs text-slate-400">Payments, refunds and platform finances</p>
+                <p className="text-xs text-slate-400">
+                  {failures
+                    ? 'Finance figures unavailable'
+                    : lastUpdated
+                    ? `Payments, refunds and platform finances · updated ${lastUpdated.toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}`
+                    : 'Payments, refunds and platform finances'}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <AdvancedExport payments={payments} costs={costs} monthlyData={monthlyChartData} dateRange={dateFilter} />
+              {!failures && (
+                <AdvancedExport
+                  payments={payments}
+                  costs={costs}
+                  monthlyData={monthlyChartData}
+                  dateRange={dateFilter}
+                />
+              )}
               <button
-                onClick={fetchData}
-                className="flex items-center gap-2 px-4 py-2 border border-[#1e2d4a] rounded-xl text-sm font-medium text-slate-400 hover:bg-[#1a2b4a] hover:text-white transition-colors whitespace-nowrap cursor-pointer"
+                onClick={() => {
+                  void fetchDataRef.current();
+                }}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 border border-[#1e2d4a] rounded-xl text-sm font-medium text-slate-400 hover:bg-[#1a2b4a] hover:text-white transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
               >
                 <div className="w-5 h-5 flex items-center justify-center">
-                  <i className="ri-refresh-line"></i>
+                  <i className={`ri-refresh-line ${loading ? 'animate-spin' : ''}`}></i>
                 </div>
                 Refresh
               </button>
@@ -698,75 +714,139 @@ export default function PlatformFinancesClient() {
       </header>
 
       <main className="max-w-7xl mx-auto px-5 sm:px-8 py-8 space-y-8 print:space-y-6">
-        <div className="print:hidden">
-          <DateFilterBar
-            active={dateFilter}
-            onChange={setDateFilter}
-            customStart={customStart}
-            customEnd={customEnd}
-            onCustomStartChange={setCustomStart}
-            onCustomEndChange={setCustomEnd}
+        {failures ? (
+          <FinanceUnavailable
+            failures={failures}
+            lastSuccessAt={lastUpdated}
+            retrying={loading}
+            onRetry={() => {
+              void fetchDataRef.current();
+            }}
           />
-        </div>
+        ) : (
+          <>
+            <div className="print:hidden">
+              <DateFilterBar
+                active={dateFilter}
+                onChange={setDateFilter}
+                customStart={customStart}
+                customEnd={customEnd}
+                onCustomStartChange={setCustomStart}
+                onCustomEndChange={setCustomEnd}
+              />
+            </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[['Payments collected', collected], ['Refunded', refunds], ['Remaining before fees / payouts', remaining]].map(([label, value]) => (
-            <div key={String(label)} className="rounded-2xl border border-[#1e2d4a] bg-[#111d35] p-6"><p className="text-sm text-slate-300">{label}</p><p className="mt-2 text-3xl font-bold text-white">{loading ? '…' : Number(value).toLocaleString('en-GB', {style: 'currency', currency: 'GBP'})}</p></div>
-          ))}
-        </div>
-        <p className="text-sm text-slate-300">For payments created in the selected period, including their refunds to date. Remaining funds include guard money and are not platform profit or the Stripe balance. Stripe fees below are estimates.</p>
-        <nav aria-label="Finance sections" className="flex flex-wrap gap-3">
-          {[['payments','Payments & refunds'], ['analytics','Analytics & history'], ['costs','Costs & estimates']].map(([key,label]) => <button key={key} onClick={() => setSection(key)} aria-pressed={section === key} className={`rounded-xl px-5 py-3 text-sm font-semibold ${section === key ? 'bg-teal-600 text-white' : 'bg-[#111d35] text-slate-300 border border-[#1e2d4a]'}`}>{label}</button>)}
-        </nav>
-        {section === 'payments' && <div className="space-y-6"><StripePaymentsTable payments={payments} loading={loading} /><FinancialOperationsPanel />
-          <ConnectPayoutsPanel key={`${dateFilter}:${loading}`} /></div>}
-        {section === 'costs' && <div className="space-y-6">
-        <FinanceOverviewCards
-          monthlyRevenue={monthlyRevenue}
-          monthlyCosts={monthlyCosts}
-          profitLoss={profitLoss}
-          stripeFees={stripeFees}
-          estimatedVat={vatEstimate}
-          refunds={refunds}
-          failedPayments={failedPayments}
-          activeSubscriptions={activeSubscriptions}
-          loading={loading}
-        />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                ['Payments collected', collected],
+                ['Refunded', refunds],
+                ['Remaining before fees / payouts', remaining],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="rounded-2xl border border-[#1e2d4a] bg-[#111d35] p-6">
+                  <p className="text-sm text-slate-300">{label}</p>
+                  <p className="mt-2 text-3xl font-bold text-white">
+                    {loading
+                      ? '…'
+                      : Number(value).toLocaleString('en-GB', { style: 'currency', currency: 'GBP' })}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="text-sm text-slate-300">
+              For payments created in the selected period, including their refunds to date. Remaining funds include
+              guard money and are not platform profit or the Stripe balance. Stripe fees below are estimates.
+            </p>
+            <nav aria-label="Finance sections" className="flex flex-wrap gap-3">
+              {[
+                ['payments', 'Payments & refunds'],
+                ['analytics', 'Analytics & history'],
+                ['costs', 'Costs & estimates'],
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setSection(key)}
+                  aria-pressed={section === key}
+                  className={`rounded-xl px-5 py-3 text-sm font-semibold cursor-pointer whitespace-nowrap ${
+                    section === key ? 'bg-teal-600 text-white' : 'bg-[#111d35] text-slate-300 border border-[#1e2d4a]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+            {section === 'payments' && (
+              <div className="space-y-6">
+                <StripePaymentsTable payments={payments} loading={loading} />
+                <FinancialOperationsPanel />
+                <ConnectPayoutsPanel key={`${dateFilter}:${loading}`} />
+              </div>
+            )}
+            {section === 'analytics' && (
+              <div className="space-y-8">
+                <div className="space-y-2">
+                  <h2 className="text-sm font-bold text-white uppercase tracking-wider">Business KPIs</h2>
+                  <KPIDashboard data={kpiData} loading={loading} />
+                </div>
 
-        </div>}
+                <div className="space-y-2">
+                  <h2 className="text-sm font-bold text-white uppercase tracking-wider">Customer Analytics</h2>
+                  <CustomerAnalytics data={customerAnalyticsData} loading={loading} />
+                </div>
 
-        {section === 'analytics' && <div className="space-y-8">
+                <div className="space-y-2">
+                  <h2 className="text-sm font-bold text-white uppercase tracking-wider">Charts</h2>
+                  <FinanceCharts monthlyData={monthlyChartData} loading={loading} />
+                </div>
 
-        <div className="space-y-2">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider">Business KPIs</h2>
-          <KPIDashboard data={kpiData} loading={loading} />
-        </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-1">
+                    <FinancialHealthScore metrics={healthMetrics} loading={loading} />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <AlertsPanel alerts={alerts} loading={loading} />
+                  </div>
+                </div>
 
-        <div className="space-y-2">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider">Customer Analytics</h2>
-          <CustomerAnalytics data={customerAnalyticsData} loading={loading} />
-        </div>
-
-        <div className="space-y-2">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider">Charts</h2>
-          <FinanceCharts monthlyData={monthlyChartData} loading={loading} />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1">
-            <FinancialHealthScore metrics={healthMetrics} loading={loading} />
-          </div>
-          <div className="lg:col-span-2">
-            <AlertsPanel alerts={alerts} loading={loading} />
-          </div>
-        </div>
-
-        <MonthlySnapshots snapshots={snapshots} loading={loading} onRefresh={fetchData} />
-        </div>}
-        {section === 'costs' && <div className="space-y-6">
-          <TaxEstimatePanel grossRevenue={monthlyRevenue} netRevenue={monthlyRevenue - stripeFees} vatEstimate={vatEstimate} runningCosts={monthlyCosts} estimatedProfit={estimatedProfit} />
-          <RunningCostsTable costs={costs} loading={loading} onAdd={handleAddCost} onEdit={handleEditCost} onDelete={handleDeleteCost} />
-        </div>}
+                <MonthlySnapshots
+                  snapshots={snapshots}
+                  loading={loading}
+                  onRefresh={() => {
+                    void fetchDataRef.current();
+                  }}
+                />
+              </div>
+            )}
+            {section === 'costs' && (
+              <div className="space-y-6">
+                <FinanceOverviewCards
+                  monthlyRevenue={monthlyRevenue}
+                  monthlyCosts={monthlyCosts}
+                  profitLoss={profitLoss}
+                  stripeFees={stripeFees}
+                  estimatedVat={vatEstimate}
+                  refunds={refunds}
+                  failedPayments={failedPayments}
+                  activeSubscriptions={activeSubscriptionCount}
+                  loading={loading}
+                />
+                <TaxEstimatePanel
+                  grossRevenue={monthlyRevenue}
+                  netRevenue={monthlyRevenue - stripeFees}
+                  vatEstimate={vatEstimate}
+                  runningCosts={monthlyCosts}
+                  estimatedProfit={estimatedProfit}
+                />
+                <RunningCostsTable
+                  costs={costs}
+                  loading={loading}
+                  onAdd={handleAddCost}
+                  onEdit={handleEditCost}
+                  onDelete={handleDeleteCost}
+                />
+              </div>
+            )}
+          </>
+        )}
 
         <CostFormModal
           open={costModalOpen}
@@ -785,9 +865,7 @@ export default function PlatformFinancesClient() {
         >
           <div className="w-6 h-6 flex items-center justify-center">
             <i
-              className={`${
-                toast.type === 'success' ? 'ri-checkbox-circle-fill' : 'ri-error-warning-fill'
-              } text-lg`}
+              className={`${toast.type === 'success' ? 'ri-checkbox-circle-fill' : 'ri-error-warning-fill'} text-lg`}
             ></i>
           </div>
           <span className="font-medium text-sm">{toast.message}</span>
