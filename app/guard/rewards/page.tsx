@@ -173,6 +173,7 @@ export default function GuardRewardsPage() {
           <div>
             <h1 className="text-2xl font-bold">QG Rewards</h1>
               <p role="status" className="my-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-200">{REWARDS_REDEMPTION_NOTICE}</p>
+            <p className="my-4 text-sm text-slate-300">Guard accounts and job applications are free. Paid guard memberships are retired, so tokens cannot be used for a new guard membership. Your recorded balance and redemption history are retained; contact support for a review of existing credits.</p>
             <p className="text-slate-400 text-sm mt-1">Your referral programme dashboard</p>
           </div>
           <Link href="/guard/dashboard" className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors text-sm whitespace-nowrap cursor-pointer">
@@ -193,8 +194,8 @@ export default function GuardRewardsPage() {
               <p className="text-5xl font-bold text-white">{balance.toLocaleString()}</p>
               <p className="text-teal-400 text-sm mt-2">≈ £{poundsValue} QuickGuard credit</p>
             </div>
-            <Link href="/upgrade?audience=guard" className="px-6 py-3 bg-teal-500 text-slate-900 font-bold rounded-xl hover:bg-teal-400 transition-all text-sm whitespace-nowrap cursor-pointer">
-              View eligible subscription checkout
+            <Link href="/guard/dashboard#guard-membership" className="px-6 py-3 bg-teal-500 text-slate-900 font-bold rounded-xl hover:bg-teal-400 transition-all text-sm whitespace-nowrap cursor-pointer">
+              View membership and billing records
             </Link>
           </div>
         </div>
@@ -256,7 +257,7 @@ export default function GuardRewardsPage() {
                       {preAccountData.pre_account_status === 'linked' && (
                         <p className="flex items-center gap-1 text-amber-400 text-xs self-end pb-2">
                           <div className="w-3.5 h-3.5 flex items-center justify-center"><i className="ri-information-line"></i></div>
-                          Eligible tokens can be linked after account verification. Approved tokens can be used where the token option is enabled in new subscription checkout.
+                          Eligible tokens can be linked after account verification. Existing credits are retained for review; no new paid guard membership is offered.
                         </p>
                       )}
                     </div>
@@ -549,7 +550,7 @@ export default function GuardRewardsPage() {
             {redemptions.length === 0 ? (
               <div className="bg-[#111d35] border border-[#1a2b4a] rounded-2xl p-12 text-center">
                 <div className="w-12 h-12 flex items-center justify-center mx-auto rounded-full bg-teal-500/10 mb-4"><i className="ri-coupon-line text-teal-400 text-xl"></i></div>
-                <p className="text-slate-400">No recorded redemptions. See checkout for eligible new subscription discounts.</p>
+                <p className="text-slate-400">No recorded redemptions. Contact support to review existing credits.</p>
                 <Link href="/qg-launch-rewards/terms" className="mt-4 inline-block px-6 py-3 bg-teal-500 text-slate-900 font-bold rounded-xl hover:bg-teal-400 transition-all text-sm whitespace-nowrap cursor-pointer">
                   View programme terms
                 </Link>

@@ -24,15 +24,15 @@ export default function LaunchHero() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 leading-[1.08] text-white">
-            QuickGuard is live — December&rsquo;s on us
+            QuickGuard launches 1 December
           </h1>
 
           <p className="text-lg md:text-xl mb-4 text-slate-300 leading-relaxed max-w-xl">
-            The UK marketplace connecting businesses with vetted, SIA-licensed security guards. No subscription fee for December.
+            Connect with approved, SIA-licensed guards. Guard job access is free; eligible new clients can review the monthly Client Pro December offer.
           </p>
 
           <p className="text-base text-amber-200/90 mb-9 max-w-xl leading-relaxed">
-            No subscription fee for December — applied automatically, no code needed.
+            Eligible Client Pro offer: £0 subscription until 1 January 2027, then £99/month unless cancelled. Booking payments and service fees are separate.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4">

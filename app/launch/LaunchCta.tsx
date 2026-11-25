@@ -19,9 +19,9 @@ export default function LaunchCta() {
           Be one of the first on QuickGuard
         </h2>
         <p className="text-xl mb-4 text-slate-400 max-w-2xl mx-auto">
-          No subscription fee for December — applied automatically, no code needed.
+          Free guard job access. Eligible new clients can review the monthly Client Pro December offer.
         </p>
-        <p className="text-sm text-slate-500 mb-10">Standard subscription applies from 1 January.</p>
+        <p className="text-sm text-slate-500 mb-10">Client Pro offer: £99/month from 1 January 2027 unless cancelled. Booking charges are separate.</p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link

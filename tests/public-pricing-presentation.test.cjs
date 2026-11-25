@@ -22,7 +22,7 @@ function loader(options = {}) {
       if (id === '@/lib/supabase') return { supabase: {} };
       if (id === '@/lib/entitlements') return {};
       if (id === 'next/link') return { __esModule: true, default: ({ children, href, ...props }) => React.createElement('a', { href, ...props }, children) };
-      if (id === '@/components/pricing/PlanPrice') return load('components/pricing/PlanPrice.tsx');
+      if (id.startsWith('@/components/pricing/')) return load(id.slice(2) + '.tsx');
       if (id.startsWith('@/components/')) return { __esModule: true, default: () => null };
       if (id.startsWith('@/')) return load(id.slice(2) + '.ts');
       if (id.startsWith('.')) { const target = path.join(path.dirname(file), id); return load(target + (fs.existsSync(target + '.ts') ? '.ts' : '.tsx')); }
@@ -71,7 +71,8 @@ test('catalogue changes, inactive plans, JSON features and fixed fees are reflec
   changed[3].features = JSON.stringify(['guard.advanced_alerts']);
   const updated = pricing.buildPublicPricing(changed, fees);
   assert.equal(updated.plans.some(p => p.slug === 'client-starter'), false);
-  assert.deepEqual(updated.plans.find(p => p.slug === 'guard-basic').features, ['guard.advanced_alerts']);
+  assert.equal(updated.plans.some(p => p.slug === 'guard-basic'), false);
+  assert.equal(updated.plans.find(p => p.slug === 'guard_starter').job_limit_per_month, null);
 });
 
 test('missing, invalid, duplicate or failed fee rules never become a zero-fee estimate', () => {
@@ -105,23 +106,23 @@ test('annual total and monthly equivalent match checkout price validation, and m
   assert.doesNotMatch(html, /£990\.00<\/span>/);
 });
 
-test('pricing, upgrade and print pages render the same changed annual prices and implemented placement labels', () => {
+test('pricing, upgrade and print pages retain client annual prices without selling guard allowances or placement', () => {
   for (const file of ['app/pricing/PricingClient.tsx', 'app/upgrade/page.tsx', 'app/pricing/pdf/PricingPDFClient.tsx']) {
     const html = renderPage(file, { cycle: 'annual' });
     assert.match(html, /£52\.50/, file); assert.match(html, /£630\.00/, file);
-    assert.match(html, /£14\.58/, file); assert.match(html, /£175\.00/, file);
+    assert.doesNotMatch(html, /£14\.58|£175\.00/, file);
     assert.match(html, /12 job postings per month/, file);
-    assert.match(html, /14 applications per month/, file);
-    assert.match(html, /Featured profile placement/, file);
+    assert.doesNotMatch(html, /14 applications per month/, file);
+    assert.doesNotMatch(html, /Featured profile placement/, file);
     assert.doesNotMatch(html, /£490\.00|£49<|10 applications per month/, file);
   }
 });
 
-test('help calculator uses live fixed fees and guard help includes the configured free allowance', () => {
+test('help calculator uses live fixed fees while guard help confirms free access', () => {
   const html = renderPage('app/help/HelpContent.tsx');
   assert.match(html, /8% \+ £0\.25 per guard/); assert.match(html, /£9\.85/); assert.match(html, /£129\.85/);
   const guard = renderPage('app/help/HelpContent.tsx', { role: 'guard' });
-  assert.match(guard, /£17\.50/); assert.match(guard, /14 applications per month/); assert.match(guard, /3 applications per month/);
+  assert.match(guard, /Free guard job access/); assert.match(guard, /no monthly application cap/); assert.doesNotMatch(guard, /£17\.50|14 applications per month|3 applications per month/);
 });
 
 test('failed catalogue hides calculator prices and prevents printing until retry succeeds', () => {
@@ -142,7 +143,7 @@ test('loader queries active catalogue fields and narrow fee RPC; catalogue read 
     order() { return Promise.resolve({ data: rows, error: null }); } };
   const client = { from(name) { calls.push(name); return query; }, async rpc(name) { calls.push(name); return { data: fees, error: null }; } };
   const data = await pricing.fetchPublicPricing(client);
-  assert.equal(data.plans.length, 4); assert.ok(calls.includes('get_public_client_pricing_fees'));
+  assert.equal(data.plans.length, 3); assert.ok(calls.includes('get_public_client_pricing_fees'));
   assert.deepEqual(calls.find(c => Array.isArray(c)), ['active', true]);
   query.order = async () => ({ data: null, error: { message: 'denied' } });
   await assert.rejects(pricing.fetchPublicPricing(client), /could not be loaded/);
@@ -185,7 +186,7 @@ test('pricing retry discards a superseded response and unmount ignores late comp
   old.resolve({ ...catalogue(), plans: [{ slug: 'stale' }] }); await flush();
   assert.deepEqual(h.render().plans, []);
   current.resolve(catalogue()); await flush(); api = h.render();
-  assert.equal(api.loading, false); assert.equal(api.plans.length, 4);
+  assert.equal(api.loading, false); assert.equal(api.plans.length, 3);
   api.retry(); h.render(); h.runEffects(); api = h.render(); assert.equal(api.loading, true); assert.deepEqual(api.plans, []);
   h.unmount(); late.resolve({ ...catalogue(), plans: [{ slug: 'late' }] }); await flush();
   assert.deepEqual(h.render().plans, []);
@@ -196,5 +197,5 @@ test('pricing failure displays no catalogue and retry can recover current prices
   h.render(); h.runEffects(); failed.reject(new Error('network failure')); await flush();
   let api = h.render(); assert.match(api.error, /could not be confirmed/); assert.deepEqual(api.plans, []); assert.equal(api.loading, false);
   api.retry(); h.render(); h.runEffects(); assert.equal(h.render().error, null);
-  retry.resolve(catalogue()); await flush(); api = h.render(); assert.equal(api.plans.length, 4); assert.equal(api.error, null); h.unmount();
+  retry.resolve(catalogue()); await flush(); api = h.render(); assert.equal(api.plans.length, 3); assert.equal(api.error, null); h.unmount();
 });

@@ -11,10 +11,10 @@ const duringOffer = Date.parse('2026-12-01T10:00:00Z');
 const guard = { enabled: true, accountType: 'guard', planId: 'guard-pro', billingCycle: 'monthly' };
 const client = { enabled: true, accountType: 'client', planId: 'client-pro', billingCycle: 'monthly' };
 
-test('only the selected monthly Pro plans qualify while enabled', () => {
-  assert.equal(christmasOfferAmount(guard, duringOffer), 1900);
+test('only the monthly Client Pro offer qualifies; guard job access is free', () => {
+  assert.equal(christmasOfferAmount(guard, duringOffer), null);
   assert.equal(christmasOfferAmount(client, duringOffer), 9900);
-  assert.equal(christmasOfferAmount({ ...guard, billingCycle: undefined }, duringOffer), 1900);
+  assert.equal(christmasOfferAmount({ ...client, billingCycle: undefined }, duringOffer), 9900);
   for (const selection of [
     { enabled: false }, { accountType: 'client' }, { billingCycle: 'annual' },
     { billingCycle: '' }, { planId: 'guard-basic' }, { planId: 'guard-elite' },
@@ -27,12 +27,12 @@ test('campaign starts on 1 December and closes at midnight starting 30 December'
   const times = [
     ['2026-11-24T00:00:00.000Z', null],
     ['2026-11-30T23:59:59.999Z', null],
-    ['2026-12-01T00:00:00.000Z', 1900],
-    ['2026-12-29T23:59:59.999Z', 1900],
+    ['2026-12-01T00:00:00.000Z', 9900],
+    ['2026-12-29T23:59:59.999Z', 9900],
     ['2026-12-30T00:00:00.000Z', null],
     ['2026-12-31T00:00:00.000Z', null],
   ];
-  for (const [time, amount] of times) assert.equal(christmasOfferAmount(guard, Date.parse(time)), amount, time);
+  for (const [time, amount] of times) assert.equal(christmasOfferAmount(client, Date.parse(time)), amount, time);
   assert.equal(christmasOfferAmount(guard, NaN), null);
 });
 

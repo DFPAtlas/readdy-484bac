@@ -366,14 +366,14 @@ export default function SubscriptionTrackingPage() {
         const user = userMap[sub.user_id];
         const client = sub.client_id ? clientMap[sub.client_id] : null;
         const plan = sub.plan_slug ? planMap[sub.plan_slug] : null;
-        const isGuard = user?.user_type === 'guard';
+        const isGuard = user?.user_type === 'guard' || /^guard[-_]/.test(sub.plan_slug || '');
         const accountName = isGuard
           ? (user?.full_name || 'Unknown')
           : (client?.company_name || user?.full_name || 'Unknown');
         const email = user?.email || '';
         const type = isGuard ? 'guard' : 'client';
         const planName = plan?.name || sub.plan_name || '';
-        const usageLimit = plan?.job_limit_per_month != null ? String(plan.job_limit_per_month) : (plan ? 'Unlimited' : 'N/A');
+        const usageLimit = isGuard ? 'No monthly application cap' : plan?.job_limit_per_month != null ? String(plan.job_limit_per_month) : (plan ? 'Unlimited' : 'N/A');
 
         return [
           accountName, email, type, planName, sub.plan_slug || '',
@@ -414,10 +414,12 @@ export default function SubscriptionTrackingPage() {
       const client = sub.client_id ? clients[sub.client_id] || null : null;
       const guard = guards[sub.user_id] || null;
       const plan = sub.plan_slug ? plans[sub.plan_slug] : undefined;
-      const isGuard = !!guard;
+      const isGuard = !!guard || user?.user_type === 'guard' || /^guard[-_]/.test(sub.plan_slug || '');
 
       let planStatus: EnrichedSub['planStatus'] = 'ok';
-      if (!plan) {
+      if (isGuard) {
+        planStatus = 'no-limit';
+      } else if (!plan) {
         planStatus = 'missing';
       } else if (plan.job_limit_per_month == null) {
         planStatus = 'no-limit';
@@ -432,7 +434,7 @@ export default function SubscriptionTrackingPage() {
         usageThisMonth = usageByEntity[sub.client_id] || 0;
       }
 
-      const usageLimit = plan?.job_limit_per_month ?? null;
+      const usageLimit = isGuard ? null : plan?.job_limit_per_month ?? null;
       const isOverLimit = usageLimit != null && usageThisMonth > usageLimit;
       const usagePercent = usageLimit == null ? 0 : Math.min((usageThisMonth / usageLimit) * 100, 100);
 
@@ -856,7 +858,7 @@ export default function SubscriptionTrackingPage() {
                   <div className="mt-3 bg-slate-500/10 border border-slate-500/20 rounded-lg px-4 py-2">
                     <p className="text-xs text-slate-400">
                       <i className="ri-information-line mr-1"></i>
-                      This plan has no monthly usage limit configured.
+                      {selectedSub.isGuard ? 'Guard application counts are informational. Free job applications have no monthly cap; historical membership records are retained.' : 'This plan has no monthly usage limit configured.'}
                     </p>
                   </div>
                 )}
@@ -948,7 +950,7 @@ export default function SubscriptionTrackingPage() {
                     {selectedSub.planStatus === 'limited' && selectedSub.usageLimit != null && (
                       <div className="flex justify-between mt-2 text-xs text-slate-500">
                         <span>{selectedSub.isGuard ? 'Applications remaining:' : 'Jobs remaining:'} {Math.max(selectedSub.usageLimit - selectedSub.usageThisMonth, 0)}</span>
-                        <span>{selectedSub.isGuard ? 'Monthly application limit:' : 'Monthly job limit:'} {selectedSub.usageLimit}</span>
+                        <span>{selectedSub.isGuard ? 'Free guard applications: no monthly cap' : `Monthly job limit: ${selectedSub.usageLimit}`}</span>
                       </div>
                     )}
                   </div>
@@ -960,7 +962,7 @@ export default function SubscriptionTrackingPage() {
                           <p className="font-semibold text-red-300 mb-1">Usage Limit Exceeded</p>
                           <p className="text-sm text-red-400/80">
                             {selectedSub.isGuard
-                              ? 'This guard has exceeded their monthly application limit. Consider upgrading their plan.'
+                              ? 'Guard application counts are informational. Job access has no paid application cap.'
                               : 'This client has exceeded their monthly job posting limit. Consider upgrading their plan or contacting them.'}
                           </p>
                         </div>

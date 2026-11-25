@@ -304,7 +304,7 @@ export default function ClientHelpPage() {
                     </div>
                     <div>
                       <p className="text-white font-semibold text-sm">Guard Selection</p>
-                      <p className="text-slate-400 text-sm">After selecting guards, you review the cost breakdown including guard pay, the plan service fee, any eligible promotion, and applicable VAT.</p>
+                      <p className="text-slate-400 text-sm">After selecting guards, you review the cost breakdown including guard pay, the plan service fee and any eligible promotion. QuickGuard is not VAT registered and adds no VAT to its own fees.</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-4">
@@ -322,7 +322,7 @@ export default function ClientHelpPage() {
                     </div>
                     <div>
                       <p className="text-white font-semibold text-sm">Invoice & Receipt</p>
-                      <p className="text-slate-400 text-sm">Download invoices from Payment History or have them emailed directly. All invoices include VAT breakdown.</p>
+                      <p className="text-slate-400 text-sm">Download your saved payment record from Payment History. It shows recorded guard fees, service charges and refunds; it is not a VAT invoice.</p>
                     </div>
                   </div>
                 </div>

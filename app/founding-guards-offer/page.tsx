@@ -4,7 +4,7 @@ import FoundingGuardsOfferClient from './FoundingGuardsOfferClient';
 export const metadata: Metadata = {
   title: 'Founding Guards Offer | Exclusive Security Guard Benefits | QuickGuard UK',
   description:
-    'Exclusive founding guard offer for early QuickGuard adopters. Recognition availability for eligible approved guards. Membership prices and booking pay are explained separately.',
+    'Exclusive founding guard offer for early QuickGuard adopters. Recognition availability for eligible approved guards. Guard job access is free; approval and licence requirements apply.',
   alternates: {
     canonical: 'https://quickguard.uk/founding-guards-offer',
   },

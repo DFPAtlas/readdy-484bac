@@ -1,3 +1,4 @@
+import { GUARD_MEMBERSHIPS_RETIRED, isGuardMembership } from '../_shared/guard-membership-retirement.ts';
 import { canUseChristmasOffer, christmasOfferAmount, christmasOfferCheckoutParams, isChristmasOfferPrice } from '../_shared/christmas-offer.mjs';
 import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -227,6 +228,8 @@ serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    if (isGuardMembership(accountType, planId)) return new Response(JSON.stringify(GUARD_MEMBERSHIPS_RETIRED), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     const { priceId, error: priceError } = await getPriceId(supabase, planId, billingCycle || 'monthly');
     if (!priceId || priceError) {

@@ -1,3 +1,4 @@
+import { GUARD_MEMBERSHIPS_RETIRED, isGuardMembership } from '../_shared/guard-membership-retirement.ts';
 import { tokenRequest, reserveTokenCheckout, finishTokenCheckout } from '../_shared/token-checkout.ts';
 import { canUseChristmasOffer, christmasOfferAmount, christmasOfferCheckoutParams, isChristmasOfferPrice } from '../_shared/christmas-offer.mjs';
 import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
@@ -330,6 +331,8 @@ serve(async (req) => {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+    if (isGuardMembership(accountType, planId)) return new Response(JSON.stringify(GUARD_MEMBERSHIPS_RETIRED), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
     const userEmail = user.email || guardProfile?.email || clientProfile?.email || requestedEmail;
 
     const { priceId, error: priceError } = await getPriceId(publicSupabase, planId, billingCycle || 'monthly');

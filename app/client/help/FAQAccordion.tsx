@@ -48,7 +48,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: 'How do I download invoices?',
-    answer: 'Go to Payment History in your client portal. Click on any completed payment to view the details, then click "Download Invoice" to get a PDF. You can also email the invoice directly to your billing contact. Invoices include VAT, guard fees, and service charges broken down clearly.',
+    answer: 'Go to Payment History in your client portal. Click on any completed payment to view the details, then click "Download Invoice" to get a PDF. The saved payment record shows recorded guard fees, service charges and any refund. QuickGuard is not VAT registered; this record is not a VAT invoice.',
     icon: 'ri-download-line',
   },
   {
