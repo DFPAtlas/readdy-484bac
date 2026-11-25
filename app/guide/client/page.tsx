@@ -97,7 +97,7 @@ const steps = [
     paymentSteps: [
       { icon: 'ri-check-double-line', label: 'Confirm & Pay', desc: 'Review the agreed guard pay, plan service fee and any eligible promotion, then pay securely before the booking is confirmed' },
       { icon: 'ri-lock-line', label: 'Funds Held Securely', desc: 'Funds are held with Stripe until the shift is completed and the release checks pass' },
-      { icon: 'ri-bank-card-line', label: 'Guard Paid', desc: 'The guard receives their agreed pay after completion' },
+      { icon: 'ri-bank-card-line', label: 'Guard Payment Released', desc: 'After completion approval and the applicable payment, dispute and account checks, eligible pay is released to the guard’s connected Stripe account. Stripe processes the bank deposit separately according to its schedule and account requirements.' },
       { icon: 'ri-mail-check-line', label: 'Confirmation', desc: 'Both parties receive payment confirmation emails' },
     ],
   },

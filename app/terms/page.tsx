@@ -167,7 +167,8 @@ export default function Terms() {
                 <h3 className="text-xl font-semibold text-white mb-3">Payment Schedule:</h3>
                 <ul className="list-disc list-inside space-y-2 text-slate-400">
                   <li>Payment held with Stripe upon booking confirmation</li>
-                  <li>Released to guard upon successful service completion</li>
+                  <li>Eligible guard pay is released to the connected Stripe account after completion approval and the applicable payment, dispute and account checks</li>
+                  <li>Stripe processes bank deposits separately according to available funds, the account payout schedule, verification requirements and bank processing. Release to Stripe does not confirm arrival in the guard&apos;s bank account</li>
                   <li>Refunds processed within 5-10 business days</li>
                   <li>Monthly subscription fees charged automatically</li>
                 </ul>

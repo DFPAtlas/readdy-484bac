@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { GUARD_BANK_DEPOSIT_GUIDANCE, GUARD_COMPLETION_GUIDANCE, GUARD_PAYOUT_SETUP_GUIDANCE, GUARD_PAYOUT_SUPPORT_GUIDANCE } from '@/lib/guard-payment-guidance';
 
 const faqs = [
   {
@@ -25,7 +26,12 @@ const faqs = [
     category: 'For Guards',
     question: 'When and how do guards get paid?',
     answer:
-      'After the client confirms the shift is complete, your pay is released under the existing confirmation, dispute and payout process. You receive your full agreed pay with no guard booking commission, and standard payout costs are covered by the client booking service fee. Payouts follow the existing Stripe onboarding and account eligibility checks \u2014 we do not promise instant payouts or fixed payout deadlines.',
+      `${GUARD_PAYOUT_SETUP_GUIDANCE} ${GUARD_COMPLETION_GUIDANCE} After approval and the applicable payment, dispute and Stripe account checks, eligible earnings are released to your connected Stripe account. You receive your full agreed pay on new bookings with no guard booking commission; standard payouts are covered by the client service fee. ${GUARD_BANK_DEPOSIT_GUIDANCE}`,
+  },
+  {
+    category: 'For Guards',
+    question: 'What if the client has not confirmed completion or my payout is delayed?',
+    answer: GUARD_PAYOUT_SUPPORT_GUIDANCE,
   },
   {
     category: 'For Clients',
@@ -113,7 +119,7 @@ export default function FAQList() {
 
           <div
             className={`overflow-hidden transition-all duration-300 ease-in-out ${
-              openIndex === index ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+              openIndex === index ? 'max-h-none opacity-100' : 'max-h-0 opacity-0'
             }`}
           >
             <div className="px-6 pb-5 pt-2 bg-[#0e1628] border-t border-slate-700/50">

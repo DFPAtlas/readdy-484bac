@@ -1,4 +1,5 @@
 import { SITE_URL } from '@/lib/seo-helpers';
+import { GUARD_PAYMENT_STEPS } from '@/lib/guard-payment-guidance';
 
 export default function GuardGuideSchema() {
   const howToSchema = {
@@ -35,7 +36,7 @@ export default function GuardGuideSchema() {
         '@type': 'HowToStep',
         position: 4,
         name: 'Complete Jobs and Get Paid',
-        text: 'Work your assigned shift professionally. The client pays before the booking is confirmed. After shift completion, payouts follow the confirmation, dispute and Stripe account checks; bank arrival times can vary.',
+        text: GUARD_PAYMENT_STEPS.map((step) => `${step.label}: ${step.desc}`).join(' '),
         url: `${SITE_URL}/guide/guard#step-04`,
       },
     ],

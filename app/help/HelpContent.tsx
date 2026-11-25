@@ -1,6 +1,7 @@
 'use client';
 
 import { CANCELLATION_GUIDANCE, GUARD_CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
+import { GUARD_BANK_DEPOSIT_GUIDANCE, GUARD_COMPLETION_GUIDANCE, GUARD_PAYOUT_SETUP_GUIDANCE, GUARD_PAYOUT_SUPPORT_GUIDANCE } from '@/lib/guard-payment-guidance';
 
 import PublicMediaImage from '@/components/PublicMediaImage';
 
@@ -22,6 +23,9 @@ const faqs = [
   { question: 'How do I get started as a Guard?', answer: 'Register as a guard, upload your SIA licence, and complete your profile. Once verified, you can browse available jobs and submit applications directly through the platform.', icon: 'ri-shield-user-line' },
   { question: 'Is SIA licence verification required?', answer: 'Yes. All security guards must hold a valid SIA licence. Every guard must pass an initial SIA licence check before they can take work through QuickGuard. We are also developing an AI agent to re-check licence status weekly and flag suspended, revoked or expired licences for review.', icon: 'ri-verified-badge-line' },
   { question: 'How does payment work?', answer: 'Clients review the agreed guard pay, plan service fee and any eligible promotion, then pay securely via Stripe before the booking is confirmed. Funds are held with Stripe and released to the guard after completion and the applicable release checks. All transactions are encrypted and processed through our secure platform.', icon: 'ri-secure-payment-line' },
+  { question: 'How do I set up guard payouts and request completion?', answer: `${GUARD_PAYOUT_SETUP_GUIDANCE} ${GUARD_COMPLETION_GUIDANCE}`, icon: 'ri-bank-line' },
+  { question: 'Does payment release mean the money is in my bank?', answer: GUARD_BANK_DEPOSIT_GUIDANCE, icon: 'ri-money-pound-circle-line' },
+  { question: 'What if the client has not confirmed completion or my payout is delayed?', answer: GUARD_PAYOUT_SUPPORT_GUIDANCE, icon: 'ri-time-line' },
   { question: 'Can I cancel or edit a job after posting?', answer: `${CANCELLATION_GUIDANCE} ${GUARD_CANCELLATION_GUIDANCE} ${REFUND_TIMING_GUIDANCE} To change a booked job, contact support.`, icon: 'ri-edit-2-line' },
   { question: 'How long does guard verification take?', answer: 'Verification timing can vary depending on the licence check and whether manual review is required. You will receive an email notification once your profile has been reviewed and approved.', icon: 'ri-time-line' },
   { question: 'What subscription plans are available?', answer: 'We offer flexible plans for clients of all sizes. Visit our Pricing page to compare features and choose the plan that best suits your business needs.', icon: 'ri-price-tag-3-line' },
@@ -85,8 +89,8 @@ function MoneySection({ role }: { role: Role }) {
       },
       {
         big: 'Stripe',
-        title: 'Paid after completion',
-        text: 'Once the client confirms the shift is complete, your pay is released to your Stripe payout account, subject to the dispute and account checks.',
+        title: 'Release, then bank deposit',
+        text: 'Set up your payout account in Bank Settings. After completion approval and the applicable payment, dispute and account checks, eligible pay is released to Stripe. Bank arrival is a separate stage.',
       },
     ];
 
@@ -103,6 +107,9 @@ function MoneySection({ role }: { role: Role }) {
             </div>
           ))}
         </div>
+        <p className="mt-5 text-sm text-slate-400 leading-relaxed">{GUARD_BANK_DEPOSIT_GUIDANCE}</p>
+        <p className="mt-3 text-sm text-slate-400 leading-relaxed">{GUARD_PAYOUT_SUPPORT_GUIDANCE}</p>
+        <Link href="/guide/guard#step-04" className="inline-block mt-4 text-sm text-sky-400 underline">Read the guard payout guide</Link>
       </div>
     );
   }

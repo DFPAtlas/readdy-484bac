@@ -1,4 +1,5 @@
 import { CANCELLATION_GUIDANCE, GUARD_CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
+import { GUARD_COMPLETION_GUIDANCE } from '@/lib/guard-payment-guidance';
 export type CancellationWindow = {
   label: string;
   outcome: string;
@@ -50,7 +51,7 @@ export const CLIENT_JOURNEY: JourneyStep[] = [
   { title: "Local guards are notified", desc: "Verified guards whose travel radius covers your location see it." },
   { title: "Pick your guard", desc: "Compare applicants and check their SIA credentials." },
   { title: "Pay securely", desc: "Review the total and pay through Stripe to confirm the booking." },
-  { title: "Pay is released", desc: "Funds are held with Stripe and released after the shift is complete." },
+  { title: "Pay is released", desc: "After completion approval and payment checks, eligible pay is released to the guard's Stripe account. Stripe processes the bank deposit separately." },
 ];
 
 export const GUARD_JOURNEY: JourneyStep[] = [
@@ -58,8 +59,8 @@ export const GUARD_JOURNEY: JourneyStep[] = [
   { title: "Licence checked", desc: "You can take work once your SIA licence check is passed." },
   { title: "Set your radius", desc: "Get alerts for jobs within the distance you're willing to travel." },
   { title: "Apply for shifts", desc: "Apply to the jobs that suit you. Clients choose who to book." },
-  { title: "Work the shift", desc: "Full job details, venue and hours are in your dashboard." },
-  { title: "Get paid in full", desc: "Once the client confirms completion, your pay is released." },
+  { title: "Request completion", desc: GUARD_COMPLETION_GUIDANCE },
+  { title: "Track your pay", desc: "Complete Stripe setup in Bank Settings. Eligible pay is released to Stripe after approval and checks; Stripe then processes your bank deposit. See the payout guide below." },
 ];
 
 export const CLIENT_TOPICS: HelpTopic[] = [

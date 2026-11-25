@@ -1,3 +1,6 @@
+import Link from 'next/link';
+import { GUARD_PAYMENT_STEPS, GUARD_PAYOUT_SUPPORT_GUIDANCE } from '@/lib/guard-payment-guidance';
+
 const GUARD_POINTS = [
   'You receive your full agreed pay on new bookings',
   'QuickGuard does not deduct a guard booking commission',
@@ -39,10 +42,18 @@ export default function GuardPaymentJourney() {
                 </li>
               ))}
             </ul>
+            <ol className="mt-8 space-y-4 list-decimal pl-5 text-slate-300">
+              {GUARD_PAYMENT_STEPS.map((step) => (
+                <li key={step.label} className="pl-2">
+                  <h3 className="font-semibold text-white">{step.label}</h3>
+                  <p className="mt-1 text-sm text-slate-400 leading-relaxed">{step.desc}</p>
+                </li>
+              ))}
+            </ol>
             <p className="mt-5 text-sm text-slate-400 leading-relaxed">
-              Guard payment is released after completion, subject to the existing confirmation, dispute and payout process.
-              We do not promise instant payouts or fixed payout deadlines.
+              {GUARD_PAYOUT_SUPPORT_GUIDANCE}
             </p>
+            <Link href="/guide/guard#step-04" className="inline-block mt-4 text-sm text-teal-400 underline">Read the guard payout guide</Link>
           </div>
 
           <div className="lg:col-span-2">
