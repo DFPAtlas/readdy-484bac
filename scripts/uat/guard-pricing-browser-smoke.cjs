@@ -37,7 +37,7 @@ const fees=[['client_free',15],['client-starter',10],['client-pro',7.5],['client
    for(const [name,total]of [['Free Starter','£138.00'],['Client Starter','£132.00'],['Client Pro','£129.00'],['Client Enterprise','£126.00']])await expect(page.getByRole('row',{name:new RegExp(name)})).toContainText(total);
    await expect(page.locator('body')).not.toContainText(/\bGuard Elite\b|applications per month|Featured profile placement/);
    await expect(page.getByText('QuickGuard is not VAT registered.',{exact:false}).first()).toBeVisible();
-   await page.getByRole('button',{name:'Annual',exact:true}).click();await expect(page.getByText('£990.00',{exact:true}).first()).toBeVisible();
+   await page.getByRole('button',{name:/^Annual\b/}).click();await expect(page.getByText('Billed £990.00 upfront each year',{exact:true}).first()).toBeVisible();
    await open('/pricing/pdf');await expect(page.getByRole('heading',{name:'Free guard account',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Save as PDF',exact:true})).toBeEnabled();
    feeFailure=true;await page.reload();await expect(page.getByRole('button',{name:'Save as PDF',exact:true})).toBeDisabled();await expect(page.getByText('Total unavailable',{exact:true}).first()).toBeVisible();
    feeFailure=false;await open('/pricing/pdf');await expect(page.getByRole('button',{name:'Save as PDF',exact:true})).toBeEnabled();
