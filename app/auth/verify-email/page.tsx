@@ -73,7 +73,7 @@ function VerifyEmailContent() {
           <h1 className="text-2xl font-bold text-white mb-3">Check Your Email</h1>
 
           <p className="text-slate-400 mb-2">
-            {email ? "We've sent a verification link to:" : "Enter your email and we'll send you a new sign-in link."}
+            {email ? 'Check this inbox for your verification link:' : 'Enter your email to request a new verification link.'}
           </p>
 
           {email ? (
@@ -117,7 +117,7 @@ function VerifyEmailContent() {
             <div className="bg-emerald-500/10 border border-emerald-400/20 rounded-xl p-4 mb-6">
               <div className="flex items-center gap-2 text-emerald-400">
                 <i className="ri-checkbox-circle-line w-5 h-5 flex items-center justify-center"></i>
-                <span className="text-sm font-medium">Verification email sent successfully!</span>
+                <span className="text-sm font-medium">Verification request received. If your account needs verification, check your inbox and spam folder for a link. If it does not arrive, try again later.</span>
               </div>
             </div>
           )}

@@ -167,8 +167,8 @@ export default function GuardRegister() {
 
       const result = await response.json();
 
-      if (!response.ok) {
-        throw new Error(result.error || result.message || `Registration failed (${response.status})`);
+      if (!response.ok || result?.success !== true || result?.verification_sent !== true) {
+        throw new Error(result?.error || result?.message || 'We could not confirm a verification email. Please try again.');
       }
 
       setSentEmail(email);
