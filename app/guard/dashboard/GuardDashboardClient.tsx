@@ -26,7 +26,6 @@ import JobMatchToast from './JobMatchToast';
 import FundedBadge from './FundedBadge';
 import { hasFeature, ensureEntitlement } from '@/lib/entitlements';
 import type { FeatureKey } from '@/lib/entitlements';
-import UpgradeRequiredModal from '@/components/billing/UpgradeRequiredModal';
 import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
 import { useUsageLimits } from '@/hooks/useUsageLimits';
 import UsageLimitWidget from '@/components/UsageLimitWidget';
@@ -85,10 +84,7 @@ export default function GuardDashboardClient() {
   const [guardToast, setGuardToast] = useState('');
   const [markingJobId, setMarkingJobId] = useState<string | null>(null);
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [blockedFeatureName, setBlockedFeatureName] = useState('');
   const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({});
-  const [entitlementsLoaded, setEntitlementsLoaded] = useState(false);
   const [dataErrors, setDataErrors] = useState<string[]>([]);
   const [dataLoadFailed, setDataLoadFailed] = useState(false);
   const { collapsed: sidebarCollapsed } = useSidebar();
@@ -176,7 +172,6 @@ export default function GuardDashboardClient() {
   };
 
 
-
   useEffect(() => {
     if (isAdmin) return;
     if (!featureFlags['guard.advanced_alerts']) return;
@@ -204,7 +199,6 @@ export default function GuardDashboardClient() {
       loadBankDetails(guard.id);
     }
   }, [guard?.id]);
-
 
   useEffect(() => {
     const hash = window.location.hash.replace('#', '');
@@ -272,7 +266,6 @@ export default function GuardDashboardClient() {
 
       const flags: Record<string, boolean> = {};
       const keys: FeatureKey[] = [
-        'guard.apply_job',
         'guard.advanced_alerts',
       ];
       for (const key of keys) {
@@ -280,12 +273,8 @@ export default function GuardDashboardClient() {
       }
       if (!isCurrent()) return;
       setFeatureFlags(flags);
-      if (!isCurrent()) return;
-      setEntitlementsLoaded(true);
     } catch {
       traceLog('loadUserEntitlement', { error: true });
-      if (!isCurrent()) return;
-      setEntitlementsLoaded(true);
     }
   }, [beginRead, traceLog]);
 
@@ -710,12 +699,6 @@ export default function GuardDashboardClient() {
   const handleApplyToJob = async (jobId: string) => {
     if (isAdmin || !guard) return;
 
-    if (entitlementsLoaded && !featureFlags['guard.apply_job']) {
-      setBlockedFeatureName('job applications');
-      setShowUpgradeModal(true);
-      return;
-    }
-
     if (guard.verification_status !== 'approved' && guard.verification_status !== 'verified') {
       const msg = 'Your profile is not yet verified. You cannot apply for jobs.';
       showGuardToast(msg);
@@ -752,13 +735,7 @@ export default function GuardDashboardClient() {
 
       const limitCheck = await checkGuardApplicationLimit(supabase, guard.id);
       if (!limitCheck.allowed) {
-        if (limitCheck.reason === 'limit_reached') {
-          showGuardToast('You have reached your monthly application limit for your current plan. Upgrade your plan to apply for more jobs this month.');
-          router.push('/upgrade?reason=guard_application_limit_reached');
-        } else {
-          showGuardToast('We could not verify your guard subscription plan. Please refresh or contact support.');
-          router.push('/upgrade?reason=guard.plan_verification_failed');
-        }
+        showGuardToast('Application access could not be confirmed. Please refresh or contact support.');
         return;
       }
 
@@ -789,13 +766,11 @@ export default function GuardDashboardClient() {
           return;
         }
         if (applyResult.limitReached) {
-          showGuardToast('You have reached your monthly application limit. Upgrade your plan to apply for more jobs.');
-          router.push('/upgrade?reason=guard_application_limit_reached');
+          showGuardToast('Application access could not be confirmed. Please refresh or contact support.');
           return;
         }
         if (applyResult.tierLocked) {
-          showGuardToast('Your current plan does not allow applying to this job tier. Please upgrade.');
-          router.push('/upgrade?reason=guard.unlimited_applications');
+          showGuardToast('Application access could not be confirmed. Please refresh or contact support.');
           return;
         }
         showGuardToast(applyResult.error || 'Failed to apply. Please try again.');
@@ -1179,21 +1154,10 @@ export default function GuardDashboardClient() {
           </div>
         )}
 
-        {guard && !isAdmin && userEntitlement && userEntitlement.is_free_tier && (
-          <div className="max-w-7xl mx-auto mb-6">
-            <div className="bg-teal-500/5 border border-teal-500/15 rounded-2xl px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-teal-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <i className="ri-vip-crown-line text-lg text-teal-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-teal-300">Upgrade your plan to unlock priority job matching, featured profile and more.</p>
-                </div>
-              </div>
-              <Link href="/pricing" className="px-4 py-2 bg-teal-500/15 text-teal-400 rounded-xl text-sm font-semibold hover:bg-teal-500/25 transition-colors whitespace-nowrap self-start sm:self-auto">
-                View Plans →
-              </Link>
-            </div>
+        {guard && !isAdmin && (
+          <div className="max-w-7xl mx-auto mb-6 bg-teal-500/5 border border-teal-500/15 rounded-2xl px-5 py-4">
+            <p className="text-sm font-semibold text-teal-300">Job applications are free, with no monthly cap or paid job tiers.</p>
+            <p className="mt-1 text-xs text-slate-400">Account approval and each job&apos;s licence requirements still apply.</p>
           </div>
         )}
 
@@ -1207,7 +1171,7 @@ export default function GuardDashboardClient() {
                 <div>
                   <p className="text-sm font-semibold text-blue-300">
                     {userEntitlement.is_free_tier ? (
-                      <>You&apos;re on the Guard Free plan — apply to up to 2 jobs per month. Upgrade for more applications and features.</>
+                      <>Your job applications are free, with no monthly application cap.</>
                     ) : (
                       <>
                         Your {userEntitlement.plan_name} trial is active.
@@ -1234,7 +1198,7 @@ export default function GuardDashboardClient() {
                   <i className="ri-alert-line text-lg text-red-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-red-300">Your payment is past due. Please update your payment method to avoid service interruption.</p>
+                  <p className="text-sm font-semibold text-red-300">Your subscription payment is past due. Job applications remain free. You can manage your existing subscription in your profile.</p>
                 </div>
               </div>
               <Link href="/guard/profile" className="px-4 py-2 bg-red-500/15 text-red-400 rounded-xl text-sm font-semibold hover:bg-red-500/25 transition-colors whitespace-nowrap self-start sm:self-auto">
@@ -1254,8 +1218,8 @@ export default function GuardDashboardClient() {
                 <div>
                   <p className="text-sm font-semibold text-amber-300">
                     {userEntitlement.cancel_at_period_end && userEntitlement.current_period_end
-                      ? `Your plan will cancel on ${new Date(userEntitlement.current_period_end).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}. Reactivate to keep your benefits.`
-                      : 'Your subscription has been cancelled. Reactivate to regain access to paid features.'}
+                      ? `Your plan will cancel on ${new Date(userEntitlement.current_period_end).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}. Job applications remain free.`
+                      : 'Your subscription has been cancelled. Job applications remain free.'}
                   </p>
                 </div>
               </div>
@@ -1390,10 +1354,7 @@ export default function GuardDashboardClient() {
               {guard && !isAdmin && (
                 <ApplicationTracker
                   applications={applications}
-                  planName={guardLimit?.planName || userEntitlement?.plan_name || 'Current'}
-                  periodEnd={guardLimit?.periodEnd || userEntitlement?.current_period_end}
-                  applicationLimit={guardLimit?.limit || 10}
-                  applicationsUsed={guardLimit?.used || applications.length}
+                  applicationsUsed={guardLimit?.used}
                 />
               )}
               {guard && guardUserId && (
@@ -1786,12 +1747,6 @@ export default function GuardDashboardClient() {
           </div>
         )}
 
-        <UpgradeRequiredModal
-          featureName={blockedFeatureName}
-          isOpen={showUpgradeModal}
-          onClose={() => setShowUpgradeModal(false)}
-          audience="guard"
-        />
       </div>
     </div>
   );

@@ -144,8 +144,7 @@ export default function GuardJobInvitesPage() {
       if (after.error || after.data.user?.id !== guardUserId) throw new Error('Session changed');
       if (!result.ok || !result.applicationId) {
         if (result.limitReached) {
-          showToast('You have reached your monthly application limit. Upgrade your plan to apply for more jobs.', 'error');
-          router.push('/upgrade?reason=guard_application_limit_reached');
+          showToast('Application access could not be confirmed. Please refresh or contact support.', 'error');
         } else showToast(result.error || 'The response could not be confirmed. Refresh before retrying.', 'error');
         return;
       }

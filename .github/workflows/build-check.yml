@@ -61,3 +61,31 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:9
           NEXT_PUBLIC_SUPABASE_ANON_KEY: quickguard-build-placeholder
         run: npm run build
+
+      - name: Install Chromium for isolated free-access smoke
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser free-access smoke with synthetic API only
+        shell: bash
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:9
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: quickguard-build-placeholder
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3100
+        run: |
+          npx next start -H 127.0.0.1 -p 3100 > /tmp/quickguard-preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid"' EXIT
+          for attempt in {1..30}; do
+            if curl --silent --fail http://127.0.0.1:3100/ > /dev/null; then break; fi
+            sleep 1
+          done
+          node scripts/uat/free-guard-browser-smoke.cjs
+
+      - name: Upload free-access browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: free-guard-browser-smoke
+          path: uat-results/free-guard-access/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -6,7 +6,6 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
-import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { checkGuardApplicationLimit } from '@/lib/guard-application-limits';
 import MessageClientModal from '@/app/guard/components/MessageClientModal';
 import { formatDateOnly } from '@/lib/date-only';
@@ -31,7 +30,6 @@ interface JobRow {
 }
 
 export default function GuardJobsPage() {
-  const router = useSafeRouter();
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [guardId, setGuardId] = useState<string | null>(null);
@@ -184,12 +182,7 @@ export default function GuardJobsPage() {
 
       const limitCheck = await checkGuardApplicationLimit(supabase, guardId);
       if (!limitCheck.allowed) {
-        if (limitCheck.reason === 'limit_reached') {
-          showToast('You have reached your monthly application limit. Upgrade your plan to apply for more jobs.', 'error');
-          router.push('/upgrade?reason=guard_application_limit_reached');
-        } else {
-          showToast('We could not verify your subscription plan. Please refresh or contact support.', 'error');
-        }
+        showToast('Application access could not be confirmed. Please refresh or contact support.', 'error');
         setApplyingId(null);
         return;
       }
@@ -215,11 +208,9 @@ export default function GuardJobsPage() {
         if (result.alreadyApplied) {
           showToast('You have already applied to this job.', 'info');
         } else if (result.limitReached) {
-          showToast('You have reached your monthly application limit. Upgrade your plan to apply for more jobs.', 'error');
-          router.push('/upgrade?reason=guard_application_limit_reached');
+          showToast('Application access could not be confirmed. Please refresh or contact support.', 'error');
         } else if (result.tierLocked) {
-          showToast('Your current plan does not allow applying to this job tier. Please upgrade.', 'error');
-          router.push('/upgrade?reason=guard.unlimited_applications');
+          showToast('Application access could not be confirmed. Please refresh or contact support.', 'error');
         } else {
           showToast(result.error || 'Failed to apply. Please try again.', 'error');
         }

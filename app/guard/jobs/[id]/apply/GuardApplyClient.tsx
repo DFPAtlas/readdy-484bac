@@ -108,12 +108,7 @@ export default function GuardApplyClient({ jobId }: { jobId: string }) {
 
     const limitCheck = await checkGuardApplicationLimit(supabase, guardId);
     if (!limitCheck.allowed) {
-      if (limitCheck.reason === 'limit_reached') {
-        showToast('Monthly application limit reached. Upgrade your plan to apply for more jobs.', 'error');
-        router.push('/upgrade?reason=guard_application_limit_reached');
-      } else {
-        showToast('Could not verify your subscription plan.', 'error');
-      }
+      showToast('Application access could not be confirmed. Please refresh or contact support.', 'error');
       return;
     }
 
@@ -127,15 +122,13 @@ export default function GuardApplyClient({ jobId }: { jobId: string }) {
           return;
         }
         if (result.limitReached) {
-          showToast('Monthly application limit reached. Upgrade your plan to apply for more jobs.', 'error');
-          router.push('/upgrade?reason=guard_application_limit_reached');
+          showToast('Application access could not be confirmed. Please refresh or contact support.', 'error');
           return;
         }
         throw new Error(result.error);
       }
 
       // The application and its recipient-checked bell commit together in PostgreSQL.
-
 
       showToast('Application submitted successfully!', 'success');
       setTimeout(() => router.push(`/guard/jobs/detail?id=${jobId}`), 1500);

@@ -3,8 +3,8 @@ import { SupabaseClient } from '@supabase/supabase-js';
 // Usage is always read for the signed-in account (app.get_my_feature_usage uses
 // auth.uid()). Browser code never passes an id, so a guards.id can no longer be
 // confused with an auth user id, and browser roles cannot read or consume another
-// account's allowance. Usage is CONSUMED only on the server, atomically with the
-// write it pays for (app.submit_job_application, trg_enforce_client_job_post_limit).
+// account's usage. Guard application counts are informational; client posting
+// allowances are still enforced atomically by trg_enforce_client_job_post_limit.
 
 export interface GuardApplicationLimit {
   allowed: boolean;
@@ -26,7 +26,7 @@ async function readMyUsage(supabase: AnyClient, featureKey: 'guard_application' 
     if (error || !result) return { allowed: false, reason: 'plan_verification_failed' };
     return {
       allowed: result.allowed,
-      reason: result.allowed ? undefined : (result.reason === 'no_entitlement' ? 'plan_verification_failed' : 'limit_reached'),
+      reason: result.allowed ? undefined : (result.reason === 'limit_reached' ? 'limit_reached' : 'plan_verification_failed'),
       limit: result.limit,
       used: result.used,
       remaining: result.remaining,
@@ -43,7 +43,7 @@ async function readMyUsage(supabase: AnyClient, featureKey: 'guard_application' 
 /**
  * Pre-flight check for the signed-in guard. `_guardId` (guards.id) is accepted for
  * call-site compatibility only; the server resolves the account from the session.
- * apply-to-job re-checks and consumes usage atomically, so this is advisory.
+ * apply-to-job re-checks eligibility atomically, so this is advisory.
  */
 export async function checkGuardApplicationLimit(supabase: AnyClient, _guardId?: string | null): Promise<GuardApplicationLimit> {
   void _guardId;

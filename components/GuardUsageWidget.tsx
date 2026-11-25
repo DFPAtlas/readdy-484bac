@@ -1,10 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { checkGuardApplicationLimit, GuardApplicationLimit } from '@/lib/guard-application-limits';
-import { getGuardAccessLevel } from '@/lib/job-access-levels';
 
 interface Props {
   guardId: string;
@@ -54,92 +52,20 @@ export default function GuardUsageWidget({ guardId, refreshTrigger }: Props) {
     );
   }
 
-  const isUnlimited = limitData.limit === null;
-  const used = limitData.used;
-  const limit = limitData.limit || 0;
-  const remaining = limitData.remaining;
-  const pct = isUnlimited ? 100 : limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
-  const isNearLimit = !isUnlimited && pct >= 75 && pct < 100;
-  const isAtLimit = !isUnlimited && remaining === 0;
-  const isWarnZone = pct >= 75;
-
-  const barColor = isAtLimit ? '#ef4444' : isWarnZone ? '#f59e0b' : '#14b8a6';
-
-  const resetLabel = limitData.periodEnd
-    ? new Date(limitData.periodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-    : 'N/A';
+  if (!limitData.allowed || limitData.limit !== null) {
+    return (
+      <div className="bg-[#111d35] rounded-2xl border border-[#1a2b4a] p-6" role="status">
+        <p className="text-sm text-slate-400">Application access could not be confirmed. Please refresh or contact support.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-[#111d35] rounded-2xl border border-[#1a2b4a] shadow-sm overflow-hidden">
-      <div className="p-4 sm:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Current Plan</p>
-            <p className="text-base font-bold text-white">{limitData.planName}</p>
-          </div>
-          <Link
-            href="/upgrade"
-            className="px-3 py-1.5 bg-teal-500 text-white text-xs font-semibold rounded-lg hover:bg-teal-600 transition-colors whitespace-nowrap"
-          >
-            Upgrade
-          </Link>
-        </div>
-
-        <div className="mb-3">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-sm text-slate-300">
-              Job Applications Used
-            </p>
-            <p className="text-sm font-bold text-white">
-              {used}{isUnlimited ? '' : ` of ${limit}`}
-            </p>
-          </div>
-          <div className="w-full h-2 bg-[#1a2b4a] rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${pct}%`, backgroundColor: barColor }}
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between text-xs">
-          {isUnlimited ? (
-            <span className="text-slate-400">Unlimited applications</span>
-          ) : remaining !== null && remaining > 0 ? (
-            <span className="text-slate-400">
-              {remaining} application{remaining !== 1 ? 's' : ''} remaining
-            </span>
-          ) : (
-            <span className="text-red-400 font-semibold">Limit reached</span>
-          )}
-          <span className="text-slate-400">
-            Resets {resetLabel}
-          </span>
-        </div>
-
-        <div className="mt-3 pt-3 border-t border-[#1a2b4a]">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-400">Job Access Level</p>
-            <span className="text-xs font-semibold text-slate-200">{getGuardAccessLevel(limitData.planSlug)}</span>
-          </div>
-        </div>
-      </div>
-
-      {isAtLimit && (
-        <div className="bg-red-500/10 border-t border-red-500/20 px-4 sm:px-6 py-3">
-          <p className="text-xs text-red-400">
-            You have reached your monthly application limit. Upgrade your plan to apply for more jobs.
-          </p>
-        </div>
-      )}
-
-      {isNearLimit && !isAtLimit && (
-        <div className="bg-amber-500/10 border-t border-amber-500/20 px-4 sm:px-6 py-3">
-          <p className="text-xs text-amber-400">
-            You have used most of your monthly applications. Upgrade now to access more opportunities.
-          </p>
-        </div>
-      )}
+    <div className="bg-[#111d35] rounded-2xl border border-[#1a2b4a] shadow-sm p-6">
+      <h3 className="text-base font-bold text-white">Free job applications</h3>
+      <p className="mt-2 text-sm text-slate-300">{limitData.used} applications submitted this month.</p>
+      <p className="mt-1 text-sm text-teal-400">No monthly application cap or paid job tiers.</p>
+      <p className="mt-3 text-xs text-slate-400">Account approval and each job&apos;s licence requirements still apply.</p>
     </div>
   );
 }

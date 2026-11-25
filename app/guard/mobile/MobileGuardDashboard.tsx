@@ -24,7 +24,6 @@ import { guardProfileCompletion } from '@/lib/guard-profile-completion';
 import { submitGuardCompletion } from '@/lib/guard-completion';
 
 
-
 import { formatDateOnly } from '@/lib/date-only';
 
 interface Guard {
@@ -281,13 +280,7 @@ export default function MobileGuardDashboard() {
     try {
       const limitCheck = await checkGuardApplicationLimit(supabase, guard.id);
       if (!limitCheck.allowed) {
-        if (limitCheck.reason === 'limit_reached') {
-          alert('You have reached your monthly application limit for your current plan. Upgrade your plan to apply for more jobs this month.');
-          router.push('/upgrade?reason=guard_application_limit_reached');
-        } else {
-          alert('We could not verify your guard subscription plan. Please refresh or contact support.');
-          router.push('/upgrade?reason=guard.plan_verification_failed');
-        }
+        alert('Application access could not be confirmed. Please refresh or contact support.');
         setApplyingTo(null);
         return;
       }
@@ -295,8 +288,7 @@ export default function MobileGuardDashboard() {
       const result = await submitGuardApplication({ guardId: guard.id, jobId });
       if (!result.ok) {
         if (result.limitReached) {
-          alert('You have reached your monthly application limit for your current plan. Upgrade your plan to apply for more jobs this month.');
-          router.push('/upgrade?reason=guard_application_limit_reached');
+          alert('Application access could not be confirmed. Please refresh or contact support.');
           return;
         }
         throw Object.assign(new Error(result.error), { code: result.alreadyApplied ? '23505' : result.code });
