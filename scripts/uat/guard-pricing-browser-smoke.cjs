@@ -17,7 +17,9 @@ const fees=[['client_free',15],['client-starter',10],['client-pro',7.5],['client
    const headers={'access-control-allow-origin':origin.origin,'access-control-allow-headers':'*','access-control-allow-methods':'*','content-type':'application/json'};
    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
    let data=null,status=200;
-   if(url.pathname==='/auth/v1/user')data=role==='guard'?user:null;
+   if(req.method()==='GET'&&url.pathname==='/functions/v1/qg-public-launch-settings')data={settings:{programme_enabled:false,exit_popup_enabled:false,exit_popup_test_icon_enabled:false}};
+   else if(req.method()==='GET'&&url.pathname==='/functions/v1/public-site-media'&&!url.search)data={publications:[]};
+   else if(url.pathname==='/auth/v1/user')data=role==='guard'?user:null;
    else if(url.pathname.endsWith('/plans'))data=plans;
    else if(url.pathname.endsWith('/rpc/get_public_client_pricing_fees')){data=feeFailure?{message:'Synthetic fee read failure'}:fees;status=feeFailure?500:200;}
    else if(url.pathname.endsWith('/user_entitlements_data'))data={plan_slug:'guard-elite',plan_name:'Historical Guard Elite',audience:'guard',features:['guard.profile_boost'],subscription_status:'active',is_active:true,is_free_tier:false,current_period_end:'2099-01-01'};
