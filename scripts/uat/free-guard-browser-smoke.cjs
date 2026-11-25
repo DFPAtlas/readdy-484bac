@@ -32,6 +32,9 @@ const U='11111111-1111-4111-8111-111111111111',G='22222222-2222-4222-8222-222222
       });
       const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
       await page.goto(base+'/guard/jobs/apply?id='+J);await expect(page.getByRole('heading',{name:'Apply for Job',exact:true})).toBeVisible();
+      // Follow the first-visit consent flow before using controls beneath its banner.
+      const essential=page.getByRole('button',{name:'Essential Only',exact:true});
+      await essential.click();await expect(essential).not.toBeVisible();
       deny=true;await page.getByRole('button',{name:'Submit Application',exact:true}).click();await expect(page.getByText('Application access could not be confirmed. Please refresh or contact support.',{exact:true})).toBeVisible();assert.equal(submitted,0);assert.ok(!page.url().includes('/upgrade'));
       deny=false;await page.getByRole('button',{name:'Submit Application',exact:true}).click();await expect(page.getByText('Application submitted successfully!',{exact:true})).toBeVisible();assert.equal(submitted,1);assert.deepEqual(errors,[]);
       fs.mkdirSync('uat-results/free-guard-access',{recursive:true});await page.screenshot({path:`uat-results/free-guard-access/apply-${viewport.width}.png`,fullPage:true});
