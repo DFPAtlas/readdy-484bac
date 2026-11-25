@@ -25,6 +25,7 @@ let latestPage;
           posts.push({ path: url.pathname, body: req.postDataJSON() }); data = { success: true, request_received: true };
         } else if (req.method() === 'GET' && url.pathname === '/functions/v1/qg-public-launch-settings') data = { settings: { programme_enabled: false, exit_popup_enabled: false, exit_popup_test_icon_enabled: false } };
         else if (req.method() === 'GET' && url.pathname === '/functions/v1/public-site-media') data = { publications: [] };
+        else if (req.method() === 'POST' && url.pathname === '/rest/v1/rpc/get_guard_promotion_summary') data = [];
         else if (url.pathname.endsWith('/wizard_fields')) data = ['email', 'first_name', 'last_name'].map((field_key, i) => ({ id: field_key, field_key, field_label: field_key, field_type: field_key === 'email' ? 'email' : 'text', is_required: true, is_enabled: true, sort_order: i }));
         else if (url.pathname.includes('/functions/') || req.method() !== 'GET') { unexpected.push(req.method() + ' ' + url.pathname); status = 409; data = { error: 'Unexpected provider call' }; }
         return route.fulfill({ status, headers, body: JSON.stringify(data) });
