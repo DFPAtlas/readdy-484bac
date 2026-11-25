@@ -63,6 +63,7 @@ function formatAmount(amount: number | null, currency: string | null): string {
 }
 
 export default function SubscriptionDetailModal({ subscription, user, plan, onClose, onCancel, onResume, actionLoading }: Props) {
+  const isRetiredGuard = plan?.audience === 'guard' || /^guard(?:-|_)/.test(subscription.plan_slug || '');
   const isActive = subscription.status === 'active' || subscription.status === 'trialing';
   const isCancelled = subscription.cancel_at_period_end || subscription.status === 'cancelled' || subscription.status === 'canceled';
   const hasStripe = !!subscription.stripe_subscription_id;
@@ -277,7 +278,7 @@ export default function SubscriptionDetailModal({ subscription, user, plan, onCl
                 {actionLoading ? 'Processing...' : 'Cancel Subscription'}
               </button>
             )}
-            {hasStripe && isCancelled && (
+            {hasStripe && isCancelled && !isRetiredGuard && (
               <button
                 onClick={onResume}
                 disabled={actionLoading}

@@ -69,7 +69,7 @@ export default function HomepageSchema() {
         name: 'How much does it cost for guards to use the platform?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Guards can create a free account with two applications per month. Paid memberships start at £10/month, with Pro at £19 and Elite at £29. Membership is separate from guard pay; compare current plans on the Pricing page.',
+          text: 'Guard profiles, job browsing and applications are free, with no monthly application cap or paid job tiers. Account approval, valid SIA licensing and job requirements apply. Paid membership does not determine discovery order.',
         },
       },
       {

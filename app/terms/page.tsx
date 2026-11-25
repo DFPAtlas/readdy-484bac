@@ -186,7 +186,7 @@ export default function Terms() {
                 <div className="bg-emerald-500/10 border border-emerald-400/20 p-4 rounded-xl mb-4">
                   <ul className="space-y-2 text-slate-400 text-sm">
                     <li>• You authorise Stripe to charge your nominated payment method for all fees, subscriptions, and bookings placed through the Platform</li>
-                    <li>• For recurring subscriptions (guard membership and client plans), you authorise Stripe to automatically charge your payment method on each billing cycle</li>
+                    <li>• For recurring client subscriptions, you authorise Stripe to automatically charge your payment method on each billing cycle</li>
                     <li>• You agree to provide current, complete, and accurate billing information and promptly update this information if it changes</li>
                     <li>• If automatic charging fails for any reason, we reserve the right to suspend your account until payment is successfully processed</li>
                   </ul>
@@ -194,7 +194,7 @@ export default function Terms() {
 
                 <h3 className="text-xl font-semibold text-white mb-3">Recurring Billing & Subscriptions:</h3>
                 <ul className="list-disc list-inside space-y-2 text-slate-400 mb-4">
-                  <li>Guard membership plans (£10, £19, £29/month) and client subscription plans (£49, £99, £199/month) are billed automatically via Stripe on a recurring basis</li>
+                  <li>Client subscription plans (£49, £99, £199/month) are billed automatically via Stripe on a recurring basis. Guard job access is free and new paid guard memberships are no longer offered. Existing guard subscription records, renewal status and any credit or refund treatment are managed separately; this change does not itself cancel an existing subscription</li>
                   <li>Annual plans are charged once upfront for the 12-month period</li>
                   <li>You may cancel recurring subscriptions at any time through your account dashboard; cancellations take effect at the end of the current billing period</li>
                   <li>No partial refunds are issued for unused portions of a billing cycle unless required by law</li>
@@ -232,7 +232,7 @@ export default function Terms() {
                 <h3 className="text-xl font-semibold text-white mb-3">Currency & VAT:</h3>
                 <ul className="list-disc list-inside space-y-2 text-slate-400 mb-4">
                   <li>All prices on QuickGuard.uk are displayed and charged in Pound Sterling (GBP)</li>
-                  <li>VAT at the applicable UK rate is included in all displayed prices unless otherwise stated</li>
+                  <li>QuickGuard is not VAT registered. No VAT is added to QuickGuard subscription or booking-service fees. Tax on any separately supplied guard services depends on the relevant engagement arrangements</li>
                   <li>International cards may be subject to foreign transaction fees charged by your card issuer; QuickGuard and Stripe do not control these fees</li>
                 </ul>
 
@@ -437,7 +437,7 @@ export default function Terms() {
 
                 <h3 className="text-xl font-semibold text-white mb-3">VAT:</h3>
                 <p className="text-slate-400 mb-4">
-                  QuickGuard&apos;s platform service fee may be subject to UK VAT at the applicable rate. Guard services are provided by the guards directly; VAT obligations on those services are the guard&apos;s responsibility. VAT estimates shown in dashboards are indicative only and not a substitute for professional accounting advice.
+                  QuickGuard is not VAT registered and adds no VAT to its subscription or booking-service fees. Tax treatment of separately supplied guard services depends on the relevant engagement arrangements. Payment records are not VAT invoices.
                 </p>
 
                 <div className="bg-[#0e1628] border border-slate-700/50 p-4 rounded-xl">

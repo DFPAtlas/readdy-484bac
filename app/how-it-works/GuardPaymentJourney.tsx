@@ -1,18 +1,13 @@
+import FreeGuardAccount from '@/components/pricing/FreeGuardAccount';
 import Link from 'next/link';
 import { GUARD_PAYMENT_STEPS, GUARD_PAYOUT_SUPPORT_GUIDANCE } from '@/lib/guard-payment-guidance';
 
 const GUARD_POINTS = [
   'You receive your full agreed pay on new bookings',
   'QuickGuard does not deduct a guard booking commission',
-  'Guard membership is separate from your earnings',
+  'Guard profiles, job browsing and applications are free',
   'Standard payout costs are covered by the client booking service fee',
   'Payouts follow the existing Stripe onboarding and account eligibility checks',
-];
-
-const GUARD_PLANS = [
-  { tier: 'Basic', price: '£10/month or £100/year' },
-  { tier: 'Pro', price: '£19/month or £190/year' },
-  { tier: 'Elite', price: '£29/month or £290/year' },
 ];
 
 export default function GuardPaymentJourney() {
@@ -28,7 +23,7 @@ export default function GuardPaymentJourney() {
             How Guard Payments Work
           </h2>
           <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-            Guards are paid for the work they do — membership and earnings are two separate things.
+            Guard job access is free. Agreed gross guard pay and client subscription/service fees are shown separately.
           </p>
         </div>
 
@@ -57,18 +52,7 @@ export default function GuardPaymentJourney() {
           </div>
 
           <div className="lg:col-span-2">
-            <div className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-7 h-full">
-              <h3 className="text-lg font-semibold text-white mb-2">Guard memberships</h3>
-              <p className="text-sm text-slate-400 mb-5">Optional paid memberships, separate from what you earn on bookings.</p>
-              <ul className="space-y-3 list-none p-0 m-0">
-                {GUARD_PLANS.map((plan) => (
-                  <li key={plan.tier} className="flex items-center justify-between gap-3 border-b border-slate-800/60 pb-3 last:border-0 last:pb-0">
-                    <span className="text-sm font-semibold text-white whitespace-nowrap">{plan.tier}</span>
-                    <span className="text-sm text-teal-400 whitespace-nowrap">{plan.price}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <FreeGuardAccount />
           </div>
         </div>
       </div>

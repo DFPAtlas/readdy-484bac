@@ -11,14 +11,14 @@ import LaunchCta from './LaunchCta';
 export const metadata: Metadata = {
   title: { absolute: 'QuickGuard Launch — December Free' },
   description:
-    'QuickGuard launches 1 December. New clients and guards pay no subscription fee for December.',
+    'QuickGuard launches 1 December. Guard job access is free. Eligible new clients can review the December subscription offer and its renewal terms.',
   alternates: {
     canonical: 'https://quickguard.uk/launch',
   },
   openGraph: {
     title: 'QuickGuard Launch — December Free',
     description:
-      'QuickGuard launches 1 December. New clients and guards pay no subscription fee for December.',
+      'QuickGuard launches 1 December. Guard job access is free. Eligible new clients can review the December subscription offer and its renewal terms.',
     url: 'https://quickguard.uk/launch',
     siteName: 'QuickGuard',
     type: 'website',

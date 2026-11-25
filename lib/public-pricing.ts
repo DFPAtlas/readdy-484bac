@@ -1,3 +1,5 @@
+export const QUICKGUARD_TAX_NOTE = 'QuickGuard is not VAT registered. No VAT is added to QuickGuard subscription or booking-service fees.';
+
 export type PricingAudience = 'client' | 'guard';
 
 export interface PublicPricingPlan {
@@ -46,7 +48,7 @@ export function buildPublicPricing(planRows: unknown, feeRows: unknown, feesFail
     }
   }
   const slugs = new Set<string>();
-  const plans = planRows.filter(row => row?.active !== false).map(row => {
+  const plans = planRows.filter(row => row?.active !== false && !(row?.audience === 'guard' && row.slug !== 'guard_starter')).map(row => {
     const monthly = numeric(row?.monthly_price_pence);
     const limit = row?.job_limit_per_month;
     if (!row || typeof row.slug !== 'string' || !row.slug || slugs.has(row.slug)
@@ -63,7 +65,7 @@ export function buildPublicPricing(planRows: unknown, feeRows: unknown, feesFail
       stripe_price_id: typeof row.stripe_price_id === 'string' && row.stripe_price_id ? row.stripe_price_id : null,
       stripe_annual_price_id: typeof row.stripe_annual_price_id === 'string' && row.stripe_annual_price_id ? row.stripe_annual_price_id : null,
       description: typeof row.description === 'string' ? row.description : '',
-      features: normalisePlanFeatures(row.features), job_limit_per_month: limit,
+      features: normalisePlanFeatures(row.features), job_limit_per_month: row.audience === 'guard' ? null : limit,
       bookingFee: fee?.percent, bookingFeeFixedPence: fee?.fixed,
     };
   }).sort((a, b) => a.monthly_price_pence - b.monthly_price_pence || a.slug.localeCompare(b.slug));
@@ -100,7 +102,8 @@ export function bookingFeeText(plan: Pick<PublicPricingPlan, 'bookingFee' | 'boo
 }
 
 export function planAllowanceText(plan: Pick<PublicPricingPlan, 'audience' | 'job_limit_per_month'>): string {
-  const unit = plan.audience === 'client' ? 'job posting' : 'application';
+  if (plan.audience === 'guard') return 'Free applications with no monthly cap';
+  const unit = 'job posting';
   const limit = plan.job_limit_per_month;
   if (limit === null) return `Unlimited ${unit}s per month`;
   if (!Number.isSafeInteger(limit) || limit < 0) return 'Monthly allowance shown in your account';

@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, feat/free-guard-access-20261125]
 
 concurrency:
   group: quickguard-build-${{ github.ref }}
@@ -80,6 +80,7 @@ jobs:
             sleep 1
           done
           node scripts/uat/free-guard-browser-smoke.cjs
+          node scripts/uat/guard-pricing-browser-smoke.cjs
 
       - name: Upload free-access browser evidence
         if: always()

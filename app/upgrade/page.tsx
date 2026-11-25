@@ -4,6 +4,7 @@ import { featurePlanNames, planIncludesFeature, recommendedFeaturePlan } from '@
 import { clientFeatureLabels, guardFeatureLabels, getFeatureLabel, presentPricingPlan } from '@/lib/pricing-presentation';
 import { subscriptionPrice, planAllowanceText, bookingFeeText } from '@/lib/public-pricing';
 import PlanPrice from '@/components/pricing/PlanPrice';
+import FreeGuardAccount from '@/components/pricing/FreeGuardAccount';
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -33,18 +34,6 @@ const FEATURE_RECOMMENDED_PLAN: Record<string, string> = {
   'client.api_access': 'client-enterprise',
   'client.job_history': 'client-starter',
   'client.job_tracker': 'client-starter',
-  'guard.apply_job': 'guard_starter',
-  'guard.view_jobs': 'guard_starter',
-  'guard.create_profile': 'guard_starter',
-  'guard.advanced_alerts': 'guard_starter',
-  'guard.priority_profile': 'guard-pro',
-  'guard.profile_boost': 'guard-basic',
-  'guard.performance_analytics': 'guard-pro',
-  'guard.priority_support': 'guard-pro',
-  'guard.direct_contact': 'guard-pro',
-  'guard.unlimited_applications': 'guard-elite',
-  'guard_application_limit_reached': 'guard-basic',
-  'guard.plan_verification_failed': 'guard-basic',
   'job_limit_reached': 'client-starter',
 };
 
@@ -65,16 +54,6 @@ const FEATURE_UNLOCK_MESSAGE: Record<string, string> = {
   'client.api_access': 'Client Enterprise',
   'client.job_history': 'Client Starter, Client Pro or Client Enterprise',
   'client.job_tracker': 'Client Starter, Client Pro or Client Enterprise',
-  'guard.apply_job': 'Guard Starter and above',
-  'guard.view_jobs': 'Guard Starter and above',
-  'guard.create_profile': 'Guard Starter and above',
-  'guard.advanced_alerts': 'Guard Starter, Guard Pro, or Guard Elite',
-  'guard.priority_profile': 'Guard Pro or Guard Elite',
-  'guard.profile_boost': 'Guard Basic, Guard Pro or Guard Elite',
-  'guard.performance_analytics': 'Guard Pro or Guard Elite',
-  'guard.priority_support': 'Guard Pro or Guard Elite',
-  'guard.direct_contact': 'Guard Pro or Guard Elite',
-  'guard.unlimited_applications': 'Guard Elite',
   'job_limit_reached': 'Client Starter, Client Pro, or Client Enterprise',
 };
 
@@ -208,72 +187,6 @@ const FEATURE_BENEFITS: Record<string, { title: string; desc: string; points: { 
     }
   ]
 },
-  'guard.advanced_alerts': {
-  "title": "Job alerts for your preferences",
-  "desc": "Receive supported notifications for matching jobs when your notification settings allow them. Delivery depends on the channel, device permissions and availability; alerts do not guarantee a booking.",
-  "points": [
-    {
-      "icon": "ri-notification-line",
-      "label": "Notification settings",
-      "detail": "Review your enabled channels and travel preferences in your account."
-    }
-  ]
-},
-  'guard.priority_profile': {
-  "title": "Priority profile eligibility",
-  "desc": "Compare the profile features in each membership. Profile eligibility does not guarantee a search position, invitation or booking.",
-  "points": [
-    {
-      "icon": "ri-user-line",
-      "label": "Profile information",
-      "detail": "Keep your professional details and availability up to date."
-    }
-  ]
-},
-  'guard.profile_boost': {
-  "title": "Featured profile placement",
-  "desc": "Eligible active profiles appear ahead of standard profiles in Find a Guard and the Recommended applicant order. Client filters and explicit rating, distance or price sorts still apply. Placement does not guarantee an invitation or booking.",
-  "points": [
-    {
-      "icon": "ri-user-line",
-      "label": "Keep your profile current",
-      "detail": "Accurate experience, licence details and availability help clients assess your suitability."
-    }
-  ]
-},
-  'guard.performance_analytics': {
-    title: 'Why upgrade to Performance Analytics?',
-    desc: 'Understand your earning patterns, booking trends, and client ratings to maximise your income.',
-    points: [
-      { icon: 'ri-line-chart-line', label: 'Earnings Dashboard', detail: 'Track monthly earnings, average hourly rate, and year-on-year growth.' },
-      { icon: 'ri-star-line', label: 'Rating Insights', detail: 'See what clients say, identify patterns, and improve your profile to attract better jobs.' },
-      { icon: 'ri-calendar-check-line', label: 'Booking Trends', detail: 'Know which days, venues, and shift types book you most so you can optimise availability.' },
-    ],
-  },
-  'guard.priority_support': {
-    title: 'Why upgrade to Priority Support?',
-    desc: 'Our AI assistant is available 24/7 for platform questions and common issues. Priority support adds human help for payment issues, client disputes, or licence verification.',
-    points: [
-      { icon: 'ri-customer-service-2-line', label: 'Priority Queue', detail: 'Your support tickets jump to the front of the queue.' },
-      { icon: 'ri-phone-line', label: 'Phone Support', detail: 'Call us directly for urgent issues related to payments or job disputes.' },
-    ],
-  },
-  'guard.direct_contact': {
-    title: 'Why upgrade to Direct Contact?',
-    desc: 'Message clients directly to ask questions, confirm details, or build relationships for repeat bookings.',
-    points: [
-      { icon: 'ri-message-3-line', label: 'Client Messaging', detail: 'Chat with clients before accepting a job to clarify expectations and requirements.' },
-      { icon: 'ri-user-heart-line', label: 'Build Relationships', detail: 'Clients can favourite you and invite you directly to future jobs.' },
-    ],
-  },
-  'guard.unlimited_applications': {
-    title: 'Why upgrade to a bigger application allowance?',
-    desc: 'Increase your monthly application allowance so you can apply for more jobs each month.',
-    points: [
-      { icon: 'ri-arrow-up-circle-line', label: 'Higher Monthly Allowance', detail: 'Compare the current application allowances listed with each plan.' },
-      { icon: 'ri-money-pound-circle-line', label: 'Maximise Earnings', detail: 'A larger application allowance lets you apply to more suitable jobs; it does not guarantee a booking.' },
-    ],
-  },
 };
 
 function UpgradeContent() {
@@ -283,7 +196,7 @@ function UpgradeContent() {
 
   const [audience, setAudience] = useState<'client' | 'guard' | null>(null);
   const catalogue = usePublicPricing();
-  const plans = catalogue.plans.filter(plan => !audience || plan.audience === audience).map(presentPricingPlan);
+  const plans = catalogue.plans.filter(plan => plan.audience === 'client' && (!audience || audience === 'client')).map(presentPricingPlan);
   const [currentPlan, setCurrentPlan] = useState<any>(null);
   const [audienceLoading, setAudienceLoading] = useState(true);
   const [membershipError, setMembershipError] = useState(false);
@@ -465,6 +378,14 @@ function UpgradeContent() {
     finally { setSubscribing(null); }
   }
 
+  if (!audienceLoading && (audience === 'guard' || reason.startsWith('guard.') || reason === 'guard_application_limit_reached' || preselectedPlan.startsWith('guard'))) {
+    return <div className="min-h-screen bg-[#0B1933]"><NavSidebar /><main className="max-w-4xl mx-auto px-6 py-12">
+      <FreeGuardAccount signedIn={audience === 'guard'} />
+      {membershipError && <p role="alert" className="mt-4 text-amber-300">Existing membership details could not be loaded. Review your dashboard membership record or contact billing support before changing renewal settings.</p>}
+      {tokenSummary?.pending && <div className="mt-6 rounded-xl border border-amber-400/30 p-4 text-slate-300"><p>A previous token checkout is pending. Review or cancel it to reconcile the reserved rewards.</p><button type="button" disabled={subscribing !== null} onClick={cancelTokenCheckout} className="mt-3 underline">Cancel pending checkout</button></div>}
+    </main></div>;
+  }
+
   const benefit = FEATURE_BENEFITS[reason];
 
   if (loading) {
@@ -505,51 +426,6 @@ function UpgradeContent() {
           <h1 className="text-4xl font-bold text-white mb-4">
             {featureIncluded ? `${featureName} is included` : isKnownFeature ? `Unlock ${featureName}` : reason ? 'Upgrade Your Plan' : 'Choose Your Plan'}
           </h1>
-
-          {reason === 'guard_application_limit_reached' && (
-            <div className="max-w-2xl mx-auto mb-6">
-              <div className="bg-[#111d35] border border-orange-500/30 rounded-2xl p-6">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="w-10 h-10 bg-orange-500/15 rounded-xl border border-orange-400/25 flex items-center justify-center flex-shrink-0">
-                    <i className="ri-alert-line text-orange-400 text-xl" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white mb-1">Monthly Application Limit Reached</h3>
-                    <p className="text-slate-300">
-                      You have reached your monthly application limit for your current plan. Upgrade your plan to apply for more jobs this month.
-                    </p>
-                  </div>
-                </div>
-                <div className="bg-[#0e1628] rounded-xl border border-slate-700/50 p-4">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Plan Application Limits</p>
-                  <div className="space-y-2 text-sm">
-                    {plans.filter(plan => plan.audience === 'guard').map(plan => <div key={plan.slug} className="flex items-center justify-between gap-4">
-                      <span className="text-slate-300">{plan.name}</span>
-                      <span className="text-slate-400">{planAllowanceText(plan)}</span>
-                    </div>)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {reason === 'guard.plan_verification_failed' && (
-            <div className="max-w-xl mx-auto mb-6">
-              <div className="bg-[#111d35] border border-yellow-500/30 rounded-2xl p-6">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-yellow-500/15 rounded-xl border border-yellow-400/25 flex items-center justify-center flex-shrink-0">
-                    <i className="ri-error-warning-line text-yellow-400 text-xl" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white mb-1">Plan Verification Failed</h3>
-                    <p className="text-slate-300">
-                      We could not verify your guard subscription plan. Please refresh or contact support.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {reason === 'job_limit_reached' && (
             <div className="max-w-2xl mx-auto mb-6">

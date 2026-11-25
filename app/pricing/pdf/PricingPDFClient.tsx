@@ -4,9 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
 import { usePublicPricing } from '@/lib/use-public-pricing';
-import { bookingFeeText, planAllowanceText } from '@/lib/public-pricing';
+import { QUICKGUARD_TAX_NOTE, bookingFeeText, planAllowanceText } from '@/lib/public-pricing';
 import { getFeatureLabel, presentPricingPlan } from '@/lib/pricing-presentation';
 import PlanPrice from '@/components/pricing/PlanPrice';
+import FreeGuardAccount from '@/components/pricing/FreeGuardAccount';
+import ClientBookingExamples from '@/components/pricing/ClientBookingExamples';
 
 export default function PricingPDFClient() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
@@ -16,13 +18,6 @@ export default function PricingPDFClient() {
     ...presentPricingPlan(plan),
     features: [planAllowanceText(plan), `${bookingFeeText(plan)} booking service fee`, 'Payment processing included', ...plan.features.map(feature => getFeatureLabel(feature, plan.audience))],
     cta: plan.monthly_price_pence === 0 ? 'Get Started Free' : 'View Plans',
-  }));
-  const guardPlans = catalogue.plans.filter(plan => plan.audience === 'guard').map(plan => ({
-    ...presentPricingPlan(plan),
-    features: [planAllowanceText(plan), ...plan.features.map(feature => getFeatureLabel(feature, plan.audience))],
-    cta: plan.monthly_price_pence === 0 ? 'Create Free Account' : 'View Plans',
-    link: plan.monthly_price_pence === 0 ? '/guard/register' : '/pricing',
-    isFree: plan.monthly_price_pence === 0,
   }));
   const canPrint = !catalogue.loading && !catalogue.error && !catalogue.feesError;
   const clientFeeSummary = clientPlans.map(plan => `${plan.name}: ${bookingFeeText(plan)}`).join('; ');
@@ -173,68 +168,8 @@ export default function PricingPDFClient() {
         </section>
 
         {/* Guard Plans */}
-        <section className="mb-12 print:mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-center">
-              <i className="ri-shield-user-line text-xl text-blue-600" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">Guard Membership Plans</h2>
-              <p className="text-sm text-slate-500">For security professionals seeking work</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:gap-3">
-            {guardPlans.map((plan) => {
-              const isPopular = !!plan.badge;
-
-              return (
-                <div
-                  key={plan.name}
-                  className={`rounded-xl border p-4 print:p-3 print:border-slate-300 flex flex-col ${
-                    isPopular ? 'border-blue-500 bg-blue-50/40' : 'border-slate-200 bg-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2 gap-2">
-                    <h3 className="font-bold text-slate-900">{plan.name}</h3>
-                    {isPopular && (
-                      <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap">
-                        {plan.badge}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 mb-3">{plan.description}</p>
-
-                  <div className="mb-3 pb-3 border-b border-slate-200">
-                    <PlanPrice plan={plan} billingCycle={billingCycle} print />
-                  </div>
-
-                  <ul className="space-y-1.5 flex-1">
-                    {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-1.5 text-xs">
-                        <i className="ri-check-line text-blue-600 mt-0.5 flex-shrink-0" />
-                        <span className="text-slate-700">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="mt-4 print:hidden">
-                    <Link
-                      href={plan.link}
-                      className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-all whitespace-nowrap block text-center ${
-                        plan.isFree
-                          ? 'bg-slate-100 text-slate-900 hover:bg-slate-200'
-                          : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }`}
-                    >
-                      {plan.cta}
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        <FreeGuardAccount print />
+        <ClientBookingExamples plans={clientPlans} print />
 
         {/* Guard Hourly Rates */}
         <section className="mb-12 print:mb-8">
@@ -415,7 +350,7 @@ export default function PricingPDFClient() {
             </div>
           </div>
           <p className="text-xs text-slate-400 text-center mt-4 print:mt-2">
-            All prices shown in GBP. VAT applies where applicable. Prices subject to change. 24/7 support is provided by our AI assistant; issues needing human review can be escalated during business hours. This guide uses the catalogue retrieved for this visit.
+            All prices shown in GBP. {QUICKGUARD_TAX_NOTE} Prices subject to change. 24/7 support is provided by our AI assistant; issues needing human review can be escalated during business hours. This guide uses the catalogue retrieved for this visit.
           </p>
         </div>
       </div>

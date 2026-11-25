@@ -1,3 +1,4 @@
+import { GUARD_MEMBERSHIPS_RETIRED, isGuardMembership } from '../_shared/guard-membership-retirement.ts';
 import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
@@ -39,13 +40,6 @@ serve(async (req) => {
   if (authError || !user) {
     return new Response(JSON.stringify({ error: 'Invalid or expired token' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
-  const { data: adminUser } = await supabase.from('admin_users').select('id, is_active, role').eq('user_id', user.id).maybeSingle();
-  if (!adminUser || !adminUser.is_active) {
-    return new Response(JSON.stringify({ error: 'Admin access required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  }
-  if (adminUser.role !== 'super_admin' && adminUser.role !== 'finance_admin') {
-    return new Response(JSON.stringify({ error: 'Only super_admin or finance_admin can resume subscriptions' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  }
 
   try {
     const { stripeSubscriptionId, userId } = await req.json();
@@ -57,14 +51,28 @@ serve(async (req) => {
       );
     }
 
+    if (userId !== user.id) {
+      const { data: adminUser } = await supabase.from('admin_users').select('id, is_active, role').eq('user_id', user.id).maybeSingle();
+      if (!adminUser || !adminUser.is_active) {
+        return new Response(JSON.stringify({ error: 'Admin access required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      if (adminUser.role !== 'super_admin' && adminUser.role !== 'finance_admin') {
+        return new Response(JSON.stringify({ error: 'Only super_admin or finance_admin can resume subscriptions' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
     const {data: local, error: lookupError} = await supabase.from('subscriptions')
-      .select('id, user_id').eq('stripe_subscription_id', stripeSubscriptionId).maybeSingle();
+      .select('id, user_id, account_type, plan_slug').eq('stripe_subscription_id', stripeSubscriptionId).maybeSingle();
     if (lookupError) throw lookupError;
     if (!local || local.user_id !== userId) {
       return new Response(JSON.stringify({error: 'Subscription does not belong to this user'}), {
         status: 404, headers: {...corsHeaders, 'Content-Type': 'application/json'},
       });
     }
+    if (isGuardMembership(local.account_type, local.plan_slug)) return new Response(JSON.stringify(GUARD_MEMBERSHIPS_RETIRED), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (local.account_type !== 'client' && !(typeof local.plan_slug === 'string' && local.plan_slug.startsWith('client'))) throw new Error('Subscription audience could not be confirmed.');
+    const { data: clientAccount, error: clientError } = await supabase.from('clients').select('id, is_active').eq('user_id', userId).maybeSingle();
+    if (clientError || !clientAccount || clientAccount.is_active !== true) throw new Error('Client account must be active to resume renewal.');
     const subscription = await stripe.subscriptions.update(stripeSubscriptionId, {
       cancel_at_period_end: false,
     });

@@ -14,7 +14,7 @@ import NavSidebar from '@/components/NavSidebar';
 import { CLIENT_JOURNEY, GUARD_JOURNEY, CANCELLATION_WINDOWS, CANCELLATION_NOTES, LICENCE_CHECKS, CLIENT_TOPICS, GUARD_TOPICS } from '@/lib/help-content';
 import { calculatePaygFees, formatCurrency } from '@/lib/payg-fees';
 import { usePublicPricing } from '@/lib/use-public-pricing';
-import { bookingFeeText, planAllowanceText } from '@/lib/public-pricing';
+import { bookingFeeText } from '@/lib/public-pricing';
 
 type Role = 'client' | 'guard';
 
@@ -60,32 +60,20 @@ function MoneySection({ role }: { role: Role }) {
   const [planSlug, setPlanSlug] = useState('client-starter');
   const catalogue = usePublicPricing();
   const clientPlans = catalogue.plans.filter(plan => plan.audience === 'client');
-  const guardPlans = catalogue.plans.filter(plan => plan.audience === 'guard');
   const [hours, setHours] = useState(8);
   const [rate, setRate] = useState(15);
 
-  if (catalogue.loading || catalogue.error || (role === 'client' && catalogue.feesError)
-    || !(role === 'client' ? clientPlans : guardPlans).length) {
-    return <div role="status" className="mb-16 bg-[#111d35] border border-slate-700/50 rounded-2xl p-6 text-slate-300">
-      <p>{catalogue.loading ? 'Loading current plans and fees…' : catalogue.error || 'Current booking fees could not be confirmed. No estimate is available.'}</p>
-      {!catalogue.loading && <button type="button" onClick={catalogue.retry} className="mt-3 text-teal-400 underline">Retry pricing</button>}
-      <Link href="/pricing" className="ml-4 text-teal-400 underline">View pricing</Link>
-    </div>;
-  }
-
   if (role === 'guard') {
-    const prices = guardPlans.map(plan => plan.monthly_price_pence / 100);
-    const priceRange = `\u00a3${Math.min(...prices)}\u2013\u00a3${Math.max(...prices)}`;
     const guardCards = [
       {
         big: '0%',
         title: 'No booking commission',
-        text: "Nothing is deducted from your pay. The client's service fee covers processing and standard payouts.",
+        text: "QuickGuard adds no platform or Stripe deduction to agreed gross guard pay. Statutory deductions depend on the engagement.",
       },
       {
-        big: priceRange,
-        title: 'Monthly membership',
-        text: `${guardPlans.map(plan => `${plan.name}: ${formatCurrency(plan.monthly_price_pence / 100)} per month (${planAllowanceText(plan)})`).join('; ')}. Membership is separate from your earnings.`,
+        big: '£0',
+        title: 'Free guard job access',
+        text: 'Create a profile, browse and apply with no monthly application cap or paid job tiers. Account approval and licence requirements apply. Manage any existing membership separately on your dashboard or through billing support.',
       },
       {
         big: 'Stripe',
@@ -97,7 +85,7 @@ function MoneySection({ role }: { role: Role }) {
     return (
       <div className="mb-16">
         <p className="text-xs font-bold uppercase tracking-[0.2em] mb-3 text-sky-400">Your earnings</p>
-        <h2 className="text-2xl md:text-3xl font-bold text-white mb-8">You keep your full agreed pay</h2>
+        <h2 className="text-2xl md:text-3xl font-bold text-white mb-8">Your agreed guard pay</h2>
         <div className="grid md:grid-cols-3 gap-5">
           {guardCards.map((card) => (
             <div key={card.title} className="h-full bg-[#111d35] border border-slate-700/50 rounded-2xl p-6">
@@ -112,6 +100,15 @@ function MoneySection({ role }: { role: Role }) {
         <Link href="/guide/guard#step-04" className="inline-block mt-4 text-sm text-sky-400 underline">Read the guard payout guide</Link>
       </div>
     );
+  }
+
+  if (catalogue.loading || catalogue.error || catalogue.feesError
+    || !clientPlans.length) {
+    return <div role="status" className="mb-16 bg-[#111d35] border border-slate-700/50 rounded-2xl p-6 text-slate-300">
+      <p>{catalogue.loading ? 'Loading current plans and fees…' : catalogue.error || 'Current booking fees could not be confirmed. No estimate is available.'}</p>
+      {!catalogue.loading && <button type="button" onClick={catalogue.retry} className="mt-3 text-teal-400 underline">Retry pricing</button>}
+      <Link href="/pricing" className="ml-4 text-teal-400 underline">View pricing</Link>
+    </div>;
   }
 
   const plan = clientPlans.find((p) => p.slug === planSlug) ?? clientPlans[0];

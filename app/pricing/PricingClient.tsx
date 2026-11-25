@@ -9,9 +9,11 @@ import PricingBreadcrumb from './PricingBreadcrumb';
 import { supabase } from '@/lib/supabase';
 import { calculatePaygFees, formatCurrency } from '@/lib/payg-fees';
 import { usePublicPricing } from '@/lib/use-public-pricing';
-import { subscriptionPrice, bookingFeeText, type PublicPricingPlan } from '@/lib/public-pricing';
+import { QUICKGUARD_TAX_NOTE, subscriptionPrice, bookingFeeText, type PublicPricingPlan } from '@/lib/public-pricing';
 import { getFeatureLabel, presentPricingPlan } from '@/lib/pricing-presentation';
 import PlanPrice from '@/components/pricing/PlanPrice';
+import FreeGuardAccount from '@/components/pricing/FreeGuardAccount';
+import ClientBookingExamples from '@/components/pricing/ClientBookingExamples';
 
 interface Plan extends PublicPricingPlan { badge?: string; limitations?: string[]; }
 
@@ -19,7 +21,6 @@ export default function PricingClient() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const catalogue = usePublicPricing();
   const clientPlans = catalogue.plans.filter(plan => plan.audience === 'client').map(presentPricingPlan);
-  const guardPlans = catalogue.plans.filter(plan => plan.audience === 'guard').map(presentPricingPlan);
   const freePlan = clientPlans.find(plan => plan.slug === 'client_free');
   const paygServiceFeePct = freePlan?.bookingFee ?? null;
   const paygFixedFeePence = freePlan?.bookingFeeFixedPence ?? 0;
@@ -288,7 +289,7 @@ export default function PricingClient() {
               Simple plans. No surprises.
             </h1>
             <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-              Choose a monthly or annual subscription, or start with a free account. Cancel renewal anytime. Current posting and application allowances are listed with each plan. Guard pay and booking service fees are separate from subscriptions.
+              Choose a monthly or annual subscription, or start with a free account. Cancel renewal anytime. Client posting allowances are listed with each plan. Guard job access is free. Guard pay and booking service fees are separate from subscriptions.
             </p>
 
             <div className="inline-flex items-center bg-slate-800/80 backdrop-blur-sm rounded-full p-1 gap-1 border border-slate-700">
@@ -326,6 +327,7 @@ export default function PricingClient() {
               <button type="button" onClick={catalogue.retry} className="mt-3 underline">Retry pricing</button>
             </div>
           )}
+          <p className="mb-8 text-sm text-slate-400">{QUICKGUARD_TAX_NOTE}</p>
           {/* CLIENT PLANS */}
           <div className="text-center mb-14">
             <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-400/20 text-teal-400 px-4 py-1.5 rounded-full text-sm font-medium mb-4">
@@ -336,7 +338,7 @@ export default function PricingClient() {
               Client Subscription Plans
             </h2>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-              Post jobs, find guards, and manage your security staffing with flexible monthly or annual billing.
+              Your subscription covers the listed business services and posting allowance. A separate booking service fee applies; standard payment processing is included in these client charges.
             </p>
           </div>
 
@@ -350,29 +352,8 @@ export default function PricingClient() {
             </div>
           )}
 
-          {/* GUARD PLANS */}
-          <div className="text-center mb-14">
-            <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-400/20 text-blue-400 px-4 py-1.5 rounded-full text-sm font-medium mb-4">
-              <i className="ri-shield-user-line" />
-              For Security Guards
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
-              Guard Membership Plans
-            </h2>
-            <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-              Compare application limits, profile features and support to find the membership that fits your security career.
-            </p>
-          </div>
-
-          {plansLoading ? (
-            <div className="flex justify-center mb-24">
-              <i className="ri-loader-4-line text-4xl text-blue-400 animate-spin" />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-24 pt-6">
-              {guardPlans.map((plan, i) => renderPlanCard(plan, i, 'blue'))}
-            </div>
-          )}
+          <div className="mb-20"><FreeGuardAccount signedIn={user?.role === 'guard'} /></div>
+          {!plansLoading && <ClientBookingExamples plans={clientPlans} />}
 
           {/* CTA — Below the cards */}
           <div className="bg-[#0e1628] rounded-2xl border border-slate-700/50 p-8 md:p-12 mb-24 text-center">
@@ -383,7 +364,7 @@ export default function PricingClient() {
               Not sure which plan fits you?
             </h2>
             <p className="text-slate-400 max-w-2xl mx-auto mb-8">
-              Every guard must pass an SIA licence check before taking work. Booking payments are processed through Stripe, and QuickGuard AI support is available 24/7 for platform and dispute questions. Human reviews are handled by our team; priority support depends on your plan.
+              Guards need account approval and the required valid SIA licence before taking work. Clients choose the services and posting allowance that fit their hiring needs. Booking payments are processed through Stripe.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
@@ -402,7 +383,7 @@ export default function PricingClient() {
               </Link>
             </div>
             <p className="text-sm text-slate-500 mt-6">
-              Free to create an account · Cancel renewal anytime · Paid access continues until your billing period ends
+              Free guard job access · Client subscription and booking charges shown separately
             </p>
           </div>
 
@@ -561,7 +542,7 @@ export default function PricingClient() {
               </Link>
             </div>
             <p className="text-sm text-slate-500 mt-6">
-              Free to create an account · Cancel renewal anytime · Paid access continues until your billing period ends
+              Free guard job access · Client subscription and booking charges shown separately
             </p>
           </div>
         </section>

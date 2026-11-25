@@ -56,13 +56,6 @@ serve(async (req) => {
   if (authError || !user) {
     return new Response(JSON.stringify({ error: 'Invalid or expired token' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
-  const { data: adminUser } = await supabase.from('admin_users').select('id, is_active, role').eq('user_id', user.id).maybeSingle();
-  if (!adminUser || !adminUser.is_active) {
-    return new Response(JSON.stringify({ error: 'Admin access required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  }
-  if (adminUser.role !== 'super_admin' && adminUser.role !== 'finance_admin') {
-    return new Response(JSON.stringify({ error: 'Only super_admin or finance_admin can cancel subscriptions' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  }
 
   try {
     const { stripeSubscriptionId, userId } = await req.json();
@@ -72,6 +65,16 @@ serve(async (req) => {
         JSON.stringify({ error: 'Missing stripeSubscriptionId or userId' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    if (userId !== user.id) {
+      const { data: adminUser } = await supabase.from('admin_users').select('id, is_active, role').eq('user_id', user.id).maybeSingle();
+      if (!adminUser || !adminUser.is_active) {
+        return new Response(JSON.stringify({ error: 'Admin access required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      if (adminUser.role !== 'super_admin' && adminUser.role !== 'finance_admin') {
+        return new Response(JSON.stringify({ error: 'Only super_admin or finance_admin can cancel subscriptions' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
     const {data: local, error: lookupError} = await supabase.from('subscriptions')

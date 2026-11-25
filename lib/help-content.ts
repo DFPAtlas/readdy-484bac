@@ -55,7 +55,7 @@ export const CLIENT_JOURNEY: JourneyStep[] = [
 ];
 
 export const GUARD_JOURNEY: JourneyStep[] = [
-  { title: "Create your profile", desc: "Register, choose a membership and upload your SIA licence." },
+  { title: "Create your profile", desc: "Register free and upload your SIA licence." },
   { title: "Licence checked", desc: "You can take work once your SIA licence check is passed." },
   { title: "Set your radius", desc: "Get alerts for jobs within the distance you're willing to travel." },
   { title: "Apply for shifts", desc: "Apply to the jobs that suit you. Clients choose who to book." },
@@ -73,10 +73,10 @@ export const CLIENT_TOPICS: HelpTopic[] = [
 ];
 
 export const GUARD_TOPICS: HelpTopic[] = [
-  { title: "Getting started", desc: "Register, choose a membership and build your profile.", href: "/guide/guard" },
+  { title: "Getting started", desc: "Register free and build your profile.", href: "/guide/guard" },
   { title: "SIA verification", desc: "Uploading your licence and what to do if it's delayed.", href: "/guide/guard" },
   { title: "Finding work", desc: "Job alerts, travel radius and applying.", href: "/guide/guard" },
   { title: "Getting paid", desc: "Stripe payout setup and when pay is released.", href: "/guide/guard" },
   { title: "On the shift", desc: "Check-in, completion and reporting problems.", href: "/guide/guard" },
-  { title: "Membership", desc: "Basic, Pro and Elite, upgrades and cancelling.", href: "/guide/guard" },
+  { title: "Membership", desc: "Free job access, existing billing records and support.", href: "/guide/guard" },
 ];
