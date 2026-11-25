@@ -115,3 +115,6 @@ verify_jwt = false
 # Private version retrieval verifies user, active admin MFA and content role.
 [functions.admin-read-site-media]
 verify_jwt = false
+
+[functions.guest-booking]
+verify_jwt = false

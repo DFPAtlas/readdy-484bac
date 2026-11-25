@@ -26,6 +26,7 @@ import FirstJobHelper from './FirstJobHelper';
 import ContextualHelpCard from '@/app/client/help/ContextualHelpCard';
 import { Suspense } from 'react';
 import { sanitiseTime, getStepErrors, validateAllSteps, stepFieldMap } from '@/lib/post-job-validation';
+import { finishGuestEnquiry } from '@/lib/guest-booking';
 import { loadPendingJobDraft, clearPendingJobDraft, mapPendingDraftToClientForm, createSubmissionId } from '@/lib/pending-job-draft';
 import ClientOnboardingAgent from '@/components/ClientOnboardingAgent';
 
@@ -547,6 +548,9 @@ function PostJobContent() {
         }).catch(() => {});
       }
 
+      if (result.jobId && submissionIdRef.current && !(await finishGuestEnquiry(result.jobId,submissionIdRef.current))) {
+        setPostSubmitWarnings(previous=>[...previous,'Your job was posted, but the saved booking follow-up could not be removed. Use Remove saved booking follow-up on the public booking page or contact support.']);
+      }
       clearPendingJobDraft();
       try { sessionStorage.removeItem('post_auth_redirect'); } catch {}
 

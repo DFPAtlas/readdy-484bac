@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feat/free-guard-access-20261125]
+    branches: [main, feat/free-guard-access-20261125, feat/free-guard-pricing-transition-20261125]
 
 concurrency:
   group: quickguard-build-${{ github.ref }}
@@ -51,6 +51,9 @@ jobs:
       - name: Admin and financial type gate
         run: npm run check:admin
 
+      - name: Guest booking Edge type gate
+        run: node scripts/checks/guest-booking-typecheck.cjs
+
       - name: Financial regression tests
         run: npm run test:unit
 
@@ -81,12 +84,15 @@ jobs:
           done
           node scripts/uat/free-guard-browser-smoke.cjs
           node scripts/uat/guard-pricing-browser-smoke.cjs
+          node scripts/uat/guest-booking-browser-smoke.cjs
 
       - name: Upload free-access browser evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: free-guard-browser-smoke
-          path: uat-results/free-guard-access/
+          path: |
+            uat-results/free-guard-access/
+            uat-results/guest-booking/
           if-no-files-found: ignore
           retention-days: 7

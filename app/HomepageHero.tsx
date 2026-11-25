@@ -79,7 +79,7 @@ export default function HomepageHero() {
           </div>
 
           <p className="text-slate-200 mb-1.5 max-w-xl">
-            Tell us what you need. We&apos;ll notify suitable verified guards immediately.
+            Check matching guard availability, then create a client account to send your booking request.
           </p>
           <p className="flex items-center gap-1.5 text-sm text-emerald-300 mb-6">
             <i className="ri-shield-check-line" aria-hidden="true"></i>

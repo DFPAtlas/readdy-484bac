@@ -1,0 +1,71 @@
+# Guest Book a Guard — phase 3
+
+Prepared 25 November 2026. Draft implementation, isolated sandbox evidence and CI browser fixtures. No production migration, deployment, merge, signup email or payment is performed by this phase.
+
+## User journey
+
+The homepage Book a Guard button opens the existing `/post-job` route with an account choice. Existing clients go to login; guests enter job requirements and check matching guards before creating an account. Active signed-in clients can use the form directly. A missing session is now a normal anonymous state in the client account wrapper; stored sessions still require verified Auth before private profile access.
+
+Contact details are optional for checking availability. The availability request contains only postcode, dates/times, days/guard count, booking type, licence, venue category and budget. Contact names/emails/phones, street address and free-text descriptions are not sent for matching. The server resolves the postcode through the fixed Postcodes.io endpoint; browser-supplied coordinates are ignored. Only a count, timestamp and explicit coverage scope are returned. Profiles, locations, names, identities and contact details are not returned.
+
+A result is an estimate from **recorded** data, not a reservation or guarantee. Unknown schedules/location/radius/rates are excluded. The page shows the requested headcount and any shortfall. Finite requests cover all requested days; recurring/ongoing requests explicitly cover their **first shift only**. All dates/times are interpreted for UK shifts. Results older than five minutes must be checked again before continuing. Changed inputs retire pending results, failed checks remain retryable and never become a zero count.
+
+Continuing requires a client account. The guest draft remains local and valid for 24 hours, with the existing submission ID carried into the authenticated review form. Storage failure prevents a false saved-draft/signup promise. Restore accepts only recognised string fields, rejects oversized/expired/future-dated records and cannot restore identity or payment state. Users can remove the saved draft. Expired browser records are discarded on the next booking-flow visit; closing the browser does not run background deletion. The job is created only through the existing authenticated `create-job` review/confirmation path, which retains ownership, validation, posting-limit and idempotency controls.
+
+The account dialog traps focus, initially focuses account creation, supports Escape and retains the existing safe login/signup return path. No job, invitation, notification, subscription or payment is created by an availability search.
+
+## Matching rules
+
+The service-only `app.guest_booking_match_count` returns an SQL aggregate, avoiding the Data API row-page limit. It does not consult guard billing entitlements, paid ranking or subscription plans.
+
+| Filter | Required evidence |
+| --- | --- |
+| Account | Active, completed guard profile, recorded reviewer and approved/verified status |
+| Test visibility | Marked test profiles excluded |
+| Licence | Verified licence number, matching recorded licence type, expiry covering the final shift end; known suspended/revoked/expired results excluded |
+| Schedule | Available status, explicit days and hours, every requested shift contained in a recorded window, including an overnight window from the previous day |
+| Budget/venue | Recorded minimum hourly rate (or hourly-rate fallback) within budget; explicit venue preferences respected |
+| Travel | Known home coordinates, affirmative willingness to travel and a positive recorded miles/km radius; real distance within that radius |
+| Conflicts | No overlapping live assignment, including overnight/multi-day jobs; missing timing on a possibly conflicting assignment fails closed; adjacent, cancelled/rejected/completed assignments do not block |
+
+Input is bounded: valid UK postcode, future shifts starting within 90 days, 1–90 finite days, 1–50 guards, 30-minute to 16-hour shifts and £10–£1,000 hourly rate. These validation bounds are not a statement of employment-law or minimum-wage compliance. Matching uses the site's existing recorded licence taxonomy; legal engagement/payroll review remains separate.
+
+## Optional follow-up and privacy
+
+A separate unticked checkbox and **Save booking follow-up** action record permission to email about that unfinished booking. Searching, continuing to signup and completing a job do not imply this permission. The versioned text is `booking-followup-2026-11-25`. No general-marketing permission is recorded or inferred.
+
+`app.guest_booking_enquiries` stores only contact name/email, postcode area, requested date, submission ID, the explicit consent/version/time, expiry and a one-way receipt digest. It does not store phone, full postcode/street address, free-text requirements, raw IP or payment information. It is separate from `quickguard_leads` and existing lead-finder/email automation. Addresses supplied by guests are self-declared, not proof of email ownership. No automated follow-up, verification email or marketing message is sent by this implementation.
+
+A CSPRNG 256-bit removal receipt stays in browser storage and is sent only in POST bodies. It is never put in URLs or administrator queries. Retrying a saved receipt preserves the original expiry and does not duplicate or extend consent. A different token cannot remove that enquiry. Administrators with the existing active-admin/MFA predicate can read the current narrow fields and remove a record; ordinary accounts cannot read contacts. No browser role can select receipt hashes. The new panel appears above existing internet-collected leads.
+
+Confirmed job creation attempts to remove the linked enquiry. The endpoint verifies the user's token, an active client, an owned posted job and matching submission ID before deletion. A failure is a warning after successful posting, not a failed job or automatic replay. Users retain the explicit removal option and can contact support if a receipt/browser is lost.
+
+Expiry is no later than 30 days after original consent, and enquiries whose requested date has passed are excluded from administrator reads and removed by cleanup. The expiry date and purpose are shown in admin. `purge_expired_guest_enquiries` also removes rate-limit records older than one day. It runs before allowed public actions; an hourly scheduler is registered **dormant** for reviewed rollout. **Enable and verify that production scheduler before releasing the feature** so physical cleanup continues without site traffic. Sandbox cron remains disabled.
+
+The public Edge endpoint has `verify_jwt=false` because guests must call it; internal RPCs and tables are not granted to guests. Sensitive conversion verifies Auth in the handler. The handler bounds body size, validates fields/action/method, applies a narrow CORS allowlist, uses no-store responses, rejects a honeypot, and returns generic internal-failure messages. A persistent keyed network-address digest limits a caller to 12 requests/minute; a serialised global 120/minute budget also bounds header/identity rotation. The forwarding header is not treated as proof of identity. No raw address is stored in the limiter. Network limits can affect clients sharing an address and need monitoring/tuning before scale.
+
+## Implementation and sandbox verification
+
+- Base: phase-2 commit `dcf2b78f36095d1a1688e2c2616ffe74c081ebda`. PR 277 reached main before PR 278 was merged into its feature branch. [PR 279](https://github.com/DFPAtlas/readdy-484bac/pull/279) now delivers that unchanged pricing implementation to main; this guest change remains a separate dependent draft.
+- CLI-generated migration: `20261125193305_guest_booking_availability_and_enquiries.sql` (pinned CLI 2.81.3). Applied only to `qg-e2e-sandbox`, project `alfwwggavmyerjyqumuo`.
+- Sandbox `guest-booking` Edge version **1**, public entry setting `verify_jwt=false`, active. The pinned Supabase client is retained. The handler and its precise database/RPC contract also pass a dedicated strict TypeScript gate against installed Supabase types; no `any` cast, suppression or build bypass is added.
+- New PostgreSQL tests execute actual schema/aggregate logic: a count above 1,000; eligibility/unknown-data exclusions; all-day and overnight windows; overlapping/adjacent/cancelled/unknown assignments; invalid/past parameters; contact/receipt ACLs; consent/expiry constraints; retention and persistent caller/global limits.
+- Actual handler/UI fixtures cover fixed geocoding, privacy of count responses/requests, first-shift labels, failures/429/retries, malformed/oversized input, explicit consent, repeat save/expiry, receipt-scoped removal, owner/foreign/draft conversion, optional contact details, storage failures, stable draft IDs, injected-field rejection and retired/unmounted requests. Client-provider regressions distinguish a legitimate absent session from a failed verified session, preserving sign-out/identity-change protections.
+- Full local suite and exact-head CI results are recorded in the PR. CI runs lint, repository/admin/Edge types, all regression tests, Next production build, both previous phase browser scripts and `guest-booking-browser-smoke.cjs` at 1440px and 390px. Browser APIs are synthetic and external/provider traffic is blocked; these fixtures are not an actual signup-email/payment journey.
+- Native `scripts/uat/guest-booking-native-smoke.sql` passed: a fresh synthetic identity/profile inside one rollback-only transaction is counted once when eligible, excluded when marked test or missing location, and discarded completely. No retained closed fixture is reopened. Auth/profile triggers were inspected before that test and perform database writes only. Native anonymous/client ACL and receipt-column denial, invalid-date rejection and synthetic retention checks passed. The scheduler exists and remains dormant.
+- Native `scripts/uat/guest-booking-http-smoke.cjs` passed seven HTTP checks plus final cleanup: approved preflight, disallowed origin, genuine Postcodes.io lookup/aggregate (zero in the closed fixture baseline), non-consent rejection, save/retry with unchanged expiry and unauthenticated conversion denial. The synthetic enquiry was removed in `finally`; final enquiry count is zero. No real email, guard notification, booking or payment was sent/created.
+- Final Auth/profile checks find no retained positive-count fixture. Financial/operational row digests match the pre-change baseline: jobs `0f943ad24428985b986e79ea0c6608e4`, subscriptions `0fa2d0b9c56a05b44185f63da5e5fe7c`, entitlements `f600d0d2cf5ea97c024ace574de3f0fb`, rewards `80ec0bf3c37a88412c58ed57e8654b35`, email queue `b2aac23d1c0c9393af85b40f2f8e7c05`. Active cron jobs remain zero. Limiter counters from real sandbox HTTP calls are expected and expire through cleanup.
+
+Security Advisor retains the two existing security-definer-view errors and broad existing function-execution warnings from phase 1. The new limiter table adds one informational RLS-without-policy finding: this is deliberately sealed to browser roles and writable only by service role, as verified by ACL tests; it is not opened to silence the advisory. New functions use invoker rights with fixed search paths. Health Advisor has no findings. No clean security/legal audit is claimed.
+
+## Rollout, fallback and remaining acceptance
+
+1. Review and deliver the pricing dependency and this draft in order. Retarget this PR to main after its dependency is merged, then check the resulting exact-head CI. No merge or production action is performed automatically.
+2. Before production enablement, review matching/availability data quality, the 30-day enquiry policy, Postcodes.io dependency/privacy wording, consent handling, admin visibility/removal, and request-limit behaviour. Do not advertise unknown schedules as guaranteed availability.
+3. Apply the reviewed migration, enable/verify the hourly retention job, deploy the matching Edge handler with the intended public entry setting, then release the matching frontend. Verify narrow RPC/table grants and repeat native aggregate/ACL/retention checks. Include cron failure monitoring and consent withdrawal in operational ownership.
+4. Complete controlled real-account sandbox login/signup, email verification/onboarding, guest draft recovery, job posting, linked enquiry conversion, MFA admin enquiry access/removal and provider test payment/refund/retry acceptance. Preserve closed retained fixtures; use newly authorised synthetic fixtures. Browser fixture auth and handler fakes do not replace that acceptance. Written engagement/payment/privacy/legal review remains a launch gate.
+5. Run integrated guest/client/guard/admin failure-and-retry smoke before separately approving production rollout and final live smoke.
+
+Fallback: remove the guest availability entry/frontend and disable the public endpoint together; retain the narrow RLS/grants, original enquiry consent/expiry and functioning cleanup. Review any retained enquiries through the MFA admin process. Do not drop financial or enquiry tables, expose matching RPCs to browsers, reset the database, reactivate guard work fees or rewrite historical records as a rollback shortcut. No old billing functions are replaced by this phase.
+
+Primary references: [Supabase Edge/Auth](https://supabase.com/docs/guides/functions/auth-legacy-jwt), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [Postcodes.io](https://postcodes.io/docs/), [ICO electronic-mail marketing](https://ico.org.uk/for-organisations/direct-marketing-and-privacy-and-electronic-communications/guide-to-pecr/electronic-and-telephone-marketing/electronic-mail-marketing/), [ICO storage limitation](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/data-protection-principles/a-guide-to-the-data-protection-principles/storage-limitation/).

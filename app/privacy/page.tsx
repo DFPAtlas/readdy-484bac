@@ -406,6 +406,12 @@ export default function PrivacyPolicy() {
               </section>
 
               <section id="data-retention">
+                <div className="mb-6 rounded-xl border border-teal-400/20 bg-teal-500/5 p-5 text-slate-300">
+                  <h3 className="text-xl font-semibold text-white mb-3">Guest booking enquiries</h3>
+                  <p className="mb-3">Guest booking drafts are saved in your browser and can be restored for up to 24 hours so you can continue after signup or login. Expired drafts are discarded when the booking flow is opened. You can remove a saved draft on the booking form or clear this site’s browser data. Checking availability sends the job postcode and shift requirements to QuickGuard. The postcode is looked up using Postcodes.io; contact names, email addresses, phone numbers and street addresses are not sent for that lookup.</p>
+                  <p className="mb-3">If you separately choose and save email follow-up about an unfinished booking, we keep your contact name, email, postcode area, requested date and consent record for up to 30 days, or until the requested date has passed. This permission is for that enquiry and does not enrol you in general marketing. You can remove the enquiry using the receipt kept in this browser, or contact us. A confirmed job removes the linked follow-up enquiry; booking and financial records follow their separate retention rules.</p>
+                  <p>Rate limiting uses a keyed digest of network-address information. These rate-limit records are removed after a day. We do not store the raw network address in the booking enquiry.</p>
+                </div>
                 <h2 className="text-2xl font-bold text-white mb-4 border-b border-teal-500/30 pb-2">
                   7. Data Retention
                 </h2>
