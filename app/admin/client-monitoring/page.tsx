@@ -22,7 +22,7 @@ interface JobData {
   status: string;
   start_date: string | null;
   created_at: string;
-  guards_required: number;
+  number_of_guards: number;
   job_title: string;
 }
 
@@ -208,7 +208,7 @@ export default function ClientMonitoringPage() {
       ] = await Promise.all([
         supabase.from('clients').select('*'),
         supabase.from('subscriptions').select('*'),
-        supabase.from('jobs').select('id, client_id, status, start_date, created_at, guards_required, job_title').eq('is_deleted', false),
+        supabase.from('jobs').select('id, client_id, status, start_date, created_at, number_of_guards, job_title').eq('is_deleted', false),
         supabase.from('job_applications').select('id, job_id, status'),
         supabase.from('subscription_payments').select('id, user_id, status, amount, created_at'),
         supabase.from('support_tickets').select('id, client_id, status, priority, created_at, subject').eq('is_deleted', false),

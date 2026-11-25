@@ -21,6 +21,15 @@ export default function AdminMfaChallenge() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!loading) return;
+    const timer = setTimeout(() => {
+      setLoadError('This is taking longer than expected. Please refresh the page or sign in again.');
+      setLoading(false);
+    }, 20000);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function init() {
@@ -179,7 +188,17 @@ export default function AdminMfaChallenge() {
           <div className="w-5 h-5 flex items-center justify-center mt-0.5">
             <i className="ri-error-warning-line text-red-400 text-sm" />
           </div>
-          <p className="text-sm text-red-300">{loadError}</p>
+          <div className="flex-1">
+            <p className="text-sm text-red-300 mb-2">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => { if (typeof window !== 'undefined') window.location.reload(); }}
+              className="text-sm font-medium text-red-400 hover:text-red-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            >
+              <i className="ri-refresh-line" />
+              Try again
+            </button>
+          </div>
         </div>
       ) : (
         <form onSubmit={handleVerify} className="space-y-4">

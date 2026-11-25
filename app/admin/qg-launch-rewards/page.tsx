@@ -177,7 +177,7 @@ export default function AdminQGLaunchRewardsPage() {
     try {
       const { data: inv } = await supabase.from('qg_launch_invites').select('*').eq('id', inviteId).maybeSingle();
       if (!inv) { setActionErr('Invite not found'); setActionLoading(null); return; }
-      await supabase.from('email_queue').insert({ to_email: inv.recipient_email, subject: 'You\'re invited to QG Launch Rewards', html_body: `<p>Join QG Launch Rewards: <a href="${inv.invite_url}">${inv.invite_url}</a></p>`, template_name: 'qg_launch_rewards_invite', status: 'pending', created_at: new Date().toISOString() });
+      await supabase.from('email_queue').insert({ recipient_email: inv.recipient_email, subject: 'You\'re invited to QG Launch Rewards', body_html: `<p>Join QG Launch Rewards: <a href="${inv.invite_url}">${inv.invite_url}</a></p>`, template_name: 'qg_launch_rewards_invite', status: 'pending', created_at: new Date().toISOString() });
       await supabase.from('qg_launch_invites').update({ status: 'sent', sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', inviteId);
       setActionMsg('Invite resent'); loadAll();
     } catch (e: any) { setActionErr(e.message); }

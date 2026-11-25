@@ -72,9 +72,9 @@ interface JobData {
   start_date: string | null;
   venue_city: string | null;
   venue_name: string | null;
-  guards_required: number;
+  number_of_guards: number | null;
   created_at: string;
-  total_cost: number | null;
+  client_total_charge: number | null;
 }
 
 interface PaymentData {
@@ -91,7 +91,6 @@ interface TicketData {
   status: string;
   priority: string;
   created_at: string;
-  last_reply_at: string | null;
 }
 
 interface MessageData {
@@ -159,7 +158,7 @@ export default function ClientMonitoringDetail({ client, onClose }: DetailProps)
     const fetchJobs = async () => {
       const { data, error } = await supabase
         .from('jobs')
-        .select('id, job_title, status, start_date, venue_city, venue_name, guards_required, created_at, total_cost')
+        .select('id, job_title, status, start_date, venue_city, venue_name, number_of_guards, created_at, client_total_charge')
         .eq('client_id', client.id)
         .eq('is_deleted', false)
         .order('created_at', { ascending: false })
@@ -171,18 +170,26 @@ export default function ClientMonitoringDetail({ client, onClose }: DetailProps)
     const fetchPayments = async () => {
       const { data, error } = await supabase
         .from('transactions')
-        .select('id, amount, status, created_at, description')
+        .select('id, amount, status, created_at, transaction_type')
         .eq('client_id', client.id)
         .order('created_at', { ascending: false })
         .limit(20);
       if (error) throw error;
-      if (current) setPayments((data || []) as PaymentData[]);
+      if (current) {
+        setPayments(((data || []) as Array<Omit<PaymentData, 'description'> & { transaction_type: string | null }>).map((p) => ({
+          id: p.id,
+          amount: p.amount,
+          status: p.status,
+          created_at: p.created_at,
+          description: p.transaction_type,
+        })));
+      }
     };
 
     const fetchTickets = async () => {
       const { data, error } = await supabase
         .from('support_tickets')
-        .select('id, subject, status, priority, created_at, last_reply_at')
+        .select('id, subject, status, priority, created_at')
         .eq('client_id', client.id)
         .eq('is_deleted', false)
         .order('created_at', { ascending: false })
@@ -194,12 +201,19 @@ export default function ClientMonitoringDetail({ client, onClose }: DetailProps)
     const fetchMessages = async () => {
       const { data, error } = await supabase
         .from('messages')
-        .select('id, content, created_at, sender_id')
+        .select('id, message_text, created_at, sender_id')
         .or(`sender_id.eq.${client.user_id},receiver_id.eq.${client.user_id}`)
         .order('created_at', { ascending: false })
         .limit(20);
       if (error) throw error;
-      if (current) setMessages((data || []) as MessageData[]);
+      if (current) {
+        setMessages(((data || []) as Array<Omit<MessageData, 'content'> & { message_text: string | null }>).map((m) => ({
+          id: m.id,
+          content: m.message_text || '',
+          created_at: m.created_at,
+          sender_id: m.sender_id,
+        })));
+      }
     };
 
     const fetchDocuments = async () => {
@@ -547,8 +561,8 @@ export default function ClientMonitoringDetail({ client, onClose }: DetailProps)
                       </div>
                       <div className="flex items-center gap-4 text-xs text-slate-400">
                         <span>{job.start_date ? formatDateOnly(job.start_date) : 'No start date'}</span>
-                        <span>{job.guards_required} guards required</span>
-                        <span>{job.total_cost ? `£${job.total_cost}` : '—'}</span>
+                        <span>{job.number_of_guards || 0} guards required</span>
+                        <span>{job.client_total_charge ? `£${job.client_total_charge}` : '—'}</span>
                       </div>
                     </div>
                   ))}

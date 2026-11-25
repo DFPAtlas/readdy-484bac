@@ -1,6 +1,15 @@
 'use client';
-import {allAdminRows} from '@/lib/adminData';
-import { collectedStatuses, paymentTotals } from '@/lib/financeAmounts';
+import { allAdminRows } from '@/lib/adminData';
+import { collectedStatuses } from '@/lib/financeAmounts';
+import {
+  buildDashboardSnapshot,
+  createLatestRequestTracker,
+  createTimeoutScope,
+  createUnavailableSnapshot,
+  type DashboardAlert,
+  type DashboardFailure,
+  type DashboardStatsData,
+} from '@/lib/admin-dashboard-stats';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
@@ -13,34 +22,70 @@ import StripeConnectHealth from './StripeConnectHealth';
 import LiveIndicator from '@/components/LiveIndicator';
 import AdminPageShell from '@/components/admin/AdminPageShell';
 import DashboardControlCentre from './DashboardControlCentre';
+import DashboardUnavailable from './DashboardUnavailable';
 
-interface DashboardStatsData {
-  totalJobs: number;
-  activeJobs: number;
-  newJobsThisMonth: number;
-  totalGuards: number;
-  totalClients: number;
-  pendingVerifications: number;
-  pendingSiaVerifications: number;
-  openComplaints: number;
-  failedPayments: number;
-  heldPayments: number;
-  monthlyRevenue: number;
-  avgMatchTimeMinutes: number | null;
-  activeSubscriptions: number;
-  trialAccounts: number;
-  incompleteProfiles: number;
-  openSupportTickets: number;
-  newUsersThisMonth: number;
+const STATS_TIMEOUT_MS = 15000;
+const ACTIVITY_TIMEOUT_MS = 15000;
+const EMPTY_STATS: DashboardStatsData = {
+  totalJobs: 0,
+  activeJobs: 0,
+  newJobsThisMonth: 0,
+  totalGuards: 0,
+  totalClients: 0,
+  pendingVerifications: 0,
+  pendingSiaVerifications: 0,
+  openComplaints: 0,
+  failedPayments: 0,
+  heldPayments: 0,
+  monthlyRevenue: 0,
+  avgMatchTimeMinutes: null,
+  activeSubscriptions: 0,
+  trialAccounts: 0,
+  incompleteProfiles: 0,
+  openSupportTickets: 0,
+  newUsersThisMonth: 0,
+};
+
+interface JobActivityRow {
+  id: string;
+  job_title: string | null;
+  venue_city: string | null;
+  venue_name: string | null;
+  created_at: string;
 }
 
-interface AlertItem {
-  id: number;
-  type: 'critical' | 'warning' | 'info';
-  title: string;
-  message: string;
-  action: string;
-  href: string;
+interface GuardActivityRow {
+  id: string;
+  full_name: string | null;
+  verification_status: string | null;
+  created_at: string;
+}
+
+interface ApplicationActivityRow {
+  id: string;
+  job_id: string | null;
+  guard_id: string | null;
+  created_at: string;
+}
+
+interface ComplaintActivityRow {
+  id: string;
+  category: string | null;
+  severity: string | null;
+  created_at: string;
+}
+
+interface ReviewActivityRow {
+  id: string;
+  guard_id: string | null;
+  rating: number | null;
+  created_at: string;
+}
+
+interface VerificationActivityRow {
+  id: string;
+  full_name: string | null;
+  verified_at: string | null;
 }
 
 function timeAgo(dateStr: string): string {
@@ -58,29 +103,17 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
+function messageOf(err: unknown): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === 'string' && err.trim()) return err;
+  return 'Request failed';
+}
+
 export default function AdminDashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<'SUBSCRIBED' | 'CLOSED' | 'CHANNEL_ERROR' | 'TIMED_OUT' | null>(null);
-  const [stats, setStats] = useState<DashboardStatsData>({
-    totalJobs: 0,
-    activeJobs: 0,
-    newJobsThisMonth: 0,
-    totalGuards: 0,
-    totalClients: 0,
-    pendingVerifications: 0,
-    pendingSiaVerifications: 0,
-    openComplaints: 0,
-    failedPayments: 0,
-    heldPayments: 0,
-    monthlyRevenue: 0,
-    avgMatchTimeMinutes: null,
-    activeSubscriptions: 0,
-    trialAccounts: 0,
-    incompleteProfiles: 0,
-    openSupportTickets: 0,
-    newUsersThisMonth: 0,
-  });
+  const [stats, setStats] = useState<DashboardStatsData>(EMPTY_STATS);
   const [, setTrends] = useState({
     newJobsThisMonthTrend: null as number | null,
     monthlyRevenueTrend: null as number | null,
@@ -88,35 +121,39 @@ export default function AdminDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
-  const [alerts, setAlerts] = useState<AlertItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
+  const [statsUnavailable, setStatsUnavailable] = useState<DashboardFailure[] | null>(null);
+  const [activityLoading, setActivityLoading] = useState(true);
   const [activityError, setActivityError] = useState<string | null>(null);
 
-  // Use a ref to track the channel so we never create duplicates
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  // Use a ref for fetchStats so realtime callbacks always call the latest version
+  const mountedRef = useRef(true);
+  const statsTrackerRef = useRef(createLatestRequestTracker());
+  const activityTrackerRef = useRef(createLatestRequestTracker());
+  const timeoutScopeRef = useRef(createTimeoutScope());
   const fetchStatsRef = useRef<(background?: boolean) => Promise<void>>(() => Promise.resolve());
 
   const fetchActivities = useCallback(async () => {
+    const requestId = activityTrackerRef.current.begin();
     setActivityError(null);
+    setActivityLoading(true);
     try {
       const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      const [
-        jobsRes,
-        guardsRes,
-        applicationsRes,
-        complaintsRes,
-        reviewsRes,
-        verificationsRes,
-      ] = await Promise.all([
-        supabase.from('jobs').select('id, job_title, venue_city, venue_name, status, created_at').eq('is_deleted', false).gte('created_at', since).order('created_at', { ascending: false }).limit(10),
-        supabase.from('guards').select('id, full_name, email, verification_status, created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(10),
-        supabase.from('job_applications').select('id, job_id, guard_id, status, created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(10),
-        supabase.from('complaints').select('id, filed_by_id, category, severity, status, created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(10),
-        supabase.from('reviews').select('id, client_id, guard_id, rating, created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(10),
-        supabase.from('guards').select('id, full_name, verified_at, verification_status').eq('verification_status', 'approved').order('verified_at', { ascending: false }).limit(10),
-      ]);
+      const [jobsRes, guardsRes, applicationsRes, complaintsRes, reviewsRes, verificationsRes] = await timeoutScopeRef.current.run(
+        Promise.all([
+          supabase.from('jobs').select('id, job_title, venue_city, venue_name, status, created_at').eq('is_deleted', false).gte('created_at', since).order('created_at', { ascending: false }).limit(10),
+          supabase.from('guards').select('id, full_name, email, verification_status, created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(10),
+          supabase.from('job_applications').select('id, job_id, guard_id, status, created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(10),
+          supabase.from('complaints').select('id, filed_by_id, category, severity, status, created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(10),
+          supabase.from('reviews').select('id, client_id, guard_id, rating, created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(10),
+          supabase.from('guards').select('id, full_name, verified_at, verification_status').eq('verification_status', 'approved').order('verified_at', { ascending: false }).limit(10),
+        ]),
+        ACTIVITY_TIMEOUT_MS,
+        'Recent activity request timed out'
+      );
+
+      if (!activityTrackerRef.current.isCurrent(requestId) || !mountedRef.current) return;
 
       if (jobsRes.error) throw new Error(`Jobs query failed: ${jobsRes.error.message}`);
       if (guardsRes.error) throw new Error(`Guards query failed: ${guardsRes.error.message}`);
@@ -127,19 +164,19 @@ export default function AdminDashboard() {
 
       const allEvents: ActivityItem[] = [];
 
-      (jobsRes.data ?? []).forEach((j: any) => {
+      ((jobsRes.data ?? []) as JobActivityRow[]).forEach((j) => {
         allEvents.push({
           id: `job-${j.id}`,
           icon: 'ri-briefcase-line',
           color: 'bg-teal-100 text-teal-700',
           title: 'Job Posted',
-          message: `${j.job_title} in ${j.venue_city || j.venue_name || 'unknown location'}`,
+          message: `${j.job_title ?? 'Job'} in ${j.venue_city || j.venue_name || 'unknown location'}`,
           time: timeAgo(j.created_at),
           timestamp: j.created_at,
         });
       });
 
-      (guardsRes.data ?? []).forEach((g: any) => {
+      ((guardsRes.data ?? []) as GuardActivityRow[]).forEach((g) => {
         const name = g.full_name || 'A new guard';
         allEvents.push({
           id: `guard-${g.id}`,
@@ -152,7 +189,7 @@ export default function AdminDashboard() {
         });
       });
 
-      (applicationsRes.data ?? []).forEach((a: any) => {
+      ((applicationsRes.data ?? []) as ApplicationActivityRow[]).forEach((a) => {
         allEvents.push({
           id: `app-${a.id}`,
           icon: 'ri-file-list-line',
@@ -164,7 +201,7 @@ export default function AdminDashboard() {
         });
       });
 
-      (complaintsRes.data ?? []).forEach((c: any) => {
+      ((complaintsRes.data ?? []) as ComplaintActivityRow[]).forEach((c) => {
         allEvents.push({
           id: `complaint-${c.id}`,
           icon: 'ri-alert-line',
@@ -176,7 +213,7 @@ export default function AdminDashboard() {
         });
       });
 
-      (reviewsRes.data ?? []).forEach((r: any) => {
+      ((reviewsRes.data ?? []) as ReviewActivityRow[]).forEach((r) => {
         allEvents.push({
           id: `review-${r.id}`,
           icon: 'ri-star-fill',
@@ -188,7 +225,7 @@ export default function AdminDashboard() {
         });
       });
 
-      (verificationsRes.data ?? []).forEach((v: any) => {
+      ((verificationsRes.data ?? []) as VerificationActivityRow[]).forEach((v) => {
         const name = v.full_name || 'A guard';
         if (v.verified_at) {
           allEvents.push({
@@ -205,15 +242,21 @@ export default function AdminDashboard() {
 
       allEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       setActivities(allEvents.slice(0, 8));
-    } catch (err: any) {
-      setActivityError(err?.message || 'Failed to load recent activity');
+    } catch (err) {
+      if (!activityTrackerRef.current.isCurrent(requestId) || !mountedRef.current) return;
+      setActivityError(messageOf(err));
       setActivities([]);
+    } finally {
+      if (activityTrackerRef.current.isCurrent(requestId) && mountedRef.current) {
+        setActivityLoading(false);
+      }
     }
   }, []);
 
   const fetchStats = useCallback(async (isBackground = false) => {
+    const requestId = statsTrackerRef.current.begin();
     if (!isBackground) setLoading(true);
-    setError(null);
+
     try {
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -225,265 +268,83 @@ export default function AdminDashboard() {
       const prevMonthStartIso = prevMonthStart.toISOString();
       const prevMonthEndIso = monthStart.toISOString();
 
-      const [
-        // All-time totals and current snapshots
-        totalJobsRes,
-        activeJobsRes,
-        newJobsThisMonthRes,
-        totalGuardsRes,
-        totalClientsRes,
-        pendingVerificationsRes,
-        pendingSiaRes,
-        openComplaintsRes,
-        failedSubPaymentsRes,
-        failedTransRes,
-        heldPayoutsRes,
+      const settlements = await timeoutScopeRef.current.run(
+        Promise.allSettled([
+          supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false),
+          supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false).in('status', ['open', 'active', 'in_progress']),
+          supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false).gte('created_at', monthStartIso),
+          supabase.from('guards').select('*', { count: 'exact', head: true }),
+          supabase.from('clients').select('*', { count: 'exact', head: true }),
+          supabase.from('guards').select('*', { count: 'exact', head: true }).in('verification_status', ['pending', 'manual_review', 'pending_sia_check']),
+          supabase.from('sia_verifications').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
+          supabase.from('complaints').select('*', { count: 'exact', head: true }).in('status', ['open', 'pending']),
+          supabase.from('subscription_payments').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
+          supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
+          supabase.from('guard_payouts').select('*', { count: 'exact', head: true }).eq('status', 'held'),
 
-        // Current month revenue (monthly metric)
-        monthlyRevenueSubRes,
-        monthlyRevenueTransRes,
-        matchTimeRes,
+          allAdminRows(() => supabase.from('subscription_payments').select('amount, status, refunded, refund_amount').in('status', collectedStatuses).gte('created_at', monthStartIso).order('id')),
+          allAdminRows(() => supabase.from('transactions').select('amount, status, refunded, refund_amount').in('status', collectedStatuses).or('transaction_type.neq.subscription,transaction_type.is.null').gte('created_at', monthStartIso).order('id')),
+          supabase.from('job_assignments').select('assigned_at, job_id').not('assigned_at', 'is', null).gte('assigned_at', monthStartIso),
 
-        // Previous month data for month-over-month trends
-        prevNewJobsRes,
-        prevMonthlyRevenueSubRes,
-        prevMonthlyRevenueTransRes,
-        prevMatchTimeRes,
+          supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false).gte('created_at', prevMonthStartIso).lt('created_at', prevMonthEndIso),
+          allAdminRows(() => supabase.from('subscription_payments').select('amount, status, refunded, refund_amount').in('status', collectedStatuses).gte('created_at', prevMonthStartIso).lt('created_at', prevMonthEndIso).order('id')),
+          allAdminRows(() => supabase.from('transactions').select('amount, status, refunded, refund_amount').in('status', collectedStatuses).or('transaction_type.neq.subscription,transaction_type.is.null').gte('created_at', prevMonthStartIso).lt('created_at', prevMonthEndIso).order('id')),
+          supabase.from('job_assignments').select('assigned_at, job_id').not('assigned_at', 'is', null).gte('assigned_at', prevMonthStartIso).lt('assigned_at', prevMonthEndIso),
 
-        activeSubscriptionsRes,
-        trialAccountsRes,
-        incompleteProfilesRes,
-        openSupportTicketsRes,
-        newGuardsThisMonthRes,
-        newClientsThisMonthRes,
-      ] = await Promise.all([
-        // All-time totals
-        supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false),
-        supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false).in('status', ['open', 'active', 'in_progress']),
-        supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false).gte('created_at', monthStartIso),
-        supabase.from('guards').select('*', { count: 'exact', head: true }),
-        supabase.from('clients').select('*', { count: 'exact', head: true }),
-        supabase.from('guards').select('*', { count: 'exact', head: true }).in('verification_status', ['pending', 'manual_review', 'pending_sia_check']),
-        supabase.from('sia_verifications').select('*', { count: 'exact', head: true }).eq('verification_status', 'pending'),
-        supabase.from('complaints').select('*', { count: 'exact', head: true }).in('status', ['open', 'pending']),
-        supabase.from('subscription_payments').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
-        supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
-        supabase.from('guard_payouts').select('*', { count: 'exact', head: true }).eq('status', 'held'),
+          supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+          supabase.from('clients').select('*', { count: 'exact', head: true }).gt('trial_end_date', now.toISOString()).not('trial_end_date', 'is', null),
+          supabase.from('guards').select('*', { count: 'exact', head: true }).eq('profile_completed', false),
+          supabase.from('support_tickets').select('*', { count: 'exact', head: true }).in('status', ['open', 'pending']),
+          supabase.from('guards').select('*', { count: 'exact', head: true }).gte('created_at', monthStartIso),
+          supabase.from('clients').select('*', { count: 'exact', head: true }).gte('created_at', monthStartIso),
+          supabase.from('jobs').select('id, created_at').gte('created_at', prevMonthStartIso).order('id'),
+        ]),
+        STATS_TIMEOUT_MS,
+        'Dashboard metrics request timed out'
+      );
 
-        // Monthly revenue — subscription_payments is the source of truth for subscription revenue
-        // Include collected payments and subtract their cumulative refunds.
-        allAdminRows(() => supabase.from('subscription_payments').select('amount, status, refunded, refund_amount').in('status', collectedStatuses).gte('created_at', monthStartIso).order('id')),
+      if (!mountedRef.current || !statsTrackerRef.current.isCurrent(requestId)) return;
 
-        // Monthly revenue — transactions is the source for non-subscription revenue (job payments, PAYG, etc.)
-        // Include collected payments and subtract their cumulative refunds.
-        // Exclude transaction_type = 'subscription' to prevent double-counting with subscription_payments
-        allAdminRows(() => supabase.from('transactions').select('amount, status, refunded, refund_amount').in('status', collectedStatuses).or('transaction_type.neq.subscription,transaction_type.is.null').gte('created_at', monthStartIso).order('id')),
+      const snapshot = buildDashboardSnapshot(settlements);
 
-        supabase.from('job_assignments').select('assigned_at, jobs!inner(created_at)').not('assigned_at', 'is', null).gte('assigned_at', monthStartIso),
-
-        // Previous month — only for monthly metrics (new jobs, revenue, match time)
-        supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('is_deleted', false).gte('created_at', prevMonthStartIso).lt('created_at', prevMonthEndIso),
-        allAdminRows(() => supabase.from('subscription_payments').select('amount, status, refunded, refund_amount').in('status', collectedStatuses).gte('created_at', prevMonthStartIso).lt('created_at', prevMonthEndIso).order('id')),
-        allAdminRows(() => supabase.from('transactions').select('amount, status, refunded, refund_amount').in('status', collectedStatuses).or('transaction_type.neq.subscription,transaction_type.is.null').gte('created_at', prevMonthStartIso).lt('created_at', prevMonthEndIso).order('id')),
-        supabase.from('job_assignments').select('assigned_at, jobs!inner(created_at)').not('assigned_at', 'is', null).gte('assigned_at', prevMonthStartIso).lt('assigned_at', prevMonthEndIso),
-
-        supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-        supabase.from('clients').select('*', { count: 'exact', head: true }).gt('trial_end_date', now.toISOString()).not('trial_end_date', 'is', null),
-        supabase.from('guards').select('*', { count: 'exact', head: true }).eq('profile_completed', false),
-        supabase.from('support_tickets').select('*', { count: 'exact', head: true }).in('status', ['open', 'pending']),
-        supabase.from('guards').select('*', { count: 'exact', head: true }).gte('created_at', monthStartIso),
-        supabase.from('clients').select('*', { count: 'exact', head: true }).gte('created_at', monthStartIso),
-      ]);
-
-      // Check for any query errors
-      const results = [
-        totalJobsRes, activeJobsRes, newJobsThisMonthRes, totalGuardsRes, totalClientsRes,
-        pendingVerificationsRes, pendingSiaRes, openComplaintsRes, failedSubPaymentsRes, failedTransRes,
-        heldPayoutsRes, monthlyRevenueSubRes, monthlyRevenueTransRes, matchTimeRes,
-        prevNewJobsRes, prevMonthlyRevenueSubRes, prevMonthlyRevenueTransRes, prevMatchTimeRes,
-        activeSubscriptionsRes, trialAccountsRes, incompleteProfilesRes, openSupportTicketsRes,
-        newGuardsThisMonthRes, newClientsThisMonthRes,
-      ];
-      const firstError = results.find((r) => r.error);
-      if (firstError?.error) {
-        throw new Error(`Database query failed: ${firstError.error.message}`);
+      if (!snapshot.available) {
+        setStatsUnavailable(snapshot.failures);
+        return;
       }
 
-      const totalJobs = totalJobsRes.count ?? 0;
-      const activeJobs = activeJobsRes.count ?? 0;
-      const newJobsThisMonth = newJobsThisMonthRes.count ?? 0;
-      const totalGuards = totalGuardsRes.count ?? 0;
-      const totalClients = totalClientsRes.count ?? 0;
-      const pendingVerifications = pendingVerificationsRes.count ?? 0;
-      const pendingSiaVerifications = pendingSiaRes.count ?? 0;
-      const openComplaints = openComplaintsRes.count ?? 0;
-      const failedPayments = (failedSubPaymentsRes.count ?? 0) + (failedTransRes.count ?? 0);
-      const heldPayments = heldPayoutsRes.count ?? 0;
-
-      // Revenue calculation — two sources, one total
-      // 1. subscription_payments: source of truth for all subscription revenue
-      // 2. transactions: source for non-subscription revenue (job payments, PAYG, service fees)
-      // We exclude subscription-type transactions to prevent double-counting.
-      const subPayments = monthlyRevenueSubRes.data ?? [];
-      const subscriptionRevenue = paymentTotals(subPayments).remaining;
-
-      const transPayments = monthlyRevenueTransRes.data ?? [];
-      const transactionRevenue = paymentTotals(transPayments).remaining;
-
-      const monthlyRevenue = subscriptionRevenue + transactionRevenue;
-
-      // Month-over-month trend calculation
-      const calcTrend = (current: number, previous: number) => {
-        if (previous === 0) return current > 0 ? 100 : null;
-        return Math.round(((current - previous) / previous) * 100);
-      };
-
-      const prevNewJobs = prevNewJobsRes.count ?? 0;
-      const prevSubPayments = prevMonthlyRevenueSubRes.data ?? [];
-      const prevTransPayments = prevMonthlyRevenueTransRes.data ?? [];
-      const prevMonthlyRevenue =
-        paymentTotals(prevSubPayments).remaining +
-        paymentTotals(prevTransPayments).remaining;
-
-      const calcMatchTime = (rows: any[]) => {
-        if (rows.length === 0) return null;
-        let totalMinutes = 0;
-        let validCount = 0;
-        for (const row of rows) {
-          const assignedAt = row.assigned_at ? new Date(row.assigned_at).getTime() : 0;
-          const jobCreatedAt = row.jobs?.created_at ? new Date(row.jobs.created_at).getTime() : 0;
-          if (assignedAt && jobCreatedAt && assignedAt > jobCreatedAt) {
-            totalMinutes += (assignedAt - jobCreatedAt) / (1000 * 60);
-            validCount++;
-          }
-        }
-        if (validCount === 0) return null;
-        return Math.round(totalMinutes / validCount);
-      };
-
-      const avgMatchTimeMinutes = calcMatchTime(matchTimeRes.data ?? []);
-      const prevAvgMatchTimeMinutes = calcMatchTime(prevMatchTimeRes.data ?? []);
-
-      const matchTimeTrend = (avgMatchTimeMinutes != null && prevAvgMatchTimeMinutes != null)
-        ? avgMatchTimeMinutes - prevAvgMatchTimeMinutes
-        : null;
-
-      // Only set trends for monthly metrics (month-over-month comparison)
-      // All-time totals and current snapshots do not show trends
-      setTrends({
-        newJobsThisMonthTrend: calcTrend(newJobsThisMonth, prevNewJobs),
-        monthlyRevenueTrend: calcTrend(monthlyRevenue, prevMonthlyRevenue),
-        avgMatchTimeTrend: matchTimeTrend,
-      });
-
-      const activeSubscriptions = activeSubscriptionsRes.count ?? 0;
-      const trialAccounts = trialAccountsRes.count ?? 0;
-      const incompleteProfiles = incompleteProfilesRes.count ?? 0;
-      const openSupportTickets = openSupportTicketsRes.count ?? 0;
-      const newUsersThisMonth = (newGuardsThisMonthRes.count ?? 0) + (newClientsThisMonthRes.count ?? 0);
-
-      setStats({
-        totalJobs,
-        activeJobs,
-        newJobsThisMonth,
-        totalGuards,
-        totalClients,
-        pendingVerifications,
-        pendingSiaVerifications,
-        openComplaints,
-        failedPayments,
-        heldPayments,
-        monthlyRevenue,
-        avgMatchTimeMinutes,
-        activeSubscriptions,
-        trialAccounts,
-        incompleteProfiles,
-        openSupportTickets,
-        newUsersThisMonth,
-      });
-
-      const realAlerts: AlertItem[] = [];
-      if (pendingVerifications > 0) {
-        realAlerts.push({
-          id: 1,
-          type: 'warning',
-          title: `${pendingVerifications} Guard${pendingVerifications > 1 ? 's' : ''} Awaiting Verification`,
-          message: 'Pending profile checks require admin review to unblock guard availability.',
-          action: 'Review Now',
-          href: '/admin/guard-verifications',
-        });
-      }
-      if (pendingSiaVerifications > 0) {
-        realAlerts.push({
-          id: 2,
-          type: 'warning',
-          title: `${pendingSiaVerifications} SIA Licence${pendingSiaVerifications > 1 ? 's' : ''} Pending`,
-          message: 'SIA licence verifications need admin approval.',
-          action: 'Verify',
-          href: '/admin/sia-verifications',
-        });
-      }
-      if (openComplaints > 0) {
-        realAlerts.push({
-          id: 3,
-          type: 'critical',
-          title: `${openComplaints} Open Complaint${openComplaints > 1 ? 's' : ''}`,
-          message: 'Unresolved complaints need admin attention.',
-          action: 'Investigate',
-          href: '/admin/complaints',
-        });
-      }
-      if (failedPayments > 0) {
-        realAlerts.push({
-          id: 4,
-          type: 'critical',
-          title: `${failedPayments} Failed Payment${failedPayments > 1 ? 's' : ''}`,
-          message: 'Recent payment failures require review and retry.',
-          action: 'Review',
-          href: '/admin/failed-payments',
-        });
-      }
-      if (heldPayments > 0) {
-        realAlerts.push({
-          id: 5,
-          type: 'warning',
-          title: `${heldPayments} Held Payout${heldPayments > 1 ? 's' : ''}`,
-          message: 'Guard payouts are on hold and need admin release.',
-          action: 'Release',
-          href: '/admin/held-payments',
-        });
-      }
-      if (realAlerts.length === 0) {
-        realAlerts.push({
-          id: 1,
-          type: 'info',
-          title: 'All Systems Normal',
-          message: 'No pending verifications, complaints, or payment issues. Dashboard is clear.',
-          action: 'View Activity',
-          href: '/admin/activity-log',
-        });
-      }
-      setAlerts(realAlerts);
-
-      await fetchActivities();
+      setStats(snapshot.stats);
+      setTrends(snapshot.trends);
+      setAlerts(snapshot.alerts);
+      setStatsUnavailable(null);
       setLastUpdated(new Date());
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load dashboard data');
+      void fetchActivities();
+    } catch (err) {
+      if (!mountedRef.current || !statsTrackerRef.current.isCurrent(requestId)) return;
+      setStatsUnavailable(createUnavailableSnapshot(messageOf(err)).failures);
     } finally {
-      setLoading(false);
+      if (statsTrackerRef.current.isCurrent(requestId) && mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [fetchActivities]);
 
-  // Keep the ref in sync with the latest fetchStats
   fetchStatsRef.current = fetchStats;
 
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
 
-  // Realtime subscriptions — only run once on mount to avoid duplicate channels
   useEffect(() => {
-    // Clean up any existing channel first
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      statsTrackerRef.current.invalidate();
+      activityTrackerRef.current.invalidate();
+      timeoutScopeRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
@@ -530,22 +391,26 @@ export default function AdminDashboard() {
         channelRef.current = null;
       }
     };
-  }, []); // intentionally empty — only mount/unmount
+  }, []);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
-    fetchStats().finally(() => {
-      setIsRefreshing(false);
+    void fetchStats().finally(() => {
+      if (mountedRef.current) setIsRefreshing(false);
     });
-  };
+  }, [fetchStats]);
 
   return (
     <AdminPageShell
       eyebrow="QuickGuard operations"
       title="Admin control centre"
-      description={lastUpdated
-        ? `Live operational view · updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-        : 'Live operational view · updating now'}
+      description={
+        statsUnavailable
+          ? 'Live operational view · metrics unavailable'
+          : lastUpdated
+          ? `Live operational view · updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+          : 'Live operational view · updating now'
+      }
       status={
         <div className="flex items-center gap-2">
           <LiveIndicator />
@@ -586,56 +451,52 @@ export default function AdminDashboard() {
         </>
       }
     >
-      {error && (
-        <div className="rounded-2xl border-l-[5px] border-l-red-500 p-5 shadow-sm bg-[#111d35] flex items-start gap-4">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-red-500/10 text-red-400">
-            <i className="ri-error-warning-line text-lg"></i>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-bold text-white">Failed to load dashboard</h3>
-            <p className="text-sm text-slate-400 mt-1 leading-relaxed">{error}</p>
-          </div>
-          <button
-            onClick={handleRefresh}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex-shrink-0 shadow-sm bg-red-600 hover:bg-red-500 text-white cursor-pointer"
-          >
-            Retry
-            <i className="ri-refresh-line text-sm"></i>
-          </button>
-        </div>
+      {statsUnavailable && (
+        <DashboardUnavailable
+          failures={statsUnavailable}
+          lastSuccessAt={lastUpdated}
+          retrying={loading || isRefreshing}
+          onRetry={handleRefresh}
+        />
       )}
 
-      <DashboardAlerts alerts={alerts} loading={loading} />
+      {!statsUnavailable && (
+        <>
+          <DashboardAlerts alerts={alerts} loading={loading} />
 
-      <DashboardControlCentre
-        activeJobs={stats.activeJobs}
-        totalJobs={stats.totalJobs}
-        pendingVerifications={stats.pendingVerifications}
-        pendingSiaVerifications={stats.pendingSiaVerifications}
-        openComplaints={stats.openComplaints}
-        failedPayments={stats.failedPayments}
-        heldPayments={stats.heldPayments}
-        openSupportTickets={stats.openSupportTickets}
-        activeSubscriptions={stats.activeSubscriptions}
-        monthlyRevenue={stats.monthlyRevenue}
-      />
+          {lastUpdated && (
+            <DashboardControlCentre
+              activeJobs={stats.activeJobs}
+              totalJobs={stats.totalJobs}
+              pendingVerifications={stats.pendingVerifications}
+              pendingSiaVerifications={stats.pendingSiaVerifications}
+              openComplaints={stats.openComplaints}
+              failedPayments={stats.failedPayments}
+              heldPayments={stats.heldPayments}
+              openSupportTickets={stats.openSupportTickets}
+              activeSubscriptions={stats.activeSubscriptions}
+              monthlyRevenue={stats.monthlyRevenue}
+            />
+          )}
 
-      <DashboardStats
-        pendingVerifications={stats.pendingVerifications}
-        failedPayments={stats.failedPayments}
-        activeSubscriptions={stats.activeSubscriptions}
-        trialAccounts={stats.trialAccounts}
-        incompleteProfiles={stats.incompleteProfiles}
-        openSupportTickets={stats.openSupportTickets}
-        newUsersThisMonth={stats.newUsersThisMonth}
-        monthlyRevenue={stats.monthlyRevenue}
-        loading={loading}
-        error={error}
-      />
+          <DashboardStats
+            pendingVerifications={stats.pendingVerifications}
+            failedPayments={stats.failedPayments}
+            activeSubscriptions={stats.activeSubscriptions}
+            trialAccounts={stats.trialAccounts}
+            incompleteProfiles={stats.incompleteProfiles}
+            openSupportTickets={stats.openSupportTickets}
+            newUsersThisMonth={stats.newUsersThisMonth}
+            monthlyRevenue={stats.monthlyRevenue}
+            loading={loading}
+            error={null}
+          />
+        </>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <DashboardActivity activities={activities} loading={loading} error={activityError} />
+          <DashboardActivity activities={activities} loading={activityLoading} error={activityError} />
         </div>
         <DashboardQuickActions />
       </div>

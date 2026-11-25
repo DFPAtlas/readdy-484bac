@@ -45,17 +45,34 @@ export default function PendingReleaseTable() {
     try {
       const { data, error } = await supabase
         .from('job_completion_requests')
-        .select(`
-          id, job_id, guard_id, status, requested_at, dispute_reason, notes,
-          jobs:job_id (job_title, venue_city, agreed_amount, payment_status, completion_status, client_id),
-          guards:guard_id (full_name, email, stripe_account_id)
-        `)
+        .select('id, job_id, guard_id, status, requested_at, dispute_reason, notes')
         .order('requested_at', { ascending: false })
         .limit(200);
 
       if (error) throw error;
 
-      const clientIds = (data || []).map((r: any) => r.jobs?.client_id).filter(Boolean);
+      const jobIds = (data || []).map((r: any) => r.job_id).filter(Boolean);
+      const guardIds = (data || []).map((r: any) => r.guard_id).filter(Boolean);
+      const jobMap: Record<string, any> = {};
+      const guardMap: Record<string, any> = {};
+
+      if (jobIds.length > 0) {
+        const { data: jobRows } = await supabase
+          .from('jobs')
+          .select('id, job_title, venue_city, agreed_amount, payment_status, completion_status, client_id')
+          .in('id', jobIds);
+        (jobRows || []).forEach((j: any) => { jobMap[j.id] = j; });
+      }
+
+      if (guardIds.length > 0) {
+        const { data: guardRows } = await supabase
+          .from('guards')
+          .select('id, full_name, email, stripe_account_id')
+          .in('id', guardIds);
+        (guardRows || []).forEach((g: any) => { guardMap[g.id] = g; });
+      }
+
+      const clientIds = (data || []).map((r: any) => jobMap[r.job_id]?.client_id).filter(Boolean);
       const clientMap: Record<string, any> = {};
       if (clientIds.length > 0) {
         const { data: clients } = await supabase
@@ -67,7 +84,9 @@ export default function PendingReleaseTable() {
 
       const enriched = (data || []).map((r: any) => ({
         ...r,
-        clients: clientMap[r.jobs?.client_id] || null,
+        jobs: jobMap[r.job_id] || null,
+        guards: guardMap[r.guard_id] || null,
+        clients: clientMap[jobMap[r.job_id]?.client_id] || null,
       }));
 
       setRequests(enriched as PendingReleaseRow[]);

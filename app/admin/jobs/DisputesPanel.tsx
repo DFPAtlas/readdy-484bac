@@ -68,9 +68,9 @@ export default function DisputesPanel() {
         .from('disputes')
         .select(`
           *,
-          jobs:job_id (job_title, venue_city, agreed_amount, currency),
-          guards:guard_id (full_name, email),
-          clients:client_id (company_name, email)
+          jobs:jobs!job_id (job_title, venue_city, agreed_amount, currency),
+          guards:guards!guard_id (full_name, email),
+          clients:clients!client_id (company_name, email)
         `)
         .order('created_at', { ascending: false });
       if (error) throw error;

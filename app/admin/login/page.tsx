@@ -12,12 +12,24 @@ import BrandLogo from '@/components/BrandLogo';
 
 const mobileBg = "https://readdy.ai/api/search-image?query=Dark%20subtle%20abstract%20gradient%20background%20with%20faint%20navy%20blue%20and%20cyan%20mesh%20lines%2C%20minimal%20technology%20pattern%2C%20very%20low%20contrast%20and%20opacity%2C%20suitable%20for%20dark%20mode%20mobile%20login%20screen%20background%2C%20soft%20glowing%20particles%2C%20premium%20SaaS%20aesthetic&width=800&height=1200&seq=2&orientation=portrait";
 
+const ADMIN_ROLES = ['super_admin', 'admin', 'finance_admin'];
+
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(message)), ms);
+    }),
+  ]);
+}
+
 export default function AdminLogin() {
   const router = useSafeRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const [mode, setMode] = useState<'login' | 'forgot'>('login');
@@ -30,11 +42,16 @@ export default function AdminLogin() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setStatusMessage('Checking your credentials...');
 
     try {
-      const { data: loginData, error: loginError } = await supabase.functions.invoke('admin-login', {
-        body: { email, password },
-      });
+      const { data: loginData, error: loginError } = await withTimeout(
+        supabase.functions.invoke('admin-login', {
+          body: { email, password },
+        }),
+        25000,
+        'The sign-in service did not respond in time. Please check your connection and try again.'
+      );
 
       if (loginError || !loginData?.session?.access_token || !loginData?.session?.refresh_token) {
         let message = loginData?.error || 'Invalid email or password';
@@ -47,45 +64,86 @@ export default function AdminLogin() {
         }
         setError(message);
         setLoading(false);
+        setStatusMessage('');
         return;
       }
 
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: loginData.session.access_token,
-        refresh_token: loginData.session.refresh_token,
-      });
+      setStatusMessage('Starting your secure session...');
+      const { error: sessionError } = await withTimeout(
+        supabase.auth.setSession({
+          access_token: loginData.session.access_token,
+          refresh_token: loginData.session.refresh_token,
+        }),
+        20000,
+        'Your session could not be started. Please try again.'
+      );
 
       if (sessionError) {
         setError('Unable to establish an admin session');
         setLoading(false);
+        setStatusMessage('');
         return;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
+      setStatusMessage('Verifying admin permissions...');
+      const { data: { user } } = await withTimeout(
+        supabase.auth.getUser(),
+        20000,
+        'Verifying your account took too long. Please try again.'
+      );
 
       if (!user) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut().catch(() => undefined);
         setError('You do not have permission to access QuickGuard Admin');
         setLoading(false);
+        setStatusMessage('');
         return;
       }
 
-      const { data: adminCheck } = await supabase
-        .from('admin_users')
-        .select('id, user_id, email, role, full_name, is_active')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      let adminRole = '';
 
-      const isValidAdmin = adminCheck && adminCheck.is_active && ['super_admin', 'admin', 'finance_admin'].includes(adminCheck.role);
+      try {
+        const { data: adminCheck, error: adminError } = await withTimeout(
+          supabase
+            .from('admin_users')
+            .select('id, user_id, email, role, full_name, is_active')
+            .eq('user_id', user.id)
+            .maybeSingle(),
+          20000,
+          'Permission check timed out. Please try again.'
+        );
+        if (!adminError && adminCheck?.is_active && ADMIN_ROLES.includes(adminCheck.role)) {
+          adminRole = adminCheck.role;
+        }
+      } catch {}
 
-      if (!isValidAdmin) {
-        await supabase.auth.signOut();
+      if (!adminRole) {
+        try {
+          const { data: verifyData, error: verifyError } = await withTimeout(
+            supabase.functions.invoke('admin-security', { body: { action: 'verify' } }),
+            20000,
+            'Permission check timed out. Please try again.'
+          );
+          if (!verifyError && verifyData?.verified && ADMIN_ROLES.includes(verifyData.role)) {
+            adminRole = verifyData.role;
+          }
+        } catch {}
+      }
+
+      if (!adminRole) {
+        await supabase.auth.signOut().catch(() => undefined);
         setError('You do not have permission to access QuickGuard Admin');
         setLoading(false);
+        setStatusMessage('');
         return;
       }
 
-      const mfaRoute = await resolveAdminMfaRoute();
+      setStatusMessage('Checking two-step verification...');
+      const mfaRoute = await withTimeout(
+        resolveAdminMfaRoute(),
+        20000,
+        'The security check timed out. Please sign in again.'
+      );
 
       if (mfaRoute === 'authorized') {
         router.push(takeApplicationReturnPath());
@@ -100,12 +158,13 @@ export default function AdminLogin() {
         return;
       }
 
-      await supabase.auth.signOut();
-      setError('You do not have permission to access QuickGuard Admin');
+      await supabase.auth.signOut().catch(() => undefined);
+      setError('We could not confirm the security level of this session. Please sign in again.');
     } catch (err: any) {
-      setError(err.message || 'An error occurred during login');
+      setError(err?.message || 'An error occurred during login');
     } finally {
       setLoading(false);
+      setStatusMessage('');
     }
   }
 
@@ -303,11 +362,16 @@ export default function AdminLogin() {
                     onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 4px 20px rgba(245,158,11,0.25)"; }}
                   >
                     {loading ? (
-                      <><div className="w-4 h-4 border-2 border-[#0B1933]/30 border-t-[#0B1933] rounded-full animate-spin" />Signing in...</>
+                      <><div className="w-4 h-4 border-2 border-[#0B1933]/30 border-t-[#0B1933] rounded-full animate-spin" />{statusMessage || 'Signing in...'}</>
                     ) : (
                       <><i className="ri-login-box-line" />Sign In</>
                     )}
                   </button>
+                  {loading && (
+                    <p className="text-center text-xs text-[#AAB7C4]/60">
+                      This can take a few seconds. Please keep this tab open.
+                    </p>
+                  )}
                 </form>
               </>
             )}

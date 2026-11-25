@@ -18,14 +18,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useSafeRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [stalled, setStalled] = useState(false);
   const [adminUser, setAdminUser] = useState<{ id: string; email: string } | null>(null);
 
-  const showSidebar = !NO_SIDEBAR_PATHS.includes(pathname);
+  const activePath = (pathname || '').replace(/\/+$/, '') || '/';
+  const isPublicAdminPath = NO_SIDEBAR_PATHS.includes(activePath);
+  const showSidebar = !isPublicAdminPath;
+
+  useEffect(() => {
+    if (!loading) {
+      setStalled(false);
+      return;
+    }
+    const timer = setTimeout(() => setStalled(true), 12000);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (NO_SIDEBAR_PATHS.includes(pathname)) {
+    if (NO_SIDEBAR_PATHS.includes(activePath)) {
       setLoading(false);
       return () => { cancelled = true; };
     }
@@ -191,21 +203,54 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     verifyAdmin();
 
     return () => { cancelled = true; };
-  }, [pathname, router]);
+  }, [activePath, router]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#0B1933]">
-        <div className="text-center">
+        <div className="text-center px-6">
           <div className="animate-spin rounded-full h-12 w-12 border-2 border-teal-500 border-t-transparent mx-auto"></div>
           <p className="mt-4 text-slate-400 text-sm font-medium">Verifying admin access...</p>
+          {stalled && (
+            <div className="mt-5 max-w-sm mx-auto">
+              <p className="text-xs text-slate-500">
+                This is taking longer than expected. Your connection may have dropped.
+              </p>
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-900 text-sm font-semibold transition cursor-pointer whitespace-nowrap"
+                >
+                  Try again
+                </button>
+                <button
+                  onClick={() => router.push('/admin/login')}
+                  className="px-4 py-2 rounded-lg border border-slate-600 hover:border-slate-400 text-slate-300 text-sm font-medium transition cursor-pointer whitespace-nowrap"
+                >
+                  Back to sign in
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  if (!isAuthorized && !NO_SIDEBAR_PATHS.includes(pathname)) {
-    return null;
+  if (!isAuthorized && !isPublicAdminPath) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#0B1933]">
+        <div className="text-center px-6">
+          <p className="text-slate-400 text-sm font-medium">Your admin session is not active.</p>
+          <button
+            onClick={() => router.push('/admin/login')}
+            className="mt-4 px-5 py-2.5 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-900 text-sm font-semibold transition cursor-pointer whitespace-nowrap"
+          >
+            Go to sign in
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (!showSidebar) return <>{children}</>;
