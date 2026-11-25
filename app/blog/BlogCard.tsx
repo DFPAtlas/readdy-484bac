@@ -1,6 +1,6 @@
+import BlogCoverImage from '@/components/blog/BlogCoverImage';
 import Link from 'next/link';
 import {
-  COVER_FALLBACK,
   audienceLabel,
   audienceStyle,
   formatBlogDate,
@@ -13,8 +13,8 @@ export default function BlogCard({ post }: { post: BlogPost }) {
   return (
     <article className="group h-full flex flex-col bg-[#111d35] border border-slate-700/50 rounded-2xl overflow-hidden hover:border-teal-500/40 transition-all duration-300">
       <Link href={postHref(post.slug)} prefetch={false} className="block relative aspect-[16/9] overflow-hidden">
-        <img
-          src={post.cover_image_url || COVER_FALLBACK}
+        <BlogCoverImage
+          cover={post.cover_image_url}
           alt={post.title}
           className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
         />

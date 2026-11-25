@@ -1,4 +1,5 @@
 "use client";
+import { usePublicMediaBackground } from '@/hooks/usePublicMediaBackground';
 
 import Link from "next/link";
 import BrandLogo from "@/components/BrandLogo";
@@ -15,11 +16,12 @@ const features = [
 const bgImage = "https://readdy.ai/api/search-image?query=Dark%20abstract%20futuristic%20security%20technology%20background%20with%20subtle%20deep%20navy%20blue%20and%20cyan%20glow%20accents%2C%20geometric%20mesh%20network%20pattern%2C%20soft%20light%20rays%20and%20particle%20effects%2C%20premium%20enterprise%20SaaS%20aesthetic%2C%20minimal%20and%20elegant%20with%20low%20contrast%2C%20perfect%20for%20dark%20mode%20login%20page%20overlay&width=1200&height=800&seq=1&orientation=landscape";
 
 export default function LoginMarketingPanel() {
+  const managedBackground = usePublicMediaBackground('login-marketing', bgImage);
   return (
     <div className="relative hidden lg:flex w-1/2 flex-col justify-between overflow-hidden bg-[#071321] p-12">
       <div
         className="absolute inset-0 bg-cover bg-center opacity-30"
-        style={{ backgroundImage: `url(${bgImage})` }}
+        style={{ backgroundImage: `url(${managedBackground})` }}
       />
       <div
         className="pointer-events-none absolute inset-0"

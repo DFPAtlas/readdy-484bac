@@ -1,16 +1,20 @@
+'use client';
+import { usePublicMediaBackground } from '@/hooks/usePublicMediaBackground';
 interface Props {
+  mediaSlot: string;
   message: string;
   sub: string;
   image: string;
 }
 
-export default function IndustryFeatureBanner({ message, sub, image }: Props) {
+export default function IndustryFeatureBanner({ mediaSlot, message, sub, image }: Props) {
+  const background = usePublicMediaBackground(mediaSlot, image);
   return (
     <section
       aria-label="Why QuickGuard"
       className="relative py-24 bg-cover bg-center bg-no-repeat"
       style={{
-        backgroundImage: `linear-gradient(to right, rgba(11, 26, 51, 0.94) 0%, rgba(11, 26, 51, 0.78) 55%, rgba(11, 26, 51, 0.55) 100%), url('${image}')`,
+        backgroundImage: `linear-gradient(to right, rgba(11, 26, 51, 0.94) 0%, rgba(11, 26, 51, 0.78) 55%, rgba(11, 26, 51, 0.55) 100%), url('${background}')`,
       }}
     >
       <div className="max-w-5xl mx-auto px-6 md:px-8 text-center">

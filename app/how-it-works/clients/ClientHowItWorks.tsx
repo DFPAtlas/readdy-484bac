@@ -1,6 +1,7 @@
 'use client';
+import { usePublicMediaBackground } from '@/hooks/usePublicMediaBackground';
 
-import QuickGuardImage from '@/components/QuickGuardImage';
+import PublicMediaImage from '@/components/PublicMediaImage';
 
 import Footer from '../../../components/Footer';
 import Header from '../../../components/Header';
@@ -51,6 +52,7 @@ const VENUE_TYPES = [
 ];
 
 export default function ClientHowItWorks() {
+  const managedHero=usePublicMediaBackground('hiw-clients-hero',"https://readdy.ai/api/search-image?query=Professional%20British%20business%20owner%20woman%20standing%20confidently%20in%20front%20of%20a%20modern%20UK%20venue%20entrance%20at%20twilight%2C%20warm%20street%20lighting%2C%20deep%20navy%20blue%20and%20teal%20color%20tones%2C%20cinematic%20wide%20angle%20shot%2C%20representing%20direct%20hiring%20of%20security%20staff%2C%20moody%20professional%20atmosphere%2C%20clean%20modern%20website%20hero%20background%20with%20space%20for%20text%20on%20the%20left%20side&width=1200&height=600&seq=hiw-clients-hero-001&orientation=landscape");
   const [, setIsVisible] = useState<Record<string, boolean>>();
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
@@ -94,7 +96,7 @@ export default function ClientHowItWorks() {
         aria-labelledby="clients-heading"
         className="relative min-h-[62vh] flex items-center bg-cover bg-center bg-no-repeat pt-24"
         style={{
-          backgroundImage: `linear-gradient(to right, rgba(11, 26, 51, 0.92) 0%, rgba(11, 26, 51, 0.6) 50%, rgba(14, 22, 40, 0.4) 100%), url('https://readdy.ai/api/search-image?query=Professional%20British%20business%20owner%20woman%20standing%20confidently%20in%20front%20of%20a%20modern%20UK%20venue%20entrance%20at%20twilight%2C%20warm%20street%20lighting%2C%20deep%20navy%20blue%20and%20teal%20color%20tones%2C%20cinematic%20wide%20angle%20shot%2C%20representing%20direct%20hiring%20of%20security%20staff%2C%20moody%20professional%20atmosphere%2C%20clean%20modern%20website%20hero%20background%20with%20space%20for%20text%20on%20the%20left%20side&width=1200&height=600&seq=hiw-clients-hero-001&orientation=landscape')`
+          backgroundImage: `linear-gradient(to right, rgba(11, 26, 51, 0.92) 0%, rgba(11, 26, 51, 0.6) 50%, rgba(14, 22, 40, 0.4) 100%), url('${managedHero}')`
         }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-[#0B1933]/50 via-transparent to-[#0B1933]" aria-hidden="true" />
@@ -130,7 +132,8 @@ export default function ClientHowItWorks() {
           <div className="lg:w-2/5 w-full max-w-md">
             <div className="bg-[#111d35] rounded-2xl border border-slate-700/50 shadow-2xl overflow-hidden">
               <div className="relative aspect-video bg-[#0e1628] flex items-center justify-center overflow-hidden">
-                <QuickGuardImage
+                <PublicMediaImage
+                  slot="hiw-clients-image-1"
                   src="https://readdy.ai/api/search-image?query=Modern%20dark-themed%20laptop%20screen%20displaying%20a%20security%20guard%20hiring%20platform%20dashboard%20showing%20guard%20profiles%20with%20ratings%20and%20booking%20buttons%2C%20dark%20navy%20blue%20UI%20theme%20with%20teal%20accent%20highlights%2C%20clean%20software%20screenshot%20aesthetic%2C%20professional%20SaaS%20interface%20on%20a%20desk%20with%20ambient%20lighting%2C%20representing%20an%20online%20marketplace%20for%20hiring%20security%20guards&width=640&height=360&seq=hiw-clients-video-thumb-001&orientation=landscape"
                   alt="QuickGuard walkthrough video thumbnail"
                   title="Watch how to book a security guard on QuickGuard"

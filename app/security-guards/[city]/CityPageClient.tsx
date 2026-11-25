@@ -1,6 +1,7 @@
 'use client';
 
 import QuickGuardImage from '@/components/QuickGuardImage';
+import { usePublicMediaBackground } from '@/hooks/usePublicMediaBackground';
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -24,6 +25,7 @@ interface CityData {
 }
 
 export default function CityPageClient({ data }: { data: CityData }) {
+  const managedImage = usePublicMediaBackground('city-' + data.slug + '-hero', data.heroImage);
   return (
     <div className="min-h-screen bg-[#0B1933]">
       <CityPageSchema
@@ -37,11 +39,11 @@ export default function CityPageClient({ data }: { data: CityData }) {
       <section
         className="relative min-h-[560px] flex items-center bg-cover bg-center bg-no-repeat pt-20"
         style={{
-          backgroundImage: `linear-gradient(to right, rgba(11,26,51,0.96) 0%, rgba(11,26,51,0.85) 50%, rgba(11,26,51,0.4) 100%), url('${data.heroImage}')`,
+          backgroundImage: `linear-gradient(to right, rgba(11,26,51,0.96) 0%, rgba(11,26,51,0.85) 50%, rgba(11,26,51,0.4) 100%), url('${managedImage}')`,
         }}
         aria-labelledby="city-hero-heading"
       >
-        <QuickGuardImage src={data.heroImage} alt={data.heroImageAlt} title={`SIA licensed security guards in ${data.city}`} className="sr-only" />
+        <QuickGuardImage src={managedImage} alt={data.heroImageAlt} title={`SIA licensed security guards in ${data.city}`} className="sr-only" />
         <div className="w-full max-w-7xl mx-auto px-6 md:px-8">
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 bg-teal-500/15 border border-teal-400/30 text-teal-300 px-4 py-1.5 rounded-full text-sm font-medium mb-6">
@@ -111,7 +113,7 @@ export default function CityPageClient({ data }: { data: CityData }) {
             </div>
             <div className="rounded-2xl overflow-hidden border border-slate-700/50">
               <QuickGuardImage
-                src={data.heroImage}
+                src={managedImage}
                 alt={`SIA licensed security guard on duty in ${data.city}`}
                 title={`SIA licensed security guard on duty in ${data.city}`}
                 className="w-full h-80 object-cover object-top"

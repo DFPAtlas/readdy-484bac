@@ -99,3 +99,19 @@ verify_jwt = true
 # Keep the deployed guard-list gateway setting explicit. The handler also verifies Auth and MFA.
 [functions.get-guards]
 verify_jwt = true
+
+# The handler verifies the bearer token, active admin MFA and content role.
+[functions.stage-site-media]
+verify_jwt = false
+
+# In-handler active admin and MFA checks.
+[functions.publish-site-media]
+verify_jwt = false
+
+# Deliberately public; only current published versions can be read.
+[functions.public-site-media]
+verify_jwt = false
+
+# Private version retrieval verifies user, active admin MFA and content role.
+[functions.admin-read-site-media]
+verify_jwt = false

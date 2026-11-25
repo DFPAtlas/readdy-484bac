@@ -1,4 +1,5 @@
 'use client';
+import { usePublicMediaBackground } from '@/hooks/usePublicMediaBackground';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -8,6 +9,7 @@ import FooterExitPopupTestIcon from '@/components/qg-rewards/FooterExitPopupTest
 const heroBg = "https://readdy.ai/api/search-image?query=Dark%20abstract%20gradient%20background%20deep%20navy%20blue%20cyan%20teal%20geometric%20mesh%20pattern%2C%20modern%20technology%20fintech%20SaaS%20aesthetic%2C%20subtle%20glowing%20particles%2C%20professional%20security%20brand%20feel%2C%20very%20dark%20moody%20atmosphere%2C%20low%20contrast%2C%20corporate%20premium%20background&width=1440&height=800&seq=1&orientation=landscape";
 
 export default function QGLaunchRewardsPage() {
+  const managedBackground = usePublicMediaBackground('launch-rewards-hero', heroBg);
   const [refCode, setRefCode] = useState('');
   const [settings, setSettings] = useState<any>({});
   const [refCaptured, setRefCaptured] = useState(false);
@@ -53,7 +55,7 @@ export default function QGLaunchRewardsPage() {
       {/* Hero */}
       <section
         className="relative w-full min-h-[600px] flex items-center overflow-hidden"
-        style={{ backgroundImage: `url(${heroBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+        style={{ backgroundImage: `url(${managedBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
       >
         <div className="absolute inset-0 bg-[#071321]/80" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#071321]/40 to-[#071321]" />

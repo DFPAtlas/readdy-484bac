@@ -1,3 +1,5 @@
+'use client';
+import { usePublicMediaBackground } from '@/hooks/usePublicMediaBackground';
 import Link from 'next/link';
 
 const HERO_IMAGE =
@@ -6,11 +8,12 @@ const HERO_IMAGE =
 const TOPICS = ['Hiring guards', 'Event security', 'Licence checks', 'Pay'];
 
 export default function BlogHero() {
+  const managed = usePublicMediaBackground('blog-hero', HERO_IMAGE);
   return (
     <section
       className="relative w-full min-h-[580px] md:min-h-[640px] flex items-center bg-cover bg-center bg-no-repeat border-b border-slate-800/60"
       style={{
-        backgroundImage: `linear-gradient(to right, rgba(11, 25, 51, 0.97) 0%, rgba(11, 25, 51, 0.9) 46%, rgba(11, 25, 51, 0.55) 100%), url('${HERO_IMAGE}')`,
+        backgroundImage: `linear-gradient(to right, rgba(11, 25, 51, 0.97) 0%, rgba(11, 25, 51, 0.9) 46%, rgba(11, 25, 51, 0.55) 100%), url('${managed}')`,
       }}
     >
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">

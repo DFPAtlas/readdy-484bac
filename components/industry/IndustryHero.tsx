@@ -1,7 +1,10 @@
+'use client';
+import { usePublicMediaBackground } from '@/hooks/usePublicMediaBackground';
 import Link from 'next/link';
 import type { IndustryCtaLink } from './types';
 
 interface Props {
+  mediaSlot: string;
   eyebrow: string;
   headline: string;
   subheadline: string;
@@ -11,13 +14,14 @@ interface Props {
   secondaryCta?: IndustryCtaLink;
 }
 
-export default function IndustryHero({ eyebrow, headline, subheadline, heroImage, name, primaryCta, secondaryCta }: Props) {
+export default function IndustryHero({ mediaSlot, eyebrow, headline, subheadline, heroImage, name, primaryCta, secondaryCta }: Props) {
+  const background = usePublicMediaBackground(mediaSlot, heroImage);
   return (
     <section
       aria-labelledby="industry-heading"
       className="relative min-h-[580px] md:min-h-[680px] flex items-center bg-cover bg-center bg-no-repeat"
       style={{
-        backgroundImage: `linear-gradient(to right, rgba(11, 26, 51, 0.96) 0%, rgba(11, 26, 51, 0.85) 52%, rgba(11, 26, 51, 0.45) 100%), url('${heroImage}')`,
+        backgroundImage: `linear-gradient(to right, rgba(11, 26, 51, 0.96) 0%, rgba(11, 26, 51, 0.85) 52%, rgba(11, 26, 51, 0.45) 100%), url('${background}')`,
       }}
     >
       <div className="w-full max-w-7xl mx-auto px-6 md:px-8 py-24">
