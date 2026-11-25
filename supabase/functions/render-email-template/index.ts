@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { activationOrigin, isQuickGuardSandbox, sandboxRecipientAllowed } from '../_shared/environment-isolation.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://quickguard.uk',
@@ -42,12 +43,13 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const sandbox = isQuickGuardSandbox(supabaseUrl);
+    let RESEND_API_KEY = Deno.env.get(sandbox ? 'SANDBOX_RESEND_API_KEY' : 'RESEND_API_KEY');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    if (!RESEND_API_KEY || !supabaseUrl || !serviceKey) {
+    if (!supabaseUrl || !serviceKey) {
       return new Response(JSON.stringify({ error: 'Email service is not configured' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -108,6 +110,26 @@ Deno.serve(async (req) => {
       });
     }
 
+    let allowedRecipients = Deno.env.get('SANDBOX_EMAIL_RECIPIENTS');
+    if (sandbox && !dry_run && !allowedRecipients) {
+      const { data, error } = await supabase.from('settings').select('value').eq('key', 'sandbox_email_recipients').maybeSingle();
+      if (!error) allowedRecipients = data?.value;
+    }
+    if (!dry_run && !sandboxRecipientAllowed(supabaseUrl, recipients, allowedRecipients)) {
+      return new Response(JSON.stringify({ error: 'Sandbox recipient is not approved' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (sandbox && !dry_run && !RESEND_API_KEY) {
+      const { data, error } = await supabase.from('sandbox_runtime_credentials').select('secret').eq('name', 'qg_sandbox_resend_key').maybeSingle();
+      if (!error) RESEND_API_KEY = data?.secret;
+    }
+    if (!dry_run && !RESEND_API_KEY) {
+      return new Response(JSON.stringify({ error: 'Email service is not configured' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const recipient = recipients.join(', ');
     const now = new Date().toISOString();
 
@@ -151,7 +173,7 @@ Deno.serve(async (req) => {
           });
           if (linkError || !link.properties?.hashed_token) throw new Error('Unable to create dashboard sign-in link');
           // Fragment keeps the bearer credential out of HTTP request URLs and referrers.
-          sendVariables.dashboard_url = 'https://quickguard.uk/auth/email-dashboard#' +
+          sendVariables.dashboard_url = activationOrigin(supabaseUrl, Deno.env.get('APP_URL')) + '/auth/email-dashboard#' +
             new URLSearchParams({ token_hash: link.properties.hashed_token, role }).toString();
         }
       }
@@ -179,8 +201,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    let senderFrom = from || DEFAULT_FROM;
-    if (!/@quickguard\.uk(?:>|$)/i.test(senderFrom)) senderFrom = DEFAULT_FROM;
+    const defaultFrom = isQuickGuardSandbox(supabaseUrl) ? 'QuickGuard <notifications@quickguard.uk>' : DEFAULT_FROM;
+    let senderFrom = from || defaultFrom;
+    if (!/@quickguard\.uk(?:>|$)/i.test(senderFrom)) senderFrom = defaultFrom;
     const senderReplyTo = reply_to && isValidEmail(reply_to) ? reply_to : DEFAULT_REPLY_TO;
 
     const payload: Record<string, unknown> = {

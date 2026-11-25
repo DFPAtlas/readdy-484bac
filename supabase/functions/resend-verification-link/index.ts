@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.47.0';
+import { activationOrigin } from '../_shared/environment-isolation.ts';
 
 function getCorsHeaders(req: Request) {
   const origin = req.headers.get('origin') || '*';
@@ -70,6 +71,7 @@ async function findAuthUserByEmail(supabase: any, email: string): Promise<any | 
 
 async function sendVerificationEmail(supabase: any, supabaseUrl: string, supabaseServiceKey: string, userId: string, email: string, fullName: string, role: string): Promise<boolean> {
   try {
+    const destination = activationOrigin(supabaseUrl, Deno.env.get('APP_URL'));
     const { data: link, error: linkError } = await supabase.auth.admin.generateLink({
       type: 'magiclink',
       email,
@@ -78,7 +80,7 @@ async function sendVerificationEmail(supabase: any, supabaseUrl: string, supabas
       console.error(`[resend-verification-link] generateLink failed for ${email}: ${linkError?.message || 'no token'}`);
       return false;
     }
-    const verify_url = 'https://quickguard.uk/auth/email-dashboard#' + new URLSearchParams({
+    const verify_url = destination + '/auth/email-dashboard#' + new URLSearchParams({
       token_hash: link.properties.hashed_token,
       role,
     }).toString();
