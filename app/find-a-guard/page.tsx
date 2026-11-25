@@ -166,7 +166,7 @@ function FindGuardContent() {
         </div>
 
         {loadError && <p role="alert" className="mb-4 text-amber-300">{loadError}</p>}
-        <p className="mb-4 text-xs text-slate-400">Featured profiles appear first, followed by priority profiles and ratings. Your filters still apply.</p>
+        <p className="mb-4 text-xs text-slate-400">Profiles are sorted by rating. Your filters still apply.</p>
         {showFilters && (
           <div className="bg-[#111d35] border border-[#1e2d4d] rounded-xl p-4 mb-6 flex flex-wrap gap-4">
             <div>

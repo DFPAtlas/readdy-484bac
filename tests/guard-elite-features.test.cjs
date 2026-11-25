@@ -28,9 +28,9 @@ test('actual guard statement download confirms owner before and after rendering 
   assert.equal(saves, 0);assert.ok(states.some(v => typeof v === 'string' && v.includes('account changed')));
 });
 
-test('placement ranks boost then priority then rating without mutating explicit input order', async () => {
+test('placement ignores paid flags and ranks by rating without mutating explicit input order', async () => {
   const rows = [{ id: 'standard', rating: 5 }, { id: 'boost', profile_boost: true, rating: 3 }, { id: 'priority', profile_boost: true, priority_profile: true, rating: 2 }];
-  assert.deepEqual([...rows].sort(placement.compareGuardPlacement).map(r => r.id), ['priority', 'boost', 'standard']);assert.equal(rows[0].id, 'standard');
+  assert.deepEqual([...rows].sort(placement.compareGuardPlacement).map(r => r.id), ['standard', 'boost', 'priority']);assert.equal(rows[0].id, 'standard');
   const db = { rpc: async (_, { p_guard_ids }) => ({ data: p_guard_ids.map(id => ({ id, profile_boost: true, priority_profile: false })), error: null }) };
   assert.equal((await placement.loadGuardPlacement(db, Array.from({ length: 401 }, (_, i) => '' + i))).size, 401);
   await assert.rejects(() => placement.loadGuardPlacement({ rpc: async () => ({ data: [{ id: 'foreign', profile_boost: true, priority_profile: true }], error: null }) }, ['owned']), /Invalid/);
@@ -47,13 +47,13 @@ test('token request rejects forged counts; only paid or expired provider session
   await token.finishTokenCheckout(db, { ...session, status: 'expired' });assert.equal(calls[1].params.p_expired, true);
 });
 
-test('actual public guard list renders entitled placement first while retaining the client postcode filter', async () => {
+test('actual public guard list ignores paid placement while retaining the client postcode filter', async () => {
   const { hooksHarness, nodes, content } = require('./helpers/guard-ui-fixture.cjs');
   const rows = [{ id: 'standard', full_name: 'Standard Guard', rating: 5, postcode_area: 'AL1', licence_types: [] }, { id: 'featured', full_name: 'Featured Guard', rating: 3, postcode_area: 'AL1', licence_types: [] }, { id: 'excluded', full_name: 'Wrong Area Guard', rating: 5, postcode_area: 'SW1', licence_types: [] }];
   const db = { from() { const q = { select() { return q; }, eq() { return q; }, in() { return q; }, order: async () => ({ data: rows, error: null }) };return q; }, rpc: async () => ({ data: rows.map(r => ({ id: r.id, profile_boost: r.id !== 'standard', priority_profile: false })), error: null }) };
   const h = hooksHarness('app/find-a-guard/page.tsx', { '@/lib/supabase': { supabase: db }, 'next/navigation': { useSearchParams: () => new URLSearchParams('postcode=AL1') } });
   const Inner = h.render().props.children.type;h.renderComponent(Inner);await h.effects();
-  const tree = h.renderComponent(Inner), text = content(tree);assert.ok(text.indexOf('Featured Guard') < text.indexOf('Standard Guard'));assert.ok(!text.includes('Wrong Area Guard'));assert.match(text, /Featured profile/);
+  const tree = h.renderComponent(Inner), text = content(tree);assert.ok(text.indexOf('Standard Guard') < text.indexOf('Featured Guard'));assert.ok(!text.includes('Wrong Area Guard'));assert.doesNotMatch(text, /Featured profile|Priority profile/);
   assert.equal(nodes(tree).filter(n => n.type === 'h3' && /Guard/.test(content(n))).length, 2);h.unmount();
 });
 

@@ -28,10 +28,10 @@ const APPLY_ERRORS: Record<string, [number, string, Record<string, unknown>?]> =
   sia_required: [403, "A verified SIA licence is required for this job"],
   sia_expiry_missing: [403, "Your SIA licence expiry date is missing"],
   licence_mismatch: [400, "You don't hold the required SIA licence types for this job"],
-  no_plan: [400, "No subscription plan found"],
-  plan_not_found: [400, "Plan not found"],
-  tier_locked: [400, "Upgrade required to access this job tier", { tierLocked: true }],
-  limit_reached: [400, "Monthly application limit reached", { limitReached: true }],
+  no_plan: [400, "Application access could not be confirmed. Please refresh or contact support."],
+  plan_not_found: [400, "Application access could not be confirmed. Please refresh or contact support."],
+  tier_locked: [400, "Application access could not be confirmed. Please refresh or contact support.", { tierLocked: true }],
+  limit_reached: [400, "Application access could not be confirmed. Please refresh or contact support.", { limitReached: true }],
 };
 
 function applicationError(error: any) {

@@ -25,12 +25,25 @@ export default function UsageLimitWidget({
   audience,
   compact = false,
 }: UsageLimitWidgetProps) {
+  if (audience === 'guard') {
+    return (
+      <div className={`bg-white dark:bg-[#111d35] border border-slate-200 dark:border-[#1e2d4d] rounded-2xl ${compact ? 'p-3' : 'p-5'}`}>
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Free job applications</h3>
+        {limit === null ? (
+          <>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{used} submitted this month. No monthly application cap.</p>
+            {!compact && <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Account approval and each job&apos;s licence requirements still apply.</p>}
+          </>
+        ) : <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Application access could not be confirmed. Please refresh or contact support.</p>}
+      </div>
+    );
+  }
   const validPeriodEnd = periodEnd && !Number.isNaN(new Date(periodEnd).getTime());
   const isUnlimited = limit === null;
   const pct = isUnlimited ? 0 : Math.min(Math.round((used / (limit || 1)) * 100), 100);
   const isNearLimit = !isUnlimited && pct >= 80 && pct < 100;
   const isAtLimit = !isUnlimited && pct >= 100;
-  const upgradeReason = audience === 'guard' ? 'guard_application_limit_reached' : 'job_limit_reached';
+  const upgradeReason = 'job_limit_reached';
 
   const barColor = isAtLimit
     ? 'bg-red-500'
@@ -141,7 +154,7 @@ export default function UsageLimitWidget({
       {isAtLimit && (
         <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
           <p className="text-xs text-red-400 font-medium">
-            You&apos;ve reached your monthly limit. Upgrade to {audience === 'guard' ? 'apply for more jobs' : 'post more jobs'}.
+            You&apos;ve reached your monthly limit. Upgrade to post more jobs.
           </p>
         </div>
       )}

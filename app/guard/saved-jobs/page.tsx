@@ -123,13 +123,7 @@ export default function GuardSavedJobsPage() {
 
       const limitCheck = await checkGuardApplicationLimit(supabase, guardId);
       if (!limitCheck.allowed) {
-        if (limitCheck.reason === 'limit_reached') {
-          showToast('You have reached your monthly application limit for your current plan. Upgrade your plan to apply for more jobs this month.', 'error');
-          router.push('/upgrade?reason=guard_application_limit_reached');
-        } else {
-          showToast('We could not verify your guard subscription plan. Please refresh or contact support.', 'error');
-          router.push('/upgrade?reason=guard.plan_verification_failed');
-        }
+        showToast('Application access could not be confirmed. Please refresh or contact support.', 'error');
         setApplying(null);
         return;
       }
@@ -140,8 +134,7 @@ export default function GuardSavedJobsPage() {
           showToast('Already applied to this job', 'info');
           setApplications(prev => new Set([...prev, jobId]));
         } else if (result.limitReached) {
-          showToast('You have reached your monthly application limit for your current plan. Upgrade your plan to apply for more jobs this month.', 'error');
-          router.push('/upgrade?reason=guard_application_limit_reached');
+          showToast('Application access could not be confirmed. Please refresh or contact support.', 'error');
         } else {
           showToast(result.error || 'Failed to apply. Please try again.', 'error');
         }

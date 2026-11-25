@@ -1,41 +1,4 @@
-const PLAN_ACCESS_LEVELS: Record<string, number> = {
-  guard_starter: 0,
-  'guard-basic': 1,
-  'guard-pro': 2,
-  'guard-elite': 3,
-};
-
-const JOB_ACCESS_LEVELS: Record<string, number> = {
-  basic: 0,
-  professional: 1,
-  premium: 2,
-  elite: 3,
-};
-
-export function getGuardAccessLevel(planSlug: string): string {
-  const map: Record<string, string> = {
-    guard_starter: 'Basic',
-    'guard-basic': 'Professional',
-    'guard-pro': 'Premium',
-    'guard-elite': 'Elite',
-  };
-  return map[planSlug] || 'Basic';
-}
-
-export function getGuardAccessLevelNumeric(planSlug: string): number {
-  return PLAN_ACCESS_LEVELS[planSlug] ?? 0;
-}
-
-export function getJobAccessLevelNumeric(accessLevel: string): number {
-  return JOB_ACCESS_LEVELS[accessLevel] ?? 0;
-}
-
-export function canAccessJob(guardPlanSlug: string, jobAccessLevel: string): boolean {
-  const guardLevel = getGuardAccessLevelNumeric(guardPlanSlug);
-  const jobLevel = getJobAccessLevelNumeric(jobAccessLevel);
-  return guardLevel >= jobLevel;
-}
-
+// Legacy job categories remain for existing client records; they do not restrict guard access.
 export function getAccessLevelBadge(level: string): { color: string; icon: string; label: string } {
   switch (level) {
     case 'basic':
