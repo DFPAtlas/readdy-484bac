@@ -15,7 +15,6 @@ export function christmasOfferAmount({ enabled, accountType, planId, billingCycl
       firstChargeAt * 1000 - now < stripeMinimumLeadMs ||
       (billingCycle != null && billingCycle !== 'monthly')) return null;
 
-  if (accountType === 'guard' && planId === 'guard-pro') return 1900;
   if (accountType === 'client' && planId === 'client-pro') return 9900;
   return null;
 }

@@ -55,6 +55,6 @@ export function getFeatureLabel(key: string, audience: string): string {
 
 export function presentPricingPlan<T extends PublicPricingPlan>(plan: T) {
   return { ...plan, features: normalisePlanFeatures(plan.features),
-    badge: plan.slug === 'client-pro' ? 'RECOMMENDED' : plan.slug === 'guard-elite' ? 'MORE APPLICATIONS' : undefined,
-    limitations: plan.job_limit_per_month === null ? [] : [planAllowanceText(plan)] };
+    badge: plan.slug === 'client-pro' ? 'RECOMMENDED' : undefined,
+    limitations: plan.audience === 'guard' || plan.job_limit_per_month === null ? [] : [planAllowanceText(plan)] };
 }

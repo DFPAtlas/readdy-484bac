@@ -25,7 +25,7 @@ export default function FoundingGuardsOfferClient() {
         <p className="text-lg text-slate-300 mb-6">Eligible guards receive founding or early-member recognition when their profile is approved and a signup number is allocated. Allocation depends on the configured limits and availability at approval.</p>
         <div className="rounded-2xl border border-teal-500/30 bg-teal-500/10 p-6 mb-10">
           <h2 className="text-xl font-bold mb-3">Guard pay and membership are separate</h2>
-          <p className="text-slate-300">All guards keep their full agreed booking pay with no guard booking commission. Recognition does not grant a free paid membership or a guaranteed search position, job or payout. Free accounts and paid memberships have their own application limits and prices.</p>
+          <p className="text-slate-300">All guards keep their full agreed booking pay with no guard booking commission. Guard job access is free for every eligible guard. Recognition does not buy application access or discovery priority, or guarantee a job or payout.</p>
           <Link href="/pricing" className="inline-block mt-4 text-teal-300 underline">Compare current membership plans and subscription offers</Link>
         </div>
         {loading ? <p className="text-slate-400">Checking recognition availability…</p> : !summary ? <p role="status" className="text-amber-300">Availability could not be confirmed. Please contact support before relying on a recognition place.</p> : summary.isPaused ? <p role="status" className="text-amber-300">New recognition allocations are paused.</p> : <>

@@ -5,15 +5,15 @@ import { useState } from 'react';
 const FAQS = [
   {
     question: 'Who is eligible?',
-    answer: 'New clients and guards who sign up during our launch campaign.',
+    answer: 'Eligible new clients who choose the monthly Client Pro offer during the campaign. Guard job access is free without a paid membership.',
   },
   {
     question: 'What\u2019s free?',
-    answer: 'Your QuickGuard subscription fee for December — applied automatically, no code needed.',
+    answer: 'Eligible new clients pay no monthly Client Pro subscription until 1 January 2027. Booking payments and service fees remain separate. Guards have free job access without a paid membership.',
   },
   {
     question: 'What happens in January?',
-    answer: 'Standard subscription applies from 1 January.',
+    answer: 'For the Client Pro offer, £99/month starts on 1 January 2027 unless cancelled. Guard job access remains free.',
   },
   {
     question: 'What does the SIA licence check involve?',

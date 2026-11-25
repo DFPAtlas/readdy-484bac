@@ -351,7 +351,8 @@ export default function PlanManagementCard({ userId, audience }: { userId: strin
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-6" id={audience === 'guard' ? 'guard-membership' : undefined}>
+          {audience === 'guard' && <div className="mb-4 rounded-xl border border-blue-400/30 p-4 text-sm text-slate-600 dark:text-slate-300"><p>Guard job access is free. Any existing membership and invoice records are retained for review.</p><Link href="/guard/support" className="mt-3 inline-block underline">Contact billing support for a legacy membership or refund review</Link></div>}
           {cancelSuccess && (
             <div className="mb-4 bg-emerald-500/10 border border-emerald-400/20 rounded-xl px-4 py-3 flex items-center gap-2">
               <i className="ri-checkbox-circle-fill text-emerald-400" />
@@ -362,7 +363,7 @@ export default function PlanManagementCard({ userId, audience }: { userId: strin
           )}
 
           <div className="space-y-3">
-            {!hasAnalytics && analyticsUpgradePlan && (
+            {audience === 'client' && !hasAnalytics && analyticsUpgradePlan && (
               <Link
                 href={`/upgrade?reason=client.analytics_dashboard&plan=${analyticsUpgradePlan.slug}`}
                 prefetch={false}
@@ -373,7 +374,7 @@ export default function PlanManagementCard({ userId, audience }: { userId: strin
               </Link>
             )}
 
-            {higherPlans.length > 0 && (
+            {audience === 'client' && higherPlans.length > 0 && (
               <Link
                 href={`/upgrade?plan=${higherPlans[0]?.slug}`}
                 prefetch={false}
@@ -384,7 +385,7 @@ export default function PlanManagementCard({ userId, audience }: { userId: strin
               </Link>
             )}
 
-            {lowerPlans.length > 0 && !isFree && !isCanceled && (
+            {audience === 'client' && lowerPlans.length > 0 && !isFree && !isCanceled && (
               <Link
                 href={`/upgrade?plan=${lowerPlans[lowerPlans.length - 1]?.slug}`}
                 prefetch={false}
@@ -406,7 +407,7 @@ export default function PlanManagementCard({ userId, audience }: { userId: strin
               </button>
             )}
 
-            {hasStripeSub && isCanceled && (
+            {audience === 'client' && hasStripeSub && isCanceled && (
               <button
                 onClick={handleResume}
                 disabled={cancelling}
@@ -417,7 +418,7 @@ export default function PlanManagementCard({ userId, audience }: { userId: strin
               </button>
             )}
 
-            {isFree && (
+            {audience === 'client' && isFree && (
               <Link
                 href="/pricing"
                 prefetch={false}

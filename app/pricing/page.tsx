@@ -5,7 +5,7 @@ import PricingSchema from './PricingSchema';
 export const metadata: Metadata = {
   title: 'Security Guard Hire Pricing | Subscription Plans UK',
   description:
-    'Compare free accounts and paid subscriptions for UK clients and SIA-licensed guards. Client plans £49–£199/month; guard memberships £10–£29/month. Booking fees shown separately.',
+    'Free guard job access and client subscriptions from £49 to £199/month, with a free client tier. Client booking fees and posting allowances shown separately.',
   keywords:
     'QuickGuard pricing, security guard subscription UK, SIA guard plans, event security pricing, security staffing cost, guard membership',
   alternates: {
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Pricing Plans | QuickGuard',
     description:
-      'Compare free accounts, client subscriptions and guard memberships. See monthly and annual pricing, booking service fees and cancellation terms.',
+      'Compare client subscriptions and free guard job access. See client posting allowances, booking service fees and renewal terms.',
     url: 'https://quickguard.uk/pricing',
     siteName: 'QuickGuard',
     type: 'website',
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Pricing Plans | QuickGuard',
-    description: 'Free accounts, client subscriptions and guard memberships, with monthly and annual billing. Booking service fees are separate.',
+    description: 'Free guard job access and client subscriptions, with monthly and annual billing. Client booking service fees are separate.',
     images: ['https://readdy.ai/api/search-image?query=professional%20pricing%20plans%20comparison%20for%20security%20guard%20staffing%20platform%2C%20clean%20modern%20UK%20corporate%20office%20background%2C%20shield%20icon%20with%20checkmarks%2C%20tiered%20subscription%20cards%20displayed%20on%20a%20sleek%20dashboard%2C%20navy%20blue%20and%20teal%20color%20scheme%2C%20premium%20flat%20design%2C%20no%20people%2C%20minimalist%20and%20professional&width=1200&height=630&seq=og-pricing-001&orientation=landscape'],
   },
 };

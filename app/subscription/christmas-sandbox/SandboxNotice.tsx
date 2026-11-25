@@ -3,7 +3,7 @@ export default function SandboxNotice() {
     { icon: 'ri-calendar-line', label: 'Offer window', value: '24 Nov to 29 Dec 2026, last sign-up day (UK time)' },
     { icon: 'ri-wallet-3-line', label: 'Due today', value: '£0 with a payment method on file' },
     { icon: 'ri-calendar-check-line', label: 'First regular payment', value: '1 January 2027 (UK time)' },
-    { icon: 'ri-user-star-line', label: 'Who qualifies', value: 'New monthly Guard Pro (£19) and Client Pro (£99)' },
+    { icon: 'ri-user-star-line', label: 'Who qualifies', value: 'Eligible new monthly Client Pro (£99); guard job access is free' },
   ];
 
   return (

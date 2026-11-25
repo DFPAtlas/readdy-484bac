@@ -376,7 +376,7 @@ export default function GuardGuidePage() {
                   <h2 className="text-2xl font-bold text-white">Complete Jobs & Get Paid</h2>
                 </div>
               </div>
-              <p className="text-slate-400 mb-6">{steps[3].description} You keep your full agreed pay on new bookings, with no guard booking commission. Membership is billed separately and standard payout costs are covered by the client service fee.</p>
+              <p className="text-slate-400 mb-6">{steps[3].description} You keep your full agreed pay on new bookings, with no guard booking commission. Guard job access is free, and standard payment processing is covered within client subscription and booking charges. Existing membership records remain available on your dashboard or through billing support.</p>
               <div className="space-y-4">
                 {steps[3].paymentSteps!.map((ps, i) => (
                   <div key={i} className="flex items-start gap-4">
