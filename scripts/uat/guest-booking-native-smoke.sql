@@ -29,6 +29,7 @@ set local role authenticated;
 do $$ begin
  if exists(select from app.guest_booking_enquiries) then raise exception 'Ordinary account can read contacts';end if;
  begin perform receipt_hash from app.guest_booking_enquiries;raise exception 'Receipt digest exposed';exception when insufficient_privilege then null;end;
+ begin perform app.guest_booking_enquiry_change(repeat('e',64),'withdraw');raise exception 'Browser consent mutation RPC exposed';exception when insufficient_privilege then null;end;
  begin perform app.guest_booking_rate_limit(repeat('e',64));raise exception 'Browser limiter RPC exposed';exception when insufficient_privilege then null;end;
 end $$;
 reset role;
@@ -42,6 +43,8 @@ do $$ declare n integer;begin
  values(repeat('f',64),'qgb_nativesynthetic000000001','sandbox.enquiry@example.invalid','Synthetic enquiry','SW1A',current_date+2,true,'booking-followup-2026-11-25',now()-interval '2 days',now()-interval '1 day');
  perform app.purge_expired_guest_enquiries();
  if exists(select from app.guest_booking_enquiries where receipt_hash=repeat('f',64)) then raise exception 'Expiry did not remove synthetic enquiry';end if;
+ perform app.guest_booking_enquiry_change(repeat('f',64),'withdraw');
+ if app.guest_booking_enquiry_change(repeat('f',64),'save',jsonb_build_object('email','sandbox.enquiry@example.invalid','contact_name','Synthetic','submission_id','qgb_nativesynthetic000000001','postcode_area','SW1A','start_date',(current_date+2)::text,'followup_consent',true,'consent_version','booking-followup-2026-11-25'))->>'status'<>'withdrawn' then raise exception 'Removed consent was recreated';end if;
 end $$;
 reset role;
 select jsonb_build_object('passed',true,'scope','native positive aggregate and test/unknown exclusions, invalid-date rejection, anonymous/client ACLs, receipt-column denial and synthetic retention; rollback only','active_cron',(select count(*) from cron.job where active),'retention_job_dormant',exists(select from cron.job where jobname='guest-booking-retention' and not active)) receipt;

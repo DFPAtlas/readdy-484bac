@@ -17,7 +17,7 @@ async function digest(secret:string,value:string){
  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
  return Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(value))),b=>b.toString(16).padStart(2,'0')).join('');
 }
-export function createGuestBookingHandler({db,secret,fetcher=fetch}:{db:Database;secret:string;fetcher?:typeof fetch}){
+export function createGuestBookingHandler({db,secret,fetcher=fetch,adminCheck=async()=>false}:{db:Database;secret:string;fetcher?:typeof fetch;adminCheck?:(token:string)=>Promise<boolean>}){
  return async(req:Request)=>{
   const origin=req.headers.get('origin');const allowed=!origin||['https://quickguard.uk','https://www.quickguard.uk','https://readdy.ai'].includes(origin)||/^https:\/\/[a-z0-9-]+\.readdy\.ai$/.test(origin)||/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
   const headers:Record<string,string>={'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Vary':'Origin'};
@@ -47,11 +47,21 @@ export function createGuestBookingHandler({db,secret,fetcher=fetch}:{db:Database
     if(typeof result.data!=='number'||!Number.isSafeInteger(result.data)||result.data<0)throw new Error('Invalid count');
     return reply(200,{count:result.data,checkedAt:new Date().toISOString(),scope:input.scope,daysChecked:input.days});
    }
+   if(body.action==='admin_remove_enquiry'){
+    const bearer=req.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1];if(!bearer)return reply(401,{error:'Please sign in.'});
+    const auth=await db.auth.getUser(bearer);if(auth.error||!auth.data.user)return reply(401,{error:'Please sign in.'});
+    if(!(await adminCheck(bearer)))return reply(403,{error:'An active administrator with MFA is required.'});
+    if(typeof body.id!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(body.id))throw new RequestProblem('Invalid enquiry.');
+    const row=await db.from('guest_booking_enquiries').select('receipt_hash').eq('id',body.id).maybeSingle();
+    if(row.error)throw new Error('Enquiry lookup unavailable');if(!row.data)return reply(404,{error:'Enquiry not found. Refresh the list.'});
+    const change=await db.rpc('guest_booking_enquiry_change',{p_hash:row.data.receipt_hash,p_action:'withdraw'});if(change.error)throw new Error('Removal unavailable');
+    return reply(200,{removed:true});
+   }
    if(!['save_enquiry','withdraw_enquiry','complete_enquiry'].includes(String(body.action)))throw new RequestProblem('Invalid action.');
    let token;try{token=receiptToken(body.receipt);}catch{throw new RequestProblem('Invalid enquiry receipt.');}
    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('enquiry:'+token))),byte=>byte.toString(16).padStart(2,'0')).join('');
    if(body.action==='withdraw_enquiry'){
-    const result=await db.from('guest_booking_enquiries').delete().eq('receipt_hash',hash);if(result.error)throw new Error('Withdrawal unavailable');
+    const result=await db.rpc('guest_booking_enquiry_change',{p_hash:hash,p_action:'withdraw'});if(result.error)throw new Error('Withdrawal unavailable');
     return reply(200,{removed:true});
    }
    if(body.action==='complete_enquiry'){
@@ -62,23 +72,25 @@ export function createGuestBookingHandler({db,secret,fetcher=fetch}:{db:Database
     if(typeof body.jobId!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(body.jobId))throw new RequestProblem('Invalid booking.');
     const job=await db.from('jobs').select('id,submission_id,is_draft,status').eq('id',body.jobId).eq('client_id',client.id).maybeSingle();
     if(job.error||!job.data||job.data.is_draft||job.data.status==='draft')return reply(404,{error:'Booking not found.'});
-    const result=await db.from('guest_booking_enquiries').delete().eq('receipt_hash',hash).eq('submission_id',job.data.submission_id||'');if(result.error)throw new Error('Conversion unavailable');
+    const result=await db.rpc('guest_booking_enquiry_change',{p_hash:hash,p_action:'complete',p_submission:job.data.submission_id||''});if(result.error)throw new Error('Conversion unavailable');
+    if(record(result.data).removed!==true)return reply(409,{error:'The saved enquiry does not match this booking.'});
     return reply(200,{removed:true});
    }
    let enquiry;try{enquiry=enquiryInput(body);}catch(e){throw new RequestProblem(e instanceof Error?e.message:'Invalid enquiry.');}
    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/London'}).format(new Date());
    if(enquiry.start_date<today||Date.parse(enquiry.start_date)>Date.now()+180*86400000)throw new RequestProblem('Check the enquiry date.');
-   const existing=await db.from('guest_booking_enquiries').select('email,submission_id,expires_at').eq('receipt_hash',hash).maybeSingle();if(existing.error)throw new Error('Enquiry lookup unavailable');
-   if(existing.data){if(existing.data.email!==enquiry.email||existing.data.submission_id!==enquiry.submission_id)return reply(409,{error:'Start a new enquiry to change the contact details.'});return reply(200,{saved:true,expiresAt:existing.data.expires_at});}
-   const result=await db.from('guest_booking_enquiries').upsert({...enquiry,receipt_hash:hash},{onConflict:'receipt_hash',ignoreDuplicates:true}).select('expires_at').maybeSingle();
+   const result=await db.rpc('guest_booking_enquiry_change',{p_hash:hash,p_action:'save',p_data:enquiry});
    if(result.error)throw new Error('Enquiry save unavailable');
-   if(!result.data)return reply(409,{error:'Enquiry confirmation is pending. Retry to check the saved enquiry.'});
-   return reply(200,{saved:true,expiresAt:result.data.expires_at});
+   const receipt=record(result.data);
+   if(receipt.status==='withdrawn')return reply(410,{error:'This enquiry was removed. Start a new enquiry to opt in again.'});
+   if(receipt.status==='conflict')return reply(409,{error:'Start a new enquiry to change the contact details.'});
+   if(receipt.saved!==true||typeof receipt.expiresAt!=='string')throw new Error('Missing enquiry receipt');
+   return reply(200,{saved:true,expiresAt:receipt.expiresAt});
   }catch(e){if(e instanceof RequestProblem)return reply(e.status,{error:e.message});return reply(503,{error:'This service is temporarily unavailable. Please retry.'});}
  };
 }
 Deno.serve(async(req:Request)=>{
  const url=Deno.env.get('SUPABASE_URL'),key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
  if(!url||!key)return new Response(JSON.stringify({error:'Service unavailable.'}),{status:503,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
- return createGuestBookingHandler({db:createClient<GuestBookingDatabase,'app'>(url,key,{db:{schema:'app'},auth:{persistSession:false,autoRefreshToken:false}}),secret:key})(req);
+ return createGuestBookingHandler({db:createClient<GuestBookingDatabase,'app'>(url,key,{db:{schema:'app'},auth:{persistSession:false,autoRefreshToken:false}}),secret:key,adminCheck:async(token:string)=>{const actor=createClient<GuestBookingDatabase,'app'>(url,key,{db:{schema:'app'},global:{headers:{Authorization:'Bearer '+token}},auth:{persistSession:false,autoRefreshToken:false}});const result=await actor.rpc('is_active_admin');return !result.error&&result.data===true;}})(req);
 });

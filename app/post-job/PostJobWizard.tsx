@@ -244,7 +244,7 @@ export default function PostJobWizard() {
       setHasEnquiry(true);
       const result=await guestBookingRequest({action:'save_enquiry',receipt:receipt.token,submissionId:submissionId.current,email:formData.contactEmail,contactName:formData.contactName,postcodeArea:formData.postcode.replace(/\s/g,'').slice(0,-3),startDate:formData.startDate,followupConsent:true,consentVersion:BOOKING_FOLLOWUP_VERSION});
       if(typeof result.expiresAt!=='string'||!result.saved)throw new Error('Enquiry confirmation is pending. Retry to check it.');
-      rememberEnquiryReceipt({...receipt,expiresAt:result.expiresAt});
+      if(readEnquiryReceipt()?.token===receipt.token)rememberEnquiryReceipt({...receipt,expiresAt:result.expiresAt});
       if(mounted.current)setEnquiryMessage('Booking follow-up saved. You can remove it below.');
     }catch(error){if(mounted.current)setEnquiryMessage(error instanceof Error?error.message:'Follow-up could not be saved. Retry or remove the saved enquiry.');}
     finally{if(mounted.current)setSavingEnquiry(false);}

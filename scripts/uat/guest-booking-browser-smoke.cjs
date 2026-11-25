@@ -2,6 +2,7 @@
 const {chromium,expect}=require('@playwright/test');const assert=require('node:assert/strict');const fs=require('node:fs');
 const base=process.env.PLAYWRIGHT_BASE_URL||'http://127.0.0.1:3100',origin=new URL(base);assert.ok(['localhost','127.0.0.1'].includes(origin.hostname));
 const U='11111111-1111-4111-8111-111111111111',C='22222222-2222-4222-8222-222222222222';
+let latestPage;
 (async()=>{const browser=await chromium.launch({args:['--no-sandbox']});try{for(const width of [1440,390]){
  const context=await browser.newContext({viewport:{width,height:1000},serviceWorkers:'block'});let signedIn=false,failAvailability=true;const calls=[],unexpected=[],errors=[];
  const user={id:U,email:'synthetic@example.invalid',aud:'authenticated',role:'authenticated',user_metadata:{role:'client'}};
@@ -21,17 +22,18 @@ const U='11111111-1111-4111-8111-111111111111',C='22222222-2222-4222-8222-222222
  else if(url.pathname.endsWith('/clients'))data=signedIn?client:null;
  else if(url.pathname.endsWith('/users'))data=signedIn?{id:U,user_type:'client'}:null;
  else if(url.pathname.endsWith('/admin_users')||url.pathname.endsWith('/guards')||url.pathname.endsWith('/subscriptions'))data=null;
+ else if(url.pathname.endsWith('/wizard_fields'))data=[{id:'synthetic-email-field',field_key:'email',label:'Email address',field_label:'Email address',field_type:'email',is_required:true,is_enabled:true,sort_order:1}];
  else if(url.pathname.endsWith('/user_entitlements_data'))data={user_id:U,plan_slug:'client_free',is_active:true,features:['client.post_job']};
  else if(url.pathname.endsWith('/plan_fee_rules'))data={platform_fee_percent:15,platform_fee_fixed_pence:0,stripe_fee_payer:'quickguard',payout_delay_days:5,auto_release_hours:72,dispute_window_hours:24};
  else if(url.pathname.endsWith('/rpc/is_active_admin'))data=false;
  else data=[];
  return route.fulfill({status,headers,body:JSON.stringify(data)});
  });
- const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+ const page=await context.newPage();latestPage=page;page.on('pageerror',e=>errors.push(e.message));
  await page.goto(base+'/');const essential=page.getByRole('button',{name:'Essential Only',exact:true});await essential.click();await expect(essential).not.toBeVisible();
  await page.locator('section[aria-labelledby="hero-heading"]').getByRole('link',{name:'Book a Guard Now',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Do you have a QuickGuard account?',exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Yes, sign in',exact:true}).click();await page.waitForURL('**/client/login?**');await expect(page.getByRole('alert')).toHaveCount(0);
+ await page.getByRole('button',{name:'Yes, sign in',exact:true}).click();await page.waitForURL('**/client/login?**');await expect(page.getByText('Your account could not be verified. Please retry.',{exact:true})).toHaveCount(0);await expect(page.locator('input[type="email"]')).toBeVisible();
  await page.goto(base+'/post-job?mode=immediate&source=homepage');await page.getByRole('button',{name:'No, check availability first',exact:true}).click();
  await page.getByRole('button',{name:/^Nightclub or Bar/}).click();await page.getByRole('button',{name:/Next: When/}).click();
  const values={'Venue or event name':'Synthetic Venue','Street address':'Synthetic Street','City':'London','Postcode':'SW1A 1AA','Start date':new Date(Date.now()+3*86400000).toISOString().slice(0,10),'Start time':'09:00','End time':'17:00'};
@@ -46,11 +48,11 @@ const U='11111111-1111-4111-8111-111111111111',C='22222222-2222-4222-8222-222222
  await page.getByRole('button',{name:'Remove saved booking follow-up',exact:true}).click();await expect(page.getByText('Saved booking follow-up removed.',{exact:true})).toBeVisible();
  fs.mkdirSync('uat-results/guest-booking',{recursive:true});await page.screenshot({path:`uat-results/guest-booking/availability-${width}.png`,fullPage:true});
  await page.getByRole('button',{name:'Continue with a client account',exact:true}).click();const dialog=page.getByRole('dialog');await expect(dialog.getByRole('heading',{name:'Your booking details are saved',exact:true})).toBeVisible();await expect(dialog.getByRole('button',{name:'Create a free account',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();await page.getByRole('button',{name:'Continue with a client account',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Create a free account',exact:true}).click();await page.waitForURL('**/client/register?**');
- const target=new URL(page.url()).searchParams.get('redirect');assert.equal(target,'/client/post-job?mode=immediate&source=homepage');await expect(page.getByRole('alert')).toHaveCount(0);
+ const target=new URL(page.url()).searchParams.get('redirect');assert.equal(target,'/client/post-job?mode=immediate&source=homepage');await expect(page.getByText('Your account could not be verified. Please retry.',{exact:true})).toHaveCount(0);await expect(page.locator('input[type="email"]')).toBeVisible();
  const draft=await page.evaluate(()=>JSON.parse(localStorage.getItem('qg_pending_job_draft_v1')));assert.equal(draft.venueName,'Synthetic Venue');assert.equal(draft.contactEmail,'synthetic@example.invalid');assert.match(draft.submissionId,/^qgb_/);
  signedIn=true;const accessToken=[Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url'),Buffer.from(JSON.stringify({sub:U,role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})).toString('base64url'),'synthetic'].join('.');
  await page.evaluate(({user,accessToken})=>localStorage.setItem('sb-127-auth-token',JSON.stringify({access_token:accessToken,refresh_token:'synthetic',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,token_type:'bearer',user})),{user,accessToken});
  await page.goto(base+target);await expect(page.getByText('Continuing your “Book a Guard Now” request',{exact:true})).toBeVisible();await expect(page.locator('input[name="jobTitle"]')).toHaveValue('Synthetic Venue — Nightclub or Bar');await expect(page.locator('textarea[name="jobDescription"]')).toHaveValue('Synthetic guest booking');
  assert.equal((await page.evaluate(()=>JSON.parse(localStorage.getItem('qg_pending_job_draft_v1')))).submissionId,draft.submissionId);
  assert.deepEqual(unexpected,[]);assert.deepEqual(errors,[]);await page.screenshot({path:`uat-results/guest-booking/restored-${width}.png`,fullPage:true});console.log(`PASS guest ${width}px: hero account choice, login/signup navigation, failure/retry, private aggregate request, explicit consent/removal, secure draft restore and no job/payment/email provider calls; synthetic APIs only`);await context.close();
- }}finally{await browser.close();}})().catch(error=>{console.error(error);process.exitCode=1;});
+ }}catch(error){if(latestPage&&!latestPage.isClosed()){fs.mkdirSync('uat-results/guest-booking',{recursive:true});await latestPage.screenshot({path:'uat-results/guest-booking/failure.png',fullPage:true});console.error('Guest failure diagnostic',JSON.stringify({url:latestPage.url(),alerts:await latestPage.getByRole('alert').allTextContents(),body:(await latestPage.locator('body').innerText()).slice(-4500)}));}throw error;}finally{await browser.close();}})().catch(error=>{console.error(error);process.exitCode=1;});

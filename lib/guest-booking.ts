@@ -26,9 +26,9 @@ export function readEnquiryReceipt():EnquiryReceipt|null{
  try{const r:unknown=JSON.parse(localStorage.getItem(KEY)||'null');if(!r||typeof r!=='object'||Array.isArray(r))return null;const v=r as Record<string,unknown>;if(typeof v.token!=='string'||!/^[a-f0-9]{64}$/.test(v.token)||typeof v.submissionId!=='string'||!/^qgb_[a-zA-Z0-9]{10,80}$/.test(v.submissionId)||typeof v.expiresAt!=='string'||!Number.isFinite(Date.parse(v.expiresAt))||Date.parse(v.expiresAt)<=Date.now()){localStorage.removeItem(KEY);return null;}return{token:v.token,submissionId:v.submissionId,expiresAt:v.expiresAt};}catch{return null;}
 }
 export function rememberEnquiryReceipt(receipt:EnquiryReceipt):boolean{try{localStorage.setItem(KEY,JSON.stringify(receipt));return true;}catch{return false;}}
-export async function withdrawGuestEnquiry(){const r=readEnquiryReceipt();if(!r)return;await guestBookingRequest({action:'withdraw_enquiry',receipt:r.token});localStorage.removeItem(KEY);}
+export async function withdrawGuestEnquiry(){const r=readEnquiryReceipt();if(!r)return;await guestBookingRequest({action:'withdraw_enquiry',receipt:r.token});if(readEnquiryReceipt()?.token===r.token)localStorage.removeItem(KEY);}
 export async function finishGuestEnquiry(jobId:string,submissionId:string):Promise<boolean>{
  const r=readEnquiryReceipt();if(!r||r.submissionId!==submissionId)return true;
  const auth=await supabase.auth.getSession();if(auth.error||!auth.data.session)return false;
- try{await guestBookingRequest({action:'complete_enquiry',receipt:r.token,jobId},auth.data.session.access_token);localStorage.removeItem(KEY);return true;}catch{return false;}
+ try{await guestBookingRequest({action:'complete_enquiry',receipt:r.token,jobId},auth.data.session.access_token);if(readEnquiryReceipt()?.token===r.token)localStorage.removeItem(KEY);return true;}catch{return false;}
 }

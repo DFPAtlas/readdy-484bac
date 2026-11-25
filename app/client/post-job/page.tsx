@@ -551,7 +551,8 @@ function PostJobContent() {
       if (result.jobId && submissionIdRef.current && !(await finishGuestEnquiry(result.jobId,submissionIdRef.current))) {
         setPostSubmitWarnings(previous=>[...previous,'Your job was posted, but the saved booking follow-up could not be removed. Use Remove saved booking follow-up on the public booking page or contact support.']);
       }
-      clearPendingJobDraft();
+      const currentPending=loadPendingJobDraft();
+      if(!currentPending||currentPending.submissionId===submissionIdRef.current)clearPendingJobDraft();
       try { sessionStorage.removeItem('post_auth_redirect'); } catch {}
 
       setSubmitStatus('success');
