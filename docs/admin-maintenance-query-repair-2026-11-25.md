@@ -15,4 +15,10 @@ The migration reads the job history once, calculates seven-day counts per job an
 - Two initial fixture submissions failed SQL parsing before execution; the corrected complete script passed.
 - No frontend or Edge Function change is needed.
 
-Production deployment and a fresh authenticated System Status retest are separate acceptance steps. The wider admin and media upload/publication gates remain open.
+## Production acceptance
+
+Applied as provider migration 20261125125635_optimize_admin_maintenance_history. The repository filename matches that migration identity. Source readback confirmed the candidate body, unchanged postgres ownership, STABLE volatility, empty search_path, SECURITY INVOKER, service_role EXECUTE and denial to anon/authenticated.
+
+A fresh authenticated published-page retest completed at 12:57:52 UTC: System Status shows Core Services Healthy, all 14 scheduled jobs, the six cleanup target inventories and recent completed cleanup activity. The maintenance timeout/schema warning and cleanup-loading error are absent. Historical failed payout count remains one and has not been hidden. No cleanup was run. No frontend publication or Edge deployment was needed.
+
+PR merge and wider admin/media upload-publication acceptance remain separate. A separately requested cleanup of old cron history is pending its own explicit confirmation and is not part of this migration.
