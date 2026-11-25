@@ -87,6 +87,7 @@ function layout({ user = { id: 'verified-owner' }, error = null, active = true, 
     select() { return q; }, eq(key, value) { assert.equal(key, 'user_id'); assert.equal(value, user.id); return q; },
     async maybeSingle() { return { data: { id: 'admin', email: 'qa@example.test', is_active: active, role } }; },
   }; return q; } };
+  const protectedComponents = ['AdminSidebar', 'AdminSessionTimeout', 'AdminSessionHeartbeat'].map(() => () => null);
   const h = hooksHarness('app/admin/layout.tsx', {
     'next/navigation': { usePathname: () => '/admin/guard-verifications' },
     '@/hooks/useSafeRouter': { useSafeRouter: () => router },
@@ -94,20 +95,31 @@ function layout({ user = { id: 'verified-owner' }, error = null, active = true, 
     '@/lib/admin-mfa': { async resolveAdminMfaRoute() { mfaCalls++; return mfa; } },
     '@/hooks/useAdminAuth': { clearAdminAuthCache() { cleared++; } },
     '@/lib/supabase': { supabase: db },
-    ...Object.fromEntries(['AdminSidebar', 'AdminSessionTimeout', 'AdminSessionHeartbeat'].map(name => ['@/components/' + name, { __esModule: true, default: () => null }])),
+    ...Object.fromEntries(['AdminSidebar', 'AdminSessionTimeout', 'AdminSessionHeartbeat'].map((name, index) => ['@/components/' + name, { __esModule: true, default: protectedComponents[index] }])),
   });
-  return { h, pushes, signOuts, queries, get cleared() { return cleared; }, get mfaCalls() { return mfaCalls; } };
+  return { h, pushes, signOuts, queries, protectedComponents, get cleared() { return cleared; }, get mfaCalls() { return mfaCalls; } };
+}
+
+function assertProtectedContentHidden(page) {
+  const tree = page.h.render({ children: 'PRIVATE ADMIN SCREEN' });
+  assert.doesNotMatch(content(tree), /PRIVATE ADMIN SCREEN/);
+  assert(!nodes(tree).some(node => node.type === 'main'));
+  assert(!nodes(tree).some(node => page.protectedComponents.includes(node.type)));
+  return tree;
 }
 
 test('revoked or missing server sessions cannot mount protected admin screens', async () => {
   for (const auth of [{ user: null }, { user: { id: 'cached-owner' }, error: { code: 'session_not_found' } }]) {
-    const page = layout(auth); page.h.render({ children: 'PRIVATE ADMIN SCREEN' }); await page.h.effects();
-    assert.equal(page.h.render({ children: 'PRIVATE ADMIN SCREEN' }), null);
+    const page = layout(auth); assertProtectedContentHidden(page); await page.h.effects();
+    const tree = assertProtectedContentHidden(page);
+    assert.match(content(tree), /Your admin session is not active/);
+    assert(nodes(tree).some(node => node.type === 'button' && /Go to sign in/.test(content(node))));
     assert.deepEqual(page.pushes, ['/admin/login']);
     assert.deepEqual(page.signOuts, [{ scope: 'local' }]);
     assert.equal(page.cleared, 1);
     assert.deepEqual(page.queries, []);
     assert.equal(page.mfaCalls, 0);
+    page.h.unmount();
   }
 });
 
@@ -117,11 +129,48 @@ test('verified active admins still require their existing role and MFA gates', a
     assert.match(content(page.h.render({ children: 'PRIVATE ADMIN SCREEN' })), /PRIVATE ADMIN SCREEN/);
     assert.deepEqual(page.pushes, []);
     assert.equal(page.mfaCalls, 1);
+    const tree = page.h.render({ children: 'PRIVATE ADMIN SCREEN' });
+    assert(nodes(tree).some(node => node.type === 'main'));
+    for (const component of page.protectedComponents) assert(nodes(tree).some(node => node.type === component));
+    page.h.unmount();
   }
   for (const [settings, target] of [[{ mfa: 'mfa' }, '/admin/mfa'], [{ mfa: 'setup' }, '/admin/mfa/setup'],
     [{ active: false }, '/admin/login'], [{ role: 'guard' }, '/admin/login']]) {
     const page = layout(settings); page.h.render({ children: 'PRIVATE ADMIN SCREEN' }); await page.h.effects();
-    assert.equal(page.h.render({ children: 'PRIVATE ADMIN SCREEN' }), null);
+    assertProtectedContentHidden(page);
     assert.deepEqual(page.pushes, [target]);
+    assert.equal(page.mfaCalls, settings.mfa ? 1 : 0);
+    if (!settings.mfa) {
+      assert.deepEqual(page.signOuts, [undefined]);
+      assert.equal(page.cleared, 1);
+    }
+    page.h.unmount();
+  }
+});
+
+test('inactive-session recovery opens sign in without exposing protected content', async () => {
+  const page = layout({ user: null });
+  assertProtectedContentHidden(page); await page.h.effects();
+  const tree = assertProtectedContentHidden(page);
+  const recovery = nodes(tree).find(node => node.type === 'button' && /Go to sign in/.test(content(node)));
+  assert(recovery);
+  recovery.props.onClick();
+  assert.deepEqual(page.pushes, ['/admin/login', '/admin/login']);
+  assertProtectedContentHidden(page);
+  assert.deepEqual(page.queries, []);
+  assert.equal(page.mfaCalls, 0);
+  page.h.unmount();
+});
+
+test('unknown MFA results fail closed and sign out before protected content can mount', async () => {
+  for (const mfa of ['unknown', null]) {
+    const page = layout({ mfa });
+    assertProtectedContentHidden(page); await page.h.effects();
+    assertProtectedContentHidden(page);
+    assert.deepEqual(page.pushes, ['/admin/login']);
+    assert.deepEqual(page.signOuts, [undefined]);
+    assert.equal(page.cleared, 1);
+    assert.equal(page.mfaCalls, 1);
+    page.h.unmount();
   }
 });
