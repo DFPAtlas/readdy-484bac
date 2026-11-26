@@ -65,8 +65,23 @@ test('private dry run forwards preview only and never claims delivery', async ()
   const missingPreview = sender({ mode: 'dry_run' }); assert.equal((await missingPreview.run()).status, 500);
 });
 test('confirmation requires successful provider acceptance and hides provider details', async () => {
-  for (const options of [{ status: 500 }, { result: { success: false, email_id: 'no' } }, { result: { success: true } }, { result: { success: true, email_id: ' ' } }, { raw: 'invalid json' }, { networkError: true }, { env: { RESEND_API_KEY: undefined } }]) {
+  for (const options of [{ status: 500 }, { result: { success: false, email_id: 'no' } }, { result: { success: true } }, { result: { success: true, email_id: ' ' } }, { raw: 'invalid json' }, { networkError: true }]) {
     const h = sender(options); const r = await h.run(); assert.equal(r.status, 500); assert.notEqual(r.body.success, true); assert.doesNotMatch(JSON.stringify(r.body), /private|provider-fixture/);
+  }
+});
+test('renderer-owned credentials support live and scheduled confirmations without a sender provider key', async () => {
+  for (const job of [{ status: 'open', is_draft: false, publish_at: null }, { status: 'draft', is_draft: true, publish_at: '2099-12-01T10:00:00Z' }]) {
+    const h = sender({ job, env: { RESEND_API_KEY: undefined } });
+    const r = await h.run();
+    assert.equal(r.status, 200); assert.equal(r.body.delivered, true);
+    assert.equal(r.body.message_id, 'accepted'); assert.equal(h.requests.length, 1);
+    assert.equal(h.requests[0].body.to, body.clientEmail);
+    assert.equal(h.requests[0].body.from, 'QuickGuard <notifications@quickguard.uk>');
+    assert.equal(h.requests[0].body.template_slug, job.is_draft ? 'job_scheduled' : 'job_posted');
+    const unavailable = sender({ job, env: { RESEND_API_KEY: undefined }, status: 500, result: { error: 'private renderer credential failure' } });
+    const failed = await unavailable.run();
+    assert.equal(unavailable.requests.length, 1); assert.equal(failed.status, 500);
+    assert.notEqual(failed.body.delivered, true); assert.doesNotMatch(JSON.stringify(failed.body), /private/);
   }
 });
 function posting(options = {}) {
