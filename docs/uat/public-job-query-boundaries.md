@@ -30,6 +30,10 @@ Native production read-only role validation confirmed anonymous SELECT on the pu
 
 ## Verification and release boundary
 
+The merged Readdy v2510 base also removed the price component's billing-cycle prop while the existing upgrade page still supplied it, causing the repository TypeScript check and build to fail. The component now defaults to the current monthly public presentation and accepts the upgrade page's explicit annual cycle using the existing authoritative price helper. No public-page annual toggle is restored, and no checkout fee, price ID or billing calculation changes. The component still rejects unavailable annual prices.
+
+Existing tests were brought into line with that merged presentation: public/print monthly pricing, the upgrade page's annual option and the current 8-hour £18/hour example (£144 gross). The cancellation harness resolves and renders the actual extracted BookingPolicySummary rather than failing its relative import; cancellation assertions are retained. The pricing browser smoke keeps monthly public-page checks and adds an authenticated client upgrade annual-display check. These repairs address actual baseline compilation and harness failures rather than suppressing them.
+
 Eight new execution regressions cover the six real private generators and forwarded runtime IDs; invalid/valid public metadata and route IDs; public static IDs; the actual public job component; scoped public metrics, validation/failure behavior, display thresholds and unmount retirement. Fixtures do not use production credentials or provider traffic.
 
 The Build Check additionally runs `scripts/uat/public-job-query-browser-smoke.cjs` on built pages at 1440px and 390px. It verifies published/absent/failed metrics, forbids private count requests and invalid UUID lookups, and checks a valid UUID still reaches the public listing API. All API responses are synthetic and third-party traffic is blocked. The pre-existing full browser suite remains enabled.

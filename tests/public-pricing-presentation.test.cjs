@@ -106,10 +106,11 @@ test('annual total and monthly equivalent match checkout price validation, and m
   assert.doesNotMatch(html, /£990\.00<\/span>/);
 });
 
-test('pricing, upgrade and print pages retain client annual prices without selling guard allowances or placement', () => {
+test('public and print pages retain monthly prices while upgrade retains annual pricing without selling guard access', () => {
   for (const file of ['app/pricing/PricingClient.tsx', 'app/upgrade/page.tsx', 'app/pricing/pdf/PricingPDFClient.tsx']) {
     const html = renderPage(file, { cycle: 'annual' });
-    assert.match(html, /£52\.50/, file); assert.match(html, /£630\.00/, file);
+    if (file.includes('/upgrade/')) { assert.match(html, /£52\.50/, file); assert.match(html, /£630\.00/, file); }
+    else { assert.match(html, /£63\.00/, file); assert.doesNotMatch(html, /£52\.50|£630\.00|month equivalent/, file); }
     assert.doesNotMatch(html, /£14\.58|£175\.00/, file);
     assert.match(html, /12 job postings per month/, file);
     assert.doesNotMatch(html, /14 applications per month/, file);
@@ -155,9 +156,11 @@ test('an unavailable annual price is not invented or offered for subscription on
   value.plans = value.plans.map(plan => plan.monthly_price_pence ? { ...plan, stripe_annual_price_id: null } : plan);
   for (const file of ['app/pricing/PricingClient.tsx', 'app/upgrade/page.tsx', 'app/pricing/pdf/PricingPDFClient.tsx']) {
     const html = renderPage(file, { catalogue: value, cycle: 'annual' });
-    assert.match(html, /Annual billing unavailable/);
+    if (file.includes('/upgrade/')) {
+      assert.match(html, /Annual billing unavailable/);
+      assert.match(html, /<button disabled=""[^>]*>Subscribe<\/button>/);
+    } else { assert.match(html, /£63\.00/); assert.doesNotMatch(html, /Annual billing unavailable/); }
     assert.doesNotMatch(html, /£630\.00|£52\.50|15% with annual/);
-    if (!file.includes('/pdf/')) assert.match(html, /<button disabled=""[^>]*>Subscribe<\/button>/);
   }
 });
 
