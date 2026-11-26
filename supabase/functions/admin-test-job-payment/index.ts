@@ -36,9 +36,24 @@ serve(async (req) => {
   if (!authHeader.startsWith('Bearer ')) return json(401, { success: false, error: 'Authentication required' });
   const token = authHeader.replace('Bearer ', '');
 
-  const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: `Bearer ${token}` } } });
+  const authClient = createClient(supabaseUrl, anonKey, {
+    db: { schema: 'app' },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
   const { data: { user }, error: userError } = await authClient.auth.getUser(token);
   if (userError || !user) return json(401, { success: false, error: 'Invalid or expired token' });
+
+  // Caller-bound RPC verifies both current administrator membership and AAL2.
+  // Request fields and user-editable metadata cannot grant finance access.
+  let mfaAdmin = false;
+  try {
+    const { data, error } = await authClient.rpc('is_active_admin');
+    if (error) return json(503, { success: false, error: 'Unable to verify administrator access' });
+    mfaAdmin = data === true;
+  } catch {
+    return json(503, { success: false, error: 'Unable to verify administrator access' });
+  }
+  if (!mfaAdmin) return json(403, { success: false, error: 'Active administrator with MFA required' });
 
   const db = createClient(supabaseUrl, serviceKey, { db: { schema: 'app' } });
   const { data: admin } = await db.from('admin_users').select('id, role, is_active').eq('user_id', user.id).maybeSingle();
