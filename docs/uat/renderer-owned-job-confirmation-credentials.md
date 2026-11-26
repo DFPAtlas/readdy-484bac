@@ -13,13 +13,17 @@ Remove only the unused sender environment read and credential gate. The renderer
 - Deployed only the sender to sandbox `alfwwggavmyerjyqumuo`, version 59, ACTIVE, with gateway JWT verification preserved. Retrieved deployed source exactly matches the reviewed file.
 - No production deployment, new migration, entitlement change or job-limit adjustment was performed for this fix.
 
-## Native acceptance still pending
+## Native acceptance passed
 
-The earlier native test client has already consumed its one free job. A second insert would exceed that allowance, including a scheduled draft. A fresh disposable native client is needed to exercise `create-job` without changing its entitlement or usage.
+The earlier native test client had consumed its one free job. A second insert would exceed that allowance, including a scheduled draft. After explicit approval of a fresh test inbox alias, one disposable client registered through `register-magic-link`. Its activation email was delivered, native verification succeeded and `complete-client-profile` completed its profile. The earlier client's entitlement and usage were preserved.
 
-No fresh client, scheduled job or outgoing confirmation was created in this attempt. The original sandbox recipient allowlist was restored; delivery remains `dry_run`, the prior synthetic guard remains inactive and no scheduler cron is active. The previously delivered direct template test establishes template/provider delivery only, not the complete native creation chain.
+The actual `create-job` handler saved one future draft and returned HTTP 200 with no warnings. The stored job was `draft`, `is_draft=true`, scheduled for 1 December 2026 at 10:00 GMT, with notification status `none` and zero notified guards. Its downstream sender and renderer created exactly one `job_scheduled` delivery audit. Resend confirmed delivery at 13:47:30 GMT on 26 November to the already approved main test inbox, from the selected QuickGuard notification sender. The received message contained the correct UK publication time, stated that the job was not yet visible and guards had not been notified, and contained no unresolved variables or false live-job claim.
 
-With an explicitly approved fresh test inbox, register and activate one synthetic client through the native handlers, complete its profile, then submit one future scheduled draft with the already approved confirmation recipient. Verify the stored draft, no guard notification, one accepted/delivered scheduled email with the correct UK publication time, and a replay returning the same job without a second email. Remove the disposable draft before its publication time, sign out the test session and restore the original delivery controls. Do not mark native acceptance complete until these checks have run.
+Replaying the same authenticated submission returned the same job with `idempotent=true`. There remained exactly one job and one confirmation audit. The email queue's complete row hash matched its pre-test baseline, proving no guard email was queued.
+
+Cleanup removed only the disposable scheduled draft, retained its delivery audit, signed the client out globally and deactivated its clearly marked synthetic profile. Zero test jobs and zero test sessions remain. All retained job rows and all email queue rows exactly match their pre-test hashes. The original single-recipient allowlist and `dry_run` mode were restored, the prior synthetic guard remains inactive and no scheduler cron is active.
+
+This establishes the sandbox native creation-to-provider-delivery chain. It does not establish browser inbox-click activation, eventual scheduled publication, production full-flow acceptance or financial/bank settlement.
 
 ## Rollout
 
