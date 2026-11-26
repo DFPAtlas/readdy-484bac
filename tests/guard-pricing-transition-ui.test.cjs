@@ -1,11 +1,12 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const React=require('react');const {renderToStaticMarkup}=require('react-dom/server');
 const {load}=require('./helpers/enterprise-module.cjs');const {hooksHarness,nodes}=require('./helpers/guard-ui-fixture.cjs');
 const Link={__esModule:true,default:p=>React.createElement('a',p,p.children)};
-test('all four £120 client booking examples agree with authoritative fee math; unavailable fees are never zero',()=>{
+test('all four £144 client booking examples agree with authoritative fee math; unavailable fees are never zero',()=>{
  const Examples=load('components/pricing/ClientBookingExamples.tsx').default;const policy=load('supabase/functions/_shared/booking-policy.ts');
  const plans=[['client_free',0,15],['client-starter',4900,10],['client-pro',9900,7.5],['client-enterprise',19900,5]].map(([slug,monthly,fee])=>({slug,name:slug,audience:'client',monthly_price_pence:monthly,bookingFee:fee,bookingFeeFixedPence:0}));
  const html=renderToStaticMarkup(React.createElement(Examples,{plans}));
- for(const [i,total]of [13800,13200,12900,12600].entries()){assert.equal(policy.bookingAmounts(12000,plans[i].bookingFee).clientTotalPence,total);assert.match(html,new RegExp('£'+(total/100).toFixed(2).replace('.','\\.')));}
+ for(const [i,total]of [16560,15840,15480,15120].entries()){assert.equal(policy.bookingAmounts(14400,plans[i].bookingFee).clientTotalPence,total);assert.match(html,new RegExp('£'+(total/100).toFixed(2).replace('.','\\.')));}
+ assert.match(html,/8 hours at £18\/hour/);assert.match(html,/£144\.00/);
  assert.match(html,/QuickGuard is not VAT registered/);assert.match(html,/No VAT is added/);assert.match(html,/Monthly subscription is additional/);
  const failed=renderToStaticMarkup(React.createElement(Examples,{plans:[{...plans[0],bookingFee:undefined}]}));assert.match(failed,/Fee unavailable/);assert.match(failed,/Total unavailable/);assert.doesNotMatch(failed,/£138\.00/);
 });

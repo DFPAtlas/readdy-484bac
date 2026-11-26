@@ -1,16 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
 import SelectGuardsClient from './SelectGuardsClient';
 
 export async function generateStaticParams() {
-  try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { db: { schema: 'app' } }
-    );
-    const { data: jobs } = await supabase.from('jobs').select('id');
-    if (jobs && jobs.length > 0) return jobs.map((job) => ({ id: job.id }));
-  } catch { /* fallback for static export */ }
+  // Keep the existing static-export shells. Private job IDs are loaded only
+  // after authentication by the client page, never by an anonymous build.
   return [{ id: '1' }, { id: '2' }, { id: '3' }];
 }
 

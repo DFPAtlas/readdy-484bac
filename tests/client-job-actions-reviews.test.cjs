@@ -2,13 +2,24 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
+const pathModule = require('node:path');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const { databaseFixture } = require('./helpers/client-read-fixture.cjs');
 const compile = source => ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
 function load(path, mocks = {}) {
   const module = { exports: {} };
-  new Function('module', 'exports', 'require', compile(fs.readFileSync(path, 'utf8')))(module, module.exports, name => mocks[name] ?? require(name));
+  const resolve = name => {
+    if (name in mocks) return mocks[name];
+    if (name.startsWith('.') || name.startsWith('@/')) {
+      const base = name.startsWith('@/') ? name.slice(2) : pathModule.join(pathModule.dirname(path), name);
+      const target = [base, base + '.ts', base + '.tsx'].find(file => fs.existsSync(file) && fs.statSync(file).isFile());
+      if (!target) throw new Error('Missing fixture import ' + name);
+      return load(target, mocks);
+    }
+    return require(name);
+  };
+  new Function('module', 'exports', 'require', compile(fs.readFileSync(path, 'utf8')))(module, module.exports, resolve);
   return module.exports;
 }
 const guidance = load('lib/customer-guidance.ts');
@@ -107,7 +118,7 @@ test('bulk cancellation uses the atomic RPC, skips terminal work and reports par
 });
 
 test('terminal cancellation modals provide support and never offer refund resolutions', () => {
-  const Modal = load('app/client/jobs/CancelJobModal.tsx', { '@/lib/client-job-actions': actions, '@/lib/supabase': { supabase: {} }, 'next/navigation': { useRouter: () => ({ push() {} }) } }).default;
+  const Modal = load('app/client/jobs/CancelJobModal.tsx', { '@/lib/client-job-actions': actions, '@/lib/supabase': { supabase: {} }, 'next/navigation': { useRouter: () => ({ push() {} }) }, 'next/link': { __esModule: true, default: ({ href, children }) => React.createElement('a', { href }, children) } }).default;
   for (const status of ['completed', 'paid_out', 'payout_approved', 'review_pending', 'closed', 'cancelled', 'disputed', 'unknown']) {
     const html = renderToStaticMarkup(React.createElement(Modal, { job: job('job', status), onClose() {}, onSuccess() {} }));
     assert.match(html, /Cannot Cancel Job/); assert.match(html, /Contact Support/);
