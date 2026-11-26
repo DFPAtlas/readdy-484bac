@@ -8,7 +8,10 @@ const body = { clientEmail: 'synthetic@example.invalid', clientName: 'Fixture', 
 function sender(options = {}) {
   let handler;
   const requests = [], reads = [];
-  const db = { from(table) { reads.push(table); return { select() { return this; }, eq() { return this; }, async maybeSingle() { return { data: options.mode === undefined ? null : { value: options.mode }, error: options.settingError || null }; } }; } };
+  const db = { from(table) { reads.push(table); return { select() { return this; }, eq() { return this; }, async maybeSingle() {
+    if (table === 'jobs') return { data: options.job === undefined ? { status: 'open', is_draft: false, publish_at: null } : options.job, error: options.jobError || null };
+    return { data: options.mode === undefined ? null : { value: options.mode }, error: options.settingError || null };
+  } }; } };
   load('supabase/functions/send-job-posted-email/index.ts', { [SERVE]: { serve(fn) { handler = fn; } }, [SDK]: { createClient: () => db } }, {
     Deno: { env: { get: key => ({ ...ENV, ...options.env })[key] } }, console: { error() {} },
     fetch: async (url, init) => { requests.push({ url, body: JSON.parse(init.body) }); if (options.networkError) throw Error('private provider detail'); return new Response(options.raw ?? JSON.stringify(options.result ?? { success: true, email_id: 'accepted' }), { status: options.status || 200 }); },
@@ -18,6 +21,30 @@ function sender(options = {}) {
 test('job confirmation accepts HTML form numeric strings and formats the rate', async () => {
   const h = sender(); const r = await h.run(); assert.equal(r.status, 200); assert.equal(r.body.delivered, true); assert.equal(r.body.message_id, 'accepted');
   assert.equal(h.requests[0].body.variables.hourly_rate, '15.50'); assert.equal(h.requests[0].body.variables.number_of_guards, '2'); assert.equal(h.requests[0].body.dry_run, false);
+  assert.equal(h.requests[0].body.template_slug, 'job_posted');
+});
+test('saved scheduled drafts receive scheduled wording and a London publication time despite forged caller state', async () => {
+  for (const [date, time] of [['2099-12-01T12:00:00Z', '12:00 GMT'], ['2099-07-01T12:00:00Z', '13:00 BST']]) {
+    const h = sender({ job: { status: 'draft', is_draft: true, publish_at: date } });
+    const r = await h.run({ ...body, status: 'open', is_draft: false, publishAt: 'invalid' });
+    assert.equal(r.status, 200); assert.equal(r.body.delivered, true);
+    assert.equal(h.requests[0].body.template_slug, 'job_scheduled');
+    assert.ok(h.requests[0].body.variables.publish_at.endsWith(time), h.requests[0].body.variables.publish_at);
+  }
+  const published = sender({ job: { status: 'open', is_draft: false, publish_at: '2000-01-01T12:00:00Z' } });
+  assert.equal((await published.run({ ...body, status: 'draft', is_draft: true })).status, 200);
+  assert.equal(published.requests[0].body.template_slug, 'job_posted');
+});
+test('missing, unreadable, inconsistent or inactive job state cannot produce a publication email', async () => {
+  for (const options of [{ job: null }, { jobError: Error('private database error') },
+    { job: { status: 'cancelled', is_draft: false } }, { job: { status: 'closed', is_draft: false } },
+    { job: { status: 'open', is_draft: true } }, { job: { status: 'draft', is_draft: false } },
+    { job: { status: 'draft', is_draft: true, publish_at: null } },
+    { job: { status: 'draft', is_draft: true, publish_at: 'invalid' } }]) {
+    const h = sender(options); const r = await h.run();
+    assert.ok([409, 503].includes(r.status)); assert.equal(h.requests.length, 0);
+    assert.doesNotMatch(JSON.stringify(r.body), /private/);
+  }
 });
 test('confirmation rejects invalid numeric input before configuration reads or template calls', async () => {
   for (const changes of [{ hourlyRate: '' }, { hourlyRate: '15oops' }, { hourlyRate: null }, { hourlyRate: [] }, { hourlyRate: true }, { hourlyRate: -1 }, { hourlyRate: 1001 }, { numberOfGuards: '2.5' }, { numberOfGuards: 0 }, { numberOfGuards: 101 }]) {
