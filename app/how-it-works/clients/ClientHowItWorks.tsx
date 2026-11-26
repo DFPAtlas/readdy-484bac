@@ -6,40 +6,36 @@ import PublicMediaImage from '@/components/PublicMediaImage';
 import Footer from '../../../components/Footer';
 import Header from '../../../components/Header';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
-import FAQList from '../FAQList';
-import SubscriptionVsBooking from '../SubscriptionVsBooking';
-import ClientBookingJourney from '../ClientBookingJourney';
-import PaymentExampleTable from '../PaymentExampleTable';
+import { useEffect, useState } from 'react';
+import { usePublicPricing } from '@/lib/use-public-pricing';
+import ClientPlanStats from './ClientPlanStats';
+import ClientPlanFacts from './ClientPlanFacts';
+import ClientPricingExample from './ClientPricingExample';
+import ClientJourney from './ClientJourney';
+import ClientSubscriptionVsBooking from './ClientSubscriptionVsBooking';
+import ClientFaq from './ClientFaq';
 
 const CLIENT_STEPS = [
   {
-    icon: 'ri-file-list-3-line',
-    title: 'Post Your Job',
-    desc: 'Tell us your venue type, shift date, location, and how many guards you need. It takes under 2 minutes.',
+    icon: 'ri-search-eye-line',
+    title: 'Check Availability as a Guest',
+    desc: 'Enter your venue, shift date and times. The check compares your details against the coverage area, travel radius and availability guards have actually recorded. A match is not a reservation, does not hold a guard and does not guarantee cover.',
   },
   {
-    icon: 'ri-robot-line',
-    title: 'Local Guards Are Notified',
-    desc: 'QuickGuard notifies verified, SIA-licensed guards whose travel radius covers your job location.',
+    icon: 'ri-login-box-line',
+    title: 'Sign In, Review and Post Within Your Allowance',
+    desc: 'Sign in or register a free client account, review the location, shift hours, SIA licence level and agreed gross guard rate, then publish the job if you still have allowance left this month. Posting does not charge the booking payment.',
   },
   {
     icon: 'ri-user-search-line',
-    title: 'Browse Profiles & Book',
-    desc: 'View guard photos, ratings, hourly rates, and verified SIA badges. Pick your favourite and request a booking.',
+    title: 'Eligible Guards Respond',
+    desc: 'Guards whose recorded licence, coverage and availability fit the job are notified and can apply. Guard registration, browsing and applications are free, with no paid membership, tier or paid priority in applicant order.',
   },
   {
     icon: 'ri-secure-payment-line',
-    title: 'Pay & Confirm',
-    desc: 'Review the agreed guard pay and your plan\u2019s service fee, then pay securely via Stripe. Funds are held with Stripe and released only after the shift is complete.',
+    title: 'Pay, Complete and Approve',
+    desc: 'Your selection is provisional until the Stripe booking payment completes. The guard checks in and out and marks completion, and you approve or dispute. After the applicable release checks, eligible pay moves to the guard\u2019s connected Stripe account; the bank payout is a separate later step.',
   },
-];
-
-const CLIENT_STATS = [
-  { icon: 'ri-timer-flash-line', value: '5–15%', label: 'Service fee, set by your plan' },
-  { icon: 'ri-shield-check-line', value: '100%', label: 'SIA-licensed guards' },
-  { icon: 'ri-map-pin-2-line', value: 'UK-wide', label: 'Coverage everywhere' },
-  { icon: 'ri-lock-2-line', value: 'Held with Stripe', label: 'Your money is protected' },
 ];
 
 const VENUE_TYPES = [
@@ -51,34 +47,33 @@ const VENUE_TYPES = [
   { icon: 'ri-store-3-line', label: 'Warehouses', slug: 'warehouse_property', href: '/post-job' },
 ];
 
+const TRUST_POINTS = [
+  {
+    icon: 'ri-shield-check-line',
+    title: 'SIA Licence on Record',
+    desc: 'Guards need an approved account with a valid SIA licence on record before they can apply for jobs.',
+  },
+  {
+    icon: 'ri-lock-2-line',
+    title: 'Payment Through Stripe',
+    desc: 'The booking payment confirms the shift. Release follows completion approval and the applicable checks.',
+  },
+  {
+    icon: 'ri-star-line',
+    title: 'Client Reviews',
+    desc: 'Read feedback left by other clients before you choose which guards to select.',
+  },
+  {
+    icon: 'ri-map-pin-line',
+    title: 'Availability, Not Guaranteed Cover',
+    desc: 'Matches reflect the coverage area, travel radius and availability each guard has recorded.',
+  },
+];
+
 export default function ClientHowItWorks() {
-  const managedHero=usePublicMediaBackground('hiw-clients-hero',"https://readdy.ai/api/search-image?query=Professional%20British%20business%20owner%20woman%20standing%20confidently%20in%20front%20of%20a%20modern%20UK%20venue%20entrance%20at%20twilight%2C%20warm%20street%20lighting%2C%20deep%20navy%20blue%20and%20teal%20color%20tones%2C%20cinematic%20wide%20angle%20shot%2C%20representing%20direct%20hiring%20of%20security%20staff%2C%20moody%20professional%20atmosphere%2C%20clean%20modern%20website%20hero%20background%20with%20space%20for%20text%20on%20the%20left%20side&width=1200&height=600&seq=hiw-clients-hero-001&orientation=landscape");
-  const [, setIsVisible] = useState<Record<string, boolean>>();
-  const [videoPlaying, setVideoPlaying] = useState(false);
+  const managedHero = usePublicMediaBackground('hiw-clients-hero', "https://readdy.ai/api/search-image?query=Professional%20British%20business%20owner%20woman%20standing%20confidently%20in%20front%20of%20a%20modern%20UK%20venue%20entrance%20at%20twilight%2C%20warm%20street%20lighting%2C%20deep%20navy%20blue%20and%20teal%20color%20tones%2C%20cinematic%20wide%20angle%20shot%2C%20representing%20direct%20hiring%20of%20security%20staff%2C%20moody%20professional%20atmosphere%2C%20clean%20modern%20website%20hero%20background%20with%20space%20for%20text%20on%20the%20left%20side&width=1200&height=600&seq=hiw-clients-hero-001&orientation=landscape");
   const [activeStep, setActiveStep] = useState(0);
-  const mountedRef = useRef(false);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
-
-  useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && mountedRef.current) {
-            setIsVisible((prev) => ({ ...prev, [entry.target.id]: true }));
-          }
-        });
-      },
-      { threshold: 0.15 }
-    );
-    const elements = document.querySelectorAll('[data-animate]');
-    elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, []);
+  const pricing = usePublicPricing();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -90,7 +85,7 @@ export default function ClientHowItWorks() {
   return (
     <div className="min-h-screen bg-[#0B1933]">
       <Header />
-      
+
       {/* HERO */}
       <section
         aria-labelledby="clients-heading"
@@ -104,20 +99,21 @@ export default function ClientHowItWorks() {
           <div className="lg:w-3/5 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-400/20 text-teal-400 px-4 py-1.5 rounded-full text-sm font-medium mb-6">
               <i className="ri-building-2-line" />
-              For Direct Clients
+              For Clients Booking Guards
             </div>
             <h1 id="clients-heading" className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-              Hire SIA Guards<br className="hidden md:block" /> Directly — <span className="text-teal-400">No Agency</span>
+              Book SIA-Licensed<br className="hidden md:block" /> <span className="text-teal-400">Guards by Shift</span>
             </h1>
             <p className="text-lg md:text-xl text-slate-400 max-w-xl mb-8">
-              Post your shift. Browse verified guards. Book instantly. No contracts, no hidden fees — just professional security when you need it.
+              Check availability as a guest, post within your plan allowance, review the guards who apply and pay through Stripe to
+              confirm the shift. Your subscription, the booking service fee and the agreed guard pay are three separate amounts.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <Link
                 href="/post-job"
                 className="inline-flex items-center gap-2 bg-teal-500 hover:bg-teal-400 text-slate-900 px-7 py-3.5 rounded-xl font-semibold transition-all duration-300 hover:scale-105 whitespace-nowrap cursor-pointer shadow-lg hover:shadow-teal-500/20"
               >
-                <i className="ri-file-list-3-line" /> Post Your First Job
+                <i className="ri-file-list-3-line" /> Post a Job
               </Link>
               <Link
                 href="/find-a-guard"
@@ -128,58 +124,30 @@ export default function ClientHowItWorks() {
             </div>
           </div>
 
-          {/* Video Placeholder Card */}
+          {/* Illustrative image card */}
           <div className="lg:w-2/5 w-full max-w-md">
-            <div className="bg-[#111d35] rounded-2xl border border-slate-700/50 shadow-2xl overflow-hidden">
-              <div className="relative aspect-video bg-[#0e1628] flex items-center justify-center overflow-hidden">
+            <figure className="bg-[#111d35] rounded-2xl border border-slate-700/50 shadow-2xl overflow-hidden">
+              <div className="relative aspect-video bg-[#0e1628] overflow-hidden">
                 <PublicMediaImage
                   slot="hiw-clients-image-1"
                   src="https://readdy.ai/api/search-image?query=Modern%20dark-themed%20laptop%20screen%20displaying%20a%20security%20guard%20hiring%20platform%20dashboard%20showing%20guard%20profiles%20with%20ratings%20and%20booking%20buttons%2C%20dark%20navy%20blue%20UI%20theme%20with%20teal%20accent%20highlights%2C%20clean%20software%20screenshot%20aesthetic%2C%20professional%20SaaS%20interface%20on%20a%20desk%20with%20ambient%20lighting%2C%20representing%20an%20online%20marketplace%20for%20hiring%20security%20guards&width=640&height=360&seq=hiw-clients-video-thumb-001&orientation=landscape"
-                  alt="QuickGuard walkthrough video thumbnail"
-                  title="Watch how to book a security guard on QuickGuard"
+                  alt="Illustrative image of a security guard booking dashboard"
+                  title="Illustrative image — not a live screenshot"
                   loading="lazy"
                   decoding="async"
-                  className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-500 ${videoPlaying ? 'opacity-0' : 'opacity-100'}`}
+                  className="absolute inset-0 w-full h-full object-cover object-top"
                 />
-                {!videoPlaying && (
-                  <button
-                    onClick={() => setVideoPlaying(true)}
-                    className="absolute inset-0 flex items-center justify-center group cursor-pointer"
-                    aria-label="Play walkthrough video"
-                  >
-                    <div className="w-16 h-16 flex items-center justify-center bg-teal-500/90 rounded-full shadow-lg group-hover:scale-110 group-hover:bg-teal-400 transition-all duration-300">
-                      <i className="ri-play-fill text-white text-2xl ml-0.5" />
-                    </div>
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <p className="text-white text-sm font-semibold drop-shadow-md">Watch: How to Book a Guard in 2 Minutes</p>
-                      <p className="text-slate-400 text-xs mt-0.5">2:34 walkthrough</p>
-                    </div>
-                  </button>
-                )}
-                {videoPlaying && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
-                    <div className="w-12 h-12 flex items-center justify-center border-2 border-slate-600 rounded-full mb-3 animate-pulse">
-                      <i className="ri-film-line text-xl text-slate-500" />
-                    </div>
-                    <p className="text-sm font-medium">Video player placeholder</p>
-                    <p className="text-xs text-slate-600 mt-1">Embed your YouTube or Vimeo URL here</p>
-                    <button
-                      onClick={() => setVideoPlaying(false)}
-                      className="mt-4 text-xs text-teal-400 hover:text-teal-300 underline cursor-pointer"
-                    >
-                      Close preview
-                    </button>
-                  </div>
-                )}
+                <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-slate-200">
+                  <i className="ri-image-line" /> Illustrative image
+                </span>
               </div>
-              <div className="px-5 py-3 bg-[#0e1628] border-t border-slate-700/50 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
-                  <span className="text-xs text-slate-400">Walkthrough available</span>
-                </div>
-                <span className="text-xs text-slate-500">HD · 2:34</span>
-              </div>
-            </div>
+              <figcaption className="px-5 py-4 bg-[#0e1628] border-t border-slate-700/50">
+                <p className="text-white text-sm font-semibold">Booking a shift, step by step</p>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  Illustrative image, not a live product screenshot. See the four stages below for what actually happens.
+                </p>
+              </figcaption>
+            </figure>
           </div>
         </div>
       </section>
@@ -188,7 +156,7 @@ export default function ClientHowItWorks() {
       <section className="py-16 bg-[#0e1628] border-b border-slate-800/60">
         <div className="max-w-7xl mx-auto px-6">
           <p className="text-center text-sm font-semibold text-slate-500 uppercase tracking-widest mb-8">
-            Trusted by venues across the UK
+            Venue types you can post for
           </p>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {VENUE_TYPES.map((v) => (
@@ -215,20 +183,21 @@ export default function ClientHowItWorks() {
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-400/20 text-teal-400 px-4 py-1.5 rounded-full text-sm font-medium mb-5">
               <i className="ri-list-check-2" />
-              4 Simple Steps
+              Four Stages
             </div>
             <h2 id="steps-heading" className="text-3xl md:text-4xl font-bold text-white mb-4">
-              How Direct Booking Works
+              How Client Booking Works
             </h2>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-              From posting your shift to confirming the guard — everything happens in minutes, not days.
+              A recorded availability check, a job posted within your allowance, eligible guards who apply, then payment before the
+              shift.
             </p>
           </div>
 
           {/* Step Progress Bar */}
           <div className="hidden md:flex items-center justify-center mb-16 max-w-3xl mx-auto">
             {CLIENT_STEPS.map((step, i) => (
-              <div key={i} className="flex items-center">
+              <div key={step.title} className="flex items-center">
                 <button
                   onClick={() => setActiveStep(i)}
                   className={`flex flex-col items-center gap-2 transition-all duration-300 cursor-pointer ${
@@ -244,10 +213,10 @@ export default function ClientHowItWorks() {
                   >
                     <i className={`${step.icon} text-lg`} />
                   </div>
-                  <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">{step.title}</span>
+                  <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">Step {i + 1}</span>
                 </button>
                 {i < CLIENT_STEPS.length - 1 && (
-                  <div className={`w-20 h-0.5 mx-2 transition-all duration-500 ${
+                  <div className={`w-16 h-0.5 mx-2 transition-all duration-500 ${
                     i < activeStep ? 'bg-teal-500' : 'bg-slate-700'
                   }`} />
                 )}
@@ -259,10 +228,10 @@ export default function ClientHowItWorks() {
             {/* Left — Active Step Visual */}
             <div className="relative">
               <div className="bg-[#111d35] rounded-2xl border border-slate-700/50 shadow-2xl overflow-hidden">
-                <div className="relative h-72 overflow-hidden">
+                <div className="relative h-80 overflow-hidden">
                   {CLIENT_STEPS.map((step, i) => (
                     <div
-                      key={i}
+                      key={step.title}
                       className={`absolute inset-0 flex items-center justify-center transition-all duration-700 ${
                         i === activeStep ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
                       }`}
@@ -281,11 +250,10 @@ export default function ClientHowItWorks() {
                   ))}
                 </div>
 
-                {/* Dot indicators */}
                 <div className="flex justify-center gap-2 py-4 bg-[#0e1628] border-t border-slate-700/50">
-                  {CLIENT_STEPS.map((_, i) => (
+                  {CLIENT_STEPS.map((step, i) => (
                     <button
-                      key={i}
+                      key={step.title}
                       onClick={() => setActiveStep(i)}
                       className={`transition-all duration-300 rounded-full cursor-pointer ${
                         i === activeStep ? 'w-6 h-2.5 bg-teal-500' : 'w-2.5 h-2.5 bg-slate-600 hover:bg-slate-400'
@@ -301,7 +269,7 @@ export default function ClientHowItWorks() {
             <div className="space-y-4">
               {CLIENT_STEPS.map((step, i) => (
                 <button
-                  key={i}
+                  key={step.title}
                   onClick={() => setActiveStep(i)}
                   className={`w-full text-left flex items-start gap-4 p-5 rounded-2xl border transition-all duration-300 cursor-pointer ${
                     i === activeStep
@@ -350,89 +318,45 @@ export default function ClientHowItWorks() {
             </div>
           </div>
 
-          {/* Stats Bar */}
-          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4">
-            {CLIENT_STATS.map((stat, i) => (
-              <div
-                key={i}
-                className="bg-[#111d35] border border-slate-700/50 rounded-2xl px-6 py-5 text-center hover:border-teal-500/30 transition-colors duration-300"
-              >
-                <div className="w-10 h-10 flex items-center justify-center bg-teal-500/10 rounded-xl mx-auto mb-3 border border-teal-400/20">
-                  <i className={`${stat.icon} text-teal-400 text-xl`} />
-                </div>
-                <p className="text-2xl font-bold text-white mb-1">{stat.value}</p>
-                <p className="text-xs text-slate-400">{stat.label}</p>
-              </div>
-            ))}
-          </div>
+          <ClientPlanStats
+            plans={pricing.plans}
+            loading={pricing.loading}
+            error={pricing.error}
+            feesError={pricing.feesError}
+          />
         </div>
       </section>
 
-      {/* PAYMENT SYSTEM */}
-      <SubscriptionVsBooking />
-      <ClientBookingJourney />
-      <PaymentExampleTable />
+      {/* SEPARATE AMOUNTS */}
+      <ClientSubscriptionVsBooking />
 
-      {/* WHY DIRECT */}
-      <section className="py-20 bg-[#0e1628] border-b border-slate-800/60">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center mb-14">
-            <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-400/20 text-teal-400 px-4 py-1.5 rounded-full text-sm font-medium mb-5">
-              <i className="ri-scales-3-line" />
-              Comparison
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Why QuickGuard vs a Security Company?
-            </h2>
-          </div>
+      {/* FULL JOURNEY */}
+      <ClientJourney />
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-700/50">
-                  <th className="py-4 pr-4 text-sm font-semibold text-slate-400">Feature</th>
-                  <th className="py-4 px-4 text-sm font-semibold text-teal-400 bg-teal-500/5 rounded-t-xl">QuickGuard Direct</th>
-                  <th className="py-4 pl-4 text-sm font-semibold text-slate-500">Traditional Agency</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { feature: 'Time to hire', quickguard: 'Under 2 hours', agency: '1–3 days' },
-                  { feature: 'Contract length', quickguard: 'No contract — book by shift', agency: '12-month minimum' },
-                  { feature: 'Guard selection', quickguard: 'You choose the guard', agency: 'Agency assigns randomly' },
-                  { feature: 'Hourly cost', quickguard: 'Transparent rate + plan service fee (5–15%)', agency: 'Hidden markups (30–50%)' },
-                  { feature: 'Payment', quickguard: 'Stripe held job payment — protected', agency: 'Invoice after service' },
-                  { feature: 'Licence verification', quickguard: 'Every guard SIA-verified', agency: 'Manual checks, often missed' },
-                ].map((row, i) => (
-                  <tr key={i} className="border-b border-slate-800/50 hover:bg-[#111d35]/30 transition-colors">
-                    <td className="py-4 pr-4 text-sm text-slate-300 font-medium">{row.feature}</td>
-                    <td className="py-4 px-4 text-sm text-teal-300 font-semibold bg-teal-500/5">
-                      <i className="ri-check-line mr-1.5" />
-                      {row.quickguard}
-                    </td>
-                    <td className="py-4 pl-4 text-sm text-slate-500">
-                      <i className="ri-close-line mr-1.5 text-slate-600" />
-                      {row.agency}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+      {/* WORKED EXAMPLE */}
+      <ClientPricingExample
+        plans={pricing.plans}
+        loading={pricing.loading}
+        error={pricing.error}
+        feesError={pricing.feesError}
+        retry={pricing.retry}
+      />
+
+      {/* CURRENT PLANS */}
+      <ClientPlanFacts
+        plans={pricing.plans}
+        loading={pricing.loading}
+        error={pricing.error}
+        feesError={pricing.feesError}
+        retry={pricing.retry}
+      />
 
       {/* TRUST STRIP */}
-      <section className="py-16 bg-[#0B1933] border-b border-slate-800/60">
+      <section className="py-16 bg-[#0e1628] border-b border-slate-800/60">
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[
-              { icon: 'ri-shield-check-line', title: 'All Guards SIA-Verified', desc: 'SIA-verified before joining, with planned weekly AI licence checks.' },
-              { icon: 'ri-lock-2-line', title: 'Payment Held with Stripe', desc: 'Your money is safe until the shift is done.' },
-              { icon: 'ri-star-line', title: 'Rated by Real Clients', desc: 'Read genuine reviews before you book.' },
-              { icon: 'ri-map-pin-line', title: 'UK-Wide Coverage', desc: 'From London to Glasgow — guards everywhere.' },
-            ].map((item, i) => (
-              <div key={i} className="text-center">
+            {TRUST_POINTS.map((item) => (
+              <div key={item.title} className="text-center">
                 <div className="w-14 h-14 flex items-center justify-center bg-teal-500/10 rounded-2xl border border-teal-400/20 mx-auto mb-4">
                   <i className={`${item.icon} text-teal-400 text-2xl`} />
                 </div>
@@ -453,13 +377,13 @@ export default function ClientHowItWorks() {
               Common Questions
             </div>
             <h2 id="faq-heading" className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Direct Client FAQs
+              Client Booking FAQs
             </h2>
             <p className="text-lg text-slate-400">
-              Everything you need to know about hiring guards directly through QuickGuard
+              Availability, postings, guard responses, payment and payout questions from clients
             </p>
           </div>
-          <FAQList />
+          <ClientFaq />
         </div>
       </section>
 
@@ -472,10 +396,10 @@ export default function ClientHowItWorks() {
             Get Started Free
           </div>
           <h2 id="cta-heading" className="text-4xl md:text-5xl font-bold mb-6 text-white">
-            Ready to Hire Your Guard?
+            Ready to Post Your Shift?
           </h2>
           <p className="text-xl mb-10 text-slate-400 max-w-2xl mx-auto">
-            Post your first shift in under 2 minutes. Browse verified guards, choose your favourite, and book instantly.
+            Check availability, post within your plan allowance and pay securely through Stripe before the guard arrives.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
@@ -494,7 +418,8 @@ export default function ClientHowItWorks() {
             </Link>
           </div>
           <p className="text-xs text-slate-500 mt-6">
-            No sign-up fees. No contracts. You only pay when you book a shift.
+            Your plan sets the monthly posting allowance and the standard booking service fee, and both are shown before you pay. The
+            service fee is never taken out of the agreed guard pay.
           </p>
         </div>
       </section>

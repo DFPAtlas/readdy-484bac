@@ -2,18 +2,18 @@ import type { Metadata } from 'next';
 import HelpContent from './HelpContent';
 
 export const metadata: Metadata = {
-  title: 'QuickGuard Help Centre | Security Guard Hire FAQs',
+  title: 'QuickGuard Help Centre | Guard Availability, Plans & Payments',
   description:
-    "Find answers about hiring security guards, SIA licence checks, payments, and cancellations. Browse QuickGuard's UK help centre or chat with QuickGuard AI Support, available 24/7.",
+    'Answers about checking guard availability before you sign in, client plan allowances and service fees, provisional guard selection, Stripe payment, check-in and completion approval, guard payouts, and free guard applications.',
   keywords:
-    'QuickGuard help, security guard FAQ, SIA verification help, hiring security guards UK, QuickGuard support, guard payment questions',
+    'QuickGuard help, security guard availability check, SIA licence verification, client plan allowances, guard payouts, completion approval, QuickGuard support',
   alternates: {
     canonical: 'https://quickguard.uk/help',
   },
   openGraph: {
     title: 'Help Centre | QuickGuard',
     description:
-      'Answers to your questions about hiring guards, SIA verification, payments, and more. Browse guides or chat with QuickGuard AI Support, available 24/7.',
+      'How availability checks, client plans and fees, payment confirmation, completion approval and guard payouts work. AI Support 24/7 with human support on weekdays.',
     url: 'https://quickguard.uk/help',
     siteName: 'QuickGuard',
     type: 'website',
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Help Centre | QuickGuard',
     description:
-      'Answers to your questions about hiring guards, SIA verification, payments, and more.',
+      'Availability checks, client plans and fees, payment confirmation, completion approval and guard payouts explained.',
     images: [
       'https://readdy.ai/api/search-image?query=modern%20UK%20online%20help%20centre%20knowledge%20base%20concept%2C%20clean%20teal%20and%20white%20interface%20with%20FAQ%20cards%20and%20search%20bar%20on%20screen%2C%20friendly%20support%20icons%2C%20shield%20and%20question%20mark%20motifs%2C%20professional%20flat%20design%20on%20light%20gradient%20background%2C%20no%20people%2C%20minimalist%20and%20informative%20visual%20style%2C%20navy%20accent%20colors&width=1200&height=630&seq=og-help-001&orientation=landscape',
     ],

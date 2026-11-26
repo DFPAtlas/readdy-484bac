@@ -1,27 +1,36 @@
 import type { Metadata } from 'next';
-import IndustryPage from '@/components/industry/IndustryPage';
 import IndustrySchema from '@/components/industry/IndustrySchema';
 import type { IndustryData } from '@/components/industry/types';
+import RetailSecurityPage from './RetailSecurityPage';
+
+const HERO_IMAGE =
+  'https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20retail%20security%20guard%20in%20formal%20black%20uniform%20standing%20attentively%20near%20the%20entrance%20of%20a%20bright%20modern%20UK%20high%20street%20store%20with%20polished%20floors%20and%20product%20displays%2C%20natural%20daylight%20through%20large%20glass%20windows%2C%20clean%20minimalist%20interior%20with%20neutral%20tones%20and%20subtle%20teal%20accents%2C%20cinematic%20composition%20with%20a%20clean%20soft%20gradient%20across%20the%20left%20side%20for%20text%20overlay%2C%20premium%20commercial%20photography%20style%2C%20sharp%20realistic%20details&width=1600&height=900&seq=ind_retail_hero_20261001&orientation=landscape';
+
+const SOCIAL_IMAGE =
+  'https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20retail%20security%20guard%20in%20formal%20black%20uniform%20standing%20attentively%20near%20the%20entrance%20of%20a%20bright%20modern%20UK%20high%20street%20store%20with%20polished%20floors%20and%20product%20displays%2C%20natural%20daylight%20through%20large%20glass%20windows%2C%20clean%20minimalist%20interior%20with%20neutral%20tones%20and%20subtle%20teal%20accents%2C%20cinematic%20composition%20with%20a%20clean%20soft%20gradient%20across%20the%20left%20side%20for%20text%20overlay%2C%20premium%20commercial%20photography%20style%2C%20sharp%20realistic%20details&width=1200&height=630&seq=ind_retail_hero_20261001&orientation=landscape';
+
+const FEATURE_IMAGE =
+  'https://readdy.ai/api/search-image?query=Retail%20security%20officer%20in%20black%20uniform%20walking%20the%20shop%20floor%20of%20a%20busy%20modern%20UK%20department%20store%20during%20a%20sale%2C%20shoppers%20and%20stocked%20shelves%20softly%20blurred%20in%20the%20background%2C%20bright%20natural%20lighting%20with%20subtle%20teal%20accents%2C%20professional%20commercial%20photography%20style%2C%20sharp%20realistic%20detail&width=1600&height=900&seq=ind_retail_feature_20261001&orientation=landscape';
 
 export const metadata: Metadata = {
-  title: 'Retail Security Guards for Temporary Store Cover',
+  title: 'Retail Security Guards for Store Cover',
   description:
-    'Find retail security guards for temporary cover, busy trading periods and unexpected shortages. QuickGuard helps stores source licensed retail security staff across the UK.',
+    'Check recorded guard availability for a retail shift, post the requirement within your client plan allowance, review the guards who apply and confirm a booking once Stripe payment succeeds.',
   keywords:
-    'retail security guards, retail security staff, shop security, store security cover, loss prevention guards',
+    'retail security guards, store security cover, retail security staffing, SIA licensed security guards, retail loss prevention duties',
   alternates: {
     canonical: 'https://quickguard.uk/retail-security',
   },
   openGraph: {
-    title: 'Retail Security Guards for Temporary Store Cover | QuickGuard',
+    title: 'Retail Security Guards for Store Cover | QuickGuard',
     description:
-      'Find retail security guards for temporary cover, busy trading periods and unexpected shortages.',
+      'Recorded availability checks for store shifts, free guard applications, provisional selection and a booking confirmed only after Stripe payment.',
     url: 'https://quickguard.uk/retail-security',
     siteName: 'QuickGuard',
     type: 'website',
     images: [
       {
-        url: 'https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20retail%20security%20guard%20in%20formal%20black%20uniform%20standing%20attentively%20near%20the%20entrance%20of%20a%20bright%20modern%20UK%20high%20street%20store%20with%20polished%20floors%20and%20product%20displays%2C%20natural%20daylight%20through%20large%20glass%20windows%2C%20clean%20minimalist%20interior%20with%20neutral%20tones%20and%20subtle%20teal%20accents%2C%20cinematic%20composition%20with%20a%20clean%20soft%20gradient%20across%20the%20left%20side%20for%20text%20overlay%2C%20premium%20commercial%20photography%20style%2C%20sharp%20realistic%20details&width=1200&height=630&seq=ind_retail_hero_20261001&orientation=landscape',
+        url: SOCIAL_IMAGE,
         width: 1200,
         height: 630,
         alt: 'QuickGuard — retail security guards for UK stores',
@@ -30,83 +39,141 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Retail Security Guards for Temporary Store Cover | QuickGuard',
+    title: 'Retail Security Guards for Store Cover | QuickGuard',
     description:
-      'Find retail security guards for temporary cover, busy trading periods and unexpected shortages.',
-    images: [
-      'https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20retail%20security%20guard%20in%20formal%20black%20uniform%20standing%20attentively%20near%20the%20entrance%20of%20a%20bright%20modern%20UK%20high%20street%20store%20with%20polished%20floors%20and%20product%20displays%2C%20natural%20daylight%20through%20large%20glass%20windows%2C%20clean%20minimalist%20interior%20with%20neutral%20tones%20and%20subtle%20teal%20accents%2C%20cinematic%20composition%20with%20a%20clean%20soft%20gradient%20across%20the%20left%20side%20for%20text%20overlay%2C%20premium%20commercial%20photography%20style%2C%20sharp%20realistic%20details&width=1200&height=630&seq=ind_retail_hero_20261001&orientation=landscape',
-    ],
+      'Check recorded guard availability for a store shift, review the guards who apply, and confirm a booking after a successful Stripe payment.',
+    images: [SOCIAL_IMAGE],
   },
 };
 
-const data: IndustryData = {
+const data: Omit<IndustryData, 'useCases' | 'complianceNote'> = {
   slug: 'retail-security',
   name: 'Retail',
   eyebrow: 'Retail security cover',
-  headline: 'Add security cover when your store needs extra protection.',
+  headline: 'Security cover for your store, shift by shift.',
   subheadline:
-    'Find licensed retail security professionals for temporary cover, busy trading periods and unexpected staffing shortages.',
-  heroImage:
-    'https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20retail%20security%20guard%20in%20formal%20black%20uniform%20standing%20attentively%20near%20the%20entrance%20of%20a%20bright%20modern%20UK%20high%20street%20store%20with%20polished%20floors%20and%20product%20displays%2C%20natural%20daylight%20through%20large%20glass%20windows%2C%20clean%20minimalist%20interior%20with%20neutral%20tones%20and%20subtle%20teal%20accents%2C%20cinematic%20composition%20with%20a%20clean%20soft%20gradient%20across%20the%20left%20side%20for%20text%20overlay%2C%20premium%20commercial%20photography%20style%2C%20sharp%20realistic%20details&width=1600&height=900&seq=ind_retail_hero_20261001&orientation=landscape',
+    'Check which guards’ recorded availability matches your store shift, post the requirement within your plan allowance, then review the applicants and confirm with payment.',
+  heroImage: HERO_IMAGE,
   primaryCta: { label: 'Find Retail Security', href: '/client/register?redirect=/post-job' },
   secondaryCta: { label: 'Create Company Account', href: '/client/register' },
-  problemsTitle: 'When stores need extra security',
+  problemsTitle: 'When stores look for extra cover',
   problemsIntro:
-    'Retailers need flexible cover for peak periods and unexpected gaps. These are the requirements QuickGuard helps you meet.',
+    'Retail rotas break at short notice. These are the situations a store requirement usually describes.',
   problems: [
-    { icon: 'ri-user-unfollow-line', title: 'Guard sickness', desc: 'A sudden absence leaves the shop floor short on cover.' },
-    { icon: 'ri-alert-line', title: 'High-theft periods', desc: 'Certain periods bring a marked rise in loss and anti-social behaviour.' },
-    { icon: 'ri-shopping-bag-3-line', title: 'Christmas', desc: 'The busiest trading weeks need more visible security presence.' },
-    { icon: 'ri-price-tag-3-line', title: 'Black Friday', desc: 'Major sale events bring crowds and a higher risk of incidents.' },
-    { icon: 'ri-store-2-line', title: 'Store openings', desc: 'New or refurbished stores may need extra cover during launch.' },
-    { icon: 'ri-truck-line', title: 'High-value deliveries', desc: 'Protect deliveries and stock around high-value drop-offs.' },
-    { icon: 'ri-emotion-unhappy-line', title: 'Increased anti-social behaviour', desc: 'Local issues can call for an increased security presence.' },
-    { icon: 'ri-file-list-3-line', title: 'Temporary contract gaps', desc: 'Cover the period while a longer-term arrangement is arranged.' },
+    { icon: 'ri-user-unfollow-line', title: 'Guard sickness', desc: 'An unexpected absence leaves the shop floor without the presence you planned for.' },
+    { icon: 'ri-close-circle-line', title: 'Late cancellation', desc: 'A cancelled shift leaves a gap that has to be filled before opening.' },
+    { icon: 'ri-shopping-bag-3-line', title: 'Christmas trading', desc: 'The busiest trading weeks need more visible presence than a normal rota provides.' },
+    { icon: 'ri-price-tag-3-line', title: 'Sale events', desc: 'Black Friday and clearance weekends bring larger crowds and longer queues.' },
+    { icon: 'ri-store-2-line', title: 'Store openings', desc: 'A new, refitted or relaunched store may need cover during the opening period.' },
+    { icon: 'ri-truck-line', title: 'Deliveries and stock movements', desc: 'Back-door deliveries and stock transfers may need someone watching the yard or loading bay.' },
+    { icon: 'ri-emotion-unhappy-line', title: 'Local anti-social behaviour', desc: 'Problems around the entrance can call for a visible presence at the door.' },
+    { icon: 'ri-file-list-3-line', title: 'Contract gaps', desc: 'Cover the period while a longer-term arrangement is being arranged.' },
   ],
-  solutionsTitle: 'How QuickGuard covers your store',
+  solutionsTitle: 'How a retail requirement works',
   solutionsIntro:
-    'Increase security capacity for the periods you need it, without permanent additions to headcount.',
+    'A recorded availability check, a posting inside your allowance, applicants you review, and a booking confirmed only by payment.',
   solutions: [
-    { icon: 'ri-calendar-2-line', title: 'Cover by the shift', desc: 'Book cover for a single day, a peak weekend or a busy season.' },
-    { icon: 'ri-user-search-line', title: 'Choose your guard', desc: 'Review experience, ratings and licence information before confirming.' },
-    { icon: 'ri-flashlight-line', title: 'Short-notice backfill', desc: 'Fill a gap quickly when a regular guard is unavailable.' },
-    { icon: 'ri-shield-check-line', title: 'Licence information shown', desc: 'Where the role is licensable, licence details are shown on profiles.' },
+    {
+      icon: 'ri-calendar-check-line',
+      title: 'Recorded availability check',
+      desc: 'A guest check counts guards whose recorded availability, travel radius, listed minimum rate and licence type match the shift. It reserves nobody and guarantees no cover.',
+    },
+    {
+      icon: 'ri-file-list-3-line',
+      title: 'Post within your allowance',
+      desc: 'Sign in or create a company account, then review and confirm the posting. Your plan sets the monthly job posting allowance and posting takes no payment.',
+    },
+    {
+      icon: 'ri-user-search-line',
+      title: 'Review the applicants',
+      desc: 'Eligible guards apply free, with no paid membership, tiers or paid priority. Compare profiles, ratings and the licence information shown.',
+    },
+    {
+      icon: 'ri-bank-card-line',
+      title: 'Payment confirms the booking',
+      desc: 'Your selection stays provisional until the card payment through Stripe succeeds. Your plan’s booking fee is charged on top of the agreed guard pay.',
+    },
   ],
-  rolesTitle: 'Typical retail security roles',
-  rolesIntro: 'The roles most often requested by shops, stores and retail chains.',
+  rolesTitle: 'Roles usually requested by retailers',
+  rolesIntro:
+    'The licence follows the duties, not the job title. Describe the work in the requirement so the right licence can be matched.',
   roles: [
-    { icon: 'ri-shield-user-line', name: 'Security Guards', desc: 'General store security, door presence and floor coverage.' },
-    { icon: 'ri-store-2-line', name: 'Retail Security', desc: 'Retail-focused roles covering loss prevention and store presence.' },
-    { icon: 'ri-team-line', name: 'Supervisors', desc: 'Supervisors to lead security across larger or multi-site stores.' },
+    {
+      icon: 'ri-shield-user-line',
+      name: 'Retail security officers',
+      desc: 'Shop-floor presence, entrance cover and patrols. Where the duties are licensable guarding, an SIA Security Guarding licence applies.',
+    },
+    {
+      icon: 'ri-search-eye-line',
+      name: 'Loss prevention duties',
+      desc: 'Watching the floor, noting suspicious behaviour and following your store procedures. Loss prevention is a set of duties, not a separate SIA licence category.',
+    },
+    {
+      icon: 'ri-door-open-line',
+      name: 'Door supervision duties',
+      desc: 'Where the work amounts to door supervision, an SIA Door Supervisor licence is the matching one. Decide this from the duties, not the site type.',
+    },
+    {
+      icon: 'ri-camera-line',
+      name: 'CCTV monitoring',
+      desc: 'Monitoring cameras that counts as public space surveillance needs an SIA CCTV (PSS) licence. Not every in-store camera check is a PSS activity.',
+    },
+    {
+      icon: 'ri-team-line',
+      name: 'Supervisors',
+      desc: 'A lead officer for multi-site or larger rotas, working under the same licence rules as the duties they carry out.',
+    },
   ],
-  useCases: {
-    planned: [
-      'Extra cover across the Christmas trading period',
-      'Security planned for a store opening or refit',
-      'Rostered weekend cover in a high-footfall store',
+  example: {
+    title: 'An example store requirement',
+    subtitle: 'These are the details you would enter when posting a shift.',
+    rows: [
+      { label: 'Store postcode', value: 'Your store postcode' },
+      { label: 'Licence required', value: 'Matched to the duties you describe' },
+      { label: 'Date', value: 'The day you need cover' },
+      { label: 'Start and finish', value: 'Your trading or delivery hours' },
+      { label: 'Number required', value: 'How many operatives you need' },
+      { label: 'Hourly rate', value: 'The agreed gross guard pay you set' },
+      { label: 'Booking fee', value: 'Your plan’s fee, added on top and shown before payment' },
     ],
-    shortNotice: [
-      'Cover while a regular guard is on holiday',
-      'Extra presence after a rise in theft',
-      'Backfill for a cancelled shift',
-    ],
-    emergency: [
-      'Same-day cover when a guard calls in sick',
-      'Immediate support after an incident in store',
-      'Rapid backfill during a peak trading day',
-    ],
+    note: 'Illustrative only. Availability is counted from guards’ recorded details and can change, so a check is not a reservation. The booking is confirmed only after a successful Stripe payment.',
   },
-  featureMessage: 'Increase security capacity without permanently increasing headcount.',
-  featureSub: 'Flexible retail cover that scales with your trading calendar.',
-  featureImage:
-    'https://readdy.ai/api/search-image?query=Retail%20security%20officer%20in%20black%20uniform%20walking%20the%20shop%20floor%20of%20a%20busy%20modern%20UK%20department%20store%20during%20a%20sale%2C%20shoppers%20and%20stocked%20shelves%20softly%20blurred%20in%20the%20background%2C%20bright%20natural%20lighting%20with%20subtle%20teal%20accents%2C%20professional%20commercial%20photography%20style%2C%20sharp%20realistic%20detail&width=1600&height=900&seq=ind_retail_feature_20261001&orientation=landscape',
-  complianceNote:
-    'Where a role involves licensable security activity, QuickGuard helps you identify professionals holding the appropriate SIA licence. Licence information is shown on profiles for you to review.',
+  featureMessage: 'Flexible retail cover that fits your trading calendar.',
+  featureSub: 'Check recorded availability, review the applicants, then confirm with payment.',
+  featureImage: FEATURE_IMAGE,
   faqs: [
-    { q: 'Can I get retail cover at short notice?', a: 'Yes. Mark your requirement as urgent and available operatives can respond quickly when you need same-day cover.' },
-    { q: 'Can I book the same guard again?', a: 'You can review profiles and experience before confirming each booking, so you can choose operatives who suit your store.' },
-    { q: 'Do I need a long-term contract?', a: 'No. QuickGuard lets you arrange cover for the shifts or periods you need, including peak trading seasons, without a long-term contract.' },
-    { q: 'Will the guard be licensed?', a: 'Where the role involves licensable security activity, licence information is displayed on the operative’s profile for you to review.' },
+    {
+      q: 'What does the retail availability check actually do?',
+      a: 'Before you sign in you can run a guest check. It counts guards whose recorded availability, travel radius, listed minimum hourly rate, venue preferences and licence type match the shift you describe. It reflects recorded details only, it does not hold or reserve anyone, and availability can change at any time.',
+    },
+    {
+      q: 'Does the check post my requirement or notify guards?',
+      a: 'No. Nothing is posted and no guard is notified at the check stage. To receive applications you sign in or create a company account, review the requirement, and confirm the posting yourself.',
+    },
+    {
+      q: 'What happens when I post a store requirement?',
+      a: 'Posting is subject to your client plan’s monthly job posting allowance. Posting on its own takes no payment and creates no confirmed booking. Eligible guards are then notified of the job and can apply.',
+    },
+    {
+      q: 'Do guards pay to apply for retail work?',
+      a: 'No. Guard registration, job browsing and applications are free, with no paid membership, no job tiers, no paid priority and no monthly application cap. Eligibility still requires an approved account with a valid SIA licence where the role is licensable.',
+    },
+    {
+      q: 'When is the booking actually confirmed?',
+      a: 'Choosing guards leaves the selection provisional. The booking is confirmed only when your card payment through Stripe succeeds. Until that payment completes, the shift is not secured and the guard is not committed.',
+    },
+    {
+      q: 'How is the client booking fee charged?',
+      a: 'Your plan’s booking service fee is calculated on the agreed gross guard pay and added on top of it, never deducted from it. QuickGuard takes no booking commission out of guard pay on new bookings, there is no escrow, and the fee plus any eligible promotion is shown before you pay.',
+    },
+    {
+      q: 'Do all retail security roles need an SIA licence?',
+      a: 'No. Licensing depends on the activity. Where duties amount to security guarding, door supervision or public space surveillance CCTV, the matching SIA licence applies. Greeting customers, queue help, directions and general shop-floor assistance are customer service, not licensable activity. Check current SIA guidance for your own duties.',
+    },
+    {
+      q: 'Can QuickGuard guarantee loss prevention results or cover for a date?',
+      a: 'No. We do not promise reduced shrinkage, fewer incidents, a guaranteed officer or cover for a specific date. Short-notice requirements can be posted, but what comes back depends on which eligible guards apply and whether payment completes in time.',
+    },
   ],
   relatedLinks: [
     { label: 'Create a company account', href: '/client/register' },
@@ -117,15 +184,15 @@ const data: IndustryData = {
   ],
 };
 
-export default function RetailSecurityPage() {
+export default function RetailSecurityRoute() {
   return (
     <>
       <IndustrySchema
         name="Retail Security Cover"
         slug="retail-security"
-        description="Licensed retail security guards for temporary cover, busy trading periods and staffing shortages."
+        description="Retail security cover for stores. Availability checks reflect recorded guard criteria only, guard applications are free, selection is provisional and a booking is confirmed after a successful Stripe payment."
       />
-      <IndustryPage data={data} />
+      <RetailSecurityPage data={data} />
     </>
   );
 }

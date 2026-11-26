@@ -132,7 +132,7 @@ export default function HomepageClient() {
               <span className="inline-block text-xs font-semibold tracking-wider uppercase text-teal-400 mb-3">Stage 1</span>
               <h3 className="text-xl font-semibold mb-4 text-white">Post your job</h3>
               <p className="text-slate-400 leading-relaxed">
-                Describe the site, dates, hours and duties. Posting is free and usually takes a few minutes.
+                Describe the site, dates, hours and duties. Posting is free within your plan allowance and usually takes a few minutes.
               </p>
             </li>
 
@@ -192,7 +192,7 @@ export default function HomepageClient() {
               <span className="inline-block text-xs font-semibold tracking-wider uppercase text-teal-400 mb-3">Stage 4</span>
               <h3 className="text-xl font-semibold mb-4 text-white">Pay and confirm</h3>
               <p className="text-slate-400 leading-relaxed">
-                Pay by card through Stripe. The booking is confirmed once payment is complete, and the funds are held until the work is done.
+                Pay by card through Stripe. The booking is confirmed once payment is complete. The client booking service fee depends on your plan and any promotion applied, and the exact amount is shown before you pay.
               </p>
             </li>
 
@@ -232,7 +232,7 @@ export default function HomepageClient() {
               <span className="inline-block text-xs font-semibold tracking-wider uppercase text-teal-400 mb-3">Stage 6</span>
               <h3 className="text-xl font-semibold mb-4 text-white">Release and review</h3>
               <p className="text-slate-400 leading-relaxed">
-                Once completion is confirmed, payment is released to the guard&apos;s connected Stripe account. Bank arrival depends on Stripe payout timing, and both sides can leave a review.
+                Once you approve completion, eligibility checks run before the agreed amount is released to the guard&apos;s connected Stripe account. Payment into the guard&apos;s bank account is a separate Stripe payout. A dispute can pause release. Both sides can leave a review.
               </p>
             </li>
           </ol>
@@ -256,7 +256,7 @@ export default function HomepageClient() {
               Why Choose QuickGuard?
             </h2>
             <p className="text-xl text-slate-400 max-w-3xl mx-auto">
-              A simple platform built for security professionals and the businesses that hire them, with SIA licence checks, held payments through Stripe and support when something needs review.
+              A simple platform built for security professionals and the businesses that hire them, with SIA licence checks before work, card payments through Stripe, and support when something needs review.
             </p>
           </div>
 
@@ -274,8 +274,8 @@ export default function HomepageClient() {
               >
                 <i className="ri-shield-check-line text-2xl text-teal-400"></i>
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-white">Verified Guards</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">Every guard must pass an SIA licence check before they can take work through QuickGuard. We are developing automated weekly re-checks that will flag suspended, revoked or expired licences for review.</p>
+              <h3 className="text-lg font-semibold mb-2 text-white">SIA licence on record</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">Guards must be approved with a valid SIA licence on record before they can take work through QuickGuard. Licence status can change over time, so you can review the guard&apos;s licence details before confirming a booking.</p>
             </li>
 
             <li
@@ -291,8 +291,8 @@ export default function HomepageClient() {
               >
                 <i className="ri-money-pound-circle-line text-2xl text-teal-400"></i>
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-white">Secure Payments</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">Card payments are held by Stripe until you confirm the shift is complete, then released to the guard&apos;s connected Stripe account.</p>
+              <h3 className="text-lg font-semibold mb-2 text-white">Secure payments through Stripe</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">Card payment is confirmed through Stripe before the shift. After you approve completion, eligibility checks run before the agreed amount is released to the guard&apos;s connected Stripe account.</p>
             </li>
 
             <li
@@ -524,7 +524,7 @@ export default function HomepageClient() {
               Ready to Get Started?
             </h2>
             <p className="text-xl mb-10 text-slate-400 max-w-2xl mx-auto">
-              Post your first job free, or sign up as a guard and start picking up shifts.
+              Post jobs within your plan allowance, or sign up as a guard and start picking up shifts.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
@@ -543,7 +543,7 @@ export default function HomepageClient() {
               </Link>
             </div>
             <p className="text-sm text-slate-500 mt-6">
-              Free to create an account &middot; Pay per job &middot; Cancel subscriptions anytime
+              Free to create an account &middot; Booking fee shown before payment &middot; Guard pay has no booking commission
             </p>
           </div>
         </div>

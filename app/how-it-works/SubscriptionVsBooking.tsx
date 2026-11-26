@@ -25,8 +25,8 @@ export default function SubscriptionVsBooking() {
               {[
                 'Pays for platform features and your monthly job posting allowance',
                 'Sets the booking service fee that applies to each booking',
-                'Higher plans carry a lower booking service fee',
-                'Billed monthly or annually — annual saves two months',
+                'Higher plans carry a lower booking service fee: 15%, 10%, 7.5% or 5%',
+                'Billed monthly — any annual option is confirmed at checkout before payment',
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <i className="ri-check-line text-teal-400 text-xs mt-1" />
@@ -46,7 +46,7 @@ export default function SubscriptionVsBooking() {
                 'Guard services are paid separately for every booking',
                 'A subscription never covers the guard\u2019s pay',
                 'The booking total is the agreed guard pay plus your plan\u2019s service fee',
-                'Paid securely through Stripe before the booking is confirmed',
+                'Selecting guards is provisional until the Stripe payment completes',
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <i className="ri-check-line text-blue-400 text-xs mt-1" />

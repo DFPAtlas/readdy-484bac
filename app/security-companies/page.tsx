@@ -4,18 +4,18 @@ import IndustrySchema from '@/components/industry/IndustrySchema';
 import type { IndustryData } from '@/components/industry/types';
 
 export const metadata: Metadata = {
-  title: 'Emergency Security Staff for Security Companies',
+  title: 'Additional Security Officers for Security Companies',
   description:
-    'Fill manpower gaps fast with available SIA-licensed security staff. QuickGuard helps security companies cover guard sickness, no-shows, new contracts and major events with short-notice cover.',
+    'Security companies can post additional officer requirements, review the guards who apply, make a provisional selection and pay by card through Stripe before a booking is confirmed. Client fees are plan-based and separate from the gross pay agreed with the officer.',
   keywords:
-    'emergency security staff, SIA security staff, security company manpower, security guard cover, short notice security officers',
+    'additional security officers, security company cover, SIA licensed officers, security staffing requests, guard applications, security company portal',
   alternates: {
     canonical: 'https://quickguard.uk/security-companies',
   },
   openGraph: {
-    title: 'Emergency Security Staff for Security Companies | QuickGuard',
+    title: 'Additional Security Officers for Security Companies | QuickGuard',
     description:
-      'Fill manpower gaps fast with available SIA-licensed security staff. Cover guard sickness, no-shows, new contracts and major events.',
+      'Post an additional officer requirement, review the guards who apply and make a provisional selection. A booking is confirmed only after card payment succeeds.',
     url: 'https://quickguard.uk/security-companies',
     siteName: 'QuickGuard',
     type: 'website',
@@ -24,15 +24,15 @@ export const metadata: Metadata = {
         url: 'https://readdy.ai/api/search-image?query=Professional%20team%20of%20SIA-licensed%20security%20officers%20in%20smart%20black%20uniforms%20standing%20confidently%20outside%20a%20modern%20UK%20corporate%20office%20building%20at%20dusk%2C%20visible%20SIA%20badges%2C%20moody%20deep%20navy%20blue%20and%20teal%20colour%20palette%20with%20soft%20city%20bokeh%2C%20cinematic%20wide%20angle%20with%20a%20clean%20dark%20gradient%20across%20the%20left%20side%20ideal%20for%20white%20text%20overlay%2C%20high-end%20editorial%20corporate%20photography%20style%2C%20realistic%20sharp%20details%2C%20uncluttered%20premium%20composition&width=1200&height=630&seq=ind_seccomp_hero_20261001&orientation=landscape',
         width: 1200,
         height: 630,
-        alt: 'QuickGuard — emergency security staff for security companies',
+        alt: 'QuickGuard — additional security officers for security companies',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Emergency Security Staff for Security Companies | QuickGuard',
+    title: 'Additional Security Officers for Security Companies | QuickGuard',
     description:
-      'Fill manpower gaps fast with available SIA-licensed security staff. Cover sickness, no-shows, new contracts and events.',
+      'Post a requirement, review applications and provisionally select officers. Confirmation follows successful card payment.',
     images: [
       'https://readdy.ai/api/search-image?query=Professional%20team%20of%20SIA-licensed%20security%20officers%20in%20smart%20black%20uniforms%20standing%20confidently%20outside%20a%20modern%20UK%20corporate%20office%20building%20at%20dusk%2C%20visible%20SIA%20badges%2C%20moody%20deep%20navy%20blue%20and%20teal%20colour%20palette%20with%20soft%20city%20bokeh%2C%20cinematic%20wide%20angle%20with%20a%20clean%20dark%20gradient%20across%20the%20left%20side%20ideal%20for%20white%20text%20overlay%2C%20high-end%20editorial%20corporate%20photography%20style%2C%20realistic%20sharp%20details%2C%20uncluttered%20premium%20composition&width=1200&height=630&seq=ind_seccomp_hero_20261001&orientation=landscape',
     ],
@@ -42,72 +42,113 @@ export const metadata: Metadata = {
 const data: IndustryData = {
   slug: 'security-companies',
   name: 'Security Companies',
-  eyebrow: 'Manpower support for security firms',
-  headline: 'Short on officers? Fill the gap with QuickGuard.',
+  eyebrow: 'Additional officer cover for security firms',
+  headline: 'Additional officers when your own rota cannot cover it.',
   subheadline:
-    'Access available SIA-licensed security professionals when your existing workforce cannot cover the requirement. From single-shift sickness cover to additional manpower for new contracts and major events.',
+    'Post the requirement and review the officers who apply. Availability is checked at a point in time and is not a reservation, and nothing is booked until you have reviewed the applications, made a provisional selection and the card payment has completed successfully.',
   heroImage:
     'https://readdy.ai/api/search-image?query=Professional%20team%20of%20SIA-licensed%20security%20officers%20in%20smart%20black%20uniforms%20standing%20confidently%20outside%20a%20modern%20UK%20corporate%20office%20building%20at%20dusk%2C%20visible%20SIA%20badges%2C%20moody%20deep%20navy%20blue%20and%20teal%20colour%20palette%20with%20soft%20city%20bokeh%2C%20cinematic%20wide%20angle%20with%20a%20clean%20dark%20gradient%20across%20the%20left%20side%20ideal%20for%20white%20text%20overlay%2C%20high-end%20editorial%20corporate%20photography%20style%2C%20realistic%20sharp%20details%2C%20uncluttered%20premium%20composition&width=1600&height=900&seq=ind_seccomp_hero_20261001&orientation=landscape',
-  primaryCta: { label: 'Find Security Staff', href: '/client/register?redirect=/post-job' },
+  primaryCta: { label: 'Post a Requirement', href: '/client/register?redirect=/post-job' },
   secondaryCta: { label: 'Create Client Account', href: '/client/register' },
-  problemsTitle: 'When your workforce cannot cover the requirement',
+  problemsTitle: 'Where additional officer cover is usually needed',
   problemsIntro:
-    'Security companies lose contracts when cover falls through. These are the gaps QuickGuard is built to help you fill.',
+    'These are the situations where a security company looks outside its own roster. In each case the requirement still goes through review, selection and payment like any other booking.',
   problems: [
-    { icon: 'ri-user-unfollow-line', title: 'Guard calls in sick', desc: 'Same-day absence leaves a shift uncovered with no time to reshuffle your existing team.' },
-    { icon: 'ri-run-line', title: 'Officer no-show', desc: 'A no-show at short notice risks the client relationship and the site’s cover.' },
-    { icon: 'ri-briefcase-4-line', title: 'New contract starts early', desc: 'A new contract begins before your recruitment and onboarding are complete.' },
-    { icon: 'ri-add-circle-line', title: 'Unexpected additional shifts', desc: 'A client requests extra days, extended hours or additional coverage at the last minute.' },
-    { icon: 'ri-calendar-event-line', title: 'Event needs extra manpower', desc: 'A one-off event requires a surge of officers beyond your standing roster.' },
-    { icon: 'ri-building-4-line', title: 'Multiple sites, simultaneous cover', desc: 'Several sites need cover on the same day and your team is already committed.' },
+    { icon: 'ri-user-unfollow-line', title: 'Officer calls in sick', desc: 'A same-day absence leaves a shift without cover while your remaining officers are already rostered elsewhere.' },
+    { icon: 'ri-run-line', title: 'Officer does not arrive', desc: 'A no-show leaves the post uncovered and puts the client relationship at risk.' },
+    { icon: 'ri-briefcase-4-line', title: 'New contract starts before recruitment finishes', desc: 'A contract begins before your own recruitment, screening and onboarding are complete.' },
+    { icon: 'ri-add-circle-line', title: 'Client asks for extra shifts', desc: 'A client adds days, extends hours or requests an additional post after your rota is published.' },
+    { icon: 'ri-calendar-event-line', title: 'One-off event needs more officers', desc: 'A single event needs more officers than your standing roster can provide on that date.' },
+    { icon: 'ri-building-4-line', title: 'Sites overlap on the same day', desc: 'Several sites need cover at once and your available officers are already committed.' },
   ],
-  solutionsTitle: 'How QuickGuard solves manpower gaps',
+  solutionsTitle: 'What this actually gives you',
   solutionsIntro:
-    'A flexible pool of available professionals you can call on without adding permanent headcount.',
+    'Additional candidates to review when your own roster cannot cover the requirement. Availability is never guaranteed, and no officer is held for you until a booking is paid and confirmed.',
   solutions: [
-    { icon: 'ri-flashlight-line', title: 'Short-notice availability', desc: 'Post a requirement and reach available operatives quickly — including same-day cover.' },
-    { icon: 'ri-user-search-line', title: 'You choose the operative', desc: 'Review experience, ratings and licence information before you confirm anyone.' },
-    { icon: 'ri-toggle-line', title: 'Cover one shift or a surge', desc: 'Fill a single shift, a weekend of absence or a multi-officer event requirement.' },
-    { icon: 'ri-shield-check-line', title: 'Licence information shown', desc: 'Profiles display licence details so you can review them against the role.' },
+    { icon: 'ri-user-search-line', title: 'More officers to review', desc: 'Post the requirement and review the guards who apply or match it. You are not obliged to select anyone.' },
+    { icon: 'ri-timer-flash-line', title: 'Near-term requests accepted', desc: 'You can post for a close date. Whether officers are available depends on live availability at that moment, and a match does not hold anyone.' },
+    { icon: 'ri-shield-check-line', title: 'Licence detail on the profile', desc: 'Where the post involves licensable activity, the licence recorded for the operative is shown on the profile so you can check it against the duties.' },
+    { icon: 'ri-money-pound-circle-line', title: 'Officer pay and fee kept separate', desc: 'The gross hourly rate you agree for the officer is separate from the plan-based QuickGuard service fee, which is shown before you pay.' },
   ],
-  rolesTitle: 'Typical roles you can source',
-  rolesIntro: 'Operatives across the disciplines security companies most often need to backfill.',
+  rolesTitle: 'Role types and the licence each activity needs',
+  rolesIntro:
+    'Licensable activity under the SIA scheme is role-specific. Match the requirement to the duties the post actually involves rather than assuming one licence covers every officer.',
   roles: [
-    { icon: 'ri-door-open-line', name: 'Door Supervisors', desc: 'Licensed door supervision for venues and events requiring that activity.' },
-    { icon: 'ri-shield-user-line', name: 'Security Guards', desc: 'General guarding, access control and patrol duties across sites.' },
-    { icon: 'ri-camera-line', name: 'CCTV Operators', desc: 'Monitoring and control room operatives for surveillance-led roles.' },
-    { icon: 'ri-vip-crown-line', name: 'Close Protection', desc: 'Close protection operatives for higher-risk or principal-focused assignments.' },
-    { icon: 'ri-team-line', name: 'Supervisors', desc: 'Experienced supervisors to lead teams on multi-officer deployments.' },
+    { icon: 'ri-door-open-line', name: 'Door Supervisors', desc: 'Door supervision at licensed premises and events is a licensable activity of its own. State door supervision as the required licence on the post.' },
+    { icon: 'ri-shield-user-line', name: 'Security Guards', desc: 'Static guarding, access control and patrol duties. Where the post involves licensable guarding activity, state the guarding licence on the requirement.' },
+    { icon: 'ri-camera-line', name: 'CCTV Operators', desc: 'Public space surveillance (CCTV) is a separate licence activity. State it on the requirement when the post involves it.' },
+    { icon: 'ri-vip-crown-line', name: 'Close Protection', desc: 'Close protection is its own licence activity, usually for principal-focused assignments. State it explicitly — it is not interchangeable with door supervision or guarding.' },
+    { icon: 'ri-team-line', name: 'Supervisors', desc: 'Team-lead and supervisory posts. The licence needed depends on the licensable activity the supervisor will personally carry out.' },
+    { icon: 'ri-footprint-line', name: 'Dog Handlers', desc: 'Dog handling is a separate licence activity. State it on the requirement rather than treating it as covered by a guarding licence.' },
   ],
   useCases: {
     planned: [
-      'Planned cover for a new contract while recruitment completes',
-      'Additional officers for a scheduled major event',
-      'Rostered weekend or seasonal cover across multiple sites',
+      'Additional officers for a new contract while your recruitment completes',
+      'Extra officers rostered for a scheduled event',
+      'Weekend or seasonal cover alongside your own team',
     ],
     shortNotice: [
-      'Sickness or holiday gaps within 24–48 hours',
-      'A client adds extra shifts at short notice',
-      'A second site needs cover on the same day',
+      'A rota gap inside the next day or two',
+      'A client adds shifts after your rota is published',
+      'A second site needs cover on the same date',
     ],
     emergency: [
-      'A no-show leaves a shift uncovered today',
-      'Rapid surge cover for an unplanned incident',
-      'Immediate backfill to protect a client site',
+      'A same-day absence — check live availability before relying on cover',
+      'A match shows who is available now and does not hold an officer',
+      'A posted requirement only becomes a booking once payment succeeds',
     ],
   },
-  featureMessage: 'Keep the client. Keep the contract. Fill the manpower gap.',
+  example: {
+    title: 'How pay, fees and confirmation fit together',
+    subtitle: 'Officer pay and the QuickGuard fee are separate, and the booking exists only after payment succeeds.',
+    rows: [
+      { label: 'Agreed gross rate for the officer', value: 'Set on the requirement' },
+      { label: 'QuickGuard service fee', value: 'From your client plan, shown before payment' },
+      { label: 'Payment', value: 'Card through Stripe' },
+      { label: 'Booking confirmation', value: 'Only after the payment succeeds' },
+    ],
+    note: 'No amounts are shown here because they depend on your client plan and the rate you agree. Nothing on this page is a quotation, and no cover is guaranteed.',
+  },
+  featureMessage: 'Review the officers, then confirm the booking.',
   featureSub:
-    'Backfill a shift or add a whole team without committing to permanent recruitment.',
+    'Additional cover for a single shift or a run of dates, with the officer pay and the platform fee shown separately before you pay.',
   featureImage:
     'https://readdy.ai/api/search-image?query=Experienced%20security%20supervisor%20in%20black%20uniform%20coordinating%20a%20small%20team%20of%20officers%20with%20a%20tablet%20at%20a%20busy%20UK%20client%20site%20entrance%2C%20focused%20and%20professional%20atmosphere%2C%20deep%20navy%20blue%20and%20teal%20tones%20with%20warm%20rim%20lighting%2C%20cinematic%20documentary%20photography%20style%2C%20sharp%20realistic%20details%2C%20clean%20uncluttered%20background&width=1600&height=900&seq=ind_seccomp_feature_20261001&orientation=landscape',
   complianceNote:
-    'Not every security role is licensable in the same way. Where a role involves licensable security activity, QuickGuard helps you identify professionals holding the appropriate SIA licence.',
+    'Licensing depends on the activity a post involves, not on its job title. QuickGuard shows the licence recorded for each operative and the licence the requirement asks for so you can check that they match. This is information for your own review and is not legal advice.',
   faqs: [
-    { q: 'Can I source more than one officer at a time?', a: 'Yes. Post a requirement for as many operatives as you need and suitable candidates will be able to respond. You review and select before confirming.' },
-    { q: 'How quickly can cover be arranged?', a: 'Response times depend on eligible guard availability and your job requirements. For urgent cover, choose the immediate option when posting. A response or booking is not guaranteed.' },
-    { q: 'Do I need to be a security company to use QuickGuard?', a: 'Security companies, venues and end clients use the same client registration and job-posting journey. Create a client account to book cover. The separate company management portal is for administrator-issued accounts; it is not activated by client registration.' },
-    { q: 'Will I know if an operative holds the right licence?', a: 'Where licensable activity is involved, licence information is displayed on operatives’ profiles so you can review it against the role before confirming.' },
+    {
+      q: 'How does a booking actually get confirmed?',
+      a: 'You post the requirement, review the officers who apply or match it, and make a provisional selection. The booking is confirmed only once the agreed gross officer pay plus the plan-based QuickGuard fee has been paid by card through Stripe. Until that payment succeeds, the requirement is not a confirmed booking.',
+    },
+    {
+      q: 'Does an availability check reserve officers?',
+      a: 'No. Availability is checked at the moment you ask and reflects who is eligible and available for those details. It is not a reservation or a hold, and officers can be booked by someone else before you confirm.',
+    },
+    {
+      q: 'Can I post a requirement for today?',
+      a: 'You can post for a near-term date, including today, but cover is never guaranteed. It depends on eligible officers being available, applying, and your selection being paid and confirmed in time.',
+    },
+    {
+      q: 'Is the QuickGuard fee taken out of the officer’s pay?',
+      a: 'No. The gross hourly rate you agree for the officer is shown separately from the QuickGuard service fee. The fee is calculated from your client plan as a percentage plus a fixed amount per guard, and both figures are displayed before you pay.',
+    },
+    {
+      q: 'Do officers pay to apply, and can priority be bought?',
+      a: 'Guard applications are free with no monthly cap. The paid guard membership tiers have been retired and no paid priority placement is sold, so the officers you see are matched on your requirement rather than on what they paid.',
+    },
+    {
+      q: 'Does the company portal handle bookings for me?',
+      a: 'The company portal is a company record view for administrator-issued accounts, covering sites, staff, rotas, incidents, compliance and training records; reporting and in-portal messaging are still limited. Booking cover runs through a client account and the job-posting journey. Client registration does not activate a company portal account.',
+    },
+    {
+      q: 'Can I be sure an officer holds the right licence?',
+      a: 'The requirement states the licence you need and the licence record is shown on each operative’s profile, so you can check that the activity matches the duties. QuickGuard does not provide legal advice on licensing.',
+    },
+    {
+      q: 'Can I request several officers or several dates at once?',
+      a: 'Yes. You can request multiple officer positions and a run of dates in one requirement. Availability still has to be established through applications, your provisional selection and a successful payment.',
+    },
   ],
   relatedLinks: [
     { label: 'Create a client account', href: '/client/register' },
@@ -122,9 +163,9 @@ export default function SecurityCompaniesPage() {
   return (
     <>
       <IndustrySchema
-        name="Security Company Manpower Support"
+        name="Additional Security Officer Cover for Security Companies"
         slug="security-companies"
-        description="Emergency and short-notice SIA-licensed security staff for security companies to fill manpower gaps."
+        description="Security companies can post additional officer requirements, review applications, make a provisional selection and confirm a booking only after successful card payment."
       />
       <IndustryPage data={data} />
     </>

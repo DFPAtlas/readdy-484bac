@@ -28,7 +28,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: 'When do I pay?',
-    answer: 'You review the agreed guard pay, your plan’s service fee and any eligible promotion, then pay securely via Stripe before the booking is confirmed. Funds are held safely with Stripe and released to the guard after completion and the applicable release checks. You can also set up automatic billing for recurring jobs.',
+    answer: 'You review the agreed guard pay, your plan’s service fee and any eligible promotion, then pay securely via Stripe when you confirm the booking. After you approve completion and the applicable release checks pass, eligible pay is released to the guard’s connected Stripe account. Payment into the guard’s bank account is a separate Stripe payout, and a dispute can pause release. There is no escrow. You can also set up automatic billing for recurring jobs.',
     icon: 'ri-secure-payment-line',
   },
   {
@@ -58,7 +58,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: 'How do I select the right guard?',
-    answer: 'Review each applicant profile which includes SIA licence verification, ratings from previous clients, years of experience, and distance from your venue. Compare guards side by side, check their compliance badges, and read past reviews. You can also message guards before confirming to ask questions.',
+    answer: 'Review each applicant profile, which shows licence information, ratings from previous clients, years of experience and distance from your venue. Compare guards side by side and read past reviews. You can also message guards before confirming to ask about their licence type and experience.',
     icon: 'ri-user-search-line',
   },
   {
@@ -78,7 +78,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: 'What SIA licence types do I need?',
-    answer: 'Common SIA licence types include Door Supervisor (for venues and bars), Security Guard (for retail and sites), and Close Protection (for high-risk scenarios). The job posting wizard will suggest the right licence based on your venue type. You can also specify multiple licence requirements if needed.',
+    answer: 'Common SIA licence types include Door Supervisor (for venues and bars), Security Guard (for retail and sites) and Close Protection (for high-risk scenarios). Not every venue or event role is licensable, so check the licence type against the duties you need covered. You can specify multiple licence requirements if needed.',
     icon: 'ri-shield-check-line',
   },
 ];

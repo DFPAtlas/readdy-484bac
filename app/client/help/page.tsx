@@ -221,7 +221,7 @@ export default function ClientHelpPage() {
                   <li className="text-slate-300"><span className="text-slate-400">Complete your company profile with business name, address, and contact details.</span></li>
                   <li className="text-slate-300"><span className="text-slate-400">Add billing information to enable payments and invoices.</span></li>
                   <li className="text-slate-300"><span className="text-slate-400">Set notification preferences so you never miss an applicant or update.</span></li>
-                  <li className="text-slate-300"><span className="text-slate-400">Post your first job to start receiving applications from verified guards.</span></li>
+                  <li className="text-slate-300"><span className="text-slate-400">Post your first job to start receiving applications from licensed guards.</span></li>
                 </ol>
                 <div className="bg-[#162036] rounded-xl p-4 border border-[#1e2d4d]">
                   <p className="text-teal-400 font-semibold text-sm mb-1">Tip</p>
@@ -266,14 +266,14 @@ export default function ClientHelpPage() {
 
             <HelpSection id="selecting-guards" icon="ri-user-search-line" title="Selecting Guards">
               <div className="space-y-4 text-sm text-slate-400">
-                <p>When guards apply, you will see their full verified profile. Here is what to look for:</p>
+                <p>When guards apply, you will see their full profile. Here is what to look for:</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-[#162036] rounded-xl p-4 border border-[#1e2d4d] text-center">
                     <div className="w-10 h-10 bg-teal-500/10 rounded-lg flex items-center justify-center mx-auto mb-3 border border-teal-400/20">
                       <i className="ri-shield-check-line text-teal-400 text-xl" />
                     </div>
-                    <p className="text-white font-semibold text-sm mb-1">SIA Verification</p>
-                    <p className="text-slate-400 text-xs">Every guard must pass an initial SIA licence check before they can take work through QuickGuard. Planned weekly AI licence re-checks will flag suspended, revoked or expired licences for review. Look for the verified badge.</p>
+                    <p className="text-white font-semibold text-sm mb-1">Licence Details</p>
+                    <p className="text-slate-400 text-xs">Where a role involves licensable security activity, the licence number and licence type are shown on the profile so you can review them before confirming. Not every venue or event role is licensable.</p>
                   </div>
                   <div className="bg-[#162036] rounded-xl p-4 border border-[#1e2d4d] text-center">
                     <div className="w-10 h-10 bg-amber-500/10 rounded-lg flex items-center justify-center mx-auto mb-3 border border-amber-400/20">
@@ -313,7 +313,7 @@ export default function ClientHelpPage() {
                     </div>
                     <div>
                       <p className="text-white font-semibold text-sm">Secure Payment</p>
-                      <p className="text-slate-400 text-sm">Review your booking total, then pay via Stripe before the booking is confirmed. Funds are held with Stripe and only released after the shift is completed and the release checks pass.</p>
+                      <p className="text-slate-400 text-sm">Review your booking total, then pay by card via Stripe to confirm the booking. After you approve completion and the applicable release checks pass, eligible pay is released to the guard’s connected Stripe account. Payment into the guard’s bank account is a separate Stripe payout, and a dispute can pause release.</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-4">

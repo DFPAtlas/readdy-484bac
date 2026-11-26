@@ -3,17 +3,17 @@ import type { Metadata } from 'next';
 import PostJobWizard from './PostJobWizard';
 
 export const metadata: Metadata = {
-  title: 'Post a Security Guard Job UK | QuickGuard',
+  title: 'Book a Security Guard UK | Check Guard Availability | QuickGuard',
   description:
-    'Post a security guard job in minutes. Hire SIA-licensed guards for events, retail, construction, and more across the UK. No agency fees.',
+    'Check matching SIA-licensed guard availability for your venue, then sign in or create a free client account to review and confirm your request. Checking availability does not post a job or notify guards.',
   keywords:
-    'post security job UK, hire security guard, security staffing, event security booking, QuickGuard post job',
+    'check security guard availability UK, book security guard, security staffing, event security booking, QuickGuard post job',
   alternates: {
     canonical: 'https://quickguard.uk/post-job',
   },
   openGraph: {
-    title: 'Post a Security Guard Job UK | QuickGuard',
-    description: 'Post a security guard job in minutes. Hire SIA-licensed guards across the UK.',
+    title: 'Book a Security Guard UK | QuickGuard',
+    description: 'Check matching SIA-licensed guard availability, then review and confirm your request before any guard is notified.',
     url: 'https://quickguard.uk/post-job',
     siteName: 'QuickGuard',
     type: 'website',
@@ -43,6 +43,8 @@ export default function PostJobPage() {
             QuickGuard helps UK businesses arrange security cover for events, shops,
             venues, construction sites and other premises. Review available guard
             information and check that the licence type suits the work you need.
+            Checking availability does not post your job or notify any guard; you
+            review and confirm the request in your account first.
           </p>
           <h3 className="mt-8 text-lg font-semibold text-white">Review details before confirming</h3>
           <p className="mt-3 leading-7">

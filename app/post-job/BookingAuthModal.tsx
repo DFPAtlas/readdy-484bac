@@ -34,14 +34,14 @@ export default function BookingAuthModal({ isOpen, email, onClose, onRegister, o
           Your booking details are saved
         </h2>
         <p className="text-slate-300 mb-1">
-          Create a free client account (or log in) to send your request to verified guards. Your details carry over automatically.
+          Create a free client account (or log in) to review and confirm your request. Your details carry over automatically, and no guard is notified until you confirm posting.
         </p>
         {email && <p className="text-sm text-teal-300 mb-5 break-all">{email}</p>}
         {!email && <div className="mb-5"></div>}
 
         <div className="bg-white/[0.05] border border-white/10 rounded-xl p-3 mb-5 flex items-start gap-2.5">
           <i className="ri-shield-check-line text-emerald-400 mt-0.5" aria-hidden="true"></i>
-          <p className="text-sm text-slate-200">No card required until you select a guard.</p>
+          <p className="text-sm text-slate-200">No card details are taken until you select a guard and reach payment.</p>
         </div>
 
         <div className="space-y-3">

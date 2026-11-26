@@ -128,10 +128,10 @@ export default function StepPayBudget({ formData, errors, onChange, onNext, onBa
                 </div>
               )}
               <div className="border-t border-[#1e2d4d] pt-2 flex justify-between items-center">
-                <span className="font-bold text-white">Total to pay</span>
+                <span className="font-bold text-white">Estimated booking total</span>
                 <span className="font-bold text-teal-400 text-lg">{formatCurrency(fees.total)}</span>
               </div>
-              <p className="text-xs text-slate-500">You pay securely before your booking is confirmed. Funds held with Stripe until shift is complete.</p>
+              <p className="text-xs text-slate-500">Posting a job does not take payment. You pay by card through Stripe when you confirm your guard. After you approve completion and the checks pass, eligible pay is released to the guard’s connected Stripe account, and the bank deposit is a separate Stripe payout.</p>
             </div>
           </div>
         )}

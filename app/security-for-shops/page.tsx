@@ -34,16 +34,16 @@ export const metadata: Metadata = {
 const data = {
   slug: 'security-for-shops',
   title: 'Retail & Shop Security',
-  headline: 'Retail Security Guards — Hire Direct, Pay Less',
-  subheadline: 'Protect your stock, staff, and customers with verified SIA security guards. Book loss prevention officers and floor walkers for single shifts or ongoing cover.',
+  headline: 'Retail Security Guards — Hire Direct',
+  subheadline: 'Protect your stock, staff and customers with SIA-licensed security guards. Book loss prevention officers and floor walkers for single shifts or ongoing cover.',
   heroImage: 'https://readdy.ai/api/search-image?query=Professional%20SIA-licensed%20security%20guard%20in%20formal%20black%20uniform%20standing%20inside%20a%20bright%20modern%20retail%20clothing%20store%20with%20polished%20floors%20and%20elegant%20displays%2C%20calm%20and%20attentive%20posture%2C%20natural%20daylight%20streaming%20through%20large%20glass%20windows%20creating%20soft%20even%20illumination%2C%20clean%20minimalist%20interior%20design%20with%20neutral%20tones%20and%20subtle%20accent%20colours%2C%20left%20side%20of%20image%20features%20a%20clean%20pale%20background%20perfect%20for%20text%20overlay%2C%20professional%20corporate%20photography%20style%20with%20sharp%20realistic%20details%2C%20modern%20premium%20retail%20security%20aesthetic%2C%20high%20quality%20commercial%20photo%20composition&width=1600&height=900&seq=qg_retail_hero_20260508&orientation=landscape',
   venueCategory: 'retail_shop',
   ctaLabel: 'Hire a Retail Guard',
   steps: [
     { icon: 'ri-file-list-line', title: 'Describe Your Store', desc: 'Tell us your shop address, opening hours, and the type of cover you need.' },
-    { icon: 'ri-user-search-line', title: 'Guards See Your Job', desc: 'Verified security guards in your postcode area get instantly notified.' },
+    { icon: 'ri-user-search-line', title: 'Guards See Your Job', desc: 'Guards whose licence and availability fit your postcode area can respond.' },
     { icon: 'ri-shield-check-line', title: 'Choose & Confirm', desc: 'Compare guard profiles, ratings, and experience. Pick the right fit.' },
-    { icon: 'ri-lock-line', title: 'Held Job Payment', desc: 'Your payment is held safely with Stripe until the shift is completed successfully.' },
+    { icon: 'ri-lock-line', title: 'Payment Before Confirmation', desc: 'Your card payment through Stripe confirms the booking. Release to the guard follows your completion approval and the applicable checks.' },
   ],
   faqs: [
     { q: 'Can I hire a guard for loss prevention specifically?', a: 'Yes. Many guards on QuickGuard specialise in retail loss prevention. You can mention this in your job description so the right guards apply.' },

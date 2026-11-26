@@ -140,7 +140,7 @@ export default function GuardPaymentCentrePage() {
     const isPaid = ['paid', 'completed', 'paid_out'].includes(status);
     const steps = [
       { label: 'Client Paid', done: payment.paymentStatus !== 'unpaid', icon: 'ri-money-pound-circle-line' },
-      { label: 'Funds Held', done: payment.paymentStatus === 'funded' || payment.paymentStatus === 'completed' || isPaid, icon: 'ri-safe-line' },
+      { label: 'Card Payment Taken via Stripe', done: payment.paymentStatus === 'funded' || payment.paymentStatus === 'completed' || isPaid, icon: 'ri-safe-line' },
       { label: 'Job Completed', done: ['payout_approved', 'completed', 'paid_out'].includes(payment.jobStatus) || isPaid, icon: 'ri-check-double-line' },
       { label: 'Transfer Created', done: status === 'processing' || status === 'initiated' || isPaid, icon: 'ri-send-plane-line' },
       { label: 'Transfer Paid', done: isPaid, icon: 'ri-bank-card-line' },

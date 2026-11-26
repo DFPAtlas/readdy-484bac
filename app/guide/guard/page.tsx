@@ -2,120 +2,58 @@ import Link from 'next/link';
 import Footer from '@/components/Footer';
 import NavSidebar from '@/components/NavSidebar';
 import GuideNavPanel from './GuideNavPanel';
+import GuardGuideFaq from './GuardGuideFaq';
 import GuardGuideSchema from './GuardGuideSchema';
 import type { Metadata } from 'next';
-import { GUARD_PAYMENT_STEPS, GUARD_PAYOUT_SUPPORT_GUIDANCE } from '@/lib/guard-payment-guidance';
+import {
+  GUIDE_STEP_SUMMARY,
+  ACCOUNT_STEP_ITEMS,
+  ACCOUNT_REQUIRED_INFO,
+  SIA_FLOW,
+  SIA_TIPS,
+  JOB_FACTORS,
+  GUARD_PAYMENT_STEPS,
+  PAYOUT_SUPPORT_TEXT,
+  BEST_PRACTICES,
+  KEY_REMINDERS,
+} from './guardGuideContent';
+
+const OG_IMAGE =
+  'https://readdy.ai/api/search-image?query=professional%20SIA%20licensed%20security%20guard%20in%20uniform%20standing%20confidently%20at%20a%20modern%20UK%20venue%20entrance%2C%20daytime%2C%20dark%20navy%20blue%20and%20teal%20color%20accents%2C%20clean%20corporate%20building%20background%20with%20glass%20facade%2C%20trustworthy%20and%20professional%20appearance%2C%20high%20quality%20realistic%20photography%20style%2C%20simple%20uncluttered%20background&width=1200&height=630&seq=og-guide-guard-002&orientation=landscape';
 
 export const metadata: Metadata = {
-  title: 'Security Guard Jobs UK',
+  title: 'Guard Guide: Free Security Guard Jobs & Applications',
   description:
-    'Complete guide for SIA-licensed guards. Register, get verified, find security work across the UK, and receive secure payments through QuickGuard.',
+    'Free guard account with no application cap and no paid job tiers. How SIA licence review works, how to browse and apply for security jobs, and how shift payouts move through Stripe on QuickGuard.',
   keywords:
-    'security guard jobs UK, SIA licence verification, QuickGuard guard guide, find security work, get paid as security guard, door supervisor jobs UK',
+    'security guard jobs UK, free guard account, SIA licence review, apply for security jobs, QuickGuard guard guide, security guard payouts, door supervisor jobs UK',
   alternates: {
     canonical: 'https://quickguard.uk/guide/guard',
   },
   openGraph: {
-    title: 'Guard Guide | Find Security Jobs & Get Paid | QuickGuard',
+    title: 'Guard Guide | Free Security Guard Jobs & Applications | QuickGuard',
     description:
-      'Register, get SIA verified, find security jobs near you, and receive secure payments. Everything SIA-licensed guards need to know about QuickGuard.',
+      'Create a free guard account, complete SIA licence review, apply for security jobs and follow each shift payment step through Stripe.',
     url: 'https://quickguard.uk/guide/guard',
     siteName: 'QuickGuard',
     type: 'article',
     images: [
       {
-        url: 'https://readdy.ai/api/search-image?query=professional%20SIA%20licensed%20security%20guard%20in%20uniform%20standing%20confidently%20at%20a%20modern%20UK%20venue%20entrance%2C%20daytime%2C%20dark%20navy%20blue%20and%20teal%20color%20accents%2C%20clean%20corporate%20building%20background%20with%20glass%20facade%2C%20trustworthy%20and%20professional%20appearance%2C%20high%20quality%20realistic%20photography%20style%2C%20simple%20uncluttered%20background&width=1200&height=630&seq=og-guide-guard-002&orientation=landscape',
+        url: OG_IMAGE,
         width: 1200,
         height: 630,
-        alt: 'QuickGuard Guard Guide — Find Security Jobs and Get Paid Across the UK',
+        alt: 'QuickGuard Guard Guide — Free Security Guard Account and Applications',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Guard Guide | Find Security Jobs & Get Paid | QuickGuard',
+    title: 'Guard Guide | Free Security Guard Jobs & Applications | QuickGuard',
     description:
-      'Register, get SIA verified, find security jobs near you, and receive secure payments on QuickGuard.',
-    images: [
-      'https://readdy.ai/api/search-image?query=professional%20SIA%20licensed%20security%20guard%20in%20uniform%20standing%20confidently%20at%20a%20modern%20UK%20venue%20entrance%2C%20daytime%2C%20dark%20navy%20blue%20and%20teal%20color%20accents%2C%20clean%20corporate%20building%20background%20with%20glass%20facade%2C%20trustworthy%20and%20professional%20appearance%2C%20high%20quality%20realistic%20photography%20style%2C%20simple%20uncluttered%20background&width=1200&height=630&seq=og-guide-guard-002&orientation=landscape',
-    ],
+      'Create a free guard account, complete SIA licence review, apply for security jobs and follow each shift payment step through Stripe.',
+    images: [OG_IMAGE],
   },
 };
-
-const steps = [
-  {
-    number: '01',
-    icon: 'ri-user-add-line',
-    title: 'Create Your Account',
-    description: 'Sign up as a guard in minutes and complete your professional profile.',
-    items: [
-      'Click "Sign Up" and select "I\'m a Guard"',
-      'Enter your email and create a secure password',
-      'Verify your email via the confirmation link',
-      'Complete your profile with SIA licence details',
-    ],
-    highlight: {
-      label: 'Required Information',
-      items: [
-        'Full name and contact details',
-        'SIA licence number and expiry date',
-        'Licence types (Door Supervisor, CCTV, etc.)',
-        'Years of security experience',
-        'Home address and postcode',
-      ],
-    },
-  },
-  {
-    number: '02',
-    icon: 'ri-shield-check-line',
-    title: 'SIA Verification',
-    description: 'Your SIA licence must pass an initial verification check before you can take work through QuickGuard.',
-    items: [
-      'Submit your SIA licence number during profile setup',
-      'Our system checks your licence against the SIA register',
-      'Verification timing can vary depending on the licence check and whether manual review is required',
-      'You\'ll receive an email once your account is approved',
-      'A verified badge appears on your profile for clients to see',
-    ],
-    tip: {
-      label: 'Verification Tips',
-      items: [
-        'Ensure your SIA licence is current and not expired',
-        'Double-check the licence number before submitting',
-        'Keep your profile details consistent with your licence',
-        'Contact support if your verification remains pending or you are asked for additional information',
-      ],
-    },
-  },
-  {
-    number: '03',
-    icon: 'ri-search-line',
-    title: 'Find & Apply for Jobs',
-    description: 'Browse available security jobs and apply with a single click.',
-    cards: [
-      { icon: 'ri-map-pin-line', title: 'Location', desc: 'Distance from your address' },
-      { icon: 'ri-money-pound-circle-line', title: 'Pay Rate', desc: 'Hourly rate clearly shown' },
-      { icon: 'ri-calendar-line', title: 'Schedule', desc: 'Dates and working hours' },
-      { icon: 'ri-shield-check-line', title: 'Requirements', desc: 'Licence types needed' },
-    ],
-  },
-  {
-    number: '04',
-    icon: 'ri-money-pound-circle-line',
-    title: 'Complete Jobs & Get Paid',
-    description: 'Set up Stripe, submit shift completion and track payment release separately from your bank deposit.',
-    paymentSteps: GUARD_PAYMENT_STEPS,
-  },
-];
-
-const bestPractices = [
-  { icon: 'ri-user-star-line', title: 'Keep Profile Updated', desc: 'Regularly update your availability, skills, and contact details so clients can find and trust you.' },
-  { icon: 'ri-time-line', title: 'Arrive Early', desc: 'Aim to arrive 10–15 minutes before your shift starts to check in and receive your briefing.' },
-  { icon: 'ri-star-line', title: 'Earn 5-Star Ratings', desc: 'Professional conduct and reliability lead to great reviews, which attract more and better-paying jobs.' },
-  { icon: 'ri-notification-3-line', title: 'Enable Job Alerts', desc: 'Turn on email notifications to be first to know about new jobs that match your profile and location.' },
-  { icon: 'ri-calendar-check-line', title: 'Honour Commitments', desc: 'Only apply for jobs you can definitely attend. Cancellations damage your reputation and rating.' },
-  { icon: 'ri-shield-star-line', title: 'Renew Your Licence', desc: 'Keep your SIA licence valid at all times. An expired licence means you cannot accept new jobs.' },
-];
 
 export default function GuardGuidePage() {
   return (
@@ -139,7 +77,8 @@ export default function GuardGuidePage() {
               <span className="text-teal-400">Confidence</span>
             </h1>
             <p className="text-slate-400 text-xl max-w-2xl mx-auto leading-relaxed">
-              Everything you need to know about registering, finding jobs, and receiving payments as an SIA-licensed security guard on QuickGuard.
+              Registering, browsing jobs and applying are free, with no monthly application cap. This guide covers licence review,
+              applying, working a shift and how pay moves through Stripe.
             </p>
             <div className="flex flex-wrap gap-4 justify-center mt-10">
               <Link
@@ -163,9 +102,9 @@ export default function GuardGuidePage() {
             </div>
             <div className="mt-16 grid grid-cols-3 gap-8 w-full max-w-2xl mx-auto">
               {[
-                { value: 'Required', label: 'Initial SIA verification' },
-                { value: '100%', label: 'Secure payments' },
-                { value: '24/7', label: 'Job alerts available' },
+                { value: 'Free', label: 'Guard account and applications' },
+                { value: 'No cap', label: 'Monthly application limit' },
+                { value: 'Stripe', label: 'Payouts to your account' },
               ].map((stat) => (
                 <div key={stat.label} className="text-center">
                   <div className="text-3xl font-extrabold text-white">{stat.value}</div>
@@ -178,9 +117,9 @@ export default function GuardGuidePage() {
 
         <section className="relative z-10 max-w-6xl mx-auto px-6 -mt-12 mb-12">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {steps.map((step, i) => (
+            {GUIDE_STEP_SUMMARY.map((step) => (
               <div
-                key={i}
+                key={step.number}
                 className="flex items-center gap-3 p-4 rounded-2xl border border-slate-700/50 bg-[#111d35] hover:border-teal-500/30 transition-all"
               >
                 <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-teal-500/10 border border-teal-400/20 flex-shrink-0">
@@ -196,7 +135,6 @@ export default function GuardGuidePage() {
         </section>
 
         <section className="max-w-6xl mx-auto px-6 space-y-10 mb-16">
-          {/* Step 1 */}
           <div id="step-01" className="grid grid-cols-2 gap-10 items-start bg-[#111d35] rounded-3xl border border-slate-700/50 p-10">
             <div>
               <div className="flex items-center gap-4 mb-6">
@@ -205,12 +143,15 @@ export default function GuardGuidePage() {
                 </div>
                 <div>
                   <span className="text-xs font-bold text-teal-400 uppercase tracking-widest">Step 01</span>
-                  <h2 className="text-2xl font-bold text-white">Create Your Account</h2>
+                  <h2 className="text-2xl font-bold text-white">Create Your Free Account</h2>
                 </div>
               </div>
-              <p className="text-slate-400 mb-6">Sign up as a guard in minutes and build your professional profile to start receiving job opportunities.</p>
+              <p className="text-slate-400 mb-6">
+                Sign up as a guard and build the profile clients see when they review applications. There is no charge to register,
+                browse jobs or apply.
+              </p>
               <ul className="space-y-3">
-                {steps[0].items!.map((item, i) => (
+                {ACCOUNT_STEP_ITEMS.map((item, i) => (
                   <li key={i} className="flex items-start gap-3">
                     <div className="w-6 h-6 flex items-center justify-center bg-teal-500/10 border border-teal-400/20 rounded-full flex-shrink-0 mt-0.5">
                       <i className="ri-check-line text-teal-400 text-xs" />
@@ -228,7 +169,7 @@ export default function GuardGuidePage() {
                 <h3 className="font-bold text-white">Required Information</h3>
               </div>
               <div className="space-y-3">
-                {steps[0].highlight!.items.map((item, i) => (
+                {ACCOUNT_REQUIRED_INFO.map((item, i) => (
                   <div key={i} className="flex items-center gap-3 bg-[#111d35] rounded-xl px-4 py-3 border border-slate-700/50">
                     <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                       <i className="ri-checkbox-circle-fill text-teal-400 text-lg" />
@@ -248,7 +189,6 @@ export default function GuardGuidePage() {
             </div>
           </div>
 
-          {/* Step 2 */}
           <div id="step-02" className="grid grid-cols-2 gap-10 items-start bg-[#111d35] rounded-3xl border border-slate-700/50 p-10">
             <div className="bg-[#0e1628] rounded-2xl p-8 border border-slate-700/50 order-1">
               <div className="flex items-center gap-2 mb-5">
@@ -258,7 +198,7 @@ export default function GuardGuidePage() {
                 <h3 className="font-bold text-white">Verification Tips</h3>
               </div>
               <div className="space-y-3">
-                {steps[1].tip!.items.map((item, i) => (
+                {SIA_TIPS.map((item, i) => (
                   <div key={i} className="flex items-start gap-3 bg-[#111d35] rounded-xl px-4 py-3 border border-slate-700/50">
                     <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 mt-0.5">
                       <i className="ri-arrow-right-circle-fill text-teal-400 text-lg" />
@@ -272,7 +212,7 @@ export default function GuardGuidePage() {
                   <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                     <i className="ri-time-line text-teal-400 text-lg" />
                   </div>
-                  <span className="text-teal-400 text-sm font-semibold">Verification timing can vary and may require manual review</span>
+                  <span className="text-teal-400 text-sm font-semibold">Review timing varies and may require manual checks</span>
                 </div>
               </div>
             </div>
@@ -283,18 +223,15 @@ export default function GuardGuidePage() {
                 </div>
                 <div>
                   <span className="text-xs font-bold text-teal-400 uppercase tracking-widest">Step 02</span>
-                  <h2 className="text-2xl font-bold text-white">SIA Verification</h2>
+                  <h2 className="text-2xl font-bold text-white">SIA Licence Review</h2>
                 </div>
               </div>
-              <p className="text-slate-400 mb-6">Your SIA licence must pass an initial verification check before you can take work through QuickGuard. Planned: QuickGuard is developing an AI agent to re-check guards’ SIA licence status weekly and flag suspended, revoked or expired licences for review.</p>
+              <p className="text-slate-400 mb-4">
+                Your account is reviewed before you can take work, and your licence must stay valid while you apply and work.
+                Free applications do not remove licence or account requirements.
+              </p>
               <div className="space-y-3">
-                {[
-                  { icon: 'ri-file-shield-line', label: 'Submit Licence', desc: 'Enter your SIA licence number in your profile' },
-                  { icon: 'ri-search-eye-line', label: 'Automatic Check', desc: 'System verifies against the official SIA register' },
-                  { icon: 'ri-mail-check-line', label: 'Email Notification', desc: 'Receive confirmation once your account is approved' },
-                  { icon: 'ri-verified-badge-line', label: 'Verified Badge', desc: 'A trust badge appears on your profile for clients' },
-                  { icon: 'ri-briefcase-line', label: 'Start Applying', desc: 'Browse and apply for jobs immediately after approval' },
-                ].map((item, i) => (
+                {SIA_FLOW.map((item, i) => (
                   <div key={i} className="flex items-center gap-4 p-3 rounded-xl hover:bg-[#0e1628] transition-colors border border-slate-700/50">
                     <div className="w-9 h-9 flex items-center justify-center bg-teal-500/10 border border-teal-400/20 rounded-lg flex-shrink-0">
                       <div className="w-4 h-4 flex items-center justify-center">
@@ -311,7 +248,6 @@ export default function GuardGuidePage() {
             </div>
           </div>
 
-          {/* Step 3 */}
           <div id="step-03" className="bg-[#111d35] rounded-3xl border border-slate-700/50 p-10">
             <div className="flex items-center gap-4 mb-8">
               <div className="w-14 h-14 flex items-center justify-center bg-teal-500/10 border border-teal-400/20 rounded-2xl">
@@ -319,13 +255,16 @@ export default function GuardGuidePage() {
               </div>
               <div>
                 <span className="text-xs font-bold text-teal-400 uppercase tracking-widest">Step 03</span>
-                <h2 className="text-2xl font-bold text-white">Find & Apply for Jobs</h2>
+                <h2 className="text-2xl font-bold text-white">Browse & Apply for Jobs</h2>
               </div>
             </div>
-            <p className="text-slate-400 mb-8 max-w-2xl">Once verified, browse available security jobs near you. Each listing shows everything you need to decide if it&apos;s the right fit.</p>
+            <p className="text-slate-400 mb-8 max-w-3xl">
+              Once your account is approved, browse open jobs and apply to the ones that fit your licence and availability.
+              Applying is free with no monthly application cap, and there are no paid applicant tiers or paid priority placement.
+            </p>
 
             <div className="grid grid-cols-4 gap-5 mb-8">
-              {steps[2].cards!.map((card, i) => (
+              {JOB_FACTORS.map((card, i) => (
                 <div key={i} className="bg-[#0e1628] rounded-2xl p-6 border border-slate-700/50 text-center hover:border-teal-500/30 transition-all hover:shadow-lg hover:shadow-teal-500/5">
                   <div className="w-12 h-12 flex items-center justify-center bg-teal-500/10 border border-teal-400/20 rounded-xl mx-auto mb-3">
                     <div className="w-5 h-5 flex items-center justify-center">
@@ -346,8 +285,11 @@ export default function GuardGuidePage() {
                   </div>
                 </div>
                 <div>
-                  <h4 className="font-bold text-white mb-1">Application Accepted</h4>
-                  <p className="text-sm text-slate-400">You receive full job details — venue address, hours, uniform requirements, and client contact info.</p>
+                  <h4 className="font-bold text-white mb-1">Applications Are Reviewed</h4>
+                  <p className="text-sm text-slate-400">
+                    Your application shows in your guard dashboard. The client reviews applicants and selects guards, so applying
+                    does not guarantee selection or work.
+                  </p>
                 </div>
               </div>
               <div className="flex items-start gap-4 p-5 bg-amber-500/5 rounded-2xl border border-amber-400/10">
@@ -357,14 +299,16 @@ export default function GuardGuidePage() {
                   </div>
                 </div>
                 <div>
-                  <h4 className="font-bold text-white mb-1">Job Match Alerts</h4>
-                  <p className="text-sm text-slate-400">Get instant email notifications when new jobs matching your profile and location are posted.</p>
+                  <h4 className="font-bold text-white mb-1">Job Match Emails</h4>
+                  <p className="text-sm text-slate-400">
+                    With job-match emails enabled, you may be emailed when a posted job matches your licence type, rate and travel
+                    distance. Alerts do not reserve a job for you.
+                  </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Step 4 */}
           <div id="step-04" className="grid grid-cols-2 gap-10 items-start bg-[#111d35] rounded-3xl border border-slate-700/50 p-10">
             <div>
               <div className="flex items-center gap-4 mb-6">
@@ -373,12 +317,16 @@ export default function GuardGuidePage() {
                 </div>
                 <div>
                   <span className="text-xs font-bold text-teal-400 uppercase tracking-widest">Step 04</span>
-                  <h2 className="text-2xl font-bold text-white">Complete Jobs & Get Paid</h2>
+                  <h2 className="text-2xl font-bold text-white">Work Shifts & Get Paid</h2>
                 </div>
               </div>
-              <p className="text-slate-400 mb-6">{steps[3].description} You keep your full agreed pay on new bookings, with no guard booking commission. Guard job access is free, and standard payment processing is covered within client subscription and booking charges. Existing membership records remain available on your dashboard or through billing support.</p>
+              <p className="text-slate-400 mb-6">
+                Guard accounts, job browsing and applications are free, and paid guard memberships are no longer sold. Any
+                QuickGuard service fee is charged to the client on top of the agreed guard pay, so the agreed gross guard pay on a
+                new booking is not reduced by a QuickGuard booking commission.
+              </p>
               <div className="space-y-4">
-                {steps[3].paymentSteps!.map((ps, i) => (
+                {GUARD_PAYMENT_STEPS.map((ps, i) => (
                   <div key={i} className="flex items-start gap-4">
                     <div className="flex flex-col items-center">
                       <div className="w-9 h-9 flex items-center justify-center bg-teal-500/10 border border-teal-400/20 rounded-full flex-shrink-0">
@@ -386,7 +334,7 @@ export default function GuardGuidePage() {
                           <i className={`${ps.icon} text-teal-400 text-sm`} />
                         </div>
                       </div>
-                      {i < steps[3].paymentSteps!.length - 1 && (
+                      {i < GUARD_PAYMENT_STEPS.length - 1 && (
                         <div className="w-px h-6 bg-teal-500/20 mt-1" />
                       )}
                     </div>
@@ -401,11 +349,11 @@ export default function GuardGuidePage() {
             <div className="space-y-4">
               <div className="bg-[#0e1628] rounded-2xl p-6 border border-slate-700/50">
                 <h3 className="font-bold text-white mb-2">If completion or payment is delayed</h3>
-                <p className="text-slate-400 text-sm">{GUARD_PAYOUT_SUPPORT_GUIDANCE}</p>
+                <p className="text-slate-400 text-sm">{PAYOUT_SUPPORT_TEXT}</p>
                 <div className="mt-4 flex flex-wrap gap-4 text-sm text-teal-400">
                   <Link href="/guard/bank-settings" className="underline">Bank Settings</Link>
                   <Link href="/guard/earnings" className="underline">Earnings and bank deposits</Link>
-                  <Link href="/contact" className="underline">Contact support</Link>
+                  <Link href="/guard/support" className="underline">Guard support</Link>
                 </div>
               </div>
               <div className="bg-[#0e1628] rounded-2xl p-6 border border-slate-700/50">
@@ -414,8 +362,11 @@ export default function GuardGuidePage() {
                     <i className="ri-shield-check-line text-teal-400 text-2xl" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-white mb-2">Bank-Level Security</h4>
-                    <p className="text-slate-400 text-sm">All payments are processed through Stripe. Your bank details are never shared with clients and all transfers are fully encrypted.</p>
+                    <h4 className="font-bold text-white mb-2">Payment Security</h4>
+                    <p className="text-slate-400 text-sm">
+                      Payments run through Stripe. Your bank details are never shared with clients, and eligible pay is transferred
+                      to your connected Stripe account after the client approves completion and the applicable checks pass.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -424,13 +375,13 @@ export default function GuardGuidePage() {
                   <div className="w-5 h-5 flex items-center justify-center">
                     <i className="ri-history-line text-slate-500" />
                   </div>
-                  Earnings Features
+                  Earnings Records
                 </h4>
                 <ul className="space-y-2">
                   {[
-                    'Full earnings history and payment records',
-                    'Pending and completed payment tracking',
-                    'Transaction IDs for every payout',
+                    'Full payment history for your shifts',
+                    'Pending and released payment tracking',
+                    'Reference for every recorded payout',
                     'Manage your bank details securely',
                   ].map((f, i) => (
                     <li key={i} className="flex items-center gap-2 text-sm text-slate-400">
@@ -450,11 +401,21 @@ export default function GuardGuidePage() {
                   </Link>
                 </div>
               </div>
+              <div className="bg-[#0e1628] rounded-2xl p-6 border border-slate-700/50">
+                <h4 className="font-bold text-white mb-2">Legacy guard memberships</h4>
+                <p className="text-slate-400 text-sm">
+                  Existing membership and invoice records are retained in your account. If you hold an active legacy subscription,
+                  manage or cancel it from the membership card in your guard dashboard, or contact billing support for a review.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-4 text-sm text-teal-400">
+                  <Link href="/guard/dashboard#guard-membership" className="underline">Membership records</Link>
+                  <Link href="/guard/support" className="underline">Billing support</Link>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Best Practices */}
         <section id="best-practices" className="bg-[#0e1628] border-y border-slate-800/60 py-16">
           <div className="max-w-6xl mx-auto px-6">
             <div className="text-center mb-12">
@@ -464,11 +425,11 @@ export default function GuardGuidePage() {
                 </div>
                 Best Practices
               </div>
-              <h2 className="text-3xl font-extrabold text-white mb-3">Tips for a Successful Guard Career</h2>
-              <p className="text-slate-400 max-w-xl mx-auto">Follow these guidelines to build your reputation, earn great ratings, and secure more high-paying jobs.</p>
+              <h2 className="text-3xl font-extrabold text-white mb-3">Tips for Building a Reliable Guard Record</h2>
+              <p className="text-slate-400 max-w-xl mx-auto">Follow these guidelines to keep your profile accurate and your shift record strong.</p>
             </div>
             <div className="grid grid-cols-3 gap-6">
-              {bestPractices.map((bp, i) => (
+              {BEST_PRACTICES.map((bp, i) => (
                 <div key={i} className="bg-[#111d35] rounded-2xl p-6 border border-slate-700/50 hover:border-teal-500/30 transition-all hover:shadow-lg hover:shadow-teal-500/5">
                   <div className="w-12 h-12 flex items-center justify-center bg-teal-500/10 border border-teal-400/20 rounded-xl mb-4">
                     <div className="w-5 h-5 flex items-center justify-center">
@@ -483,8 +444,7 @@ export default function GuardGuidePage() {
           </div>
         </section>
 
-        {/* Key Reminders */}
-        <section id="key-reminders" className="max-w-6xl mx-auto px-6 py-16 mb-8">
+        <section id="key-reminders" className="max-w-6xl mx-auto px-6 pt-16 pb-8">
           <div className="text-center mb-10">
             <div className="inline-flex items-center gap-2 bg-red-500/10 border border-red-400/20 text-red-400 text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full mb-4">
               <div className="w-4 h-4 flex items-center justify-center">
@@ -493,15 +453,10 @@ export default function GuardGuidePage() {
               Important
             </div>
             <h2 className="text-3xl font-extrabold text-white mb-3">Key Reminders</h2>
-            <p className="text-slate-400 max-w-xl mx-auto">Keep these in mind to stay compliant, professional, and in good standing on the platform.</p>
+            <p className="text-slate-400 max-w-xl mx-auto">Keep these in mind so your account stays approved and your applications stay accurate.</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            {[
-              { icon: 'ri-shield-check-line', title: 'Keep Your SIA Licence Valid', desc: 'You cannot accept or work jobs with an expired SIA licence. Renew well in advance of the expiry date.' },
-              { icon: 'ri-calendar-check-line', title: 'Honour Every Commitment', desc: 'Only apply for jobs you can definitely attend. Last-minute cancellations negatively impact your rating.' },
-              { icon: 'ri-user-settings-line', title: 'Keep Your Profile Current', desc: 'Update your contact details, availability, and licence information whenever anything changes.' },
-              { icon: 'ri-mail-check-line', title: 'Check Emails Regularly', desc: 'Job acceptances, payment confirmations, and important platform updates are sent via email.' },
-            ].map((r, i) => (
+            {KEY_REMINDERS.map((r, i) => (
               <div key={i} className="flex items-start gap-4 p-5 bg-red-500/5 rounded-2xl border border-red-400/10 hover:border-red-400/20 transition-all">
                 <div className="w-10 h-10 flex items-center justify-center bg-red-500/10 border border-red-400/20 rounded-xl flex-shrink-0">
                   <div className="w-5 h-5 flex items-center justify-center">
@@ -515,9 +470,16 @@ export default function GuardGuidePage() {
               </div>
             ))}
           </div>
+          <div className="mt-6 p-5 bg-[#111d35] rounded-2xl border border-slate-700/50">
+            <p className="text-sm text-slate-400">
+              QuickGuard does not guarantee work, earnings or a fixed payout date, and does not provide legal or compliance advice.
+              Licence requirements, client selection and Stripe account checks all apply.
+            </p>
+          </div>
         </section>
 
-        {/* CTA */}
+        <GuardGuideFaq />
+
         <section id="get-started" className="max-w-6xl mx-auto px-6 pb-16">
           <div className="relative overflow-hidden bg-gradient-to-br from-[#0e1628] to-[#111d35] rounded-3xl p-12 text-center border border-slate-700/50">
             <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 via-transparent to-slate-900/40 pointer-events-none" />
@@ -528,7 +490,7 @@ export default function GuardGuidePage() {
                 </div>
               </div>
               <h2 className="text-3xl font-extrabold text-white mb-3">Ready to Start Finding Security Work?</h2>
-              <p className="text-slate-400 text-lg mb-8 max-w-xl mx-auto">Create your guard profile and explore security jobs across the UK with QuickGuard.</p>
+              <p className="text-slate-400 text-lg mb-8 max-w-xl mx-auto">Create your free guard profile and explore security jobs across the UK with QuickGuard.</p>
               <div className="flex flex-wrap gap-4 justify-center">
                 <Link
                   href="/guard/register"

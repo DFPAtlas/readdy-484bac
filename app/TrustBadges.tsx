@@ -6,26 +6,26 @@ import { useEffect, useState } from 'react';
 const badges = [
   {
     icon: 'ri-shield-star-line',
-    title: 'SIA Licence Checked',
-    description: "Every guard's SIA licence is checked before they can take work through QuickGuard.",
+    title: 'SIA Licence On Record',
+    description: 'Guards must be approved with a valid SIA licence on record before they can take work through QuickGuard.',
     color: 'blue',
   },
   {
     icon: 'ri-lock-line',
-    title: 'Held Job Payments',
-    description: "Your payment is held until the shift is confirmed complete, then released to the guard's connected Stripe account.",
+    title: 'Secure payments through Stripe',
+    description: "Card payment is confirmed through Stripe before the shift. After completion approval and eligibility checks, the agreed amount is released to the guard's connected Stripe account. A dispute can pause release.",
     color: 'green',
   },
   {
     icon: 'ri-secure-payment-line',
-    title: 'Payments by Stripe',
-    description: 'Card payments are processed by Stripe, a PCI DSS Level 1 certified provider. QuickGuard never stores your card details.',
+    title: 'Card handling with Stripe',
+    description: 'Stripe processes card payments and is PCI DSS Level 1 certified. Card details are entered with Stripe and are not stored by QuickGuard.',
     color: 'purple',
   },
   {
     icon: 'ri-file-shield-2-line',
-    title: 'ICO Registered',
-    description: "Registered with the Information Commissioner's Office. Personal data handled under UK GDPR.",
+    title: 'Data handled under UK GDPR',
+    description: 'Personal data is handled under UK GDPR, with access, correction and deletion requests available from your account.',
     color: 'indigo',
   },
 ];
@@ -107,10 +107,10 @@ export default function TrustBadges() {
             </div>
             <div>
               <p className="font-semibold text-white text-lg">
-                Every Guard Licence-Checked
+                SIA licence checked before work
               </p>
               <p className="text-slate-400 text-sm">
-                Guards must pass an SIA licence check before they can accept any work.
+                Guards must be approved with a valid SIA licence on record before they can take work.
               </p>
             </div>
           </div>

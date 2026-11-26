@@ -689,7 +689,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
             <div className="mt-4">
               <ContextualHelpCard
                 title="When guards are confirmed"
-                tip="Payment is processed securely via Stripe. Your funds are held with Stripe and only released to guards after the shift is completed and confirmed. You can download your invoice at any time from Payment History."
+                tip="Card payment is taken through Stripe when you confirm this booking. After you approve completion and the applicable checks pass, eligible pay is released to the guard’s connected Stripe account. Payment into the guard’s bank account is a separate Stripe payout, a dispute can pause release, and there is no escrow. You can download your invoice any time from Payment History."
                 learnMoreHref="/client/help#payments-invoices"
                 learnMoreLabel="Payment guide"
                 icon="ri-secure-payment-line"
@@ -1049,7 +1049,7 @@ export default function PaymentClient({ jobId }: { jobId: string }) {
                     <div>
                       <p className="text-sm font-medium text-teal-400">Payment Protection</p>
                       <p className="text-xs text-teal-500 mt-1">
-                        Your payment is held with Stripe. Guard pay is released after shift completion and the applicable confirmation, dispute and payout checks. Bank arrival times depend on Stripe and the guard’s account.
+                        Card payment is taken through Stripe when you confirm the booking. After you approve completion and the applicable confirmation, dispute and payout checks pass, eligible pay is released to the guard’s connected Stripe account. Payment into the guard’s bank account is a separate Stripe payout and bank arrival times depend on Stripe and the guard’s account. There is no escrow.
                       </p>
                     </div>
                   </div>

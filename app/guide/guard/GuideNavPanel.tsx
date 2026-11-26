@@ -9,6 +9,7 @@ const sections = [
   { id: 'step-04', icon: 'ri-money-pound-circle-line', label: 'Get Paid' },
   { id: 'best-practices', icon: 'ri-star-line', label: 'Best Practices' },
   { id: 'key-reminders', icon: 'ri-alarm-warning-line', label: 'Key Reminders' },
+  { id: 'guard-faq', icon: 'ri-question-line', label: 'Guard FAQ' },
   { id: 'get-started', icon: 'ri-rocket-line', label: 'Get Started' },
 ];
 

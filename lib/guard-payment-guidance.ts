@@ -8,9 +8,9 @@ export const GUARD_PAYOUT_SUPPORT_GUIDANCE = 'If the client has not confirmed co
 
 export const GUARD_PAYMENT_STEPS = [
   { icon: 'ri-bank-line', label: 'Set up your payout account', desc: GUARD_PAYOUT_SETUP_GUIDANCE },
-  { icon: 'ri-bank-card-line', label: 'Client funds the booking', desc: 'The client pays securely through Stripe before the booking is confirmed. The booking payment is held pending completion and release checks.' },
+  { icon: 'ri-bank-card-line', label: 'Client pays by card', desc: 'The client pays by card through Stripe when the booking is confirmed. There is no escrow.' },
   { icon: 'ri-briefcase-line', label: 'Work the shift and request completion', desc: GUARD_COMPLETION_GUIDANCE },
-  { icon: 'ri-checkbox-circle-line', label: 'Completion is reviewed', desc: 'The client reviews your completion request and can approve it or raise a dispute. An open dispute or payment issue can delay release while it is reviewed.' },
+  { icon: 'ri-checkbox-circle-line', label: 'Completion is reviewed', desc: 'The client reviews your completion request and can approve it or raise a dispute. An open dispute or payment issue can pause release while it is reviewed.' },
   { icon: 'ri-secure-payment-line', label: 'Eligible pay is released to Stripe', desc: 'After completion approval and the applicable payment, dispute and Stripe account checks, eligible earnings are transferred to your connected Stripe account.' },
   { icon: 'ri-money-pound-circle-line', label: 'Stripe processes your bank deposit', desc: GUARD_BANK_DEPOSIT_GUIDANCE },
 ];

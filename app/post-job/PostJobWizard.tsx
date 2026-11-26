@@ -323,7 +323,7 @@ export default function PostJobWizard() {
             Book a Guard Now
           </span>
           <h1 className="mb-2 text-2xl font-bold leading-tight text-white sm:text-3xl">Tell us what you need</h1>
-          <p className="max-w-2xl text-sm text-slate-300 sm:text-base">We&apos;ll notify suitable verified guards immediately. No card required until you select a guard.</p>
+          <p className="max-w-2xl text-sm text-slate-300 sm:text-base">Check which verified guards match your request before you sign in. Checking availability does not post a job and does not notify any guard — you review and confirm posting first, and no card details are taken until you select a guard and reach payment.</p>
         </div>
 
         <PostJobProgress step={step} />
@@ -469,13 +469,13 @@ export default function PostJobWizard() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Your Budget (per guard, per hour) *</label>
+              <label className="block text-sm font-semibold text-slate-300 mb-2">Agreed guard pay (per guard, per hour) *</label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">£</span>
                 <input disabled={savingEnquiry} type="number" aria-label="Hourly rate" value={formData.hourlyRate} onChange={e => updateField('hourlyRate', e.target.value)} min="10" step="0.50" placeholder="12.50" className="w-full pl-8 pr-4 py-3 bg-white/[0.05] border border-white/10 rounded-xl focus:ring-2 focus:ring-red-500/40 focus:border-red-400/60 text-white text-sm placeholder:text-slate-400" />
               </div>
               {errors?.hourlyRate && <p className="text-red-300 text-sm mt-1">{errors.hourlyRate}</p>}
-              <p className="text-xs text-slate-400 mt-1">Most guards charge £12–£18/hr. You choose the rate.</p>
+              <p className="text-xs text-slate-400 mt-1">You set the gross hourly pay offered to each guard. Minimum £10.00 per hour.</p>
             </div>
 
             <div>
@@ -500,17 +500,18 @@ export default function PostJobWizard() {
 
             {formData.hourlyRate && formData.startTime && formData.endTime && (
               <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-                <h4 className="text-sm font-bold text-white mb-2">Cost Estimate</h4>
+                <h4 className="text-sm font-bold text-white mb-2">Cost estimate — guard pay only</h4>
                 <div className="space-y-1 text-sm">
-                  <div className="flex justify-between text-slate-400"><span>Rate</span><span>£{parseFloat(formData.hourlyRate).toFixed(2)}/hr</span></div>
+                  <div className="flex justify-between text-slate-400"><span>Agreed guard pay</span><span>£{parseFloat(formData.hourlyRate).toFixed(2)}/hr</span></div>
                   <div className="flex justify-between text-slate-400"><span>Guards</span><span>× {formData.numberOfGuards}</span></div>
                   <div className="flex justify-between text-slate-400"><span>Hours</span><span>× {calculateHours().toFixed(1)}</span></div>
                   <div className="flex justify-between text-slate-400"><span>Days</span><span>× {formData.numberOfDays}</span></div>
                   <div className="border-t border-white/10 pt-1 flex justify-between">
-                    <span className="font-semibold text-white">Estimated guard total</span>
+                    <span className="font-semibold text-white">Estimated gross guard pay</span>
                     <span className="font-bold text-red-400">£{estimatedTotal()}</span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-1">Any platform fee and the confirmed total are shown before you pay. No card required until you select a guard.</p>
+                  <p className="text-xs text-slate-400 mt-1">This estimate is the agreed gross pay for guards at the hourly rate you set. A separate booking fee is added on top and its percentage depends on your client plan; any client plan subscription is billed separately. The final amount, including the booking fee, is shown before payment.</p>
+                  <p className="text-xs text-slate-400">Guards browse and apply free — there are no paid guard tiers, no application caps, and no booking commission is deducted from the agreed guard pay.</p>
                 </div>
               </div>
             )}
@@ -537,15 +538,15 @@ export default function PostJobWizard() {
             {availability&&<section aria-labelledby="guest-availability-title" className="rounded-2xl border border-teal-400/30 bg-teal-500/10 p-5 space-y-4">
               <h2 id="guest-availability-title" className="text-xl font-bold text-white">{availability.count} {availability.count===1?'guard matches':'guards match'} your requirements</h2>
               <p className="text-sm text-slate-300">You requested {formData.numberOfGuards} {formData.numberOfGuards==='1'?'guard':'guards'}. {availability.count<Number(formData.numberOfGuards)?'Fewer guards match than you requested; full cover is not confirmed.':''}</p>
-              <p className="text-sm text-slate-300">{availability.scope==='first_shift'?'This count covers the first shift only. Recurring and ongoing cover must be agreed separately.':`This count covers all ${availability.daysChecked} requested shift ${availability.daysChecked===1?'day':'days'}.`} Matching uses recorded licence, schedule, travel distance, venue preferences, budget and existing assignments. Unknown availability is excluded.</p>
-              <p className="text-sm text-slate-300">{availability.count===0?'No guards currently match these recorded criteria. You can adjust the request or create an account to post it.':'Matches are not reserved. Guards must still accept the work.'} {prefilledGuard?'This is the overall matching pool; a named guard request is checked separately.':''}</p>
+              <p className="text-sm text-slate-300">{availability.scope==='first_shift'?'For recurring or ongoing cover, this count covers your first requested shift only; later shifts are not included in this check.':`This count covers all ${availability.daysChecked} requested shift ${availability.daysChecked===1?'day':'days'}.`} The check uses recorded matching criteria only: required SIA licence, shift schedule, travel distance from your postcode, venue preferences, budget and existing assignments. Guards whose availability is not recorded are excluded.</p>
+              <p className="text-sm text-slate-300">{availability.count===0?'No guards currently match these recorded criteria. You can adjust the request or create a free client account to post it.':'A match is not a reservation and no cover is guaranteed. Guards still decide whether to accept work.'} Sign in or create a free client account, review your request and confirm posting before any guard is notified. Selecting a guard is provisional, and cover is confirmed only after Stripe payment succeeds. {prefilledGuard?'This is the overall matching pool; a named guard request is checked separately.':''}</p>
               <button type="button" disabled={savingEnquiry} onClick={handleContinue} className="w-full rounded-xl bg-red-600 px-5 py-3 font-semibold text-white disabled:opacity-60 cursor-pointer hover:bg-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1730]">{isAuth?'Continue to review booking':'Continue with a client account'}</button>
               {!isAuth&&<div className="border-t border-slate-600 pt-4 space-y-3"><label className="flex items-start gap-3 text-sm text-slate-300"><input type="checkbox" checked={followupConsent} disabled={savingEnquiry} onChange={event=>setFollowupConsent(event.target.checked)} className="mt-1"/>{BOOKING_FOLLOWUP_TEXT}</label><p className="text-sm text-slate-400"><Link href="/privacy" className="underline">Privacy policy</Link>. This optional choice is separate from creating an account.</p><button type="button" disabled={!followupConsent||savingEnquiry} onClick={saveEnquiry} className="rounded-lg border border-slate-500 px-4 py-2 text-sm text-white disabled:opacity-50">{savingEnquiry?'Saving…':'Save booking follow-up'}</button></div>}
             </section>}
             <button type="button" disabled={savingEnquiry} onClick={()=>{clearPendingJobDraft();setEnquiryMessage('Saved draft removed from this browser.');}} className="text-sm text-slate-300 underline">Remove saved draft from this browser</button>
             {hasEnquiry&&<button type="button" disabled={savingEnquiry} onClick={removeEnquiry} className="text-sm text-slate-300 underline">Remove saved booking follow-up</button>}
             {enquiryMessage&&<p role="status" className="text-sm text-amber-200">{enquiryMessage}</p>}
-            <p className="text-sm text-slate-400 text-center">Your saved draft can be restored in this browser for up to 24 hours. No job is posted until you sign in, review it and confirm. No card required until you select a guard.</p>
+            <p className="text-sm text-slate-400 text-center">Your saved draft can be restored in this browser for up to 24 hours. No job is posted and no guard is notified until you sign in, review the request and confirm posting. No card details are taken until you select a guard and reach payment.</p>
           </div>
         )}
         </div>

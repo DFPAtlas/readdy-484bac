@@ -5,6 +5,7 @@ import { canClientCancelJob } from '@/lib/client-job-actions';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { ClientJob } from '@/lib/client-types';
+import BookingPolicySummary from './BookingPolicySummary';
 
 import { useRouter } from 'next/navigation';
 
@@ -269,6 +270,8 @@ export default function CancelJobModal({ job, onClose, onSuccess }: CancelJobMod
                   </div>
                 )}
               </div>
+
+              <BookingPolicySummary />
 
               {/* Impact warning */}
               <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-4">

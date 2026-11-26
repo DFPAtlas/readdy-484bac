@@ -7,6 +7,7 @@ const sections = [
   { id: 'step-02', icon: 'ri-file-add-line', label: 'Post a Job' },
   { id: 'step-03', icon: 'ri-team-line', label: 'Review Guards' },
   { id: 'step-04', icon: 'ri-secure-payment-line', label: 'Secure Payment' },
+  { id: 'booking-policy', icon: 'ri-calendar-check-line', label: 'Booking Policy' },
   { id: 'best-practices', icon: 'ri-star-line', label: 'Best Practices' },
   { id: 'get-started', icon: 'ri-rocket-line', label: 'Get Started' },
 ];

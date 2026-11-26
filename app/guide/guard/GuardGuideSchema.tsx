@@ -1,5 +1,5 @@
 import { SITE_URL } from '@/lib/seo-helpers';
-import { GUARD_PAYMENT_STEPS } from '@/lib/guard-payment-guidance';
+import { GUARD_PAYMENT_STEPS, GUARD_GUIDE_FAQS } from './guardGuideContent';
 
 export default function GuardGuideSchema() {
   const howToSchema = {
@@ -7,39 +7,52 @@ export default function GuardGuideSchema() {
     '@type': 'HowTo',
     name: 'How to Find Security Guard Jobs on QuickGuard',
     description:
-      'Complete guide for SIA-licensed guards to register, get verified, find security work across the UK, and receive secure payments through QuickGuard.',
+      'How SIA-licensed guards create a free account, complete licence review, apply for security work and follow shift payments through Stripe on QuickGuard.',
     url: `${SITE_URL}/guide/guard`,
     totalTime: 'PT30M',
     step: [
       {
         '@type': 'HowToStep',
         position: 1,
-        name: 'Create Your Account',
-        text: 'Sign up as a guard in minutes. Enter your email, create a password, verify your email, and complete your professional profile with contact details, SIA licence number, and experience.',
+        name: 'Create Your Free Account',
+        text: 'Sign up as a guard. There is no charge to register, browse jobs or apply. Enter your email, create a password, verify your email, and complete your profile with contact details, SIA licence number, licence types and experience.',
         url: `${SITE_URL}/guide/guard#step-01`,
       },
       {
         '@type': 'HowToStep',
         position: 2,
-        name: 'SIA Verification',
-        text: 'Submit your SIA licence number during profile setup. Your licence must pass an initial check and your profile must be approved before you can take work. Timing varies and manual review may be needed. Planned: QuickGuard is developing an AI agent to check guards’ SIA licence status weekly and flag suspended, revoked or expired licences for review.',
+        name: 'SIA Licence Review',
+        text: 'Your SIA licence details are reviewed before your account is approved. Review can include a check against the SIA register and may require manual review, so timing varies. An expired licence blocks applications, and your licence number and types appear on your profile.',
         url: `${SITE_URL}/guide/guard#step-02`,
       },
       {
         '@type': 'HowToStep',
         position: 3,
-        name: 'Find and Apply for Jobs',
-        text: 'Browse available security jobs near you. Each listing shows pay rate, schedule, requirements, and location. Apply with a single click and receive instant notifications when accepted.',
+        name: 'Browse and Apply for Jobs',
+        text: 'Browse open jobs and apply for free with no monthly application cap and no paid job tiers. Each listing shows pay rate, schedule, requirements and location. Clients review applications and select guards, so applying does not guarantee selection or work.',
         url: `${SITE_URL}/guide/guard#step-03`,
       },
       {
         '@type': 'HowToStep',
         position: 4,
-        name: 'Complete Jobs and Get Paid',
+        name: 'Work Shifts and Get Paid',
         text: GUARD_PAYMENT_STEPS.map((step) => `${step.label}: ${step.desc}`).join(' '),
         url: `${SITE_URL}/guide/guard#step-04`,
       },
     ],
+  };
+
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: GUARD_GUIDE_FAQS.map((faq) => ({
+      '@type': 'Question',
+      name: faq.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: faq.answer,
+      },
+    })),
   };
 
   const breadcrumbSchema = {
@@ -66,6 +79,10 @@ export default function GuardGuideSchema() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(howToSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
       <script
         type="application/ld+json"

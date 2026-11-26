@@ -669,10 +669,16 @@
                     <h3 className="font-semibold text-slate-900 dark:text-white mb-1">How Payouts Work</h3>
                     <ul className="text-sm text-slate-500 dark:text-slate-400 space-y-1">
                       <li className="flex items-center gap-2">
-                        <i className="ri-check-line text-teal-400"></i>Payouts are initiated once the client completes payment for the job
+                        <i className="ri-check-line text-teal-400"></i>Client card payment is taken through Stripe when the booking is confirmed, and there is no escrow
                       </li>
                       <li className="flex items-center gap-2">
-                        <i className="ri-check-line text-teal-400"></i>Processing typically takes 3-5 business days via bank transfer
+                        <i className="ri-check-line text-teal-400"></i>Eligible pay is released to your connected Stripe account after the client approves completion and the checks pass
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <i className="ri-check-line text-teal-400"></i>Payment into your bank is a separate Stripe deposit, so arrival depends on Stripe and your account
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <i className="ri-check-line text-teal-400"></i>A dispute can pause release while it is reviewed
                       </li>
                       <li className="flex items-center gap-2">
                         <i className="ri-check-line text-teal-400"></i>A small platform fee is deducted from each payout

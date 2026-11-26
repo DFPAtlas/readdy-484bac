@@ -1,6 +1,6 @@
 'use client';
 
-import { CANCELLATION_GUIDANCE, GUARD_CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
+import { CANCELLATION_GUIDANCE, GUARD_CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE, HUMAN_SUPPORT_HOURS } from '@/lib/customer-guidance';
 import { GUARD_BANK_DEPOSIT_GUIDANCE, GUARD_COMPLETION_GUIDANCE, GUARD_PAYOUT_SETUP_GUIDANCE, GUARD_PAYOUT_SUPPORT_GUIDANCE } from '@/lib/guard-payment-guidance';
 
 import PublicMediaImage from '@/components/PublicMediaImage';
@@ -11,26 +11,114 @@ import Link from 'next/link';
 import BackToTop from '@/components/BackToTop';
 import Footer from '@/components/Footer';
 import NavSidebar from '@/components/NavSidebar';
-import { CLIENT_JOURNEY, GUARD_JOURNEY, CANCELLATION_WINDOWS, CANCELLATION_NOTES, LICENCE_CHECKS, CLIENT_TOPICS, GUARD_TOPICS } from '@/lib/help-content';
+import { CANCELLATION_WINDOWS, CANCELLATION_NOTES, LICENCE_CHECKS } from '@/lib/help-content';
 import { calculatePaygFees, formatCurrency } from '@/lib/payg-fees';
 import { usePublicPricing } from '@/lib/use-public-pricing';
-import { bookingFeeText } from '@/lib/public-pricing';
+import { bookingFeeText, planAllowanceText, pricingMoney, QUICKGUARD_TAX_NOTE, type PublicPricingPlan } from '@/lib/public-pricing';
 
 type Role = 'client' | 'guard';
 
-const faqs = [
-  { question: 'How do I get started as a Client?', answer: 'Register as a client, complete your profile, and post your first job. You can browse verified guards, review applications, and hire the best match for your security needs.', icon: 'ri-user-add-line' },
-  { question: 'How do I get started as a Guard?', answer: 'Register as a guard, upload your SIA licence, and complete your profile. Once verified, you can browse available jobs and submit applications directly through the platform.', icon: 'ri-shield-user-line' },
-  { question: 'Is SIA licence verification required?', answer: 'Yes. All security guards must hold a valid SIA licence. Every guard must pass an initial SIA licence check before they can take work through QuickGuard. We are also developing an AI agent to re-check licence status weekly and flag suspended, revoked or expired licences for review.', icon: 'ri-verified-badge-line' },
-  { question: 'How does payment work?', answer: 'Clients review the agreed guard pay, plan service fee and any eligible promotion, then pay securely via Stripe before the booking is confirmed. Funds are held with Stripe and released to the guard after completion and the applicable release checks. All transactions are encrypted and processed through our secure platform.', icon: 'ri-secure-payment-line' },
-  { question: 'How do I set up guard payouts and request completion?', answer: `${GUARD_PAYOUT_SETUP_GUIDANCE} ${GUARD_COMPLETION_GUIDANCE}`, icon: 'ri-bank-line' },
-  { question: 'Does payment release mean the money is in my bank?', answer: GUARD_BANK_DEPOSIT_GUIDANCE, icon: 'ri-money-pound-circle-line' },
-  { question: 'What if the client has not confirmed completion or my payout is delayed?', answer: GUARD_PAYOUT_SUPPORT_GUIDANCE, icon: 'ri-time-line' },
-  { question: 'Can I cancel or edit a job after posting?', answer: `${CANCELLATION_GUIDANCE} ${GUARD_CANCELLATION_GUIDANCE} ${REFUND_TIMING_GUIDANCE} To change a booked job, contact support.`, icon: 'ri-edit-2-line' },
-  { question: 'How long does guard verification take?', answer: 'Verification timing can vary depending on the licence check and whether manual review is required. You will receive an email notification once your profile has been reviewed and approved.', icon: 'ri-time-line' },
-  { question: 'What subscription plans are available?', answer: 'We offer flexible plans for clients of all sizes. Visit our Pricing page to compare features and choose the plan that best suits your business needs.', icon: 'ri-price-tag-3-line' },
-  { question: 'How do I raise a complaint?', answer: 'You can submit a complaint directly from your job detail page. Our team reviews all complaints promptly and will keep you updated on the resolution progress.', icon: 'ri-feedback-line' },
+type HelpFaq = { question: string; answer: string; icon: string };
+type LocalJourneyStep = { title: string; desc: string };
+type LocalHelpTopic = { title: string; desc: string; href: string };
+
+const CLIENT_JOURNEY_STEPS: LocalJourneyStep[] = [
+  { title: 'Check availability', desc: 'See how many verified guards match your postcode, licence need, shift times and budget. This uses recorded criteria only; it is not a reservation or cover guarantee.' },
+  { title: 'Create your account', desc: 'Choose a client plan. Your plan sets your monthly posting allowance and your per-booking service fee.' },
+  { title: 'Post your job', desc: 'Sign in, review your request and confirm posting. Posting does not charge you and no guard is notified before you confirm.' },
+  { title: 'Select guards', desc: 'Compare applicants and check their licence details. Your selection is provisional until payment succeeds.' },
+  { title: 'Pay through Stripe', desc: 'Review agreed guard pay plus your plan service fee, then pay by card. The booking is confirmed only when payment succeeds.' },
+  { title: 'Complete and release', desc: 'Guards check in and out. You approve completion or raise a dispute; release checks then transfer eligible pay to the guard’s Stripe account. The bank payout is separate.' },
 ];
+
+const GUARD_JOURNEY_STEPS: LocalJourneyStep[] = [
+  { title: 'Register free', desc: 'Create your profile and upload your identity and SIA licence details. Guard accounts are free, with no paid membership.' },
+  { title: 'Get verified', desc: 'Licensable work needs an approved profile and a valid SIA licence of the required type. Verification timing varies.' },
+  { title: 'Set your area', desc: 'Choose the travel radius and job alerts for the work you are willing to take.' },
+  { title: 'Apply freely', desc: 'Applications are unlimited with no monthly cap, no paid job tiers and no paid priority. Clients choose who to book.' },
+  { title: 'Work the shift', desc: 'Check in when you arrive and check out at the end. The client sees check-in times, and late check-ins are recorded.' },
+  { title: 'Request completion', desc: GUARD_COMPLETION_GUIDANCE },
+];
+
+const CLIENT_HELP_TOPICS: LocalHelpTopic[] = [
+  { title: 'Getting started', desc: 'Check guard availability, create an account and post your first job.', href: '/post-job' },
+  { title: 'Plans & fees', desc: 'Monthly posting allowances, service fees and eligible promotions.', href: '/pricing' },
+  { title: 'Selecting & paying', desc: 'Compare applicants, provisional selection and Stripe payment confirmation.', href: '/guide/client#step-04' },
+  { title: 'On the day', desc: 'Check-in and check-out, attendance problems and completion approval.', href: '/guide/client' },
+  { title: 'Cancellations & refunds', desc: 'Cancelling, refund review and how long a Stripe refund can take.', href: '/how-it-works/clients' },
+  { title: 'Data & privacy', desc: 'What we keep, for how long, and how to request erasure.', href: '/privacy' },
+];
+
+const GUARD_HELP_TOPICS: LocalHelpTopic[] = [
+  { title: 'Getting started', desc: 'Register free and build a profile that clients can review.', href: '/guide/guard' },
+  { title: 'SIA verification', desc: 'Licence checks, expiry dates and what a mismatch blocks.', href: '/guide/guard#step-02' },
+  { title: 'Finding work', desc: 'Job alerts, travel radius and unlimited applications.', href: '/jobs' },
+  { title: 'Pay & payouts', desc: 'Completion approval, release checks, Stripe transfer and bank payout.', href: '/guide/guard#step-04' },
+  { title: 'On the shift', desc: 'Check-in, check-out, extra hours and reporting problems.', href: '/guide/guard' },
+  { title: 'Membership & billing', desc: 'Free access, retired memberships, old invoices and support.', href: '/contact' },
+];
+
+function clientPlanSummary(plans: PublicPricingPlan[]): string | null {
+  const clientPlans = plans.filter((plan) => plan.audience === 'client');
+  if (!clientPlans.length) return null;
+  return clientPlans
+    .map((plan) => {
+      const price = plan.monthly_price_pence === 0 ? 'no monthly fee' : `${pricingMoney(plan.monthly_price_pence)} a month`;
+      return `${plan.name}: ${price}, ${planAllowanceText(plan).toLowerCase()}, ${bookingFeeText(plan)} service fee`;
+    })
+    .join('; ');
+}
+
+const DATA_FAQ: HelpFaq = {
+  question: 'What happens to my data and how long is it kept?',
+  answer: 'Our privacy notice sets out retention. As a summary: active-account data is kept while the account is active and for two years after closure. A nightly process minimises account profile data after two years and deletes verification documents after three years. Financial records are kept for seven years as standard, with specific tax, accounting and legal requirements assessed separately, and a documented legal hold pauses cleanup while evidence is needed. You can request earlier erasure. See the privacy notice for the full detail.',
+  icon: 'ri-lock-line',
+};
+
+const SUPPORT_FAQ: HelpFaq = {
+  question: 'What support is available, and when?',
+  answer: `QuickGuard AI Support answers platform questions 24/7. Human support is normally available ${HUMAN_SUPPORT_HOURS}; anything sent outside those hours is picked up when the team is next available. We do not guarantee a response time or a particular outcome, and no one can guarantee guard cover, refund timing or a bank arrival date.`,
+  icon: 'ri-customer-service-2-line',
+};
+
+function buildFaqs(role: Role, plans: PublicPricingPlan[]): HelpFaq[] {
+  const summary = clientPlanSummary(plans);
+
+  if (role === 'guard') {
+    return [
+      { question: 'Is guard registration really free?', answer: 'Yes. Creating a guard account, browsing jobs and applying are free, with no monthly application cap. Approval and licence requirements still apply: a job that needs a licence requires a valid SIA licence of the required type.', icon: 'ri-shield-user-line' },
+      { question: 'Are paid guard memberships or paid priority still available?', answer: 'No. Paid guard memberships have been retired, and there are no paid job tiers or paid priority placement. If you bought a membership earlier, its billing records and invoices remain available, and support can help with any question about that subscription.', icon: 'ri-close-circle-line' },
+      { question: 'Is commission taken from my agreed pay?', answer: 'No QuickGuard booking commission is deducted from the agreed gross guard pay on new bookings. The client pays your agreed pay plus their plan service fee. Tax and any other statutory deductions depend on how you are engaged, so we do not promise a take-home amount.', icon: 'ri-money-pound-circle-line' },
+      { question: 'How do I set up guard payouts and request completion?', answer: `${GUARD_PAYOUT_SETUP_GUIDANCE} ${GUARD_COMPLETION_GUIDANCE}`, icon: 'ri-bank-line' },
+      { question: 'When is my pay released?', answer: 'After you request completion, the client approves it and the applicable payment, dispute and Stripe account checks pass, eligible pay is transferred to your connected Stripe account. If the client does not respond, the request can be approved automatically after the applicable release window, unless there is an open dispute or a finance hold. Release is not the same as money in your bank.', icon: 'ri-secure-payment-line' },
+      { question: 'Does payment release mean the money is in my bank?', answer: GUARD_BANK_DEPOSIT_GUIDANCE, icon: 'ri-time-line' },
+      { question: 'What if the client has not confirmed completion or my payout is delayed?', answer: GUARD_PAYOUT_SUPPORT_GUIDANCE, icon: 'ri-error-warning-line' },
+      { question: 'How long does SIA and identity verification take?', answer: 'Timing depends on the licence check and whether manual review is required, so we cannot promise a fixed turnaround. You will be emailed once your profile has been reviewed. Keep your licence number, type and expiry date current: an expired or mismatched licence blocks applications for licensable work.', icon: 'ri-verified-badge-line' },
+      { question: 'What do I do on the shift?', answer: 'Check in when you arrive and check out at the end from your guard account. Your check-in time is shown to the client and a late check-in is recorded. If a shift may run beyond the agreed hours, agree the change with the client and contact support before working extra hours; extra hours do not automatically create a top-up or a payout.', icon: 'ri-login-box-line' },
+      { question: 'What if I cannot attend a confirmed shift?', answer: 'Contact the client and QuickGuard support as early as possible from the booking so a replacement can be arranged. Any refund or payment outcome is reviewed against the booking circumstances rather than decided automatically.', icon: 'ri-calendar-close-line' },
+      SUPPORT_FAQ,
+      DATA_FAQ,
+    ];
+  }
+
+  return [
+    { question: 'Can I check guard availability before creating an account?', answer: 'Yes. You can check how many verified guards match your postcode, licence requirement, shift times, budget, venue type and recorded travel preferences. The check uses recorded matching criteria only, is not a reservation and does not guarantee cover; guards whose availability is not recorded are excluded. It does not post your job or notify any guard: you sign in, review the request and confirm posting first. For recurring or ongoing cover the count covers the first requested shift only. No card details are taken until you select a guard and reach payment.', icon: 'ri-search-eye-line' },
+    { question: 'How do I get started as a client?', answer: 'Register, verify your email, complete your company profile, choose a plan, then post your first job. You can check availability before signing in, but posting a job needs an account, and no guard is notified until you review and confirm the post.', icon: 'ri-user-add-line' },
+    { question: 'What client plans and allowances are available?', answer: summary ? `Client plans are monthly memberships with a posting allowance and a separate service fee on each booking. Current plans: ${summary}. Allowances reset each month and the exact fee and total are confirmed before you pay. Guard accounts remain free.` : 'Client plans are monthly memberships with a posting allowance and a separate service fee on each booking. Current allowances and fees are listed on the pricing page and confirmed before you pay. Guard accounts remain free.', icon: 'ri-price-tag-3-line' },
+    { question: 'What does a booking cost?', answer: `You pay the agreed guard pay plus your plan service fee; card processing is included and no QuickGuard booking commission is deducted from the guard’s agreed gross pay on new bookings. Eligible promotions can reduce the service fee. ${QUICKGUARD_TAX_NOTE} The total is shown before you pay.`, icon: 'ri-secure-payment-line' },
+    { question: 'How does selecting a guard and confirming a booking work?', answer: 'Your selected guards are reserved provisionally for that job. The booking is confirmed only after your Stripe card payment succeeds; until then nothing is guaranteed and no work is confirmed. If a payment fails you can retry while the provisional selection stands, subject to availability.', icon: 'ri-shield-check-line' },
+    { question: 'Is an SIA licence verified?', answer: 'Where a role involves licensable security activity, the guard must hold a valid SIA licence, and the licence number and type are shown on their profile so you can review them before confirming. Applying for a licensable job requires a verified, unexpired licence of the required type. Not every venue, event or site role is licensable, and roles that do not need a licence are not presented as licensed work.', icon: 'ri-verified-badge-line' },
+    { question: 'What happens on the shift?', answer: 'Guards check in on arrival and check out at the end from their guard account, and you receive check-in and check-out notifications. Late check-ins are recorded. If a guard does not arrive or there is a problem on site, report it from the job page so our team can review next steps.', icon: 'ri-calendar-check-line' },
+    { question: 'How does completion approval and payment release work?', answer: 'The guard marks the shift complete, which submits it for your review. You can approve completion or raise a dispute. Approval plus the applicable payment, dispute and Stripe account checks must pass before eligible pay transfers to the guard’s connected Stripe account. If you do not respond, the request can be approved automatically after the applicable release window, unless there is an open dispute or a finance hold. Bank deposit is a separate Stripe payout, and a dispute can pause release. There is no escrow.', icon: 'ri-checkbox-circle-line' },
+    { question: 'Can I cancel or edit a job after posting?', answer: `${CANCELLATION_GUIDANCE} ${GUARD_CANCELLATION_GUIDANCE} ${REFUND_TIMING_GUIDANCE} To change a booked job, contact support.`, icon: 'ri-edit-2-line' },
+    { question: 'How long does a refund take?', answer: `${REFUND_TIMING_GUIDANCE} Actual timing depends on Stripe and your bank, so no refund or arrival date is guaranteed, and a refund request is not an approved refund.`, icon: 'ri-refund-2-line' },
+    { question: 'How do I raise a complaint or dispute?', answer: 'You can submit a complaint from the affected booking. Our team reviews the booking record, messages, attendance and payment history, and keeps you updated on progress. Outcomes and response times are not guaranteed, and the service fee, release or refund is reviewed against the circumstances rather than decided automatically.', icon: 'ri-feedback-line' },
+    { question: 'Can I change or cancel my client plan?', answer: 'You can review and change your plan from your account billing area, and support can help with a cancellation question. Charges already taken for a booking are separate from your subscription: cancellation and any refund are reviewed through the booking process rather than refunded automatically.', icon: 'ri-repeat-line' },
+    { question: 'Where do I find invoices and receipts?', answer: 'Payment History holds your saved payment records and receipts, showing recorded guard pay, service charges and refunds. Subscription invoices are available from your account billing area. These records are not VAT invoices, because QuickGuard is not VAT registered and adds no VAT to its own fees.', icon: 'ri-file-list-3-line' },
+    SUPPORT_FAQ,
+    DATA_FAQ,
+  ];
+}
 
 const visualGuides = [
   {
@@ -56,9 +144,8 @@ const visualGuides = [
   },
 ];
 
-function MoneySection({ role }: { role: Role }) {
+function MoneySection({ role, catalogue }: { role: Role; catalogue: ReturnType<typeof usePublicPricing> }) {
   const [planSlug, setPlanSlug] = useState('client-starter');
-  const catalogue = usePublicPricing();
   const clientPlans = catalogue.plans.filter(plan => plan.audience === 'client');
   const [hours, setHours] = useState(8);
   const [rate, setRate] = useState(15);
@@ -68,17 +155,17 @@ function MoneySection({ role }: { role: Role }) {
       {
         big: '0%',
         title: 'No booking commission',
-        text: "QuickGuard adds no platform or Stripe deduction to agreed gross guard pay. Statutory deductions depend on the engagement.",
+        text: "QuickGuard deducts no booking commission from the agreed gross guard pay on new bookings. Statutory deductions depend on how you are engaged.",
       },
       {
         big: '£0',
         title: 'Free guard job access',
-        text: 'Create a profile, browse and apply with no monthly application cap or paid job tiers. Account approval and licence requirements apply. Manage any existing membership separately on your dashboard or through billing support.',
+        text: 'Create a profile and apply with no monthly application cap and no paid job tiers or paid priority. Approval and licence requirements apply. Any earlier membership keeps its billing records; support can help with an old subscription.',
       },
       {
         big: 'Stripe',
         title: 'Release, then bank deposit',
-        text: 'Set up your payout account in Bank Settings. After completion approval and the applicable payment, dispute and account checks, eligible pay is released to Stripe. Bank arrival is a separate stage.',
+        text: 'Set up your payout account in Bank Settings. After completion approval (or the applicable review window) and the payment, dispute and Stripe account checks, eligible pay is transferred to Stripe. Bank arrival is a separate stage.',
       },
     ];
 
@@ -128,10 +215,10 @@ function MoneySection({ role }: { role: Role }) {
           <p className="text-xs font-bold uppercase tracking-[0.2em] mb-3 text-teal-400">What you&apos;ll pay</p>
           <h2 className="text-2xl md:text-3xl font-bold text-white mb-5">Two separate costs, both shown upfront</h2>
           <p className="text-slate-400 text-sm leading-relaxed mb-4">
-            Your subscription covers platform features and your monthly posting allowance. Each booking is paid separately: the guard&apos;s agreed pay plus your plan&apos;s service fee. Card processing is included, and the guard never has anything deducted.
+            Your subscription covers platform features and your monthly posting allowance. Each booking is paid separately: the guard&apos;s agreed pay plus your plan&apos;s service fee. Card processing is included, and no QuickGuard booking commission is deducted from the guard&apos;s agreed gross pay.
           </p>
           <p className="text-slate-400 text-sm leading-relaxed mb-6">
-            Eligible launch promotions can reduce your service fee. Any applicable VAT is shown at checkout.
+            Eligible promotions can reduce your service fee. {QUICKGUARD_TAX_NOTE}
           </p>
           <Link href="/pricing" className="inline-flex items-center gap-1 text-teal-400 font-semibold text-sm hover:underline cursor-pointer whitespace-nowrap">
             Compare plans <i className="ri-arrow-right-line" />
@@ -234,7 +321,7 @@ function MoneySection({ role }: { role: Role }) {
           </div>
 
           <p className="text-xs text-slate-500 leading-relaxed mt-4">
-            The guard receives {formatCurrency(fees.guardTotal)} in full. Example only; your total is confirmed before you pay.
+            The guard&apos;s agreed pay is {formatCurrency(fees.guardTotal)}, with no QuickGuard booking commission deducted. Statutory deductions depend on the engagement. Example only; your total is confirmed before you pay.
           </p>
         </div>
       </div>
@@ -290,15 +377,15 @@ function CancellationSection() {
 function LicenceChecksSection({ role }: { role: Role }) {
   const isClient = role === 'client';
   const intro = isClient
-    ? "Every guard you book has passed an SIA licence check. Here's exactly what is in place today and what's coming."
-    : "Your licence is checked before you can take work. Here's exactly what is in place today and what's coming.";
+    ? "Here's what licence information is shown today, and what it means for the role you are booking."
+    : "Here's what licence information is shown today, and what it means for the work you apply for.";
 
   return (
     <div className="mb-16">
       <div className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-6 md:p-8 grid lg:grid-cols-2 gap-8 items-start">
         <div>
           <p className={`text-xs font-bold uppercase tracking-[0.2em] mb-3 ${isClient ? 'text-teal-400' : 'text-sky-400'}`}>Licence checks</p>
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">What we check, and when</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">What is shown, and when</h2>
           <p className="text-slate-400 text-sm leading-relaxed">{intro}</p>
         </div>
         <div>
@@ -328,6 +415,7 @@ function LicenceChecksSection({ role }: { role: Role }) {
 
 export default function HelpContent() {
   const router = useRouter();
+  const catalogue = usePublicPricing();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [role, setRole] = useState<Role>('client');
@@ -350,20 +438,21 @@ export default function HelpContent() {
     : 'bg-sky-500 text-slate-900 hover:bg-sky-400';
   const accentSolid = isClient ? 'bg-teal-500 text-white' : 'bg-sky-500 text-white';
 
-  const journey = isClient ? CLIENT_JOURNEY : GUARD_JOURNEY;
+  const journey = isClient ? CLIENT_JOURNEY_STEPS : GUARD_JOURNEY_STEPS;
   const journeyLabel = isClient ? 'Hiring with QuickGuard' : 'Working with QuickGuard';
-  const journeyHeading = isClient ? 'From job post to a guard on site' : 'From sign-up to getting paid';
+  const journeyHeading = isClient ? 'From availability check to a guard on site' : 'From free sign-up to getting paid';
   const searchPlaceholder = isClient
-    ? 'Search: refunds, plans, posting a job\u2026'
+    ? 'Search: availability, plans, refunds, release\u2026'
     : 'Search: SIA check, payouts, job alerts\u2026';
 
   const query = search.toLowerCase();
+  const faqs = buildFaqs(role, catalogue.plans);
 
   const filtered = faqs.filter(
     (f) => f.question.toLowerCase().includes(query) || f.answer.toLowerCase().includes(query)
   );
 
-  const topics = isClient ? CLIENT_TOPICS : GUARD_TOPICS;
+  const topics = isClient ? CLIENT_HELP_TOPICS : GUARD_HELP_TOPICS;
   const filteredTopics = topics.filter(
     (t) => t.title.toLowerCase().includes(query) || t.desc.toLowerCase().includes(query)
   );
@@ -391,7 +480,7 @@ export default function HelpContent() {
           </p>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">How can we help?</h1>
           <p className="text-slate-400 text-lg mb-8 max-w-2xl mx-auto">
-            Tell us who you are and we&apos;ll show you exactly how QuickGuard works for you, from first booking to getting paid.
+            Tell us who you are and we&apos;ll show you exactly how QuickGuard works, from checking availability to getting paid.
           </p>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 mb-8">
@@ -425,6 +514,7 @@ export default function HelpContent() {
             </div>
             <input
               type="text"
+              aria-label="Search the help centre"
               placeholder={searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -452,7 +542,7 @@ export default function HelpContent() {
           </div>
         </div>
 
-        <MoneySection role={role} />
+        <MoneySection role={role} catalogue={catalogue} />
 
         {isClient && <CancellationSection />}
 
@@ -535,6 +625,7 @@ export default function HelpContent() {
                 <div key={i} className="border border-slate-700/50 rounded-xl overflow-hidden hover:border-teal-500/30 transition-colors bg-[#111d35]">
                   <button
                     onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                    aria-expanded={openFaq === i}
                     className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-[#0e1628] transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-3">
@@ -565,7 +656,8 @@ export default function HelpContent() {
               <i className="ri-headphone-line text-2xl text-teal-400" />
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Still stuck?</h2>
-            <p className="text-slate-400 mb-6 max-w-md mx-auto text-sm">QuickGuard AI Support answers platform questions 24/7. Anything that needs a person is escalated to our team during business hours.</p>
+            <p className="text-slate-400 mb-6 max-w-md mx-auto text-sm">QuickGuard AI Support answers platform questions 24/7. Human support is normally available {HUMAN_SUPPORT_HOURS}; anything outside those hours is picked up when the team is next available.</p>
+            <p className="text-slate-500 mb-6 max-w-md mx-auto text-xs">We do not guarantee a response time, guard cover, a refund or a bank arrival date.</p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <button
                 type="button"

@@ -190,6 +190,9 @@ export default function StepReviewPost({
                 <InfoRow label="Guard Total" value={formatCurrency(fees.guardTotal)} />
                 <InfoRow label="Service Fee" value={`${formatCurrency(fees.serviceFee)} (${fees.serviceFeeLabel})`} />
                 <InfoRow label="Total to Pay" value={formatCurrency(fees.total)} />
+                <p className="text-xs text-slate-500 pt-2">
+                  These are estimates. Posting a job does not take payment. You pay by card through Stripe when you confirm your guard, and eligible pay is released to the guard’s Stripe account after you approve completion and the checks pass.
+                </p>
               </>
             )}
             <InfoRow label="Contact" value={formData.contactName} />

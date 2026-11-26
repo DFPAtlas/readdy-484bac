@@ -128,9 +128,9 @@ export default function UseCasePage({ data }: { data: UseCaseData }) {
         <div className="max-w-6xl mx-auto px-6 md:px-8">
           <div className="grid md:grid-cols-4 gap-6">
             {[
-              { icon: 'ri-shield-check-line', label: 'All Guards SIA-Verified', desc: 'SIA-verified before joining, with planned weekly AI licence checks' },
-              { icon: 'ri-lock-line', label: 'Held Job Payment with Stripe', desc: 'Funds released only after the shift is complete' },
-              { icon: 'ri-money-pound-circle-line', label: 'Pay Per Shift', desc: 'No contracts, no hidden fees — pay per shift' },
+              { icon: 'ri-shield-check-line', label: 'Licence Details Shown', desc: 'Licence information appears on each profile and is reviewed before approval' },
+              { icon: 'ri-bank-card-line', label: 'Card Payment via Stripe', desc: 'Pay before the shift; release follows your completion approval and the applicable checks' },
+              { icon: 'ri-money-pound-circle-line', label: 'Pay Per Shift', desc: 'Book only the shifts you need' },
               { icon: 'ri-map-pin-2-line', label: 'UK-Wide Coverage', desc: 'Guards in London, Manchester, Birmingham & beyond' },
             ].map((s) => (
               <div key={s.label} className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-6 text-center hover:border-teal-500/30 transition-all">
@@ -182,7 +182,7 @@ export default function UseCasePage({ data }: { data: UseCaseData }) {
             Ready to Secure Your Venue?
           </h2>
           <p className="text-xl mb-10 text-slate-400 max-w-2xl mx-auto">
-            Post your job in under 5 minutes. Pay-as-you-go — no contracts, no hidden markups. SIA-verified guards in your area will be notified instantly.
+            Post your shift and review the guards who respond. You pay per shift by card through Stripe, and payment is released after you approve completion and the applicable checks pass.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link

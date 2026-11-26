@@ -3,21 +3,22 @@ import Footer from '@/components/Footer';
 import NavSidebar from '@/components/NavSidebar';
 import ClientNavPanel from './ClientNavPanel';
 import ClientGuideSchema from './ClientGuideSchema';
+import ClientBookingPolicyPanel from './ClientBookingPolicyPanel';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'How to Hire Security Guards UK',
   description:
-    'Step-by-step guide for UK businesses hiring security guards. Learn to post jobs, review SIA-verified profiles, and process secure payments on QuickGuard.',
+    'Step-by-step guide for UK businesses hiring security guards. Learn to post jobs, review licence details on guard profiles, and process secure payments on QuickGuard.',
   keywords:
-    'hire security guards UK, how to post security job, SIA verified guards, security staffing guide, QuickGuard client guide, event security hiring',
+    'hire security guards UK, how to post security job, SIA licensed guards, security staffing guide, QuickGuard client guide, event security hiring',
   alternates: {
     canonical: 'https://quickguard.uk/guide/client',
   },
   openGraph: {
     title: 'Client Guide | Hire SIA-Licensed Security Guards | QuickGuard',
     description:
-      'Post a job, review SIA-verified guard profiles, and process secure payments in minutes. Complete guide to hiring security on QuickGuard.',
+      'Post a job, review licence details on guard profiles, and process secure payments in minutes. Complete guide to hiring security on QuickGuard.',
     url: 'https://quickguard.uk/guide/client',
     siteName: 'QuickGuard',
     type: 'article',
@@ -33,7 +34,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Client Guide | Hire SIA-Licensed Security Guards | QuickGuard',
-    description: 'Post a job, review SIA-verified guard profiles, and process secure payments in minutes on QuickGuard.',
+    description: 'Post a job, review licence details on guard profiles, and process secure payments in minutes on QuickGuard.',
     images: [
       'https://readdy.ai/api/search-image?query=UK%20business%20manager%20reviewing%20security%20guard%20profiles%20on%20a%20laptop%20in%20a%20dark%20modern%20office%2C%20dark%20navy%20blue%20color%20scheme%2C%20professional%20corporate%20setting%2C%20clean%20desk%20with%20ambient%20lighting%2C%20confident%20and%20organised%20atmosphere%2C%20hiring%20and%20recruitment%20concept%2C%20realistic%20photography%20style&width=1200&height=630&seq=og-guide-client-002&orientation=landscape',
     ],
@@ -60,7 +61,7 @@ const steps = [
     number: '02',
     icon: 'ri-file-add-line',
     title: 'Post a Job',
-    description: 'Create a detailed job listing to attract the best-matched security guards.',
+    description: 'Create a detailed job listing to attract the best-matched, SIA-licensed security guards.',
     items: [
       'Enter job title, security type, and number of guards needed',
       'Set start/end dates, working hours, and urgency level',
@@ -83,7 +84,7 @@ const steps = [
     title: 'Review & Select Guards',
     description: 'Browse applicants and choose the best guards for your job.',
     cards: [
-      { icon: 'ri-shield-star-line', title: 'SIA License', desc: 'Verified license number and types' },
+      { icon: 'ri-shield-star-line', title: 'Licence Details', desc: 'Licence number and types shown' },
       { icon: 'ri-star-line', title: 'Ratings', desc: 'Reviews from previous clients' },
       { icon: 'ri-briefcase-line', title: 'Experience', desc: 'Years of security experience' },
       { icon: 'ri-map-pin-line', title: 'Location', desc: 'Distance from your venue' },
@@ -93,10 +94,10 @@ const steps = [
     number: '04',
     icon: 'ri-secure-payment-line',
     title: 'Secure Payment',
-    description: 'Pay securely through Stripe before the booking is confirmed, with full transaction history.',
+    description: 'Card payment is taken through Stripe when you confirm the booking, with full transaction history.',
     paymentSteps: [
       { icon: 'ri-check-double-line', label: 'Confirm & Pay', desc: 'Review the agreed guard pay, plan service fee and any eligible promotion, then pay securely before the booking is confirmed' },
-      { icon: 'ri-lock-line', label: 'Funds Held Securely', desc: 'Funds are held with Stripe until the shift is completed and the release checks pass' },
+      { icon: 'ri-lock-line', label: 'Payment Taken via Stripe', desc: 'Card payment is taken through Stripe when you confirm the booking, before the shift' },
       { icon: 'ri-bank-card-line', label: 'Guard Payment Released', desc: 'After completion approval and the applicable payment, dispute and account checks, eligible pay is released to the guard’s connected Stripe account. Stripe processes the bank deposit separately according to its schedule and account requirements.' },
       { icon: 'ri-mail-check-line', label: 'Confirmation', desc: 'Both parties receive payment confirmation emails' },
     ],
@@ -130,7 +131,7 @@ export default function ClientGuidePage() {
               <span>Client User Guide</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-5 leading-tight">
-              Hire Verified Security Guards with<br />
+              Hire Security Guards with<br />
               <span className="text-teal-400">Confidence</span>
             </h1>
             <p className="text-slate-400 text-xl max-w-2xl mx-auto leading-relaxed">
@@ -159,7 +160,7 @@ export default function ClientGuidePage() {
             <div className="mt-16 grid grid-cols-3 gap-8 w-full max-w-2xl mx-auto">
               {[
                 { value: '5 mins', label: 'To post a job' },
-                { value: '100%', label: 'SIA verified guards' },
+                { value: 'SIA', label: 'Licence details on profiles' },
                 { value: '24/7', label: 'AI support' },
               ].map((stat) => (
                 <div key={stat.label} className="text-center">
@@ -279,7 +280,7 @@ export default function ClientGuidePage() {
                   <h2 className="text-2xl font-bold text-white">Post a Job</h2>
                 </div>
               </div>
-              <p className="text-slate-400 mb-6">Create a detailed listing to attract the best-matched, verified security guards.</p>
+              <p className="text-slate-400 mb-6">Create a detailed listing to attract the best-matched, SIA-licensed security guards.</p>
               <div className="space-y-3">
                 {[
                   { icon: 'ri-file-text-line', label: 'Job Details', desc: 'Title, security type, number of guards needed' },
@@ -315,7 +316,7 @@ export default function ClientGuidePage() {
                 <h2 className="text-2xl font-bold text-white">Review & Select Guards</h2>
               </div>
             </div>
-            <p className="text-slate-400 mb-8 max-w-2xl">When guards apply, you&apos;ll see their complete verified profiles. Review each applicant and choose the best fit for your job.</p>
+            <p className="text-slate-400 mb-8 max-w-2xl">When guards apply, you&apos;ll see their full profile with licence details. Review each applicant and choose the best fit for your job.</p>
 
             <div className="grid grid-cols-4 gap-5 mb-8">
               {steps[2].cards!.map((card, i) => (
@@ -369,7 +370,7 @@ export default function ClientGuidePage() {
                   <h2 className="text-2xl font-bold text-white">Secure Payment</h2>
                 </div>
               </div>
-              <p className="text-slate-400 mb-6">Pay securely through Stripe before the booking is confirmed, with full transaction history.</p>
+              <p className="text-slate-400 mb-6">Card payment is taken through Stripe when you confirm the booking, with full transaction history.</p>
               <div className="space-y-4">
                 {steps[3].paymentSteps!.map((ps, i) => (
                   <div key={i} className="flex items-start gap-4">
@@ -399,7 +400,7 @@ export default function ClientGuidePage() {
                   </div>
                   <div>
                     <h4 className="font-bold text-white mb-2">Bank-Level Security</h4>
-                    <p className="text-slate-400 text-sm">All payments are processed through Stripe, ensuring complete security and protection for both clients and guards.</p>
+                    <p className="text-slate-400 text-sm">Card payments and guard payouts are both processed through Stripe. Payment into the guard’s bank account is a separate Stripe payout.</p>
                   </div>
                 </div>
               </div>
@@ -415,7 +416,7 @@ export default function ClientGuidePage() {
                     'Full payment history & receipts',
                     'Automatic invoice generation',
                     'Dispute resolution support',
-                    'Multiple payment methods accepted',
+                    'Card payment through Stripe',
                   ].map((f, i) => (
                     <li key={i} className="flex items-center gap-2 text-sm text-slate-400">
                       <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
@@ -429,6 +430,10 @@ export default function ClientGuidePage() {
             </div>
           </div>
         </section>
+
+        <div className="max-w-6xl mx-auto px-6 mb-16">
+          <ClientBookingPolicyPanel />
+        </div>
 
         {/* Best Practices */}
         <section id="best-practices" className="bg-[#0e1628] border-y border-slate-800/60 py-16">

@@ -33,7 +33,7 @@ export default function HomepageSchema() {
     name: 'QuickGuard',
     url: SITE_URL,
     description:
-      'Post security work or find security jobs in the UK, with SIA licence checks and held payments through Stripe.',
+      'Post security work or find security jobs in the UK, with SIA licence checks before work and card payments confirmed through Stripe.',
     potentialAction: {
       '@type': 'SearchAction',
       target: {
@@ -77,7 +77,7 @@ export default function HomepageSchema() {
         name: 'When and how do guards get paid?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Once a client confirms job completion, the agreed amount is released in full, with no commission deducted from guard pay. The funds are transferred to your connected Stripe account, and payment into your bank account is a separate Stripe payout. Bank arrival depends on available funds, your Stripe payout schedule, account verification and bank processing. Payment records are available in your account, and you remain responsible for your own tax reporting.',
+          text: 'Once a client approves job completion and eligibility checks are completed, the agreed amount is released, with no booking commission deducted from guard pay. The funds are transferred to your connected Stripe account, and payment into your bank account is a separate Stripe payout. Bank arrival depends on available funds, your Stripe payout schedule, account verification and bank processing. A dispute can pause release. Payment records are available in your account, and you remain responsible for your own tax reporting.',
         },
       },
       {
@@ -85,7 +85,7 @@ export default function HomepageSchema() {
         name: 'Is there a cost for clients to post a job?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'You can post a job for free and there are no setup fees. Payment is required after you select a guard and before the booking is confirmed. The client booking service fee depends on your plan and any promotion applied, and the exact amount is shown before you pay.',
+          text: 'Posting a job is free within your plan allowance. Payment is required after you select a guard and before the booking is confirmed. A client booking service fee applies, depending on your plan and any promotion applied, and the exact amount is shown before you pay. No booking commission is deducted from the guard\u2019s agreed pay.',
         },
       },
       {
@@ -101,15 +101,15 @@ export default function HomepageSchema() {
         name: 'Are all guards on the platform verified?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Every guard must pass an SIA licence check before being approved to take work on the platform. Clients can review a guard\u2019s profile and licence details before confirming. A licence check reduces risk but is not a guarantee of a guard\u2019s future conduct.',
+          text: 'Every guard must be approved with a valid SIA licence on record before taking work on the platform. Clients can review a guard\u2019s profile and licence details before confirming. Licence status can change over time, and a licence check reduces risk but is not a guarantee of a guard\u2019s conduct.',
         },
       },
       {
         '@type': 'Question',
-        name: 'How does the payment protection work?',
+        name: 'How does payment work?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Clients pay for the shift by card through Stripe, and the funds are held until the client confirms the shift has been completed. The payment is then released to the guard\u2019s connected Stripe account, with no commission deducted from guard pay. If a dispute is raised, release can be paused for review.',
+          text: 'Clients pay by card through Stripe before the shift, and the booking is confirmed once payment is complete. After the client approves completion, eligibility checks run before the agreed amount is released to the guard\u2019s connected Stripe account. Payment into the guard\u2019s bank account is a separate Stripe payout. A dispute can pause release. There is no escrow or guaranteed release date.',
         },
       },
       {

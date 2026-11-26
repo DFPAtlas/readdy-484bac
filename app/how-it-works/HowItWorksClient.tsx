@@ -20,10 +20,10 @@ const DEMO_TABS = [
     icon: 'ri-shield-user-line',
     color: 'teal',
     steps: [
-      { icon: 'ri-user-add-line', title: 'Create Your Profile', desc: 'Register in minutes, upload your SIA licence, and set your availability across the UK.' },
-      { icon: 'ri-notification-3-line', title: 'Get Instant Job Alerts', desc: 'Receive real-time notifications for jobs that match your skills, location, and schedule.' },
-      { icon: 'ri-send-plane-line', title: 'Apply with One Click', desc: 'Apply to multiple jobs instantly. Your verified SIA badge builds instant client trust.' },
-      { icon: 'ri-bank-card-line', title: 'Get Paid Securely', desc: 'Receive your full agreed pay after the shift is confirmed complete. No guard commission — standard payouts are covered by the client service fee.' },
+      { icon: 'ri-user-add-line', title: 'Register a free guard account', desc: 'Create your profile and submit your SIA licence details for verification. Registration, job browsing and applications are free.' },
+      { icon: 'ri-search-eye-line', title: 'Browse and apply without a paid tier', desc: 'There is no paid guard membership, no paid job tier and no paid priority in discovery or applicant order. Applications are not capped by a paid plan.' },
+      { icon: 'ri-send-plane-line', title: 'Respond to shifts that fit', desc: 'Apply to jobs that suit your licence, location and availability. Each job still applies its own requirements and selection is always the client\u2019s decision.' },
+      { icon: 'ri-bank-card-line', title: 'Complete the shift and get paid', desc: 'Check in and out, then mark completion. After client approval and the applicable release checks, eligible pay is released to your connected Stripe account; the bank payout is a separate later step.' },
     ],
   },
   {
@@ -32,19 +32,19 @@ const DEMO_TABS = [
     icon: 'ri-building-2-line',
     color: 'blue',
     steps: [
-      { icon: 'ri-file-list-3-line', title: 'Post Your Job', desc: 'Describe your security needs — location, shift times, SIA requirements. Posting a job does not charge the booking payment.' },
-      { icon: 'ri-robot-line', title: 'Local Guards Notified', desc: 'QuickGuard notifies verified guards whose travel radius covers your job location.' },
-      { icon: 'ri-user-search-line', title: 'Review & Select', desc: 'Browse guard profiles, check SIA credentials, and confirm your preferred candidate.' },
-      { icon: 'ri-secure-payment-line', title: 'Pay & Confirm', desc: 'Review the agreed guard pay, your plan\u2019s service fee and any eligible promotion, then pay securely via Stripe. Funds are held with Stripe until release.' },
+      { icon: 'ri-calendar-check-line', title: 'Check availability as a guest', desc: 'Enter your venue, date and shift times to see whether guards indicate availability. A match is not a reservation and does not hold a guard.' },
+      { icon: 'ri-login-box-line', title: 'Sign in or register, then review your posting', desc: 'Sign in or create an account. Your plan sets your monthly posting allowance and booking service fee, and you review the full job details before publishing.' },
+      { icon: 'ri-user-search-line', title: 'Eligible guards respond', desc: 'Guards whose licence and coverage fit the job are notified and can apply. Applications are free for guards, so no applicant is ordered by a paid tier.' },
+      { icon: 'ri-secure-payment-line', title: 'Pay to confirm, then complete the shift', desc: 'Your selection is provisional until the Stripe booking payment completes. After the shift, completion is approved or disputed, then release checks apply before guard pay is released.' },
     ],
   },
 ];
 
 const PLATFORM_STATS = [
-  { icon: 'ri-timer-flash-line', value: 'No commission', label: 'Guards keep full agreed pay' },
-  { icon: 'ri-shield-check-line', value: '100%', label: 'SIA-verified guards' },
+  { icon: 'ri-shield-user-line', value: 'Free', label: 'Guard registration and applications' },
+  { icon: 'ri-infinity-line', value: 'No paid tier', label: 'No guard membership or job tiers' },
   { icon: 'ri-map-pin-2-line', value: 'UK-wide', label: 'Coverage across all regions' },
-  { icon: 'ri-lock-2-line', value: 'Held with Stripe', label: 'Secure payment protection' },
+  { icon: 'ri-hand-coin-line', value: 'No deduction', label: 'Added to agreed guard pay on new bookings' },
 ];
 
 export default function HowItWorksClient() {
@@ -126,7 +126,7 @@ export default function HowItWorksClient() {
             How QuickGuard.uk Works
           </h1>
           <p className="text-lg md:text-xl text-slate-400 max-w-3xl mx-auto">
-            Connecting UK security professionals with clients through intelligent matching
+            A clear walkthrough of how availability checks, job posting, guard responses, payment, shift completion and payout actually work.
           </p>
         </div>
       </section>
@@ -143,7 +143,7 @@ export default function HowItWorksClient() {
               See How It Works in Action
             </h2>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-              An interactive step-by-step demo of the QuickGuard.uk platform — from registration to payment, in minutes.
+              An interactive walkthrough of the client and guard journeys, from the first availability check to the separate bank payout.
             </p>
           </div>
 
@@ -302,10 +302,10 @@ export default function HowItWorksClient() {
               Step-by-Step
             </div>
             <h2 id="process-heading" className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Our 5-Step Process
+              The Full Journey, Step by Step
             </h2>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-              From profile creation to secure payment — here&apos;s exactly how QuickGuard connects guards and clients
+              From a guest availability check and free guard registration through to posting, payment, shift completion and the separate bank payout
             </p>
             <Link
               href="/how-it-works/clients"
@@ -329,17 +329,17 @@ export default function HowItWorksClient() {
                 <div className="w-16 h-16 bg-teal-500/10 border border-teal-400/20 rounded-2xl flex items-center justify-center mb-6">
                   <span className="text-2xl font-bold text-teal-400">1</span>
                 </div>
-                <h3 className="text-3xl font-bold text-white mb-4">Security Guards Create Profiles</h3>
+                <h3 className="text-3xl font-bold text-white mb-4">Guards Register Free</h3>
                 <p className="text-lg text-slate-400 mb-6">
-                  UK security professionals register and create comprehensive profiles showcasing their:
+                  UK security professionals create a free guard account and submit the details clients need to review:
                 </p>
                 <ul className="space-y-3 text-slate-400 list-none p-0 m-0">
                   {[
-                    'SIA licence and door supervisor badges',
+                    'SIA licence details submitted for verification before applying',
                     'Years of experience in security',
                     'Specialisation areas (retail, events, corporate)',
                     'Availability schedule and shift patterns',
-                    'Coverage areas across the UK'
+                    'Coverage areas and travel radius across the UK'
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-3">
                       <i className="ri-check-line text-teal-400" />
@@ -353,12 +353,12 @@ export default function HowItWorksClient() {
                   <PublicMediaImage
                     slot="hiw-image-2"
                     src="https://readdy.ai/api/search-image?query=Professional%20British%20security%20guard%20in%20formal%20uniform%20holding%20a%20tablet%20device%20and%20smiling%2C%20modern%20office%20environment%20background%20with%20dark%20moody%20lighting%2C%20warm%20natural%20highlights%2C%20clean%20and%20friendly%20portrait%20style%20photography%2C%20high%20quality%20professional%20headshot%20aesthetic%2C%20representing%20online%20profile%20creation%2C%20dark%20navy%20blue%20color%20palette&width=600&height=350&seq=hiw-step1-002&orientation=landscape"
-                    alt="Security guard creating profile"
+                    alt="Illustrative visual of a security guard profile and licence details"
                     title="Security guard creating a profile on QuickGuard"
                     loading="lazy" decoding="async" className="w-full h-[260px] object-cover object-top"
                   />
                 </div>
-                <figcaption className="sr-only">Guard Profile Creation Process</figcaption>
+                <figcaption className="sr-only">Guard registration process</figcaption>
               </figure>
             </li>
 
@@ -374,17 +374,17 @@ export default function HowItWorksClient() {
                 <div className="w-16 h-16 bg-blue-500/10 border border-blue-400/20 rounded-2xl flex items-center justify-center mb-6">
                   <span className="text-2xl font-bold text-blue-400">2</span>
                 </div>
-                <h3 className="text-3xl font-bold text-white mb-4">UK Clients Post Security Jobs</h3>
+                <h3 className="text-3xl font-bold text-white mb-4">Clients Check Availability, Then Sign In or Register</h3>
                 <p className="text-lg text-slate-400 mb-6">
-                  Clients across England, Scotland, Wales and Northern Ireland describe their security requirements including:
+                  Before creating an account, a guest can check whether guards indicate availability for a venue and shift time. A match is a starting point, not a reservation:
                 </p>
                 <ul className="space-y-3 text-slate-400 list-none p-0 m-0">
                   {[
-                    'Job location (London, Manchester, Birmingham, etc.)',
-                    'Duration and shift patterns (days, nights, weekends)',
-                    'Required SIA licence level',
-                    'Special requirements (CCTV, crowd control)',
-                    'Hourly rates and payment terms (£12-25/hour)'
+                    'Availability check shows guards who indicate cover for that area and time',
+                    'A match is not a reservation and does not hold or guarantee a guard',
+                    'Sign in to an existing account or create a free client account',
+                    'Your plan sets your monthly posting allowance and booking service fee',
+                    'Nothing is charged at the availability-check or posting stage'
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-3">
                       <i className="ri-check-line text-blue-400" />
@@ -398,12 +398,12 @@ export default function HowItWorksClient() {
                   <PublicMediaImage
                     slot="hiw-image-3"
                     src="https://readdy.ai/api/search-image?query=British%20business%20professional%20woman%20sitting%20at%20a%20modern%20desk%20using%20a%20laptop%20computer%20to%20post%20a%20job%20online%2C%20contemporary%20office%20interior%20with%20glass%20walls%20and%20dark%20ambient%20lighting%2C%20subtle%20teal%20accent%20lights%2C%20clean%20corporate%20photography%20style%2C%20professional%20and%20approachable%20mood%2C%20dark%20navy%20blue%20color%20palette&width=600&height=350&seq=hiw-step2-002&orientation=landscape"
-                    alt="Client posting a security job online"
+                    alt="Illustrative visual of a client posting a security job online"
                     title="Client posting a security job on QuickGuard"
                     loading="lazy" decoding="async" className="w-full h-[260px] object-cover object-top"
                   />
                 </div>
-                <figcaption className="sr-only">Client Job Posting Process</figcaption>
+                <figcaption className="sr-only">Client availability check and job posting process</figcaption>
               </figure>
             </li>
 
@@ -419,17 +419,17 @@ export default function HowItWorksClient() {
                 <div className="w-16 h-16 bg-purple-500/10 border border-purple-400/20 rounded-2xl flex items-center justify-center mb-6">
                   <span className="text-2xl font-bold text-purple-400">3</span>
                 </div>
-                <h3 className="text-3xl font-bold text-white mb-4">AI-Powered Smart Matching</h3>
+                <h3 className="text-3xl font-bold text-white mb-4">Review and Confirm Your Job Posting</h3>
                 <p className="text-lg text-slate-400 mb-6">
-                  Our intelligent algorithm analyses and matches UK security professionals based on:
+                  Signed-in clients review the full shift before publishing it within their plan&apos;s allowance:
                 </p>
                 <ul className="space-y-3 text-slate-400 list-none p-0 m-0">
                   {[
-                    'SIA licence validity and specialisations',
-                    'Geographic proximity within the UK',
-                    'Shift availability and working patterns',
-                    'Experience in similar UK venues',
-                    'Client feedback and performance ratings'
+                    'Job location, shift dates and hours are reviewed before publishing',
+                    'Required SIA licence level and site requirements are stated on the job',
+                    'Agreed guard hourly rate is set by you and shown in the booking total',
+                    'Posting is limited by your plan allowance: 1, 10, 30 or unlimited jobs per month',
+                    'Posting a job does not charge the booking payment'
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-3">
                       <i className="ri-check-line text-purple-400" />
@@ -443,12 +443,12 @@ export default function HowItWorksClient() {
                   <PublicMediaImage
                     slot="hiw-image-4"
                     src="https://readdy.ai/api/search-image?query=Abstract%20digital%20network%20visualization%20showing%20connected%20nodes%20and%20glowing%20lines%20forming%20a%20matching%20pattern%2C%20deep%20navy%20blue%20and%20dark%20teal%20gradient%20background%2C%20futuristic%20AI%20technology%20concept%2C%20clean%20minimalist%20digital%20art%20style%2C%20representing%20intelligent%20algorithm%20matching%20security%20professionals%20with%20jobs%2C%20subtle%20purple%20and%20blue%20neon%20glow%20accents&width=600&height=350&seq=hiw-step3-002&orientation=landscape"
-                    alt="AI-powered smart matching technology connecting security guards with clients"
-                    title="QuickGuard AI smart matching for security jobs"
+                    alt="Illustrative visual of a job being published to eligible security guards"
+                    title="Illustrative: publishing a job to eligible guards on QuickGuard"
                     loading="lazy" decoding="async" className="w-full h-[260px] object-cover object-top"
                   />
                 </div>
-                <figcaption className="sr-only">Guard Matching Process</figcaption>
+                <figcaption className="sr-only">Job posting reaching eligible guards</figcaption>
               </figure>
             </li>
 
@@ -464,19 +464,19 @@ export default function HowItWorksClient() {
                 <div className="w-16 h-16 bg-orange-500/10 border border-orange-400/20 rounded-2xl flex items-center justify-center mb-6">
                   <span className="text-2xl font-bold text-orange-400">4</span>
                 </div>
-                <h3 className="text-3xl font-bold text-white mb-4">Guards Apply & Clients Select</h3>
+                <h3 className="text-3xl font-bold text-white mb-4">Eligible Guards Respond, Then You Select</h3>
                 <p className="text-lg text-slate-400 mb-6">
-                  Matched UK security guards receive notifications and can apply for suitable positions. Clients review applications and select their preferred guards based on SIA qualifications and experience.
+                  Guards whose licence, coverage and availability fit the job are notified and can apply free of charge. You review responses and choose who you want:
                 </p>
                 <aside className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-6">
-                  <h4 className="font-semibold text-white mb-3">UK Selection Process:</h4>
+                  <h4 className="font-semibold text-white mb-3">How selection works:</h4>
                   <ul className="space-y-2 text-sm text-slate-400 list-none p-0 m-0">
                     {[
-                      'Guards receive job notifications via app/SMS',
-                      'One-click application with SIA verification',
-                      'Client reviews all UK-verified applications',
-                      'Direct communication through secure messaging',
-                      'Final selection and shift confirmation'
+                      'Guards apply for free, with no paid tier or paid priority',
+                      'Responses are not reordered by a paid membership',
+                      'You review SIA details, experience and each job\u2019s requirements',
+                      'Your selection is provisional until the booking payment completes',
+                      'The shift is confirmed once Stripe payment succeeds'
                     ].map((item) => (
                       <li key={item} className="flex items-center gap-2">
                         <i className="ri-arrow-right-line text-orange-400 text-xs" />
@@ -491,12 +491,12 @@ export default function HowItWorksClient() {
                   <PublicMediaImage
                     slot="hiw-image-5"
                     src="https://readdy.ai/api/search-image?query=Professional%20British%20businessman%20reviewing%20documents%20on%20a%20tablet%20screen%20while%20seated%20at%20a%20conference%20table%2C%20modern%20office%20meeting%20room%20background%20with%20dark%20ambient%20lighting%20and%20subtle%20teal%20accents%2C%20corporate%20photography%20style%2C%20selective%20focus%20on%20the%20tablet%20and%20hands%2C%20clean%20aesthetic%2C%20dark%20navy%20blue%20color%20palette&width=600&height=350&seq=hiw-step4-002&orientation=landscape"
-                    alt="Client reviewing and selecting security guard applications"
+                    alt="Illustrative visual of a client reviewing security guard applications"
                     title="Client reviewing guard applications on QuickGuard"
                     loading="lazy" decoding="async" className="w-full h-[260px] object-cover object-top"
                   />
                 </div>
-                <figcaption className="sr-only">Application Review Process</figcaption>
+                <figcaption className="sr-only">Guard applications review and provisional selection</figcaption>
               </figure>
             </li>
 
@@ -512,17 +512,18 @@ export default function HowItWorksClient() {
                 <div className="w-16 h-16 bg-teal-500/10 border border-teal-400/20 rounded-2xl flex items-center justify-center mb-6">
                   <span className="text-2xl font-bold text-teal-400">5</span>
                 </div>
-                <h3 className="text-3xl font-bold text-white mb-4">Secure Payment & Job Completion</h3>
+                <h3 className="text-3xl font-bold text-white mb-4">Shift Check-In, Completion and Payout</h3>
                 <p className="text-lg text-slate-400 mb-6">
-                  Our secure UK payment system is built around held job payments and protects both sides:
+                  After the shift, completion is reviewed and payment release checks are applied before the guard is paid:
                 </p>
                 <ul className="space-y-3 text-slate-400 list-none p-0 m-0">
                   {[
-                    'Review the agreed guard pay, your plan\u2019s service fee and any eligible promotion before checkout',
-                    'Pay securely through Stripe before the booking is confirmed',
-                    'Funds remain with Stripe pending completion and the applicable release checks',
-                    'Guard pay is released after completion under the confirmation, dispute and payout process',
-                    'Guards keep their full agreed pay — no guard commission'
+                    'The agreed guard pay, your plan\u2019s service fee and any eligible promotion are shown before checkout',
+                    'The client pays through Stripe before the booking is confirmed',
+                    'The guard checks in at the start of the shift and checks out at the end',
+                    'The guard marks the shift complete and the client approves it or raises a dispute',
+                    'An open dispute can pause release while it is reviewed',
+                    'After approval and the applicable release checks, eligible pay is released to the guard\u2019s connected Stripe account, with the bank payout as a separate later step'
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-3">
                       <i className="ri-check-line text-teal-400" />
@@ -536,12 +537,12 @@ export default function HowItWorksClient() {
                   <PublicMediaImage
                     slot="hiw-image-6"
                     src="https://readdy.ai/api/search-image?query=Close%20up%20of%20a%20secure%20digital%20payment%20interface%20on%20a%20smartphone%20screen%20with%20shield%20security%20icon%2C%20professional%20hands%20holding%20the%20phone%2C%20dark%20blurred%20office%20background%2C%20teal%20and%20blue%20trust%20colors%20glowing%20softly%2C%20clean%20modern%20fintech%20photography%20style%2C%20representing%20secure%20held%20job%20payment%20system%2C%20dark%20navy%20blue%20color%20palette&width=600&height=350&seq=hiw-step5-002&orientation=landscape"
-                    alt="Secure payment and job completion process"
-                    title="Secure held job payment on QuickGuard"
+                    alt="Illustrative visual of a booking payment and shift completion review"
+                    title="Illustrative: booking payment, shift completion and payout on QuickGuard"
                     loading="lazy" decoding="async" className="w-full h-[260px] object-cover object-top"
                   />
                 </div>
-                <figcaption className="sr-only">Secure Payment Process</figcaption>
+                <figcaption className="sr-only">Shift completion approval and guard payout process</figcaption>
               </figure>
             </li>
           </ol>
@@ -573,15 +574,15 @@ export default function HowItWorksClient() {
               </div>
               <h3 className="text-xl font-semibold mb-4 text-white">For Security Guards</h3>
               <p className="text-3xl font-bold mb-2 text-white">
-                From £10<span className="text-lg text-slate-400">/month</span>
+                Free
               </p>
-              <p className="text-slate-400 mb-6 text-sm">Monthly subscription for access to UK security jobs</p>
+              <p className="text-slate-400 mb-6 text-sm">Registration, job browsing and applications cost nothing. Paid guard memberships are retired.</p>
               <ul className="text-sm text-slate-400 space-y-2 mb-6 text-left list-none p-0 m-0">
                 {[
-                  'Keep your full agreed pay — no guard commission',
-                  'Profile visibility to UK clients',
-                  'Mobile app with instant notifications',
-                  'SIA licence verification support'
+                  'No guard membership fee and no monthly application cap',
+                  'No paid job tiers and no paid priority in discovery or applicant order',
+                  'No platform deduction added to agreed gross pay on new bookings',
+                  'Account approval and a valid SIA licence still apply'
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-2">
                     <i className="ri-check-line text-teal-400 text-xs" />
@@ -590,11 +591,10 @@ export default function HowItWorksClient() {
                 ))}
               </ul>
               <Link
-                href="/pricing#guard-pricing"
-                onClick={() => window.scrollTo(0, 0)}
+                href="/guard/register"
                 className="inline-flex items-center gap-2 bg-teal-500 text-slate-900 px-6 py-3 rounded-xl font-semibold hover:bg-teal-400 transition-all whitespace-nowrap shadow-lg hover:shadow-teal-500/20"
               >
-                View All Guard Plans
+                Create a Free Guard Account
                 <i className="ri-arrow-right-line" />
               </Link>
             </article>
@@ -608,15 +608,15 @@ export default function HowItWorksClient() {
                 href="/pricing"
                 className="text-3xl font-bold mb-2 text-blue-400 hover:text-blue-300 underline inline-block"
               >
-                View Pricing
+                £0 / £49 / £99 / £199
               </Link>
-              <p className="text-slate-400 mb-6 mt-3 text-sm">Service fee from 5% to 15% by plan. Guard services are paid separately for each booking.</p>
+              <p className="text-slate-400 mb-6 mt-3 text-sm">Verified monthly client plans with standard booking service fees of 15% / 10% / 7.5% / 5%, and allowances of 1 / 10 / 30 / unlimited jobs per month.</p>
               <ul className="text-sm text-slate-400 space-y-2 text-left list-none p-0 m-0">
                 {[
-                  'Free, Starter, Pro and Enterprise plans',
-                  'Service fee from 15% down to 5%',
-                  'Payment held with Stripe until release',
-                  '24/7 AI support'
+                  'Subscription and booking payments are separate charges',
+                  'Service fee is added to the agreed guard pay, never deducted from it',
+                  'Posting a job does not charge the booking payment',
+                  'Payment is taken through Stripe before the booking is confirmed'
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-2">
                     <i className="ri-check-line text-blue-400 text-xs" />

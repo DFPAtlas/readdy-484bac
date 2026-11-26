@@ -48,9 +48,9 @@ export default function HomepageHero() {
 
           <div className="flex flex-wrap items-center gap-3 mb-8">
             {[
-              { icon: 'ri-checkbox-circle-fill', text: 'No long contracts' },
-              { icon: 'ri-checkbox-circle-fill', text: 'Free to post a job' },
+              { icon: 'ri-checkbox-circle-fill', text: 'Posting free within your plan allowance' },
               { icon: 'ri-checkbox-circle-fill', text: 'Pay per shift' },
+              { icon: 'ri-checkbox-circle-fill', text: 'Booking fee shown before payment' },
             ].map((badge) => (
               <span key={badge.text} className="flex items-center gap-1.5 bg-white/5 border border-white/10 text-teal-300 text-sm px-3 py-1.5 rounded-full">
                 <i className={badge.icon} />
@@ -99,7 +99,7 @@ export default function HomepageHero() {
               <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">
                 <i className="ri-lock-line text-teal-400 text-base" aria-hidden="true"></i>
               </div>
-              <span className="font-medium text-slate-200">Payment held with Stripe until completion</span>
+              <span className="font-medium text-slate-200">Secure payments through Stripe</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">
@@ -111,7 +111,7 @@ export default function HomepageHero() {
               <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">
                 <i className="ri-star-fill text-teal-400 text-base" aria-hidden="true"></i>
               </div>
-              <span className="font-medium text-slate-200">No contracts</span>
+              <span className="font-medium text-slate-200">Booking fee shown before payment</span>
             </div>
           </div>
         </div>

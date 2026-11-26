@@ -120,21 +120,21 @@ export function getPaymentFlowStatus(data: FlowSourceData): PaymentFlowStatus {
   const stage3Amount = data.payoutNetAmount ?? data.payoutAmount ?? data.jobGuardPayoutAmount ?? stage1Amount;
 
   const stage1Tooltips: Record<FlowStage, string> = {
-    complete: 'Client payment received and held by QuickGuard.',
+    complete: 'Client card payment taken through Stripe.',
     pending: 'Payment is being processed or awaiting client action.',
     failed: 'Client payment was not successful.',
     not_started: 'Guard has not been assigned or client has not paid yet.',
   };
 
   const stage2Tooltips: Record<FlowStage, string> = {
-    complete: 'Client approved completion. Payout is now pending.',
+    complete: 'Client approved completion and the applicable checks passed.',
     pending: 'Job is complete; waiting for client approval.',
-    failed: 'Client has disputed or payment release was blocked.',
+    failed: 'Client has disputed the completion request, so release is paused.',
     not_started: 'Job has not been completed yet.',
   };
 
   const stage3Tooltips: Record<FlowStage, string> = {
-    complete: 'Money has been sent to your bank account.',
+    complete: 'Eligible pay was released to your connected Stripe account. Payment into your bank is a separate Stripe payout.',
     pending: 'Payout is being processed.',
     failed: 'Payout did not succeed. Please check your bank details.',
     not_started: 'Payment has not been released to your account yet.',

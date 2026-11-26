@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { CANCELLATION_GUIDANCE, REFUND_TIMING_GUIDANCE } from '@/lib/customer-guidance';
 import { usePublicPricing } from '@/lib/use-public-pricing';
@@ -11,8 +10,6 @@ import FreeGuardAccount from '@/components/pricing/FreeGuardAccount';
 import ClientBookingExamples from '@/components/pricing/ClientBookingExamples';
 
 export default function PricingPDFClient() {
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
-
   const catalogue = usePublicPricing();
   const clientPlans = catalogue.plans.filter(plan => plan.audience === 'client').map(plan => ({
     ...presentPricingPlan(plan),
@@ -39,28 +36,7 @@ export default function PricingPDFClient() {
             Back to Pricing
           </Link>
           <div className="flex items-center gap-3">
-            <div className="inline-flex items-center bg-slate-100 rounded-full p-1 gap-1">
-              <button
-                onClick={() => setBillingCycle('monthly')}
-                className={`px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  billingCycle === 'monthly'
-                    ? 'bg-white text-slate-900 shadow'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBillingCycle('annual')}
-                className={`px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  billingCycle === 'annual'
-                    ? 'bg-white text-slate-900 shadow'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                Annual
-              </button>
-            </div>
+            <span className="text-sm text-slate-500">Monthly subscription prices</span>
             <button
               onClick={handlePrint}
             disabled={!canPrint}
@@ -100,7 +76,7 @@ export default function PricingPDFClient() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 print:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 print:gap-4">
             {clientPlans.map((plan) => {
               const isPopular = !!plan.badge;
 
@@ -122,7 +98,7 @@ export default function PricingPDFClient() {
                   <p className="text-xs text-slate-500 mb-4">{plan.description}</p>
 
                   <div className="mb-4 pb-4 border-b border-slate-200">
-                    <PlanPrice plan={plan} billingCycle={billingCycle} print />
+                    <PlanPrice plan={plan} print />
                   </div>
 
                   <ul className="space-y-2">
@@ -257,7 +233,7 @@ export default function PricingPDFClient() {
                   </li>
                   <li className="flex items-start gap-2">
                     <i className="ri-check-line text-teal-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-slate-700">Any applicable VAT is shown at checkout</span>
+                    <span className="text-slate-700">No VAT is added to QuickGuard fees</span>
                   </li>
                 </ul>
               </div>
@@ -266,19 +242,19 @@ export default function PricingPDFClient() {
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
                     <i className="ri-check-line text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-slate-700">Monthly membership (see plans above)</span>
+                    <span className="text-slate-700">Free guard account, with no monthly membership charge</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <i className="ri-check-line text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-slate-700">Subscribe or cancel anytime</span>
+                    <span className="text-slate-700">No monthly application cap or paid job tiers</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <i className="ri-check-line text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-slate-700">No deductions from hourly earnings</span>
+                    <span className="text-slate-700">No deductions from the agreed guard pay</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <i className="ri-check-line text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-slate-700">Payment held securely until job completion</span>
+                    <span className="text-slate-700">Guard pay released through Stripe after completion and the release checks; the bank payout follows separately</span>
                   </li>
                 </ul>
               </div>
@@ -319,10 +295,10 @@ export default function PricingPDFClient() {
             <div className="rounded-xl border border-amber-200 bg-amber-50/30 p-5">
               <div className="flex items-center gap-2 mb-2">
                 <i className="ri-percent-line text-amber-600" />
-                <span className="font-bold text-amber-800 text-sm">Compare Annual Billing</span>
+                <span className="font-bold text-amber-800 text-sm">Subscription, Fee and Pay</span>
               </div>
               <p className="text-sm text-slate-600">
-                Annual and monthly prices are shown above. Compare the configured annual price with 12 monthly payments for your chosen plan; checkout confirms any eligible offer.
+                The monthly subscription is shown on each plan. The booking service fee is charged separately when a booking is funded, and the guard&apos;s agreed pay is separate again. Final amounts are confirmed in secure checkout.
               </p>
             </div>
             <div className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-5">

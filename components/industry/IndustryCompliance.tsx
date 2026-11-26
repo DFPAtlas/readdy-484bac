@@ -21,9 +21,9 @@ export default function IndustryCompliance({ note }: Props) {
               <ul className="grid sm:grid-cols-2 gap-3 list-none m-0 p-0">
                 {[
                   'Licence information shown on each profile',
-                  'Profiles reviewed before joining the platform',
-                  'Planned weekly AI SIA licence checks',
-                  'Accurate wording — not every venue or event role is licensable',
+                  'Licence details reviewed before approval',
+                  'Licence wording matched to the role, not assumed',
+                  'Not every venue or event role is licensable',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-sm text-slate-400">
                     <i className="ri-check-line mt-0.5 text-teal-400" aria-hidden="true" />

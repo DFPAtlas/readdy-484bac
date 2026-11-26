@@ -12,7 +12,7 @@ const FEATURE_LABELS: Record<string,string> = {
   'client.priority_support':'Priority Support', 'client.job_templates':'Job Templates', 'client.analytics_dashboard':'Analytics Dashboard',
   'client.direct_contact':'Direct Contact', 'client.unlimited_jobs':'Unlimited Jobs', 'client.bulk_posting':'Bulk Posting',
   'client.multi_site':'Multi-Site', 'client.team_access':'Team Access', 'client.custom_contracts':'Custom Contracts',
-  'client.api_access':'API Access', 'client.escrow_payments':'Held Payments', 'client.job_history':'Job History', 'client.job_tracker':'Job Tracker',
+  'client.api_access':'API Access', 'client.escrow_payments':'Card Payments', 'client.job_history':'Job History', 'client.job_tracker':'Job Tracker',
 };
 const buttonClass = 'px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed';
 const errorText = (error: unknown) => error instanceof Error ? error.message : 'The request could not be confirmed. Retry.';

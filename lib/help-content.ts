@@ -35,20 +35,20 @@ export const CANCELLATION_NOTES = [CANCELLATION_GUIDANCE, `${GUARD_CANCELLATION_
 export const LICENCE_CHECKS: LicenceCheck[] = [
   {
     status: "live",
-    title: "SIA licence check before any work",
-    detail: "Every guard must pass an SIA licence check before they can take work through QuickGuard.",
+    title: "Licence details shown on every profile",
+    detail: "The licence number and licence type appear on the guard's profile so you can review them against the role before confirming.",
   },
   {
-    status: "coming",
-    title: "Automated weekly re-checks",
-    detail: "We're developing weekly re-checks that will flag suspended, revoked or expired licences for review.",
+    status: "live",
+    title: "Licence wording matched to the role",
+    detail: "Not every venue, event or site role is licensable. Licence information is shown where the role requires it, and roles that do not need a licence are not presented as licensed work.",
   },
 ];
 
 export const CLIENT_JOURNEY: JourneyStep[] = [
   { title: "Choose a plan", desc: "Your plan sets your monthly posting allowance and booking service fee." },
   { title: "Post your job", desc: "Describe the shift in minutes. Posting doesn't charge you." },
-  { title: "Local guards are notified", desc: "Verified guards whose travel radius covers your location see it." },
+  { title: "Local guards are notified", desc: "Guards whose licence and travel radius fit your location see it." },
   { title: "Pick your guard", desc: "Compare applicants and check their SIA credentials." },
   { title: "Pay securely", desc: "Review the total and pay through Stripe to confirm the booking." },
   { title: "Pay is released", desc: "After completion approval and payment checks, eligible pay is released to the guard's Stripe account. Stripe processes the bank deposit separately." },
@@ -67,7 +67,7 @@ export const CLIENT_TOPICS: HelpTopic[] = [
   { title: "Getting started", desc: "Set up your account and post your first job.", href: "/guide/client" },
   { title: "Plans & fees", desc: "Posting allowances, service fees and promotions.", href: "/guide/client" },
   { title: "Choosing a guard", desc: "Reading profiles, SIA credentials and reviews.", href: "/guide/client" },
-  { title: "Payments & refunds", desc: "How payment is held, released and refunded.", href: "/guide/client" },
+  { title: "Payments & refunds", desc: "How card payment, release and refunds work.", href: "/guide/client" },
   { title: "Cancellations & disputes", desc: "Cancelling, no-shows and raising a complaint.", href: "/guide/client" },
   { title: "Account & billing", desc: "Invoices, subscription changes and your profile.", href: "/guide/client" },
 ];

@@ -90,7 +90,7 @@ export default function EarningsSummaryCards({
           </div>
           <div className="text-3xl font-bold text-white">£{formatCurrency(heldPayouts)}</div>
           <p className="text-xs text-slate-500 mt-1">
-            {heldCount} held payment{heldCount !== 1 ? 's' : ''}
+            {heldCount} awaiting review
           </p>
         </div>
       </div>

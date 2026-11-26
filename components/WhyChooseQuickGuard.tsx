@@ -7,34 +7,34 @@ const comparisons = [
   {
     label: 'Time to book',
     quickguard: 'Post in minutes',
-    agency: 'Often days of calls & paperwork',
+    agency: 'Varies by provider',
     highlight: true,
   },
   {
-    label: 'Cost per hour',
-    quickguard: 'You set the rate',
-    agency: 'Agency markup on top of guard pay',
+    label: 'Guard pay',
+    quickguard: 'You set the agreed guard pay',
+    agency: 'Varies by provider',
     highlight: true,
   },
   {
-    label: 'Contract lock-in',
-    quickguard: 'None — book by the shift',
-    agency: 'Often a minimum contract term',
+    label: 'Commitment',
+    quickguard: 'Book by the shift',
+    agency: 'Varies by provider',
   },
   {
     label: 'Choose your guard',
-    quickguard: 'Browse profiles & reviews',
-    agency: 'Usually assigned by the agency',
+    quickguard: 'Review responses and choose',
+    agency: 'Varies by provider',
   },
   {
-    label: 'Payment protection',
-    quickguard: 'Held with Stripe until done',
-    agency: 'Usually invoiced upfront or on account',
+    label: 'Payment timing',
+    quickguard: 'Card payment before the shift; released after completion approval and checks',
+    agency: 'Varies by provider',
   },
   {
     label: 'Licence verification',
-    quickguard: 'Licence checked before a guard can work',
-    agency: 'Varies by agency',
+    quickguard: 'SIA licence required on record before work',
+    agency: 'Varies by provider',
   },
 ];
 
@@ -71,7 +71,7 @@ export default function WhyChooseQuickGuard() {
             QuickGuard vs a Traditional Agency
           </h2>
           <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-            No long contracts. You choose the guard. Payment is held until the work is confirmed complete.
+            You choose the guard from the responses you receive. Payment is confirmed through Stripe before the shift, and release follows completion approval and checks.
           </p>
         </div>
 
@@ -121,7 +121,7 @@ export default function WhyChooseQuickGuard() {
             No card needed to post <span className="mx-1">&#183;</span> Payment is taken after you select a guard, before the booking is confirmed
           </p>
           <p className="text-xs text-slate-500 mt-4 max-w-2xl mx-auto leading-relaxed">
-            QuickGuard does not deduct a commission from guard pay. Guard payouts are transferred to the guard&apos;s connected Stripe account, and the later payment into their bank account is a separate Stripe payout.
+            QuickGuard does not deduct a booking commission from the guard&apos;s agreed pay. The agreed amount is released to the guard&apos;s connected Stripe account, and the later payment into their bank account is a separate Stripe payout.
           </p>
         </div>
       </div>

@@ -4,7 +4,8 @@ export default function FreeGuardAccount({ signedIn = false, print = false }: { 
   return (
     <section className={`rounded-2xl border p-6 ${print ? 'border-slate-200 text-slate-800' : 'border-blue-400/30 bg-blue-500/5 text-slate-300'}`} aria-labelledby="free-guard-heading">
       <h2 id="free-guard-heading" className={`text-2xl font-bold mb-3 ${print ? 'text-slate-900' : 'text-white'}`}>Free guard account</h2>
-      <p className="font-semibold mb-3">£0 subscription for guard job access. No monthly application cap or paid job tiers.</p>
+      <p className="font-semibold mb-2">Free Starter: £0 subscription for guard job access, with no monthly application cap and no paid job tiers.</p>
+      <p className="text-sm mb-4">A free guard profile, job browsing and job applications, with no monthly fee to apply.</p>
       <ul className="space-y-2 text-sm mb-4">
         <li>Create a profile, browse jobs and apply free.</li>
         <li>Paid membership does not determine discovery or applicant order.</li>
