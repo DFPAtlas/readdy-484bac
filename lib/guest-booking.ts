@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-export { BOOKING_FOLLOWUP_TEXT,BOOKING_FOLLOWUP_VERSION } from '../supabase/functions/_shared/guest-booking-policy';
+export { BOOKING_FOLLOWUP_TEXT,BOOKING_FOLLOWUP_VERSION } from './guest-booking-policy';
 export interface GuestAvailability {count:number;checkedAt:string;scope:string;daysChecked:number;}
 interface EnquiryReceipt {token:string;submissionId:string;expiresAt:string;}
 const KEY='qg_booking_enquiry_receipt_v1';
