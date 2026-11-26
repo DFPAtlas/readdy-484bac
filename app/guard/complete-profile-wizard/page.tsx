@@ -1262,7 +1262,7 @@ function GuardCompleteProfileWizardContent() {
           onNext={handleNext}
           onSubmit={handleSubmit}
           isSubmitting={saving || uploadingPhoto || uploadingSia || uploadingDocs}
-          submitLabel={uploadingDocs ? 'Uploading Documents...' : uploadingSia ? 'Uploading Licence...' : uploadingPhoto ? 'Uploading Photo...' : saving ? 'Saving...' : 'Complete Profile &amp; Continue'}
+          submitLabel={uploadingDocs ? 'Uploading Documents...' : uploadingSia ? 'Uploading Licence...' : uploadingPhoto ? 'Uploading Photo...' : saving ? 'Saving...' : 'Complete Profile & Continue'}
         />
       </div>
     </div>

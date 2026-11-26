@@ -13,7 +13,7 @@ interface SIALicenceImageProps {
 
 export default function SIALicenceImage({ path, label, className = '' }: SIALicenceImageProps) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(Boolean(path));
   const [error, setError] = useState(false);
   const [enlarged, setEnlarged] = useState(false);
 
@@ -42,7 +42,7 @@ export default function SIALicenceImage({ path, label, className = '' }: SIALice
 
   if (loading) {
     return (
-      <div className={`bg-gray-100 rounded-lg flex items-center justify-center min-h-[120px] ${className}`}>
+      <div className={`bg-gray-100 rounded-lg flex items-center justify-center min-h-[120px] ${className}`} aria-busy="true" aria-label={`Loading ${label || 'SIA licence'}`}>
         <div className="w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );

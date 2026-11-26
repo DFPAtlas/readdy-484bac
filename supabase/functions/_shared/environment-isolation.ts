@@ -31,3 +31,9 @@ export function stripeEventMatchesEnvironment(projectUrl: string, key: string, l
   if (isQuickGuardSandbox(projectUrl) && (mode !== 'test' || livemode)) return false;
   return livemode === (mode === 'live');
 }
+
+export function stripeAppOrigin(projectUrl: string, key: string, configuredAppUrl: string | undefined, legacyOrigin: string): string {
+  if (!isQuickGuardSandbox(projectUrl)) return legacyOrigin;
+  if (!stripeEventMatchesEnvironment(projectUrl, key, false)) throw new Error('Sandbox Stripe test mode is not configured');
+  return activationOrigin(projectUrl, configuredAppUrl);
+}

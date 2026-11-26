@@ -40,8 +40,8 @@ export default function GuardDocumentsUploader({
     if (!allowedTypes.includes(file.type)) {
       return 'Only JPG, PNG, and PDF files are allowed';
     }
-    if (file.size > 10 * 1024 * 1024) {
-      return 'File size must be less than 10MB';
+    if (file.size > 5 * 1024 * 1024) {
+      return 'File size must be 5MB or less';
     }
     return null;
   };
@@ -205,7 +205,7 @@ export default function GuardDocumentsUploader({
                   <i className="ri-upload-cloud-line text-2xl text-teal-400"></i>
                 </div>
                 <p className="text-sm font-medium text-white mb-1">Click to upload</p>
-                <p className="text-xs text-slate-400">JPG, PNG, or PDF · Max 10MB</p>
+                <p className="text-xs text-slate-400">JPG, PNG, or PDF · Max 5MB</p>
               </div>
             )}
             <input ref={drivingFrontRef} type="file" accept="image/jpeg,image/png,image/jpg,application/pdf" onChange={handleDrivingFrontChange} className="hidden" />
@@ -249,7 +249,7 @@ export default function GuardDocumentsUploader({
                   <i className="ri-upload-cloud-line text-2xl text-teal-400"></i>
                 </div>
                 <p className="text-sm font-medium text-white mb-1">Click to upload</p>
-                <p className="text-xs text-slate-400">JPG, PNG, or PDF · Max 10MB</p>
+                <p className="text-xs text-slate-400">JPG, PNG, or PDF · Max 5MB</p>
               </div>
             )}
             <input ref={drivingBackRef} type="file" accept="image/jpeg,image/png,image/jpg,application/pdf" onChange={handleDrivingBackChange} className="hidden" />
@@ -293,7 +293,7 @@ export default function GuardDocumentsUploader({
                   <i className="ri-upload-cloud-line text-2xl text-teal-400"></i>
                 </div>
                 <p className="text-sm font-medium text-white mb-1">Click to upload</p>
-                <p className="text-xs text-slate-400">JPG, PNG, or PDF · Max 10MB</p>
+                <p className="text-xs text-slate-400">JPG, PNG, or PDF · Max 5MB</p>
               </div>
             )}
             <input ref={poaRef} type="file" accept="image/jpeg,image/png,image/jpg,application/pdf" onChange={handlePoaChange} className="hidden" />
