@@ -9,6 +9,7 @@ import { JobPostingSchema } from "@/components/JobPostingSchema";
 import SimilarJobs from "./SimilarJobs";
 
 import { formatDateOnly } from "@/lib/date-only";
+import { isJobId } from "@/lib/job-id";
 
 interface Job {
   id: string;
@@ -76,6 +77,16 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   const [showGuardRequired, setShowGuardRequired] = useState(false);
 
   useEffect(() => {
+    if (!jobId || jobId === "undefined" || jobId.trim() === "") {
+      router.replace("/jobs");
+      return;
+    }
+    if (!isJobId(jobId)) {
+      setJob(null);
+      setLoading(false);
+      setLoadError(false);
+      return;
+    }
     let cancelled = false;
     
     const checkUserAndFetchJob = async () => {
@@ -209,10 +220,6 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       }
     };
 
-    if (!jobId || jobId === "undefined" || jobId.trim() === "") {
-      router.replace("/jobs");
-      return;
-    }
     checkUserAndFetchJob();
 
     return () => { cancelled = true; };

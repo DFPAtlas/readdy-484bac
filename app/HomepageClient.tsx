@@ -3,22 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { EMPTY_PUBLIC_PLATFORM_STATS, loadPublicPlatformStats, type PublicPlatformStats } from '@/lib/public-platform-stats';
 import TrustBadges from './TrustBadges';
 
 export default function HomepageClient() {
   const [isVisible, setIsVisible] = useState<Record<string, boolean>>({});
   const [jsEnabled, setJsEnabled] = useState(false);
-  const [stats, setStats] = useState<{
-    totalGuards: number | null;
-    completedJobs: number | null;
-    activeClients: number | null;
-    successRate: number | null;
-  }>({
-    totalGuards: null,
-    completedJobs: null,
-    activeClients: null,
-    successRate: null,
-  });
+  const [stats, setStats] = useState<PublicPlatformStats>({ ...EMPTY_PUBLIC_PLATFORM_STATS });
   const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
@@ -47,35 +38,10 @@ export default function HomepageClient() {
     let cancelled = false;
     const fetchStats = async () => {
       try {
-        const [guardsRes, completedJobsRes, clientsRes, totalAssignmentsRes, completedAssignmentsRes] = await Promise.all([
-          supabase.from('guards').select('id', { count: 'exact', head: true }),
-          supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
-          supabase.from('clients').select('id', { count: 'exact', head: true }),
-          supabase.from('job_assignments').select('id', { count: 'exact', head: true }),
-          supabase.from('job_assignments').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
-        ]);
-
-        if (cancelled) return;
-
-        const totalGuards = guardsRes.count ?? 0;
-        const completedJobs = completedJobsRes.count ?? 0;
-        const activeClients = clientsRes.count ?? 0;
-
-        const totalAssignments = totalAssignmentsRes.count ?? 0;
-        const completedAssignments = completedAssignmentsRes.count ?? 0;
-        const successRate =
-          totalAssignments > 0
-            ? Math.round((completedAssignments / totalAssignments) * 100)
-            : 0;
-
-        setStats({
-          totalGuards,
-          completedJobs,
-          activeClients,
-          successRate: totalAssignments > 0 ? successRate : null,
-        });
+        const published = await loadPublicPlatformStats(supabase);
+        if (!cancelled) setStats(published);
       } catch {
-        // silent fail
+        // Optional public statistics stay hidden when unavailable.
       } finally {
         if (!cancelled) setLoadingStats(false);
       }

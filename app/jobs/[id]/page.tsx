@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Metadata } from 'next';
+import { isJobId } from '@/lib/job-id';
 import JobDetailClient from './JobDetailClient';
 
 export async function generateStaticParams() {
@@ -10,7 +11,7 @@ export async function generateStaticParams() {
       { db: { schema: 'app' } }
     );
     const { data: jobRows } = await supabase.rpc('get_public_jobs').select('id').eq('is_deleted', false).limit(200);
-    const jobs = Array.isArray(jobRows) ? jobRows : [];
+    const jobs = Array.isArray(jobRows) ? jobRows.filter(job => isJobId(job.id)) : [];
     if (jobs && jobs.length > 0) return jobs.map((job) => ({ id: job.id }));
   } catch { /* fallback for static export */ }
   return [{ id: '1' }, { id: '2' }, { id: '3' }];
@@ -18,6 +19,12 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
+  const fallback: Metadata = {
+    title: 'Security Guard Job | QuickGuard UK',
+    description: 'Find SIA-licensed security guard jobs across the UK on QuickGuard.',
+    alternates: { canonical: `https://quickguard.uk/jobs/detail?id=${encodeURIComponent(id)}` },
+  };
+  if (!isJobId(id)) return fallback;
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,11 +56,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       };
     }
   } catch { /* fallback */ }
-  return {
-    title: 'Security Guard Job | QuickGuard UK',
-    description: 'Find SIA-licensed security guard jobs across the UK on QuickGuard.',
-    alternates: { canonical: `https://quickguard.uk/jobs/detail?id=${encodeURIComponent(id)}` },
-  };
+  return fallback;
 }
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {

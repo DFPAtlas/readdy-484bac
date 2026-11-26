@@ -86,6 +86,7 @@ jobs:
           node scripts/uat/guard-pricing-browser-smoke.cjs
           node scripts/uat/guest-booking-browser-smoke.cjs
           node scripts/uat/signup-delivery-browser-smoke.cjs
+          node scripts/uat/public-job-query-browser-smoke.cjs
 
       - name: Upload free-access browser evidence
         if: always()
