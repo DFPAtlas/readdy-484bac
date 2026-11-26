@@ -14,7 +14,7 @@ import {
   IMMEDIATE_BOOKING_RETURN_PATH,
 } from '@/lib/pending-job-draft';
 import { londonCalendarDate } from '@/lib/date-only';
-import { availabilityInput } from '@/supabase/functions/_shared/guest-booking-policy';
+import { availabilityInput } from '@/lib/guest-booking-policy';
 import { checkGuestAvailability,guestBookingRequest,readEnquiryReceipt,rememberEnquiryReceipt,createEnquiryReceipt,withdrawGuestEnquiry,BOOKING_FOLLOWUP_TEXT,BOOKING_FOLLOWUP_VERSION,type GuestAvailability } from '@/lib/guest-booking';
 import BookingAuthModal from './BookingAuthModal';
 import styles from './postJobInputs.module.css';
