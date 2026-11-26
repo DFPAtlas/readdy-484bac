@@ -295,6 +295,16 @@ serve(async (req) => {
       });
     }
 
+    // Validate sandbox mode and destination before any subscription, token,
+    // customer or profile operation, including paths that return early.
+    const referer = req.headers.get('referer') || '';
+    let refererOrigin = '';
+    try {
+      if (referer) refererOrigin = new URL(referer).origin;
+    } catch { /* ignore */ }
+    const rawSiteUrl = bodySiteUrl || refererOrigin || origin;
+    const siteUrl = stripeAppOrigin(supabaseUrl, Deno.env.get('STRIPE_SECRET_KEY') || '', Deno.env.get('APP_URL'), getValidatedSiteUrl(rawSiteUrl, 'https://quickguard.uk', origin));
+
     const publicSupabase = createClient(supabaseUrl, supabaseServiceKey, {
       db: { schema: 'app' }
     });
@@ -553,14 +563,6 @@ serve(async (req) => {
       await requireWrite(publicSupabase.from(profileTable(accountType)).update({ stripe_customer_id: customerId }).eq('user_id', userId).select('id'),
         'Stripe customer save', { minRows: 1 });
     }
-
-    const referer = req.headers.get('referer') || '';
-    let refererOrigin = '';
-    try {
-      if (referer) refererOrigin = new URL(referer).origin;
-    } catch { /* ignore */ }
-    const rawSiteUrl = bodySiteUrl || refererOrigin || origin;
-    const siteUrl = stripeAppOrigin(supabaseUrl, Deno.env.get('STRIPE_SECRET_KEY') || '', Deno.env.get('APP_URL'), getValidatedSiteUrl(rawSiteUrl, 'https://quickguard.uk', origin));
 
     const successUrl = `${siteUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${siteUrl}/pricing?cancelled=true`;
