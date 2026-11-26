@@ -100,6 +100,23 @@ serve(async (req: Request) => {
       return corsResponse(origin, 500, { error: 'Email service is not configured' });
     }
 
+    // Publication state is authoritative in the saved job, never caller input.
+    // A scheduled draft must not receive the existing "now live" confirmation.
+    const { data: job, error: jobError } = await supabase.from('jobs')
+      .select('status,is_draft,publish_at').eq('id', jobId).maybeSingle();
+    if (jobError) {
+      return corsResponse(origin, 503, { success: false, error: 'Job publication status unavailable' });
+    }
+    if (!job || !['open', 'draft'].includes(job.status)) {
+      return corsResponse(origin, 409, { success: false, error: 'Job is not awaiting publication confirmation' });
+    }
+    const scheduled = job.status === 'draft' && job.is_draft === true;
+    const publishAt = typeof job.publish_at === 'string' ? new Date(job.publish_at) : null;
+    if ((job.status === 'draft' && !scheduled) || (job.status === 'open' && job.is_draft)
+        || (scheduled && (!publishAt || Number.isNaN(publishAt.getTime())))) {
+      return corsResponse(origin, 409, { success: false, error: 'Job publication status needs review' });
+    }
+
     const variables: Record<string, string> = {
       client_name: clientName,
       job_title: jobTitle,
@@ -111,12 +128,18 @@ serve(async (req: Request) => {
       dashboard_url: 'https://quickguard.uk/client/dashboard',
       year: String(new Date().getFullYear()),
     };
+    if (scheduled && publishAt) {
+      variables.publish_at = publishAt.toLocaleString('en-GB', {
+        timeZone: 'Europe/London', weekday: 'long', year: 'numeric', month: 'long',
+        day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+      });
+    }
 
     const renderRes = await fetch(`${supabaseUrl}/functions/v1/render-email-template`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
       body: JSON.stringify({
-        template_slug: 'job_posted',
+        template_slug: scheduled ? 'job_scheduled' : 'job_posted',
         to: clientEmail,
         variables,
         from: 'QuickGuard <notifications@quickguard.uk>',
