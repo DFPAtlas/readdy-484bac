@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feat/free-guard-access-20261125, feat/free-guard-pricing-transition-20261125]
+    branches: [main, feat/free-guard-access-20261125, feat/free-guard-pricing-transition-20261125, feat/guest-booking-availability-20261125]
 
 concurrency:
   group: quickguard-build-${{ github.ref }}

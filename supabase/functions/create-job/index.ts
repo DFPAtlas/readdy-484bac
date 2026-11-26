@@ -380,7 +380,7 @@ serve(async (req) => {
     }
 
     try {
-      await fetch(`${supabaseUrl}/functions/v1/send-job-posted-email`, {
+      const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-job-posted-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -394,10 +394,15 @@ serve(async (req) => {
           venue: formData.venue,
           startDate: formData.startDate,
           startTime: formData.startTime,
-          numberOfGuards: formData.numberOfGuards,
-          hourlyRate: formData.hourlyRate,
+          numberOfGuards: guardCount,
+          hourlyRate,
         }),
       });
+      const emailResult = await emailResponse.json().catch(() => null);
+      if (!emailResponse.ok || emailResult?.success !== true || emailResult?.delivered === false
+          || typeof emailResult?.message_id !== 'string' || !emailResult.message_id.trim()) {
+        warnings.push('email_failed');
+      }
     } catch {
       warnings.push('email_failed');
     }
