@@ -16,7 +16,7 @@ function webhook({badSignature=false,failSave=false}={}){
  const db={from:()=>({select:()=>({eq:async()=>({data:[{signing_secret:'test_secret',livemode:false}],error:null})})})};
  class FakeStripe{constructor(){this.webhooks={constructEventAsync:async()=>{if(badSignature)throw Error('Signature mismatch');return {livemode:false,type:'payout.paid',account:'acct_test',id:'evt_test',data:{object:{id:'po_test'}}};}};}}
  const code=ts.transpileModule(fs.readFileSync('supabase/functions/stripe-bank-payout-webhook/index.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
- const fakeRequire=name=>name.includes('stripe@')?{default:FakeStripe}:name.includes('supabase-js')?{createClient:()=>db}:{bankPayoutEventTypes:['payout.paid'],recordBankPayout:async()=>{saves++;if(failSave)throw Error('Database unavailable');return {status:'paid'};}};
+ const fakeRequire=name=>name.includes('environment-isolation')?require('./helpers/enterprise-module.cjs').load('supabase/functions/_shared/environment-isolation.ts'):name.includes('stripe@')?{default:FakeStripe}:name.includes('supabase-js')?{createClient:()=>db}:{bankPayoutEventTypes:['payout.paid'],recordBankPayout:async()=>{saves++;if(failSave)throw Error('Database unavailable');return {status:'paid'};}};
  new Function('require','exports','Deno',code)(fakeRequire,{}, {env:{get:name=>name==='STRIPE_SECRET_KEY'?'sk_test_fixture':'fixture'},serve:fn=>{handler=fn;}});
  return {handler,saves:()=>saves};
 }

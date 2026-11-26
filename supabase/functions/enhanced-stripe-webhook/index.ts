@@ -1,4 +1,5 @@
 import { finishTokenCheckout } from '../_shared/token-checkout.ts';
+import { stripeEventMatchesEnvironment } from '../_shared/environment-isolation.ts';
 import { persistUserNotifications } from '../_shared/user-notifications.ts';
 async function requireAudit(write: PromiseLike<{error: unknown}>) {const result=await write;if(result.error) throw result.error;return result;}
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -329,6 +330,11 @@ serve(async (req) => {
   try {
     const body = await req.text();
     const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
+    if (!stripeEventMatchesEnvironment(supabaseUrl, stripeSecretKey, event.livemode)) {
+      return new Response(JSON.stringify({ error: 'Stripe environment mismatch' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     console.log(`[EnhancedWebhook] Received event: ${event.type} (${event.id})`);
 
     const claim = await acquireStripeEventClaim(appSupabase, { id: event.id, type: event.type });
