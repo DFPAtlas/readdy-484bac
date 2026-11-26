@@ -1,4 +1,5 @@
 import { GUARD_MEMBERSHIPS_RETIRED, isGuardMembership } from '../_shared/guard-membership-retirement.ts';
+import { stripeAppOrigin } from '../_shared/environment-isolation.ts';
 import { tokenRequest, reserveTokenCheckout, finishTokenCheckout } from '../_shared/token-checkout.ts';
 import { canUseChristmasOffer, christmasOfferAmount, christmasOfferCheckoutParams, isChristmasOfferPrice } from '../_shared/christmas-offer.mjs';
 import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
@@ -559,7 +560,7 @@ serve(async (req) => {
       if (referer) refererOrigin = new URL(referer).origin;
     } catch { /* ignore */ }
     const rawSiteUrl = bodySiteUrl || refererOrigin || origin;
-    const siteUrl = getValidatedSiteUrl(rawSiteUrl, 'https://quickguard.uk', origin);
+    const siteUrl = stripeAppOrigin(supabaseUrl, Deno.env.get('STRIPE_SECRET_KEY') || '', Deno.env.get('APP_URL'), getValidatedSiteUrl(rawSiteUrl, 'https://quickguard.uk', origin));
 
     const successUrl = `${siteUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${siteUrl}/pricing?cancelled=true`;

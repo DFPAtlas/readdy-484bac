@@ -1,4 +1,5 @@
 import { paymentFreezeResponse } from '../_shared/payment-freeze.ts';
+import { stripeAppOrigin } from '../_shared/environment-isolation.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
@@ -43,7 +44,7 @@ serve(async (req) => {
   const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const appUrl = Deno.env.get('APP_URL') || 'https://quickguard.uk';
+  const legacyAppUrl = Deno.env.get('APP_URL') || 'https://quickguard.uk';
 
   if (!stripeSecretKey || !supabaseUrl || !supabaseServiceKey) {
     return new Response(
@@ -56,6 +57,7 @@ serve(async (req) => {
   const supabaseService = createClient(supabaseUrl, supabaseServiceKey, { db: { schema: 'app' } });
 
   try {
+    const appUrl = stripeAppOrigin(supabaseUrl, stripeSecretKey, Deno.env.get('APP_URL'), legacyAppUrl);
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
       return new Response(

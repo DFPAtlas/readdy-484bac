@@ -325,7 +325,7 @@ export default function ClientCompleteProfileWizard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FeatureItem icon="ri-shield-star-line" title="Verified Guards" desc="All guards are SIA-licensed and checked" />
                   <FeatureItem icon="ri-time-line" title="Book in Minutes" desc="Post a job and get matched fast" />
-                  <FeatureItem icon="ri-secure-payment-line" title="Held Job Payments with Stripe" desc="Pay only after the shift is done" />
+                  <FeatureItem icon="ri-secure-payment-line" title="Held Job Payments with Stripe" desc="Fund the booking before the shift; guard payouts follow completion approval" />
                   <FeatureItem icon="ri-customer-service-2-line" title="No Contracts" desc="Book by the shift, no lock-in" />
                 </div>
               </div>
@@ -524,7 +524,7 @@ export default function ClientCompleteProfileWizard() {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  {['Post unlimited security jobs','Access verified SIA-licensed guards','Manage all your security needs in one place','Get matched with the best guards'].map(text => (
+                  {['Post security jobs within your plan','Access verified SIA-licensed guards','Manage all your security needs in one place','Get matched with the best guards'].map(text => (
                     <div key={text} className="flex items-center gap-3 text-sm text-slate-400">
                       <i className="ri-check-double-line text-teal-400 w-5 h-5 flex items-center justify-center"></i>
                       <span>{text}</span>

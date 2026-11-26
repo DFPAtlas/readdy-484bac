@@ -13,7 +13,7 @@ interface DocumentImageProps {
 
 export default function DocumentImage({ path, label, className = '' }: DocumentImageProps) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(Boolean(path));
   const [error, setError] = useState(false);
   const [enlarged, setEnlarged] = useState(false);
 
