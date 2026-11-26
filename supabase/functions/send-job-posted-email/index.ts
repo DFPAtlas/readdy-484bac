@@ -52,7 +52,6 @@ serve(async (req: Request) => {
     return corsResponse(origin, 405, { error: 'Method not allowed' });
   }
 
-  const resendApiKey = Deno.env.get('RESEND_API_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
@@ -96,9 +95,6 @@ serve(async (req: Request) => {
       return corsResponse(origin, 503, { success: false, delivered: false, error: 'Email delivery is paused' });
     }
     const dryRun = mode === 'dry_run';
-    if (!dryRun && !resendApiKey) {
-      return corsResponse(origin, 500, { error: 'Email service is not configured' });
-    }
 
     // Publication state is authoritative in the saved job, never caller input.
     // A scheduled draft must not receive the existing "now live" confirmation.
