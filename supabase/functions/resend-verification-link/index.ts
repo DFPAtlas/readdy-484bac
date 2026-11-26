@@ -100,8 +100,13 @@ async function sendVerificationEmail(supabase: any, supabaseUrl: string, supabas
       }),
     });
     if (!res.ok) {
-      const errText = await res.text();
-      console.error(`[resend-verification-link] Verification email send failed (${res.status}): ${errText}`);
+      console.error(`[resend-verification-link] Verification email send failed (${res.status})`);
+      return false;
+    }
+    const result: unknown = await res.json();
+    if (!result || typeof result !== 'object' || !('success' in result) || result.success !== true
+        || !('email_id' in result) || typeof result.email_id !== 'string' || !result.email_id.trim()) {
+      console.error('[resend-verification-link] Email provider acceptance was not confirmed');
       return false;
     }
     console.log(`[resend-verification-link] Verification email sent to ${email}`);
@@ -177,11 +182,14 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (profile?.user_id) {
         const fullName = `${existingUser.user_metadata?.first_name || ''} ${existingUser.user_metadata?.last_name || ''}`.trim();
-        await sendVerificationEmail(supabase, supabaseUrl, supabaseServiceKey, existingUser.id, normalizedEmail, fullName, normalizedRole);
+        const sent = await sendVerificationEmail(supabase, supabaseUrl, supabaseServiceKey, existingUser.id, normalizedEmail, fullName, normalizedRole);
+        if (!sent) console.error('[resend-verification-link] Verification request could not be delivered.');
       }
     }
 
-    return new Response(JSON.stringify({ success: true }), {
+    // Acknowledge the request uniformly; never reveal whether an account
+    // exists or claim delivery for unknown, verified or failed recipients.
+    return new Response(JSON.stringify({ success: true, request_received: true }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

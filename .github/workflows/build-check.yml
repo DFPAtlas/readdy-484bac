@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feat/free-guard-access-20261125, feat/free-guard-pricing-transition-20261125, feat/guest-booking-availability-20261125]
+    branches: [main, feat/free-guard-access-20261125, feat/free-guard-pricing-transition-20261125, feat/guest-booking-availability-20261125, fix/job-posted-email-acceptance-20261125]
 
 concurrency:
   group: quickguard-build-${{ github.ref }}
@@ -85,6 +85,7 @@ jobs:
           node scripts/uat/free-guard-browser-smoke.cjs
           node scripts/uat/guard-pricing-browser-smoke.cjs
           node scripts/uat/guest-booking-browser-smoke.cjs
+          node scripts/uat/signup-delivery-browser-smoke.cjs
 
       - name: Upload free-access browser evidence
         if: always()
@@ -94,5 +95,6 @@ jobs:
           path: |
             uat-results/free-guard-access/
             uat-results/guest-booking/
+            uat-results/signup-delivery/
           if-no-files-found: ignore
           retention-days: 7

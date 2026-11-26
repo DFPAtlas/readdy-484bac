@@ -18,6 +18,18 @@ function getCorsHeaders(req: Request) {
   };
 }
 
+function verificationResponse(sent: boolean, corsHeaders: Record<string, string>): Response {
+  return new Response(JSON.stringify(sent
+    ? { success: true, verification_sent: true }
+    : {
+      success: false, verification_sent: false, code: 'verification_delivery_failed',
+      error: 'Your account is awaiting verification, but we could not send the email. Please try again to request a new link.',
+    }), {
+    status: sent ? 200 : 503,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', ...(!sent ? { 'Retry-After': '60' } : {}) },
+  });
+}
+
 async function checkRateLimit(supabase: any, ip: string, email: string): Promise<{ allowed: boolean; reason: string }> {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { count: ipCount } = await supabase
@@ -245,8 +257,13 @@ async function sendVerificationEmail(supabase: any, supabaseUrl: string, supabas
       }),
     });
     if (!res.ok) {
-      const errText = await res.text();
-      console.error(`[register-magic-link] Verification email send failed (${res.status}): ${errText}`);
+      console.error(`[register-magic-link] Verification email send failed (${res.status})`);
+      return false;
+    }
+    const result: unknown = await res.json();
+    if (!result || typeof result !== 'object' || !('success' in result) || result.success !== true
+        || !('email_id' in result) || typeof result.email_id !== 'string' || !result.email_id.trim()) {
+      console.error('[register-magic-link] Email provider acceptance was not confirmed');
       return false;
     }
     console.log(`[register-magic-link] Verification email sent to ${email}`);
@@ -333,11 +350,8 @@ Deno.serve(async (req) => {
         const existingUser = await findAuthUserByEmail(supabase, normalizedEmail);
         if (existingUser && !existingUser.email_confirmed_at) {
           const existingName = `${existingUser.user_metadata?.first_name || ''} ${existingUser.user_metadata?.last_name || ''}`.trim();
-          await sendVerificationEmail(supabase, supabaseUrl, supabaseServiceKey, existingUser.id, normalizedEmail, existingName || fullName, normalizedRole);
-          return new Response(JSON.stringify({ success: true, verification_sent: true }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
+          const sent = await sendVerificationEmail(supabase, supabaseUrl, supabaseServiceKey, existingUser.id, normalizedEmail, existingName || fullName, normalizedRole);
+          return verificationResponse(sent, corsHeaders);
         }
         return new Response(JSON.stringify({ error: 'An account with this email already exists. Please sign in instead.' }), {
           status: 409,
@@ -448,13 +462,10 @@ Deno.serve(async (req) => {
 
     const verificationSent = await sendVerificationEmail(supabase, supabaseUrl, supabaseServiceKey, userId, normalizedEmail, fullName, normalizedRole);
     if (!verificationSent) {
-      console.error(`[register-magic-link] Verification email did not complete for ${normalizedEmail}; will retry via queue/health check if configured.`);
+      console.error('[register-magic-link] Verification email was not accepted; registration retry is required.');
     }
 
-    return new Response(JSON.stringify({ success: true, verification_sent: true }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return verificationResponse(verificationSent, corsHeaders);
   } catch (err: any) {
     console.error('register-magic-link error:', err);
     return new Response(JSON.stringify({ error: err.message || 'Internal server error' }), {
