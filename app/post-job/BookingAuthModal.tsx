@@ -1,5 +1,7 @@
 'use client';
 
+import FocusTrap from 'focus-trap-react';
+
 interface BookingAuthModalProps {
   isOpen: boolean;
   email?: string;
@@ -12,7 +14,7 @@ export default function BookingAuthModal({ isOpen, email, onClose, onRegister, o
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="booking-auth-title">
+    <FocusTrap focusTrapOptions={{initialFocus:'#booking-auth-register',escapeDeactivates:false,allowOutsideClick:true}}><div onKeyDown={event=>{if(event.key==='Escape')onClose();}} className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="booking-auth-title">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} aria-hidden="true"></div>
       <div className="relative w-full max-w-md bg-[#111d35] border border-[#1e2d4d] rounded-2xl p-6 sm:p-8 shadow-2xl">
         <button
@@ -44,6 +46,7 @@ export default function BookingAuthModal({ isOpen, email, onClose, onRegister, o
 
         <div className="space-y-3">
           <button
+            id="booking-auth-register"
             type="button"
             onClick={onRegister}
             className="w-full bg-red-600 hover:bg-red-500 text-white py-3.5 rounded-xl font-semibold transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
@@ -61,6 +64,6 @@ export default function BookingAuthModal({ isOpen, email, onClose, onRegister, o
           </button>
         </div>
       </div>
-    </div>
+    </div></FocusTrap>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import BookingEnquiries from './BookingEnquiries';
 import LeadDrawer from './LeadDrawer';
 import LeadCsvImport from './LeadCsvImport';
 
@@ -205,6 +206,7 @@ export default function LeadsClient() {
       </header>
 
       <div className="px-5 sm:px-8 py-8 space-y-6">
+        <BookingEnquiries />
         {error ? (
           <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-8 flex flex-col items-center justify-center gap-3">
             <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center">

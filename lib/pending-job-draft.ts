@@ -128,8 +128,8 @@ export function buildPendingJobDraft(input: PendingJobDraftInput): PendingJobDra
   };
 }
 
-export function savePendingJobDraft(draft: PendingJobDraft): void {
-  if (typeof window === 'undefined') return;
+export function savePendingJobDraft(draft: PendingJobDraft): boolean {
+  if (typeof window === 'undefined') return false;
   try {
     const payload: PendingJobDraft = {
       ...draft,
@@ -137,14 +137,15 @@ export function savePendingJobDraft(draft: PendingJobDraft): void {
       createdAt: draft.createdAt || new Date().toISOString(),
     };
     localStorage.setItem(PENDING_JOB_DRAFT_KEY, JSON.stringify(payload));
-    sessionStorage.removeItem(PENDING_JOB_DRAFT_KEY);
-  } catch {}
+    try { sessionStorage.removeItem(PENDING_JOB_DRAFT_KEY); } catch {}
+    return true;
+  } catch { return false; }
 }
 
 function isPendingJobDraftExpired(draft: PendingJobDraft): boolean {
   const created = Date.parse(draft.createdAt || '');
   if (!Number.isFinite(created)) return true;
-  return Date.now() - created > PENDING_JOB_DRAFT_TTL_MS;
+  return created > Date.now() + 300000 || Date.now() - created >= PENDING_JOB_DRAFT_TTL_MS;
 }
 
 export function loadPendingJobDraft(): PendingJobDraft | null {
@@ -160,14 +161,26 @@ export function loadPendingJobDraft(): PendingJobDraft | null {
       }
     }
     if (!raw) return null;
+    if (raw.length > 16384) { clearPendingJobDraft(); return null; }
     const parsed = JSON.parse(raw);
     if (!parsed || parsed.version !== PENDING_JOB_DRAFT_VERSION || parsed.mode !== 'immediate') {
       clearPendingJobDraft();
       return null;
     }
+    const keys: (keyof PendingJobDraftInput)[] = ['source','venueCategory','venueName','addressLine1','city','postcode','startDate','startTime','endTime','numberOfGuards','numberOfDays','bookingType','requiredLicenseType','hourlyRate','jobDescription','contactName','contactPhone','contactEmail'];
+    const clean: Record<string,string> = {};
+    for (const key of keys) {
+      if (parsed[key] !== undefined && (typeof parsed[key] !== 'string' || parsed[key].length > 1000)) { clearPendingJobDraft(); return null; }
+      clean[key] = parsed[key] || '';
+    }
     const candidate: PendingJobDraft = {
-      ...parsed,
-      createdAt: parsed.createdAt || parsed.savedAt || '',
+      version: PENDING_JOB_DRAFT_VERSION, mode: 'immediate', source: clean.source,
+      venueCategory: clean.venueCategory,venueName: clean.venueName,addressLine1: clean.addressLine1,city: clean.city,postcode: clean.postcode,
+      startDate: clean.startDate,startTime: clean.startTime,endTime: clean.endTime,numberOfGuards: clean.numberOfGuards || '1',numberOfDays: clean.numberOfDays || '1',
+      bookingType: clean.bookingType || 'one_off_shift',requiredLicenseType: clean.requiredLicenseType,hourlyRate: clean.hourlyRate,jobDescription: clean.jobDescription,
+      contactName: clean.contactName,contactPhone: clean.contactPhone,contactEmail: clean.contactEmail,
+      createdAt: typeof (parsed.createdAt || parsed.savedAt) === 'string' ? (parsed.createdAt || parsed.savedAt) : '',
+      submissionId: typeof parsed.submissionId === 'string' && /^qgb_[a-zA-Z0-9]{10,80}$/.test(parsed.submissionId) ? parsed.submissionId : '',
     };
     if (isPendingJobDraftExpired(candidate)) {
       clearPendingJobDraft();

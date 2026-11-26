@@ -17,6 +17,10 @@ export function ClientAuthProvider({ children }: { children: ReactNode }) {
     const current = () => mounted.current && generation.current === request;
     setState(previous => ({ ...previous, isLoaded: false, authError: null }));
     try {
+      const session = await withRequestDeadline(supabase.auth.getSession());
+      if (!current()) return;
+      if (session.error) throw session.error;
+      if (!session.data.session) { owner.current = null; setState({ ...blank, isLoaded: true }); return; }
       const auth = await withRequestDeadline(supabase.auth.getUser());
       if (!current()) return;
       if (auth.error) throw auth.error;
