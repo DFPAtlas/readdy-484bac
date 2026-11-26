@@ -46,6 +46,8 @@ const metrics = [
       await page.goto(base + '/');
       const stats = page.getByRole('group', { name: 'Platform statistics', exact: true });
       await expect(stats).toBeVisible();
+      await stats.scrollIntoViewIfNeeded();
+      await expect(stats).toHaveCSS('opacity', '1');
       await expect(stats.getByText('75+', { exact: true })).toBeVisible();
       assert.equal(reads.filter(path => path.endsWith('/qg_launch_public_stats')).length, 1);
       statsMode = 'empty';

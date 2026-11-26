@@ -130,3 +130,28 @@ test('retired homepage responses cannot update an unmounted component', async ()
   resolve({ data: [{ key: 'total_guard_profiles', value: 75 }], error: null }); await flush();
   assert.equal(h.writes, before);
 });
+
+test('statistics inserted after the async public read are observed and become visually visible', async () => {
+  let statsMounted = false;
+  const seen = [];
+  const f = statsFixture([{ key: 'total_guard_profiles', value: 75 }]);
+  const h = hooksHarness('app/HomepageClient.tsx', {
+    'next/link': child, './TrustBadges': child, '@/lib/supabase': { supabase: f.client },
+  }, {
+    document: { querySelectorAll: () => statsMounted ? [{ id: 'stats' }] : [] },
+    IntersectionObserver: class {
+      constructor(callback) { this.callback = callback; }
+      observe(target) { seen.push(target.id); this.callback([{ target, isIntersecting: true }]); }
+      disconnect() {}
+    },
+  });
+  h.render(); await h.effects();
+  statsMounted = nodes(h.render()).some(node => node.props?.id === 'stats');
+  assert.equal(statsMounted, true); await h.effects();
+  const stats = nodes(h.render()).find(node => node.props?.id === 'stats');
+  assert.ok(seen.includes('stats'));
+  assert.match(stats.props.className, /opacity-100/);
+  assert.doesNotMatch(stats.props.className, /opacity-0\b/);
+  assert.equal(f.calls.filter(call => call[0] === 'from').length, 1);
+  h.unmount();
+});

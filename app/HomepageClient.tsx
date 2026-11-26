@@ -32,7 +32,7 @@ export default function HomepageClient() {
     elements.forEach((el) => observer.observe(el));
 
     return () => observer.disconnect();
-  }, []);
+  }, [loadingStats]);
 
   useEffect(() => {
     let cancelled = false;
