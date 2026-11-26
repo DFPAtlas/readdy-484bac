@@ -38,18 +38,18 @@ export default function HomepageHero() {
 
         <div className="max-w-2xl">
           <h1 id="hero-heading" className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-[1.1] text-white">
-            Hire SIA-Licensed Guards
-            <span className="block text-teal-400 mt-1">Directly. By the Shift.</span>
+            Hire SIA-Licensed Security Guards.
+            <span className="block text-teal-400 mt-1">On Your Terms.</span>
           </h1>
 
           <p className="text-lg md:text-xl mb-10 text-slate-300 max-w-xl leading-relaxed">
-            No agency fees. No long contracts. Pay-as-you-go security. Book verified SIA guards for your venue, event, or site in under 5 minutes.
+            Post a security job in minutes. Eligible SIA-licensed guards can then respond, subject to availability. You review the responses, select your guard, and confirm the booking by paying securely through Stripe before the shift.
           </p>
 
           <div className="flex flex-wrap items-center gap-3 mb-8">
             {[
-              { icon: 'ri-checkbox-circle-fill', text: 'No contracts' },
-              { icon: 'ri-checkbox-circle-fill', text: 'Free plan available' },
+              { icon: 'ri-checkbox-circle-fill', text: 'No long contracts' },
+              { icon: 'ri-checkbox-circle-fill', text: 'Free to post a job' },
               { icon: 'ri-checkbox-circle-fill', text: 'Pay per shift' },
             ].map((badge) => (
               <span key={badge.text} className="flex items-center gap-1.5 bg-white/5 border border-white/10 text-teal-300 text-sm px-3 py-1.5 rounded-full">
@@ -66,7 +66,7 @@ export default function HomepageHero() {
               className="bg-red-600 hover:bg-red-500 text-white px-6 sm:px-8 py-4 rounded-lg text-base sm:text-lg font-semibold shadow-lg shadow-red-600/30 transition-all duration-300 hover:scale-105 whitespace-nowrap focus:ring-4 focus:ring-red-500/30 focus:outline-none text-center"
             >
               <i className="ri-flashlight-fill mr-2"></i>
-              Book a Guard Now
+              Post a Job Now
             </Link>
             <Link
               href="/company/login"
@@ -79,11 +79,11 @@ export default function HomepageHero() {
           </div>
 
           <p className="text-slate-200 mb-1.5 max-w-xl">
-            Check matching guard availability, then create a client account to send your booking request.
+            Posting is quick, but cover is not automatic. Guards respond only if they are available, and your booking is confirmed once you select a guard and payment is complete.
           </p>
           <p className="flex items-center gap-1.5 text-sm text-emerald-300 mb-6">
             <i className="ri-shield-check-line" aria-hidden="true"></i>
-            No card required until you select a guard.
+            No card needed to post. Payment happens after you select a guard and before the booking is confirmed.
           </p>
 
           <HomepageIndustries />
@@ -93,19 +93,19 @@ export default function HomepageHero() {
               <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">
                 <i className="ri-shield-star-line text-teal-400 text-base" aria-hidden="true"></i>
               </div>
-              <span className="font-medium text-slate-200">SIA licences checked</span>
+              <span className="font-medium text-slate-200">SIA licence checked before work</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">
                 <i className="ri-lock-line text-teal-400 text-base" aria-hidden="true"></i>
               </div>
-              <span className="font-medium text-slate-200">Held Job Payment with Stripe</span>
+              <span className="font-medium text-slate-200">Payment held with Stripe until completion</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">
-                <i className="ri-building-2-line text-teal-400 text-base" aria-hidden="true"></i>
+                <i className="ri-user-star-line text-teal-400 text-base" aria-hidden="true"></i>
               </div>
-              <span className="font-medium text-slate-200">No agency fees</span>
+              <span className="font-medium text-slate-200">You choose your guard</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-teal-500/15">

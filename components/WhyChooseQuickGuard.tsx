@@ -6,8 +6,8 @@ import Link from 'next/link';
 const comparisons = [
   {
     label: 'Time to book',
-    quickguard: 'Under 5 minutes',
-    agency: 'Days of calls & paperwork',
+    quickguard: 'Post in minutes',
+    agency: 'Often days of calls & paperwork',
     highlight: true,
   },
   {
@@ -33,7 +33,7 @@ const comparisons = [
   },
   {
     label: 'Licence verification',
-    quickguard: 'Checked before a guard can work',
+    quickguard: 'Licence checked before a guard can work',
     agency: 'Varies by agency',
   },
 ];
@@ -71,7 +71,7 @@ export default function WhyChooseQuickGuard() {
             QuickGuard vs a Traditional Agency
           </h2>
           <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-            No middlemen. No long contracts. Just verified guards when you need them.
+            No long contracts. You choose the guard. Payment is held until the work is confirmed complete.
           </p>
         </div>
 
@@ -118,7 +118,10 @@ export default function WhyChooseQuickGuard() {
             Hire a Guard Now
           </Link>
           <p className="text-sm text-slate-500 mt-3">
-            No credit card required to post <span className="mx-1">&#183;</span> Pay only when you book
+            No card needed to post <span className="mx-1">&#183;</span> Payment is taken after you select a guard, before the booking is confirmed
+          </p>
+          <p className="text-xs text-slate-500 mt-4 max-w-2xl mx-auto leading-relaxed">
+            QuickGuard does not deduct a commission from guard pay. Guard payouts are transferred to the guard&apos;s connected Stripe account, and the later payment into their bank account is a separate Stripe payout.
           </p>
         </div>
       </div>

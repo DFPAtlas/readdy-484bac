@@ -13,7 +13,7 @@ const badges = [
   {
     icon: 'ri-lock-line',
     title: 'Held Job Payments',
-    description: 'Your payment is held until the shift is confirmed complete, then released to the guard.',
+    description: "Your payment is held until the shift is confirmed complete, then released to the guard's connected Stripe account.",
     color: 'green',
   },
   {

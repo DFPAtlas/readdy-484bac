@@ -9,7 +9,7 @@ export default function HomepageSchema() {
     url: SITE_URL,
     logo: BRAND_LOGO.social,
     description:
-      "UK's leading marketplace connecting clients with SIA-licensed security guards for emergency cover, events, and ongoing security needs.",
+      'A UK marketplace where businesses and venues can post security work and connect with SIA-licensed guards, subject to guard availability.',
     contactPoint: {
       '@type': 'ContactPoint',
       contactType: 'customer support',
@@ -33,7 +33,7 @@ export default function HomepageSchema() {
     name: 'QuickGuard',
     url: SITE_URL,
     description:
-      'Find verified SIA-licensed security guards across the UK, or find security jobs near you.',
+      'Post security work or find security jobs in the UK, with SIA licence checks and held payments through Stripe.',
     potentialAction: {
       '@type': 'SearchAction',
       target: {
@@ -53,7 +53,7 @@ export default function HomepageSchema() {
         name: 'What is QuickGuard.uk?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'QuickGuard.uk is a UK-based platform that connects SIA-licensed security guards with clients who need professional security services. When a job is posted, QuickGuard notifies verified guards whose travel radius covers the job location.',
+          text: 'QuickGuard.uk is a UK-based platform where clients post security work and SIA-licensed guards can respond. When a job is posted, guards whose settings match the job location can be notified. Responses depend on guard availability, and cover is confirmed only after a client selects a guard and completes payment.',
         },
       },
       {
@@ -61,7 +61,7 @@ export default function HomepageSchema() {
         name: 'Do I need an SIA licence to join as a security guard?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: "Yes. All security guards on QuickGuard.uk must hold a valid SIA (Security Industry Authority) licence. We verify every guard's licence before they can apply for jobs, ensuring clients always work with fully compliant professionals.",
+          text: "Yes. Guards on QuickGuard.uk must hold an SIA (Security Industry Authority) licence, and the licence is checked before they can take work through the platform. Licence status can change over time, so clients can review the guard's licence details before confirming a booking.",
         },
       },
       {
@@ -77,7 +77,7 @@ export default function HomepageSchema() {
         name: 'When and how do guards get paid?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Once a client confirms job completion, payment is released to your account in full, with no guard commission. Funds are transferred directly to your registered UK bank account. Payment records are available in your account. You remain responsible for your own tax reporting and should seek independent advice when needed.',
+          text: 'Once a client confirms job completion, the agreed amount is released in full, with no commission deducted from guard pay. The funds are transferred to your connected Stripe account, and payment into your bank account is a separate Stripe payout. Bank arrival depends on available funds, your Stripe payout schedule, account verification and bank processing. Payment records are available in your account, and you remain responsible for your own tax reporting.',
         },
       },
       {
@@ -85,7 +85,7 @@ export default function HomepageSchema() {
         name: 'Is there a cost for clients to post a job?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: "There are no upfront costs or setup fees for clients. Payment is required after guard selection, before booking confirmation. Client booking service fees are Free 15%, Starter 10%, Pro 7.5% and Enterprise 5%, with processing included.",
+          text: 'You can post a job for free and there are no setup fees. Payment is required after you select a guard and before the booking is confirmed. The client booking service fee depends on your plan and any promotion applied, and the exact amount is shown before you pay.',
         },
       },
       {
@@ -93,7 +93,7 @@ export default function HomepageSchema() {
         name: 'How quickly can I find a security guard?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'As soon as you post, QuickGuard notifies verified guards whose travel radius covers your location. You can review applications, check SIA credentials and confirm a guard as soon as applications arrive.',
+          text: 'Posting a job usually takes a few minutes. Guards whose settings match your location can be notified and can respond, but responses depend on their availability. Posting does not guarantee cover; the booking exists only once you select a responding guard and complete payment.',
         },
       },
       {
@@ -101,7 +101,7 @@ export default function HomepageSchema() {
         name: 'Are all guards on the platform verified?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Yes. Every guard undergoes SIA licence verification before being approved on the platform. We check licence validity, specialisations, and compliance status so you can hire with complete confidence.',
+          text: 'Every guard must pass an SIA licence check before being approved to take work on the platform. Clients can review a guard\u2019s profile and licence details before confirming. A licence check reduces risk but is not a guarantee of a guard\u2019s future conduct.',
         },
       },
       {
@@ -109,7 +109,7 @@ export default function HomepageSchema() {
         name: 'How does the payment protection work?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Clients pre-pay for the shift and funds are held securely with Stripe during the job. Payment is only released to the guard once the client confirms the shift has been completed satisfactorily. This protects both parties throughout the process.',
+          text: 'Clients pay for the shift by card through Stripe, and the funds are held until the client confirms the shift has been completed. The payment is then released to the guard\u2019s connected Stripe account, with no commission deducted from guard pay. If a dispute is raised, release can be paused for review.',
         },
       },
       {
@@ -125,7 +125,7 @@ export default function HomepageSchema() {
         name: 'Which areas of the UK does QuickGuard.uk cover?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'We cover the entire United Kingdom — including major cities like London, Manchester, Birmingham, Edinburgh, Cardiff, and Belfast, as well as regional and rural areas. Guards can set their preferred coverage radius when creating their profile.',
+          text: 'Jobs can be posted anywhere in the UK, and guards set the areas they are willing to work in. Whether a job receives a response depends on which guards are available near that location, so cover is not guaranteed in every area or at every time.'
         },
       },
     ],

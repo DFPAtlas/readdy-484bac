@@ -24,12 +24,12 @@ export default function PostJobPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-[#0B1933]">
-        <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     }>
       <PostJobWizard />
-      <section aria-labelledby="post-job-guide-title" className="bg-[#0B1933] border-t border-slate-800 py-12">
-        <div className="mx-auto max-w-4xl px-6 text-slate-300">
+      <section aria-labelledby="post-job-guide-title" className="border-t border-white/10 bg-[#0A1730]/95 py-12">
+        <div className="mx-auto max-w-3xl px-4 text-slate-300 sm:px-6">
           <h2 id="post-job-guide-title" className="text-2xl font-bold text-white">
             How to post a security guard job on QuickGuard
           </h2>

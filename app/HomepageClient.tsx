@@ -111,7 +111,7 @@ export default function HomepageClient() {
               How QuickGuard Works
             </h2>
             <p className="text-xl text-slate-400 max-w-3xl mx-auto">
-              QuickGuard is a UK security staffing platform that connects SIA-licensed guards directly with businesses and venues. No agency fees, no long contracts — hire professional security by the shift in minutes.
+              QuickGuard connects businesses and venues with SIA-licensed guards, booked by the shift. You can post a job in minutes, but cover is only in place once an eligible guard responds, you select them, and payment is complete.
             </p>
           </div>
 
@@ -129,9 +129,10 @@ export default function HomepageClient() {
               >
                 <i className="ri-user-add-line text-2xl text-teal-400"></i>
               </div>
-              <h3 className="text-xl font-semibold mb-4 text-white">Guards Create Profiles</h3>
+              <span className="inline-block text-xs font-semibold tracking-wider uppercase text-teal-400 mb-3">Stage 1</span>
+              <h3 className="text-xl font-semibold mb-4 text-white">Post your job</h3>
               <p className="text-slate-400 leading-relaxed">
-                Upload certifications, highlight experience, and set availability to build a strong, hire-ready profile.
+                Describe the site, dates, hours and duties. Posting is free and usually takes a few minutes.
               </p>
             </li>
 
@@ -148,9 +149,10 @@ export default function HomepageClient() {
               >
                 <i className="ri-briefcase-line text-2xl text-teal-400"></i>
               </div>
-              <h3 className="text-xl font-semibold mb-4 text-white">Clients Post Jobs</h3>
+              <span className="inline-block text-xs font-semibold tracking-wider uppercase text-teal-400 mb-3">Stage 2</span>
+              <h3 className="text-xl font-semibold mb-4 text-white">Eligible guards respond</h3>
               <p className="text-slate-400 leading-relaxed">
-                Submit assignment details—location, duration, needs—and find matching guards fast.
+                Licensed guards who match your job can respond, subject to their own availability. A posted job does not guarantee cover.
               </p>
             </li>
 
@@ -167,9 +169,70 @@ export default function HomepageClient() {
               >
                 <i className="ri-cpu-line text-2xl text-teal-400"></i>
               </div>
-              <h3 className="text-xl font-semibold mb-4 text-white">We Match &amp; Connect</h3>
+              <span className="inline-block text-xs font-semibold tracking-wider uppercase text-teal-400 mb-3">Stage 3</span>
+              <h3 className="text-xl font-semibold mb-4 text-white">Select your guard</h3>
               <p className="text-slate-400 leading-relaxed">
-                When you post a job, QuickGuard notifies verified guards whose travel radius covers your location.
+                Review responses, profiles and licence details, then choose the guard you want for the shift.
+              </p>
+            </li>
+
+            <li
+              id="step-4"
+              data-animate
+              className={`bg-[#111d35] border border-slate-700/50 p-8 rounded-2xl text-center transition-all duration-1000 delay-200 hover:border-teal-500/30 hover:scale-[1.02] ${
+                jsEnabled && !isVisible['step-4'] ? 'opacity-0 translate-y-10' : 'opacity-100 translate-y-0'
+              }`}
+            >
+              <div
+                className="w-16 h-16 flex items-center justify-center bg-teal-500/10 rounded-2xl mx-auto mb-6 border border-teal-400/20"
+                aria-hidden="true"
+              >
+                <i className="ri-bank-card-line text-2xl text-teal-400"></i>
+              </div>
+              <span className="inline-block text-xs font-semibold tracking-wider uppercase text-teal-400 mb-3">Stage 4</span>
+              <h3 className="text-xl font-semibold mb-4 text-white">Pay and confirm</h3>
+              <p className="text-slate-400 leading-relaxed">
+                Pay by card through Stripe. The booking is confirmed once payment is complete, and the funds are held until the work is done.
+              </p>
+            </li>
+
+            <li
+              id="step-5"
+              data-animate
+              className={`bg-[#111d35] border border-slate-700/50 p-8 rounded-2xl text-center transition-all duration-1000 delay-400 hover:border-teal-500/30 hover:scale-[1.02] ${
+                jsEnabled && !isVisible['step-5'] ? 'opacity-0 translate-y-10' : 'opacity-100 translate-y-0'
+              }`}
+            >
+              <div
+                className="w-16 h-16 flex items-center justify-center bg-teal-500/10 rounded-2xl mx-auto mb-6 border border-teal-400/20"
+                aria-hidden="true"
+              >
+                <i className="ri-calendar-check-line text-2xl text-teal-400"></i>
+              </div>
+              <span className="inline-block text-xs font-semibold tracking-wider uppercase text-teal-400 mb-3">Stage 5</span>
+              <h3 className="text-xl font-semibold mb-4 text-white">Shift and completion</h3>
+              <p className="text-slate-400 leading-relaxed">
+                The guard attends the shift. You confirm attendance and job completion from your dashboard.
+              </p>
+            </li>
+
+            <li
+              id="step-6"
+              data-animate
+              className={`bg-[#111d35] border border-slate-700/50 p-8 rounded-2xl text-center transition-all duration-1000 delay-600 hover:border-teal-500/30 hover:scale-[1.02] ${
+                jsEnabled && !isVisible['step-6'] ? 'opacity-0 translate-y-10' : 'opacity-100 translate-y-0'
+              }`}
+            >
+              <div
+                className="w-16 h-16 flex items-center justify-center bg-teal-500/10 rounded-2xl mx-auto mb-6 border border-teal-400/20"
+                aria-hidden="true"
+              >
+                <i className="ri-star-line text-2xl text-teal-400"></i>
+              </div>
+              <span className="inline-block text-xs font-semibold tracking-wider uppercase text-teal-400 mb-3">Stage 6</span>
+              <h3 className="text-xl font-semibold mb-4 text-white">Release and review</h3>
+              <p className="text-slate-400 leading-relaxed">
+                Once completion is confirmed, payment is released to the guard&apos;s connected Stripe account. Bank arrival depends on Stripe payout timing, and both sides can leave a review.
               </p>
             </li>
           </ol>
@@ -193,7 +256,7 @@ export default function HomepageClient() {
               Why Choose QuickGuard?
             </h2>
             <p className="text-xl text-slate-400 max-w-3xl mx-auto">
-              A secure, simple platform built for security professionals and the businesses that hire them — with verified guards, protected payments, and 24/7 AI support whenever you need it.
+              A simple platform built for security professionals and the businesses that hire them, with SIA licence checks, held payments through Stripe and support when something needs review.
             </p>
           </div>
 
@@ -229,7 +292,7 @@ export default function HomepageClient() {
                 <i className="ri-money-pound-circle-line text-2xl text-teal-400"></i>
               </div>
               <h3 className="text-lg font-semibold mb-2 text-white">Secure Payments</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">Protected payment system with job completion confirmation</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Card payments are held by Stripe until you confirm the shift is complete, then released to the guard&apos;s connected Stripe account.</p>
             </li>
 
             <li
@@ -245,8 +308,8 @@ export default function HomepageClient() {
               >
                 <i className="ri-time-line text-2xl text-teal-400"></i>
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-white">Fast Matching</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">When you post a job, verified guards whose travel radius covers your location are notified straight away.</p>
+              <h3 className="text-lg font-semibold mb-2 text-white">Guard responses</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">When you post a job, licensed guards whose settings match your location can be notified and can respond. Responses depend on their availability.</p>
             </li>
 
             <li
@@ -262,8 +325,8 @@ export default function HomepageClient() {
               >
                 <i className="ri-customer-service-2-line text-2xl text-teal-400"></i>
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-white">24/7 AI Support</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">Our AI assistant is available 24/7 to help with platform questions and common issues. Issues requiring human review can be escalated.</p>
+              <h3 className="text-lg font-semibold mb-2 text-white">Support and guidance</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">Help articles cover posting, selecting and paying. You can raise a support ticket from your dashboard when you need a person to review an issue.</p>
             </li>
           </ul>
         </div>
@@ -292,7 +355,7 @@ export default function HomepageClient() {
                 <div className="text-4xl font-bold text-teal-400 mb-2">
                   <span>{stats.totalGuards !== null ? `${stats.totalGuards.toLocaleString()}+` : ''}</span>
                 </div>
-                <figcaption className="text-slate-400 font-medium">Verified Guards</figcaption>
+                <figcaption className="text-slate-400 font-medium">Guard profiles</figcaption>
               </div>
             </figure>
             )}
@@ -325,7 +388,7 @@ export default function HomepageClient() {
                   <div className="text-4xl font-bold text-teal-400 mb-2">
                     <span>{stats.successRate !== null ? `${stats.successRate}%` : ''}</span>
                   </div>
-                  <figcaption className="text-slate-400 font-medium">Success Rate</figcaption>
+                  <figcaption className="text-slate-400 font-medium">Completed assignment rate</figcaption>
                 </div>
               </figure>
             )}
@@ -339,13 +402,13 @@ export default function HomepageClient() {
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-400/20 text-teal-400 px-4 py-1.5 rounded-full text-sm font-medium mb-4">
               <i className="ri-map-pin-line" aria-hidden="true"></i>
-              UK Coverage
+              UK Cities
             </div>
             <h2 id="cities-heading" className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Security Guards in Major UK Cities
+              Security Guard Jobs in Major UK Cities
             </h2>
             <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-              Post a job in any of these cities and verified local guards are notified.
+              You can post a job in these cities. Local guards can respond if they are available, so cover is not guaranteed everywhere.
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
@@ -357,7 +420,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">London</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">Security cover across all 32 Greater London boroughs.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Guard jobs across Greater London, subject to local availability.</p>
             </Link>
             <Link href="/security-guards/manchester" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -367,7 +430,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Manchester</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">From the city centre to Salford and Trafford.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Guard jobs in Manchester, Salford and Trafford.</p>
             </Link>
             <Link href="/security-guards/birmingham" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -377,7 +440,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Birmingham</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">Birmingham and the wider West Midlands.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Guard jobs in Birmingham and the West Midlands.</p>
             </Link>
             <Link href="/security-guards/leeds" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -387,7 +450,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Leeds</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">Leeds and across West Yorkshire.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Guard jobs in Leeds and West Yorkshire.</p>
             </Link>
             <Link href="/security-guards/liverpool" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -397,7 +460,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Liverpool</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">From the waterfront to match days across Merseyside.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Guard jobs in Liverpool and Merseyside.</p>
             </Link>
             <Link href="/security-guards/glasgow" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -407,7 +470,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Glasgow</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">Events, retail and corporate cover across Greater Glasgow.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Guard jobs in Glasgow and the surrounding area.</p>
             </Link>
             <Link href="/security-guards/edinburgh" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -417,7 +480,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Edinburgh</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">Festival, retail and corporate cover across the Lothians.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Guard jobs in Edinburgh and the Lothians.</p>
             </Link>
             <Link href="/security-guards/bristol" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -427,7 +490,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Bristol</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">Bristol and across the South West.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Guard jobs in Bristol and the South West.</p>
             </Link>
             <Link href="/security-guards/cardiff" prefetch={false} className="group bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -437,7 +500,7 @@ export default function HomepageClient() {
                 <i className="ri-arrow-right-line text-slate-500 group-hover:text-teal-400 transition-colors" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Cardiff</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">Stadium events, retail and more across South Wales.</p>
+              <p className="text-slate-400 text-sm leading-relaxed">Guard jobs in Cardiff and South Wales.</p>
             </Link>
           </div>
         </div>

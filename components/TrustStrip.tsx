@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 
 const trustSignals = [
-  { icon: 'ri-shield-check-line', label: 'All Guards SIA-Verified', sub: 'Planned: weekly AI licence checks' },
-  { icon: 'ri-lock-line', label: 'Held Job Payment with Stripe', sub: 'Released only after shift completion' },
-  { icon: 'ri-money-pound-circle-line', label: 'Pay Per Shift', sub: 'No contracts, pay per shift' },
-  { icon: 'ri-map-pin-2-line', label: 'UK-Wide Coverage', sub: 'Post a job anywhere in the UK' },
+  { icon: 'ri-shield-check-line', label: 'SIA-Verified Guards', sub: 'Licence checked before work' },
+  { icon: 'ri-lock-line', label: 'Held Job Payment with Stripe', sub: 'Released after completion is confirmed' },
+  { icon: 'ri-money-pound-circle-line', label: 'Pay Per Shift', sub: 'No long contracts' },
+  { icon: 'ri-map-pin-2-line', label: 'UK Job Listings', sub: 'Cover depends on guard availability' },
 ];
 
 export default function TrustStrip() {
