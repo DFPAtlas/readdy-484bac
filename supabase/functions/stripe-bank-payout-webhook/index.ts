@@ -12,8 +12,10 @@ Deno.serve(async(req:Request)=>{
   const stripe=new Stripe(stripeKey,{apiVersion:'2023-10-16'});
   try {
     const keyIsLive=/^(?:sk|rk)_live_/.test(stripeKey);
-    let configuredSecret=Deno.env.get('STRIPE_BANK_PAYOUT_WEBHOOK_SECRET');
-    if(isQuickGuardSandbox(Deno.env.get('SUPABASE_URL') || '') && !configuredSecret){
+    const sandbox=isQuickGuardSandbox(Deno.env.get('SUPABASE_URL') || '');
+    // Production keeps its existing database-backed signing-key rotation.
+    let configuredSecret=sandbox?Deno.env.get('STRIPE_BANK_PAYOUT_WEBHOOK_SECRET'):undefined;
+    if(sandbox && !configuredSecret){
       const {data,error}=await db.from('sandbox_runtime_credentials').select('secret').eq('name','qg_sandbox_bank_payout_webhook').maybeSingle();
       if(error||!data?.secret) throw new Error('Sandbox bank payout webhook configuration missing');
       configuredSecret=data.secret;

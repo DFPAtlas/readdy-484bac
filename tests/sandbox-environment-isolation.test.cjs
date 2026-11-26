@@ -64,3 +64,26 @@ test('main webhook rejects a validly signed wrong-mode event before claiming or 
   load('supabase/functions/enhanced-stripe-webhook/index.ts',{'https://deno.land/std@0.168.0/http/server.ts':{serve(fn){handler=fn;}},'https://esm.sh/stripe@14.10.0?target=deno':Stripe,'https://esm.sh/@supabase/supabase-js@2.39.3':{createClient:()=>db}},{Deno:{env:{get:name=>({SUPABASE_URL:project,STRIPE_SECRET_KEY:'sk_test_fixture',SUPABASE_SERVICE_ROLE_KEY:'fixture-service',STRIPE_WEBHOOK_SECRET:'fixture-secret'})[name]}},console:{log(){},error(){}}});
   const response=await handler(new Request(project,{method:'POST',headers:{'stripe-signature':'fixture'},body:'{}'}));assert.equal(response.status,400);assert.equal((await response.json()).error,'Stripe environment mismatch');
 });
+
+test('production payout signing-key rotation ignores a sandbox environment-secret override',async()=>{
+  for(const livemode of [false,true]){
+    let handler;const reads=[],verified=[];let records=0;
+    const db={from(table){reads.push(table);assert.equal(table,'bank_payout_webhook_keys');return{select(){return this;},eq:async()=>({data:[{signing_secret:'previous-fixture',livemode},{signing_secret:'current-fixture',livemode}],error:null})};}};
+    class Stripe{constructor(){this.webhooks={constructEventAsync:async(_body,_signature,secret)=>{verified.push(secret);if(secret!=='current-fixture')throw Error('Signature mismatch');return{livemode,type:'payout.paid',account:'acct_synthetic',id:'evt_synthetic',data:{object:{id:'po_synthetic'}}};}};}}
+    load('supabase/functions/stripe-bank-payout-webhook/index.ts',{
+      'https://esm.sh/stripe@14.10.0?target=deno':Stripe,
+      'https://esm.sh/@supabase/supabase-js@2.39.3':{createClient:()=>db},
+      '../_shared/bank-payouts.ts':{bankPayoutEventTypes:['payout.paid'],recordBankPayout:async()=>{records++;return{status:'paid'};}},
+    },{Deno:{serve(fn){handler=fn;},env:{get:name=>({SUPABASE_URL:'https://production.example.invalid',STRIPE_SECRET_KEY:livemode?'sk_live_fixture':'sk_test_fixture',SUPABASE_SERVICE_ROLE_KEY:'fixture-service',STRIPE_BANK_PAYOUT_WEBHOOK_SECRET:'sandbox-only-fixture'})[name]}},console:{error(){}}});
+    const response=await handler(new Request('https://production.example.invalid',{method:'POST',headers:{'stripe-signature':'fixture'},body:'{}'}));
+    assert.equal(response.status,200);assert.deepEqual(reads,['bank_payout_webhook_keys']);assert.deepEqual(verified,['previous-fixture','current-fixture']);assert.equal(records,1);
+  }
+});
+
+test('missing sandbox payout credential fails closed without reading production rotation keys',async()=>{
+  let handler;const reads=[];let verifies=0;
+  const db={from(table){reads.push(table);assert.equal(table,'sandbox_runtime_credentials');return{select(){return this;},eq(){return this;},maybeSingle:async()=>({data:null,error:null})};}};
+  class Stripe{constructor(){this.webhooks={constructEventAsync:async()=>{verifies++;throw Error('Must not verify without the sandbox credential');}};}}
+  load('supabase/functions/stripe-bank-payout-webhook/index.ts',{'https://esm.sh/stripe@14.10.0?target=deno':Stripe,'https://esm.sh/@supabase/supabase-js@2.39.3':{createClient:()=>db}},{Deno:{serve(fn){handler=fn;},env:{get:name=>({SUPABASE_URL:project,STRIPE_SECRET_KEY:'sk_test_fixture',SUPABASE_SERVICE_ROLE_KEY:'fixture-service'})[name]}},console:{error(){}}});
+  const response=await handler(new Request(project,{method:'POST',headers:{'stripe-signature':'fixture'},body:'{}'}));assert.equal(response.status,500);assert.deepEqual(reads,['sandbox_runtime_credentials']);assert.equal(verifies,0);
+});

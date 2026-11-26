@@ -34,6 +34,8 @@ The two enabled test callbacks now target only sandbox `alfwwggavmyerjyqumuo`:
 
 The new connected-account endpoint retains API version `2025-11-17.clover`, matching the main test endpoint. Both handlers now require event mode to match the configured `sk_`/`rk_` key; sandbox never accepts live mode. Main-handler rejection occurs before acquiring an event claim or touching business data. Sandbox payout signing-key lookup fails closed instead of falling back to other database keys. Production's legacy payout key rotation path is preserved.
 
+Review correction: the environment-secret override is scoped to the sandbox as well as the Vault fallback. Otherwise, an existing production `STRIPE_BANK_PAYOUT_WEBHOOK_SECRET` would silently replace the active database rotation keys. The actual-handler regression reproduced rejection of a valid rotated-key event before this correction. New test/live production fixtures now try the active database keys successfully, while missing sandbox credentials still fail closed without reading production rotation keys. No real credential, webhook configuration or payment was changed by this correction.
+
 Native payout policy probes returned HTTP 400 for missing/invalid signatures, HTTP 400 for a correctly signed live-mode event, and HTTP 200 `{ignored:true}` for a correctly signed test-mode unsupported event. These establish signing-key wiring and rejection behavior only; they are not Stripe-originated delivery, checkout or payout settlement evidence.
 
 Sandbox deployed versions: renderer 46, registration 70, resend 22, main webhook 137, payout webhook 21. Gateway JWT settings were preserved; the renderer and webhooks perform their own authorization/signature checks.
