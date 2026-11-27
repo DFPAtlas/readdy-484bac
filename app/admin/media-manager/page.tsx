@@ -183,7 +183,7 @@ export default function MediaManager(){
     async function load(){
       setLoading(true);setError('');
       try{
-        const db=supabase.schema('public');
+        const db=supabase.schema('app');
         const [s,v,p]=await Promise.all([db.from('site_media_slots').select('slot_key,page_label,section_label,recommended_width,recommended_height').order('page_label'),db.from('site_media_versions').select('id,slot_key,width,height,byte_size,mime_type,created_at').order('created_at',{ascending:false}),db.from('site_media_publications').select('slot_key,version_id')]);
         if(s.error||v.error||p.error)throw new Error('Media registry unavailable. Check the migration and permissions.');
         if(live){setSlots(s.data??[]);setVersions(v.data??[]);setPublications(Object.fromEntries((p.data??[]).map(item=>[item.slot_key,item.version_id])));}

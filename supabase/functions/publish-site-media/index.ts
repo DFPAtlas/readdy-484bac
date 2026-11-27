@@ -18,10 +18,10 @@ Deno.serve(async (req: Request) => {
     if(!url||!key||!anon)return reply(503,{error:'Service unavailable'});
     const jwt=req.headers.get('authorization')?.match(/^Bearer ([^ ]+)$/i)?.[1];
     if(!jwt)return reply(401,{error:'Authentication required'});
-    const db=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
+    const db=createClient(url,key,{db:{schema:'app'},auth:{persistSession:false,autoRefreshToken:false}});
     const {data:{user},error:authError}=await db.auth.getUser(jwt);
     if(authError||!user)return reply(401,{error:'Invalid session'});
-    const caller=createClient(url,anon,{global:{headers:{Authorization:'Bearer '+jwt}},auth:{persistSession:false,autoRefreshToken:false}});
+    const caller=createClient(url,anon,{db:{schema:'app'},global:{headers:{Authorization:'Bearer '+jwt}},auth:{persistSession:false,autoRefreshToken:false}});
     const {data:active,error:activeError}=await caller.rpc('is_active_admin');
     if(activeError||active!==true)return reply(403,{error:'Active administrator with MFA required'});
     const {data:admin,error:roleError}=await db.schema('app').from('admin_users').select('role,is_active').eq('user_id',user.id).maybeSingle();
