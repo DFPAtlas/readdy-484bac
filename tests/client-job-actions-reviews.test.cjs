@@ -107,7 +107,10 @@ test('bulk cancellation uses the atomic RPC, skips terminal work and reports par
 });
 
 test('terminal cancellation modals provide support and never offer refund resolutions', () => {
-  const Modal = load('app/client/jobs/CancelJobModal.tsx', { '@/lib/client-job-actions': actions, '@/lib/supabase': { supabase: {} }, 'next/navigation': { useRouter: () => ({ push() {} }) } }).default;
+  const paymentGuidance = load('lib/guard-payment-guidance.ts');
+  const helpContent = load('lib/help-content.ts', { '@/lib/customer-guidance': guidance, '@/lib/guard-payment-guidance': paymentGuidance });
+  const bookingPolicy = load('app/client/jobs/BookingPolicySummary.tsx', { '@/lib/help-content': helpContent, 'next/link': { __esModule: true, default: props => React.createElement('a', props, props.children) } });
+  const Modal = load('app/client/jobs/CancelJobModal.tsx', { './BookingPolicySummary': bookingPolicy, '@/lib/client-job-actions': actions, '@/lib/supabase': { supabase: {} }, 'next/navigation': { useRouter: () => ({ push() {} }) } }).default;
   for (const status of ['completed', 'paid_out', 'payout_approved', 'review_pending', 'closed', 'cancelled', 'disputed', 'unknown']) {
     const html = renderToStaticMarkup(React.createElement(Modal, { job: job('job', status), onClose() {}, onSuccess() {} }));
     assert.match(html, /Cannot Cancel Job/); assert.match(html, /Contact Support/);
