@@ -165,7 +165,7 @@ export default function ClientDashboardPage() {
   const [blockedFeatureName, setBlockedFeatureName] = useState('');
   const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>();
   const [entitlementsLoaded, setEntitlementsLoaded] = useState(false);
-  const { clientLimit, loading: usageLoading } = useUsageLimits(userId);
+  const { clientLimit, loading: usageLoading, error: usageError, refresh: refreshUsage } = useUsageLimits(userId);
   const mountedRef = useRef(true);
   const loadDashboardRef = useRef<(() => Promise<void>) | null>(null);
   const loadingRef = useRef(false);
@@ -562,7 +562,7 @@ export default function ClientDashboardPage() {
       <PortalSidebar
         role="client"
         displayName={client.company_name || client.contact_name || "Client"}
-        subtitle={planLabel(userEntitlement?.plan_name || client.subscription_tier)}
+        subtitle={`Access: ${planLabel(userEntitlement?.plan_name || client.subscription_tier)}`}
         initials={initials}
         userId={userId}
         featureFlags={featureFlags}
@@ -927,10 +927,16 @@ export default function ClientDashboardPage() {
               />
               {featureFlags?.['client.advanced_matching'] !== false && <DynamicTopRecommendedGuards guards={recommendedGuards} />}
               <ClientPromoCard />
+              {!usageLoading && usageError && <div role="status" className="rounded-xl border border-amber-500/30 p-4 text-sm">
+                <p>Posting allowance unavailable. Please try again.</p>
+                <button type="button" className="mt-2 underline" onClick={refreshUsage}>Retry posting allowance</button>
+              </div>}
               {!usageLoading && clientLimit && (
                 <UsageLimitWidget
                   featureLabel="Job Posts"
                   icon="ri-briefcase-line"
+                  allowed={clientLimit.allowed}
+                  reason={clientLimit.reason}
                   limit={clientLimit.limit}
                   used={clientLimit.used}
                   remaining={clientLimit.remaining}

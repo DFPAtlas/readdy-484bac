@@ -78,7 +78,7 @@ export default function BillingSection({ subscription, profile, paymentMethodSta
   const status = sub ? statusBadge(sub.status) : { label: "Free", bg: "bg-slate-500/15", color: "text-slate-500" };
 
   const planInfo = [
-    { label: "Current Plan", value: sub?.plan_name || profile.plan_name || "Free" },
+    { label: "Billing Plan", value: sub?.plan_name || profile.plan_name || "Free" },
     { label: "Status", value: status.label, badge: true },
     { label: "Trial Status", value: trialDaysLeft !== null ? `${trialDaysLeft} days left` : "Not on trial" },
     { label: "Trial End Date", value: formatDate(sub?.trial_end_date || profile.trial_end_date) },

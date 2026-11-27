@@ -12,6 +12,8 @@ interface UsageLimitWidgetProps {
   periodEnd: string;
   audience: 'guard' | 'client';
   compact?: boolean;
+  allowed?: boolean;
+  reason?: string;
 }
 
 export default function UsageLimitWidget({
@@ -24,6 +26,8 @@ export default function UsageLimitWidget({
   periodEnd,
   audience,
   compact = false,
+  allowed,
+  reason,
 }: UsageLimitWidgetProps) {
   if (audience === 'guard') {
     return (
@@ -37,6 +41,10 @@ export default function UsageLimitWidget({
         ) : <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Application access could not be confirmed. Please refresh or contact support.</p>}
       </div>
     );
+  }
+  if (reason !== undefined && !((reason === 'unlimited' && allowed === true && limit === null)
+    || (((reason === 'ok' && allowed === true) || (reason === 'limit_reached' && allowed === false)) && limit !== null && remaining !== null))) {
+    return <div className="rounded-2xl border border-amber-500/30 p-5 text-sm" role="status">Posting allowance could not be confirmed. Please refresh or contact support.</div>;
   }
   const validPeriodEnd = periodEnd && !Number.isNaN(new Date(periodEnd).getTime());
   const isUnlimited = limit === null;
@@ -103,7 +111,7 @@ export default function UsageLimitWidget({
           </div>
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white">{featureLabel}</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{planName} Plan</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Access: {planName}</p>
           </div>
         </div>
         {isAtLimit && (
@@ -128,9 +136,7 @@ export default function UsageLimitWidget({
         <div className={`${bgColor} rounded-xl p-4 text-center border ${borderColor}`}>
           <i className={`ri-infinity-line text-2xl ${textColor}`}></i>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">No monthly limit</p>
-          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
-            Resets {validPeriodEnd ? new Date(periodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'date unavailable'}
-          </p>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">No posting quota reset is needed while this access is active.</p>
         </div>
       ) : (
         <>
