@@ -13,6 +13,7 @@ import LiveIndicator from '@/components/LiveIndicator';
 
 import ClientSpendingSummary from '../components/ClientSpendingSummary';
 import { loadClientFinanceRecords, paymentsInRange } from '@/lib/client-finance';
+import { loadClientReportJobs } from '@/lib/client-report-jobs';
 import JobHistoryReport from './JobHistoryReport';
 import FinanceReport from './FinanceReport';
 import AttendanceReport from './AttendanceReport';
@@ -124,40 +125,28 @@ export default function ClientReportsPage() {
       if (!current()) return;
       if (authError || !user) throw new Error('Sign in to load reports.');
 
-      const { data: client } = await supabase
+      const { data: client, error: clientError } = await supabase
         .from('clients')
         .select('id, company_name, subscription_tier, contact_name, email, phone, address:address_line1, city, postcode, vat_number')
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (!current()) return;
-      if (!client) throw new Error('Client reports could not be loaded.');
+      if (clientError || !client) throw new Error('Client reports could not be loaded.');
       setClientId(client.id);
       setCompanyName(client.company_name || 'Client');
       setSubscriptionTier(client.subscription_tier || 'Free');
       const parts = (client.company_name || 'Client').trim().split(' ');
       setInitials(parts.length >= 2 ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase() : (client.company_name || 'Client').slice(0, 2).toUpperCase());
 
-      const { data: jobs } = await supabase
-        .from('jobs')
-        .select('*, job_assignments(id, status, assigned_at, completed_at, payment_status, payment_amount, guards(id, full_name, sia_licence_number, sia_expiry_date, sia_verified, licence_types))')
-        .eq('client_id', client.id)
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false });
+      const { jobs, assignments, guards } = await loadClientReportJobs(supabase, client.id);
 
       const { transactions, subscriptionPayments } = await loadClientFinanceRecords(supabase, client.id, user.id);
 
       const supportRecords = await loadClientSupportReport(supabase, client.id, user.id);
 
-      const { data: assignments } = await supabase
-        .from('job_assignments')
-        .select('id, job_id, guard_id, status, assigned_at, completed_at, payment_status, payment_amount, guards(id, full_name, sia_licence_number, sia_expiry_date, sia_verified, licence_types, rating)')
-        .in('job_id', (jobs || []).map(j => j.id));
-
-      const { data: guards } = await supabase
-        .from('guards')
-        .select('id, full_name, sia_licence_number, sia_expiry_date, sia_verified, licence_types, rating, total_reviews, years_experience, is_active, verification_status')
-        .in('id', [...new Set((assignments || []).map(a => a.guard_id).filter(Boolean))]);
+      const { data: currentAuth, error: currentAuthError } = await supabase.auth.getUser();
+      if (currentAuthError || currentAuth.user?.id !== user.id) throw new Error('Your account changed. Reopen reports.');
 
       if (!current()) return;
       setReportData({

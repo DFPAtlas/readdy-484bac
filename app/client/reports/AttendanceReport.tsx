@@ -15,11 +15,17 @@ function getStatusColor(status: string) {
 }
 
 function escapeCsv(value: string | number | null | undefined): string {
-  const str = value === null || value === undefined ? '' : String(value);
+  const raw = value === null || value === undefined ? '' : String(value);
+  const str = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
   if (str.includes(',') || str.includes('"') || str.includes('\n')) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
+}
+
+function recordedTime(value: string | null | undefined): string | null {
+  if (!value || Number.isNaN(Date.parse(value))) return null;
+  return new Date(value).toLocaleString('en-GB', { timeZone: 'Europe/London' });
 }
 
 export default function AttendanceReport({
@@ -39,20 +45,26 @@ export default function AttendanceReport({
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   const guardsList = useMemo(() => {
-    const all = assignments.map(a => a.guards?.full_name).filter(Boolean);
-    return [...new Set(all)];
+    const guards = new Map<string, string>();
+    for (const a of assignments) {
+      const id = a.guard_id || a.guards?.id;
+      if (id) guards.set(id, a.guards?.full_name || 'Guard name unavailable');
+    }
+    return [...guards].map(([id, name]) => ({ id, name }));
   }, [assignments]);
 
   const filtered = useMemo(() => {
     return assignments.filter((a) => {
       if (statusFilter !== 'all' && a.status !== statusFilter) return false;
-      if (guardFilter && a.guards?.full_name !== guardFilter) return false;
+      if (guardFilter && (a.guard_id || a.guards?.id) !== guardFilter) return false;
       const job = jobs.find(j => j.id === a.job_id);
       if (reportRange.from && job?.start_date && job.start_date < reportRange.from) return false;
       if (reportRange.to && job?.start_date && job.start_date > reportRange.to) return false;
       return true;
     });
   }, [assignments, statusFilter, guardFilter, jobs, reportRange]);
+
+  const uniqueGuardCount = new Set(filtered.map(a => a.guard_id || a.guards?.id).filter(Boolean)).size;
 
   const jobMap = useMemo(() => {
     return Object.fromEntries(jobs.map(j => [j.id, j]));
@@ -67,16 +79,16 @@ export default function AttendanceReport({
       for (const a of filtered) {
         const job = jobMap[a.job_id];
         const row = [
-          a.guards?.full_name || 'Guard',
+          a.guards?.full_name || 'Guard name unavailable',
           job?.job_title || 'N/A',
           job?.start_date || 'N/A',
           job?.start_time || 'N/A',
           job?.end_time || 'N/A',
-          a.assigned_at ? new Date(a.assigned_at).toLocaleString('en-GB') : 'N/A',
-          a.completed_at ? new Date(a.completed_at).toLocaleString('en-GB') : 'N/A',
+          recordedTime(a.check_in_time) || 'N/A',
+          recordedTime(a.check_out_time) || 'N/A',
           a.status,
           a.payment_status || 'N/A',
-          a.payment_amount || 'N/A',
+          a.payment_amount ?? 'N/A',
         ];
         rows.push(row);
       }
@@ -98,16 +110,16 @@ export default function AttendanceReport({
       for (const a of filtered) {
         const job = jobMap[a.job_id];
         const row = [
-          a.guards?.full_name || 'Guard',
+          a.guards?.full_name || 'Guard name unavailable',
           job?.job_title || 'N/A',
           job?.start_date || 'N/A',
           job?.start_time || 'N/A',
           job?.end_time || 'N/A',
-          a.assigned_at ? new Date(a.assigned_at).toLocaleString('en-GB') : 'N/A',
-          a.completed_at ? new Date(a.completed_at).toLocaleString('en-GB') : 'N/A',
+          recordedTime(a.check_in_time) || 'N/A',
+          recordedTime(a.check_out_time) || 'N/A',
           a.status,
           a.payment_status || 'N/A',
-          a.payment_amount || 'N/A',
+          a.payment_amount ?? 'N/A',
         ].map(escapeCsv);
         lines.push(row.join(','));
       }
@@ -138,9 +150,9 @@ export default function AttendanceReport({
       <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg p-4 mb-6 flex items-start gap-3">
         <i className="ri-timer-line text-amber-400 text-xl mt-0.5"></i>
         <div>
-          <p className="text-sm font-medium text-amber-400">Clock-in tracking not yet available</p>
+          <p className="text-sm font-medium text-amber-400">Recorded attendance times</p>
           <p className="text-sm text-slate-400 mt-1">
-            This report shows assigned guards and scheduled shifts. Real-time clock-in and clock-out data will be available once the guard mobile app clock-in feature is deployed.
+            Check-in and check-out times are shown only when recorded. Assignment and completion dates are not used as clock-in or clock-out evidence.
           </p>
         </div>
       </div>
@@ -150,18 +162,20 @@ export default function AttendanceReport({
         <div className="flex-1 flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
             <select
+              aria-label="Filter attendance by guard"
               value={guardFilter}
               onChange={(e) => setGuardFilter(e.target.value)}
               className="w-full pl-3 pr-8 py-2 bg-[#162036] border border-[#1e2d4d] rounded-lg text-sm text-slate-300 focus:ring-2 focus:ring-teal-500 cursor-pointer"
             >
               <option value="">All Guards</option>
-              {guardsList.map(name => (
-                <option key={name} value={name}>{name}</option>
+              {guardsList.map(guard => (
+                <option key={guard.id} value={guard.id}>{guard.name}</option>
               ))}
             </select>
           </div>
           <div className="relative">
             <select
+              aria-label="Filter attendance by status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="pl-3 pr-8 py-2 bg-[#162036] border border-[#1e2d4d] rounded-lg text-sm text-slate-300 focus:ring-2 focus:ring-teal-500 cursor-pointer"
@@ -177,12 +191,14 @@ export default function AttendanceReport({
         <div className="flex items-center gap-2">
           <div className="hidden md:flex items-center bg-[#162036] rounded-lg border border-[#1e2d4d] overflow-hidden">
             <button
+              aria-label="Show attendance cards"
               onClick={() => setViewMode('cards')}
               className={`px-3 py-2 text-sm cursor-pointer ${viewMode === 'cards' ? 'bg-teal-500 text-white' : 'text-slate-400'}`}
             >
               <i className="ri-layout-grid-line"></i>
             </button>
             <button
+              aria-label="Show attendance table"
               onClick={() => setViewMode('table')}
               className={`px-3 py-2 text-sm cursor-pointer ${viewMode === 'table' ? 'bg-teal-500 text-white' : 'text-slate-400'}`}
             >
@@ -212,7 +228,7 @@ export default function AttendanceReport({
       <div className="flex items-center gap-4 text-sm text-slate-400 mb-4">
         <span>{filtered.length} shifts</span>
         <span className="text-[#1e2d4d]">|</span>
-        <span>{guardsList.length} unique guards</span>
+        <span>{uniqueGuardCount} unique guards</span>
       </div>
 
       {filtered.length === 0 ? (
@@ -232,7 +248,7 @@ export default function AttendanceReport({
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-base font-bold text-white">{a.guards?.full_name || 'Guard'}</h3>
+                      <h3 className="text-base font-bold text-white">{a.guards?.full_name || 'Guard name unavailable'}</h3>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(a.status)}`}>
                         {a.status || 'Unknown'}
                       </span>
@@ -255,29 +271,23 @@ export default function AttendanceReport({
                       <div className="bg-[#162036] rounded-lg p-3 border border-[#1e2d4d]">
                         <p className="text-xs text-slate-500 font-medium uppercase">Check-in</p>
                         <p className="text-sm text-slate-300 mt-1">
-                          {a.assigned_at
-                            ? new Date(a.assigned_at).toLocaleString('en-GB')
-                            : (
-                              <span className="text-amber-400 flex items-center gap-1">
-                                <i className="ri-timer-flash-line"></i>
-                                Scheduled — no clock-in yet
-                              </span>
-                            )
-                          }
+                          {recordedTime(a.check_in_time) || (
+                            <span className="text-amber-400 flex items-center gap-1">
+                              <i className="ri-timer-flash-line"></i>
+                              No check-in recorded
+                            </span>
+                          )}
                         </p>
                       </div>
                       <div className="bg-[#162036] rounded-lg p-3 border border-[#1e2d4d]">
                         <p className="text-xs text-slate-500 font-medium uppercase">Check-out</p>
                         <p className="text-sm text-slate-300 mt-1">
-                          {a.completed_at
-                            ? new Date(a.completed_at).toLocaleString('en-GB')
-                            : (
-                              <span className="text-slate-500 flex items-center gap-1">
-                                <i className="ri-timer-line"></i>
-                                Not completed yet
-                              </span>
-                            )
-                          }
+                          {recordedTime(a.check_out_time) || (
+                            <span className="text-slate-500 flex items-center gap-1">
+                              <i className="ri-timer-line"></i>
+                              No check-out recorded
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -314,7 +324,7 @@ export default function AttendanceReport({
                   return (
                     <tr key={a.id} className="hover:bg-[#162036]/50">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-slate-200 text-sm">{a.guards?.full_name || 'Guard'}</div>
+                        <div className="font-medium text-slate-200 text-sm">{a.guards?.full_name || 'Guard name unavailable'}</div>
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-400">{job?.job_title || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-slate-400">{job?.start_date || 'N/A'}</td>
@@ -322,10 +332,10 @@ export default function AttendanceReport({
                         {job?.start_time || 'N/A'} - {job?.end_time || 'N/A'}
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-400">
-                        {a.assigned_at ? new Date(a.assigned_at).toLocaleString('en-GB') : '—'}
+                        {recordedTime(a.check_in_time) || '—'}
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-400">
-                        {a.completed_at ? new Date(a.completed_at).toLocaleString('en-GB') : '—'}
+                        {recordedTime(a.check_out_time) || '—'}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(a.status)}`}>
