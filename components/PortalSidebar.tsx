@@ -12,7 +12,8 @@ import { useSidebar } from '@/lib/SidebarContext';
 import type React from 'react';
 import NotificationBadge from '@/components/NotificationBadge';
 import BrandLogo from '@/components/BrandLogo';
-import { planLabel } from '@/lib/client-journey';
+import { clientAccessLabel } from '@/lib/client-access-plan';
+import { useClientAccessPlan } from '@/hooks/useClientAccessPlan';
 
 interface PortalSidebarProps {
   companyTab?: CompanyTab;
@@ -109,6 +110,8 @@ export default function PortalSidebar({
 
   const navItems = role === 'client' ? CLIENT_NAV : role === 'company' ? COMPANY_NAV : GUARD_NAV;
   const isActive = (href: string) => role === 'company' ? href === companyTabHref(companyTab) : pathname === href;
+  const clientAccess = useClientAccessPlan(role === 'client', userId);
+  const accountSubtitle = role === 'client' ? clientAccessLabel(clientAccess) : subtitle;
 
   const mergedFlags: Record<string, boolean> = { ...internalFlags, ...explicitFlags };
 
@@ -203,8 +206,8 @@ export default function PortalSidebar({
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-white text-sm font-semibold truncate">{displayName}</p>
-              <span className={`text-xs ${accentColor === 'emerald' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-teal-500/15 text-teal-300'} px-2 py-0.5 rounded-full font-medium border ${accentColor === 'emerald' ? 'border-emerald-500/25' : 'border-teal-500/25'}`}>
-                {role === 'client' ? planLabel(subtitle) : subtitle}
+              <span className={`text-xs ${accentColor === 'emerald' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-teal-500/15 text-teal-300'} px-2 py-0.5 rounded-full font-medium border ${accentColor === 'emerald' ? 'border-emerald-500/25' : 'border-teal-500/25'}`} title={accountSubtitle}>
+                {accountSubtitle}
               </span>
             </div>
           )}
