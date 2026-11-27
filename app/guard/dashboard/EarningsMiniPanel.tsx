@@ -2,39 +2,20 @@
 
 import Link from 'next/link';
 import { JobAssignment } from './types';
+import type { GuardDashboardSummary } from '@/lib/guard-dashboard-summary';
 
 interface Props {
-  guard: any;
+  summary: GuardDashboardSummary | null;
   assignments: JobAssignment[];
 }
 
-export default function EarningsMiniPanel({ guard, assignments }: Props) {
+export default function EarningsMiniPanel({ summary, assignments }: Props) {
   const inProgress = assignments.filter(a => a.status === 'in_progress');
-  const pendingPayout = assignments.filter(a =>
-    ['pending', 'funded', 'payout_pending', 'processing'].includes(a.payment_status || '')
-  );
-
-  const pendingEarnings = pendingPayout.reduce((sum, a) => sum + (a.payment_amount || 0), 0);
-  const totalEarnings = Number(guard?.total_earnings || 0);
-  const paidEarnings = totalEarnings;
-  const completedCount = Number(guard?.total_jobs_completed || 0);
-
-  // Build real chart data from completed assignments sorted by job date
-  const recentCompleted = assignments.filter(a => a.status === 'completed')
-    .sort((a, b) => {
-      const da = (a.jobs as any)?.start_date || a.assigned_at || '';
-      const db = (b.jobs as any)?.start_date || b.assigned_at || '';
-      return da.localeCompare(db);
-    })
-    .slice(-7);
-
-  const maxAmount = Math.max(...recentCompleted.map(a => a.payment_amount || 0), 1);
-  const chartBars = recentCompleted.map(a => ({
-    height: ((a.payment_amount || 0) / maxAmount) * 100,
-    amount: a.payment_amount || 0,
-  }));
-
-  const hasEarnings = totalEarnings > 0 || chartBars.length > 0;
+  const money = (amount: number | undefined) => amount === undefined ? '—' : `£${amount.toFixed(2)}`;
+  const chart = summary?.recentPayouts || [];
+  const maxAmount = Math.max(...chart.map(row => row.amount), 1);
+  const chartBars = chart.map(row => ({ height: row.amount / maxAmount * 100, amount: row.amount }));
+  const hasEarnings = (summary?.earned || 0) > 0;
 
   return (
     <div className="bg-[#0d1b36] rounded-2xl border border-[#1a2b4a] shadow-lg p-5">
@@ -51,7 +32,7 @@ export default function EarningsMiniPanel({ guard, assignments }: Props) {
       </div>
 
       <div className="mb-4">
-        <p className="text-3xl font-bold text-white">£{totalEarnings.toFixed(2)}</p>
+        <p className="text-3xl font-bold text-white">{money(summary?.earned)}</p>
         <p className="text-xs text-slate-500 mt-1">Lifetime earnings</p>
       </div>
 
@@ -61,14 +42,14 @@ export default function EarningsMiniPanel({ guard, assignments }: Props) {
             <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
             <span className="text-[10px] text-slate-500">Paid Out</span>
           </div>
-          <p className="text-lg font-bold text-white">£{paidEarnings.toFixed(2)}</p>
+          <p className="text-lg font-bold text-white">{money(summary?.earned)}</p>
         </div>
         <div className="bg-[#0B1933] rounded-xl border border-[#1a2b4a] p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <div className="w-2 h-2 rounded-full bg-amber-400"></div>
-            <span className="text-[10px] text-slate-500">Pending</span>
+            <span className="text-[10px] text-slate-500">Pending payouts</span>
           </div>
-          <p className="text-lg font-bold text-white">£{pendingEarnings.toFixed(2)}</p>
+          <p className="text-lg font-bold text-white">{money(summary?.pending)}</p>
         </div>
         <div className="bg-[#0B1933] rounded-xl border border-[#1a2b4a] p-3">
           <div className="flex items-center gap-1.5 mb-1">
@@ -82,7 +63,7 @@ export default function EarningsMiniPanel({ guard, assignments }: Props) {
             <div className="w-2 h-2 rounded-full bg-teal-400"></div>
             <span className="text-[10px] text-slate-500">Completed</span>
           </div>
-          <p className="text-lg font-bold text-white">{completedCount}</p>
+          <p className="text-lg font-bold text-white">{summary?.completed ?? '—'}</p>
         </div>
       </div>
 
@@ -102,11 +83,11 @@ export default function EarningsMiniPanel({ guard, assignments }: Props) {
       ) : (
         <div className="h-16 bg-[#0B1933] rounded-xl border border-[#1a2b4a] flex flex-col items-center justify-center gap-1">
           <i className="ri-bar-chart-line text-slate-600 text-lg"></i>
-          <p className="text-[10px] text-slate-500">{hasEarnings ? 'Payout history is available in Payment Centre' : 'No earnings data yet'}</p>
+          <p className="text-[10px] text-slate-500">{!summary ? 'Earnings totals unavailable — retry dashboard data' : hasEarnings ? 'Payout history is available in Payment Centre' : 'No earnings data yet'}</p>
         </div>
       )}
       <p className="text-[10px] text-slate-600 text-center mt-2">
-        {chartBars.length > 0 ? 'Recent job earnings' : hasEarnings ? 'Verified paid-out total' : 'Complete shifts to start earning'}
+        {chartBars.length > 0 ? 'Recent released payouts' : hasEarnings ? 'Verified paid-out total' : summary ? 'Complete shifts to start earning' : 'Totals unavailable'}
       </p>
     </div>
   );

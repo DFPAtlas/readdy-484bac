@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { loadClientActivityRows, filterClientActivity, clientActivitySummary } from '@/lib/client-activity-read';
+import type { ClientActivityEntry as ActivityEntry } from '@/lib/client-activity-read';
+import { readAllClientRows } from '@/lib/client-job-list';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PortalSidebar from '@/components/PortalSidebar';
@@ -9,25 +12,6 @@ import ActivityFilters from './ActivityFilters';
 import ActivityExportModal from './ActivityExportModal';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-
-interface ActivityEntry {
-  id: string;
-  action_type: string;
-  action_description: string;
-  category: string;
-  related_job_id: string | null;
-  related_payment_id: string | null;
-  related_ticket_id: string | null;
-  related_guard_id: string | null;
-  related_site_id: string | null;
-  metadata: Record<string, unknown>;
-  ip_address: string | null;
-  created_at: string;
-  job_title?: string | null;
-  ticket_subject?: string | null;
-  guard_name?: string | null;
-  site_name?: string | null;
-}
 
 const CATEGORY_CONFIG: Record<string, { icon: string; color: string; bg: string; label: string }> = {
   account: { icon: 'ri-user-settings-line', color: 'text-blue-400', bg: 'bg-blue-500/15', label: 'Account' },
@@ -112,19 +96,11 @@ function ActivityLogContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
-  const [filteredActivities, setFilteredActivities] = useState<ActivityEntry[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const requestRef = useRef(0);
+  const invalidateRequests = useCallback(() => { requestRef.current++; }, []);
   const [companyName, setCompanyName] = useState('Client');
   const [initials, setInitials] = useState('CL');
-  const [, setClientId] = useState('');
-  const [stats, setStats] = useState({
-    total: 0,
-    today: 0,
-    thisWeek: 0,
-    jobsUpdated: 0,
-    paymentsUpdated: 0,
-    supportUpdates: 0,
-  });
-
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || 'all');
   const [actionFilter, setActionFilter] = useState(searchParams.get('action') || 'all');
@@ -135,7 +111,6 @@ function ActivityLogContent() {
   const [showExport, setShowExport] = useState(false);
   const [jobs, setJobs] = useState<{id: string; job_title: string}[]>([]);
   const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
   const PAGE_SIZE = 25;
 
   const getInitials = (name: string) => {
@@ -144,126 +119,75 @@ function ActivityLogContent() {
     return name.slice(0, 2).toUpperCase();
   };
 
-  const fetchActivities = useCallback(async (reset = false) => {
+  const fetchActivities = useCallback(async () => {
+    const request = ++requestRef.current;
+    setLoading(true);
+    setLoadError(null);
     try {
-      if (reset) {
-        setPage(0);
-        setLoading(true);
-      }
-      const currentPage = reset ? 0 : page;
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: client } = await supabase
-        .from('clients')
-        .select('id, company_name')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!client) return;
-      setClientId(client.id);
+      const auth = await supabase.auth.getUser();
+      const user = auth.data.user;
+      if (auth.error || !user) throw new Error('Sign in again to view activity.');
+      const clientResult = await supabase.from('clients').select('id, company_name')
+        .eq('user_id', user.id).maybeSingle();
+      const client = clientResult.data;
+      if (clientResult.error || !client) throw new Error('Your client account could not be loaded.');
+      const [rows, jobData] = await Promise.all([
+        loadClientActivityRows(supabase, client.id),
+        readAllClientRows(() => supabase.from('jobs').select('id, job_title')
+          .eq('client_id', client.id).eq('is_deleted', false)
+          .order('created_at', { ascending: false }).order('id', { ascending: true })),
+      ]);
+      const current = await supabase.auth.getUser();
+      if (request !== requestRef.current) return;
+      if (current.error || current.data.user?.id !== user.id) throw new Error('Your session changed. Please retry.');
+      const jobTitles = new Map(jobData.map(job => [job.id, job.job_title]));
+      setActivities(rows.map(row => ({ ...row, job_title: jobTitles.get(row.related_job_id) || null })));
+      setJobs(jobData);
       setCompanyName(client.company_name || 'Client');
       setInitials(getInitials(client.company_name || 'Client'));
-
-      let query = supabase
-        .from('client_activity_log')
-        .select('*')
-        .eq('client_id', client.id)
-        .order('created_at', { ascending: false })
-        .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
-
-      if (categoryFilter !== 'all') {
-        query = query.eq('category', categoryFilter);
-      }
-      if (actionFilter !== 'all') {
-        query = query.eq('action_type', actionFilter);
-      }
-      if (dateFrom) {
-        query = query.gte('created_at', dateFrom);
-      }
-      if (dateTo) {
-        query = query.lte('created_at', dateTo + 'T23:59:59');
-      }
-      if (relatedJobFilter) {
-        query = query.eq('related_job_id', relatedJobFilter);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const results = (data || []) as ActivityEntry[];
-      setHasMore(results.length === PAGE_SIZE);
-
-      if (reset) {
-        setActivities(results);
-      } else {
-        setActivities(prev => [...prev, ...results]);
-      }
-
-      const { data: jobData } = await supabase
-        .from('jobs')
-        .select('id, job_title')
-        .eq('client_id', client.id)
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false })
-        .limit(50);
-      setJobs((jobData || []) as {id: string; job_title: string}[]);
-
-      const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
-      const { data: allActivity } = await supabase
-        .from('client_activity_log')
-        .select('created_at, category, action_type')
-        .eq('client_id', client.id)
-        .gte('created_at', startOfWeek);
-
-      const all = allActivity || [];
-      const today = all.filter(a => a.created_at >= startOfDay);
-      const week = all.filter(a => a.created_at >= startOfWeek);
-      const jobsUpdated = all.filter(a => a.category === 'job' && a.created_at >= startOfDay).length;
-      const paymentsUpdated = all.filter(a => a.category === 'payment' && a.created_at >= startOfDay).length;
-      const supportUpdates = all.filter(a => a.category === 'support' && (a.action_type === 'ticket_created' || a.action_type === 'ticket_updated') && a.created_at >= startOfDay).length;
-
-      setStats({
-        total: all.length,
-        today: today.length,
-        thisWeek: week.length,
-        jobsUpdated,
-        paymentsUpdated,
-        supportUpdates,
-      });
+      setPage(0);
     } catch (err) {
-      console.error('Error fetching activity:', err);
+      if (request !== requestRef.current) return;
+      setActivities([]);
+      setJobs([]);
+      setLoadError(err instanceof Error ? err.message : 'Activity could not be loaded. Please retry.');
     } finally {
-      setLoading(false);
+      if (request === requestRef.current) setLoading(false);
     }
-  }, [categoryFilter, actionFilter, dateFrom, dateTo, relatedJobFilter, page]);
+  }, []);
 
   useEffect(() => {
-    fetchActivities(true);
-  }, [fetchActivities]);
+    if (authLoading || !allowed) return;
+    void fetchActivities();
+    const refresh = () => { void fetchActivities(); };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== 'SIGNED_OUT' && event !== 'SIGNED_IN') return;
+      // Clear the previous owner's data before the deferred authenticated read.
+      requestRef.current++;
+      setActivities([]);
+      setJobs([]);
+      setLoading(true);
+      timer = setTimeout(refresh, 0);
+    });
+    window.addEventListener('focus', refresh);
+    return () => {
+      invalidateRequests();
+      clearTimeout(timer);
+      subscription.unsubscribe();
+      window.removeEventListener('focus', refresh);
+    };
+  }, [authLoading, allowed, fetchActivities, invalidateRequests]);
 
-  useEffect(() => {
-    let filtered = activities;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(a =>
-        a.action_description.toLowerCase().includes(q) ||
-        (a.job_title || '').toLowerCase().includes(q) ||
-        (a.ticket_subject || '').toLowerCase().includes(q) ||
-        (a.guard_name || '').toLowerCase().includes(q)
-      );
-    }
-    setFilteredActivities(filtered);
-  }, [searchQuery, activities]);
-
-  const loadMore = () => {
-    setPage(prev => prev + 1);
-    fetchActivities(false);
-  };
+  const filteredActivities = useMemo(() => filterClientActivity(activities, {
+    search: searchQuery, category: categoryFilter, action: actionFilter,
+    from: dateFrom, to: dateTo, jobId: relatedJobFilter,
+  }), [activities, searchQuery, categoryFilter, actionFilter, dateFrom, dateTo, relatedJobFilter]);
+  const stats = useMemo(() => clientActivitySummary(filteredActivities), [filteredActivities]);
+  const visibleActivities = filteredActivities.slice(0, (page + 1) * PAGE_SIZE);
+  const hasMore = visibleActivities.length < filteredActivities.length;
+  useEffect(() => { setPage(0); }, [searchQuery, categoryFilter, actionFilter, dateFrom, dateTo, relatedJobFilter]);
+  const loadMore = () => setPage(previous => previous + 1);
 
   const clearFilters = () => {
     setSearchQuery('');
@@ -273,7 +197,6 @@ function ActivityLogContent() {
     setDateTo('');
     setRelatedJobFilter('');
     setPage(0);
-    fetchActivities(true);
   };
 
   const activeFiltersCount = [
@@ -374,6 +297,7 @@ function ActivityLogContent() {
               <p className="text-sm text-slate-400 mt-1">Track all actions across your account</p>
             </div>
             <div className="flex items-center gap-3">
+              <button onClick={() => void fetchActivities()} className="text-sm text-teal-400">Refresh activity</button>
               <button
                 onClick={() => setShowExport(true)}
                 disabled={filteredActivities.length === 0}
@@ -401,30 +325,37 @@ function ActivityLogContent() {
             </div>
           </div>
 
+          {loadError && (
+            <div role="alert" className="mb-6 rounded-xl border border-amber-500/30 p-4 text-amber-300">
+              <p>{loadError}</p>
+              <button onClick={() => void fetchActivities()} className="mt-2 underline">Retry activity</button>
+            </div>
+          )}
+          <p className="mb-3 text-xs text-slate-400">Totals and exports use all matching events, across every page. Today and Last 7 Days use UK calendar dates.</p>
           {/* Stats Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
             <div className="bg-[#111d35] border border-[#1e2d4d] rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold text-white">{stats.total}</p>
+              <p className="text-2xl font-bold text-white">{loadError ? '—' : stats.total}</p>
               <p className="text-xs text-slate-400">Total Events</p>
             </div>
             <div className="bg-[#111d35] border border-[#1e2d4d] rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold text-teal-400">{stats.today}</p>
+              <p className="text-2xl font-bold text-teal-400">{loadError ? '—' : stats.today}</p>
               <p className="text-xs text-slate-400">Today</p>
             </div>
             <div className="bg-[#111d35] border border-[#1e2d4d] rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold text-sky-400">{stats.thisWeek}</p>
-              <p className="text-xs text-slate-400">This Week</p>
+              <p className="text-2xl font-bold text-sky-400">{loadError ? '—' : stats.thisWeek}</p>
+              <p className="text-xs text-slate-400">Last 7 Days</p>
             </div>
             <div className="bg-[#111d35] border border-[#1e2d4d] rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold text-emerald-400">{stats.jobsUpdated}</p>
+              <p className="text-2xl font-bold text-emerald-400">{loadError ? '—' : stats.jobsUpdated}</p>
               <p className="text-xs text-slate-400">Job Updates</p>
             </div>
             <div className="bg-[#111d35] border border-[#1e2d4d] rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold text-amber-400">{stats.paymentsUpdated}</p>
+              <p className="text-2xl font-bold text-amber-400">{loadError ? '—' : stats.paymentsUpdated}</p>
               <p className="text-xs text-slate-400">Payment Updates</p>
             </div>
             <div className="bg-[#111d35] border border-[#1e2d4d] rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold text-orange-400">{stats.supportUpdates}</p>
+              <p className="text-2xl font-bold text-orange-400">{loadError ? '—' : stats.supportUpdates}</p>
               <p className="text-xs text-slate-400">Support Updates</p>
             </div>
           </div>
@@ -446,7 +377,7 @@ function ActivityLogContent() {
               onRelatedJobChange={setRelatedJobFilter}
               jobs={jobs}
               onClear={clearFilters}
-              onApply={() => { setPage(0); fetchActivities(true); }}
+              onApply={() => setShowFilters(false)}
             />
           )}
 
@@ -454,35 +385,35 @@ function ActivityLogContent() {
           {activeFiltersCount > 0 && !showFilters && (
             <div className="flex items-center gap-2 mb-4 flex-wrap">
               {categoryFilter !== 'all' && (
-                <button onClick={() => { setCategoryFilter('all'); setPage(0); fetchActivities(true); }}
+                <button onClick={() => { setCategoryFilter('all'); setPage(0); }}
                   className="flex items-center gap-1 px-3 py-1.5 bg-teal-500/15 border border-teal-500/25 text-teal-400 rounded-full text-xs font-medium cursor-pointer whitespace-nowrap">
                   {CATEGORIES.find(c => c.value === categoryFilter)?.label}
                   <i className="ri-close-line"></i>
                 </button>
               )}
               {actionFilter !== 'all' && (
-                <button onClick={() => { setActionFilter('all'); setPage(0); fetchActivities(true); }}
+                <button onClick={() => { setActionFilter('all'); setPage(0); }}
                   className="flex items-center gap-1 px-3 py-1.5 bg-teal-500/15 border border-teal-500/25 text-teal-400 rounded-full text-xs font-medium cursor-pointer whitespace-nowrap">
                   {ACTION_TYPES.find(a => a.value === actionFilter)?.label}
                   <i className="ri-close-line"></i>
                 </button>
               )}
               {dateFrom && (
-                <button onClick={() => { setDateFrom(''); setPage(0); fetchActivities(true); }}
+                <button onClick={() => { setDateFrom(''); setPage(0); }}
                   className="flex items-center gap-1 px-3 py-1.5 bg-teal-500/15 border border-teal-500/25 text-teal-400 rounded-full text-xs font-medium cursor-pointer whitespace-nowrap">
                   From {dateFrom}
                   <i className="ri-close-line"></i>
                 </button>
               )}
               {dateTo && (
-                <button onClick={() => { setDateTo(''); setPage(0); fetchActivities(true); }}
+                <button onClick={() => { setDateTo(''); setPage(0); }}
                   className="flex items-center gap-1 px-3 py-1.5 bg-teal-500/15 border border-teal-500/25 text-teal-400 rounded-full text-xs font-medium cursor-pointer whitespace-nowrap">
                   To {dateTo}
                   <i className="ri-close-line"></i>
                 </button>
               )}
               {relatedJobFilter && (
-                <button onClick={() => { setRelatedJobFilter(''); setPage(0); fetchActivities(true); }}
+                <button onClick={() => { setRelatedJobFilter(''); setPage(0); }}
                   className="flex items-center gap-1 px-3 py-1.5 bg-teal-500/15 border border-teal-500/25 text-teal-400 rounded-full text-xs font-medium cursor-pointer whitespace-nowrap">
                   Job: {jobs.find(j => j.id === relatedJobFilter)?.job_title || 'Selected'}
                   <i className="ri-close-line"></i>
@@ -497,7 +428,7 @@ function ActivityLogContent() {
 
           {/* Activity List */}
           <div className="bg-[#111d35] border border-[#1e2d4d] rounded-2xl overflow-hidden">
-            {filteredActivities.length === 0 ? (
+            {loadError ? null : filteredActivities.length === 0 ? (
               <div className="text-center py-16">
                 <div className="w-16 h-16 bg-[#162036] rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <i className="ri-history-line text-3xl text-slate-600"></i>
@@ -517,7 +448,8 @@ function ActivityLogContent() {
               </div>
             ) : (
               <div className="divide-y divide-[#1e2d4d]">
-                {filteredActivities.map((activity) => {
+                <div className="px-6 py-2 text-xs text-slate-400">Showing {visibleActivities.length} of {filteredActivities.length} matching events</div>
+                {visibleActivities.map((activity) => {
                   const config = getConfig(activity.category);
                   const relatedLink = getRelatedLink(activity);
                   const relatedLabel = getRelatedLabel(activity);
@@ -561,7 +493,7 @@ function ActivityLogContent() {
               </div>
             )}
 
-            {hasMore && filteredActivities.length > 0 && !searchQuery && (
+            {hasMore && !loadError && (
               <div className="px-6 py-4 border-t border-[#1e2d4d] text-center">
                 <button onClick={loadMore}
                   className="px-6 py-2.5 text-sm font-medium text-teal-400 hover:bg-teal-500/10 rounded-xl transition-colors cursor-pointer whitespace-nowrap">
