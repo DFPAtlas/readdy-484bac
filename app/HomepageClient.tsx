@@ -2,25 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
 import TrustBadges from './TrustBadges';
 
 export default function HomepageClient() {
   const [isVisible, setIsVisible] = useState<Record<string, boolean>>({});
   const [jsEnabled, setJsEnabled] = useState(false);
-  const [stats, setStats] = useState<{
-    totalGuards: number | null;
-    completedJobs: number | null;
-    activeClients: number | null;
-    successRate: number | null;
-  }>({
-    totalGuards: null,
-    completedJobs: null,
-    activeClients: null,
-    successRate: null,
-  });
-  const [loadingStats, setLoadingStats] = useState(true);
-
   useEffect(() => {
     setJsEnabled(true);
     const observer = new IntersectionObserver(
@@ -42,55 +28,6 @@ export default function HomepageClient() {
 
     return () => observer.disconnect();
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fetchStats = async () => {
-      try {
-        const [guardsRes, completedJobsRes, clientsRes, totalAssignmentsRes, completedAssignmentsRes] = await Promise.all([
-          supabase.from('guards').select('id', { count: 'exact', head: true }),
-          supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
-          supabase.from('clients').select('id', { count: 'exact', head: true }),
-          supabase.from('job_assignments').select('id', { count: 'exact', head: true }),
-          supabase.from('job_assignments').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
-        ]);
-
-        if (cancelled) return;
-
-        const totalGuards = guardsRes.count ?? 0;
-        const completedJobs = completedJobsRes.count ?? 0;
-        const activeClients = clientsRes.count ?? 0;
-
-        const totalAssignments = totalAssignmentsRes.count ?? 0;
-        const completedAssignments = completedAssignmentsRes.count ?? 0;
-        const successRate =
-          totalAssignments > 0
-            ? Math.round((completedAssignments / totalAssignments) * 100)
-            : 0;
-
-        setStats({
-          totalGuards,
-          completedJobs,
-          activeClients,
-          successRate: totalAssignments > 0 ? successRate : null,
-        });
-      } catch {
-        // silent fail
-      } finally {
-        if (!cancelled) setLoadingStats(false);
-      }
-    };
-    fetchStats();
-    return () => { cancelled = true; };
-  }, []);
-
-  const MIN_STAT = 50;
-  const statsReady = !loadingStats;
-  const showGuards = statsReady && stats.totalGuards !== null && stats.totalGuards >= MIN_STAT;
-  const showJobs = statsReady && stats.completedJobs !== null && stats.completedJobs >= MIN_STAT;
-  const showClients = statsReady && stats.activeClients !== null && stats.activeClients >= MIN_STAT;
-  const showSuccessRate = statsReady && stats.successRate !== null && stats.successRate >= MIN_STAT;
-  const showStatsSection = statsReady && (showGuards || showJobs || showClients);
 
   return (
     <>
@@ -333,69 +270,6 @@ export default function HomepageClient() {
       </section>
 
       <TrustBadges />
-
-      {showStatsSection && (
-      <section className="py-20 bg-[#0B1933] border-y border-slate-800/60" aria-labelledby="stats-heading">
-        <div className="max-w-7xl mx-auto px-6 md:px-8">
-          <h2 id="stats-heading" className="sr-only">
-            Platform Statistics
-          </h2>
-          <div
-            id="stats"
-            data-animate
-            className={`grid md:grid-cols-4 gap-8 text-center transition-all duration-1000 ${
-              jsEnabled && !isVisible['stats'] ? 'opacity-0 translate-y-10' : 'opacity-100 translate-y-0'
-            }`}
-            role="group"
-            aria-label="Platform statistics"
-          >
-            {showGuards && (
-            <figure className="group">
-              <div className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 transition-all duration-300 hover:border-teal-500/30 hover:-translate-y-1">
-                <div className="text-4xl font-bold text-teal-400 mb-2">
-                  <span>{stats.totalGuards !== null ? `${stats.totalGuards.toLocaleString()}+` : ''}</span>
-                </div>
-                <figcaption className="text-slate-400 font-medium">Guard profiles</figcaption>
-              </div>
-            </figure>
-            )}
-
-            {showJobs && (
-            <figure className="group">
-              <div className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 transition-all duration-300 hover:border-teal-500/30 hover:-translate-y-1">
-                <div className="text-4xl font-bold text-teal-400 mb-2">
-                  <span>{stats.completedJobs !== null ? `${stats.completedJobs.toLocaleString()}+` : ''}</span>
-                </div>
-                <figcaption className="text-slate-400 font-medium">Jobs Completed</figcaption>
-              </div>
-            </figure>
-            )}
-
-            {showClients && (
-            <figure className="group">
-              <div className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 transition-all duration-300 hover:border-teal-500/30 hover:-translate-y-1">
-                <div className="text-4xl font-bold text-teal-400 mb-2">
-                  <span>{stats.activeClients !== null ? `${stats.activeClients.toLocaleString()}+` : ''}</span>
-                </div>
-                <figcaption className="text-slate-400 font-medium">Active Clients</figcaption>
-              </div>
-            </figure>
-            )}
-
-            {showSuccessRate && (
-              <figure className="group">
-                <div className="bg-[#111d35] border border-slate-700/50 rounded-2xl p-8 transition-all duration-300 hover:border-teal-500/30 hover:-translate-y-1">
-                  <div className="text-4xl font-bold text-teal-400 mb-2">
-                    <span>{stats.successRate !== null ? `${stats.successRate}%` : ''}</span>
-                  </div>
-                  <figcaption className="text-slate-400 font-medium">Completed assignment rate</figcaption>
-                </div>
-              </figure>
-            )}
-          </div>
-        </div>
-      </section>
-      )}
 
       <section className="py-20 bg-[#0B1933] border-y border-slate-800/60" aria-labelledby="cities-heading">
         <div className="max-w-7xl mx-auto px-6 md:px-8">
