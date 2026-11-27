@@ -32,6 +32,21 @@ test('completion retry keeps newest result and preserves genuine transport error
 test('completion cleanup prevents a late session lookup from starting a fetch',async()=>{
  const h=completionHarness();const session=deferred();h.sessions.push(session.promise);h.r.render({clientId:'client'});await h.r.runEffects();h.r.unmount();session.resolve({data:{session:{access_token:'token'}}});await flush();assert.equal(h.calls.length,0);
 });
+test('completion transport failures identify the unavailable panel and retry recovers',async()=>{
+ const h=completionHarness(),props={clientId:'client'};
+ h.responses.push(Promise.reject(new TypeError('Failed to fetch')));
+ h.r.render(props);await h.r.runEffects();let api=h.r.render(props);
+ assert.equal(api.error,'Unable to load completion requests. Check your connection and retry.');
+ assert.equal(api.loading,false);assert.deepEqual(api.requests,[]);
+ await api.loadRequests();api=h.r.render(props);
+ assert.equal(api.error,'');assert.equal(api.loading,false);assert.equal(h.calls.length,2);h.r.unmount();
+});
+test('completion requires a session before any read request and reports expiry honestly',async()=>{
+ const h=completionHarness();h.sessions.push(Promise.resolve({data:{session:null}}));
+ h.r.render({clientId:'client'});await h.r.runEffects();const api=h.r.render({clientId:'client'});
+ assert.equal(h.calls.length,0);assert.equal(api.loading,false);
+ assert.equal(api.error,'Your session has expired. Please sign in again.');h.r.unmount();
+});
 function drawerHarness(){
  const source=fs.readFileSync('app/client/jobs/JobDetailDrawer.tsx','utf8');const marker='export default function JobDetailDrawer({ job, clientId, onClose }: JobDetailDrawerProps) {';const body=source.slice(source.indexOf(marker)+marker.length,source.indexOf('  const formatDate ='));
  const assignments=[],calls=[],failures=new Map();const db={schema:()=>db,from:table=>{let job,client;const q={select:()=>q,eq:(k,v)=>{if(k==='job_id')job=v;if(k==='client_id')client=v;return q},order:()=>q,limit:()=>q,maybeSingle:()=>q,then:(resolve,reject)=>{calls.push({table,job,client});return Promise.resolve(failures.has(table)?{data:null,error:failures.get(table)}:{data:table==='job_cancellations'?{id:'cancel-'+job}:[{id:table+'-'+job,guard_id:'guard-'+client}]}).then(resolve,reject)}};return q}};

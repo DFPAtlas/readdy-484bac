@@ -47,6 +47,7 @@ export default function CompletionApprovalPanel({ clientId, jobId, onReviewed }:
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!isCurrent()) return;
+      if (!sessionData.session?.access_token) throw new Error('Your session has expired. Please sign in again.');
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-completion-requests`,
         {
@@ -66,7 +67,9 @@ export default function CompletionApprovalPanel({ clientId, jobId, onReviewed }:
       const pending = data.requests.filter((r: CompletionRequest) => r.status === 'pending' && (!jobId || r.job_id === jobId));
       setRequests(pending);
     } catch (err: any) {
-      if (isCurrent()) setError(err.message || 'Unable to load completion requests');
+      if (isCurrent()) setError(err instanceof TypeError
+        ? 'Unable to load completion requests. Check your connection and retry.'
+        : err.message || 'Unable to load completion requests');
     } finally {
       if (isCurrent()) setLoading(false);
     }
