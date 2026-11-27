@@ -8,6 +8,7 @@ import { guardProfileCompletion } from '@/lib/guard-profile-completion';
 
 interface Props {
   guard: Guard | null;
+  completedShifts?: number | null;
   onAvailabilityToggle?: () => void;
   planName?: string;
   subscriptionStatus?: string;
@@ -37,7 +38,7 @@ function getVerificationBadge(status: string | null) {
   return { label: 'Unknown', color: 'slate', icon: 'ri-question-line' };
 }
 
-export default function ProfileHeroCard({ guard, onAvailabilityToggle, planName, subscriptionStatus }: Props) {
+export default function ProfileHeroCard({ guard, completedShifts, onAvailabilityToggle, planName, subscriptionStatus }: Props) {
   if (!guard) return null;
 
   const initials = guard.full_name
@@ -123,7 +124,7 @@ export default function ProfileHeroCard({ guard, onAvailabilityToggle, planName,
                 <i className="ri-briefcase-line text-teal-400 text-sm"></i>
                 <span className="text-xs text-slate-500">Jobs Done</span>
               </div>
-              <p className="text-lg font-bold text-white">{guard.total_jobs_completed || 0}</p>
+              <p className="text-lg font-bold text-white">{completedShifts ?? '—'}</p>
             </div>
             <div className="bg-[#0B1933] rounded-xl border border-[#1a2b4a] p-3">
               <div className="flex items-center gap-1.5 mb-1">

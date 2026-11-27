@@ -52,7 +52,8 @@ import EarningsMiniPanel from './EarningsMiniPanel';
 import MobileQuickActions from './MobileQuickActions';
 import QuickActionsPanel from './QuickActionsPanel';
 import PaymentFlowCard from '@/components/guard/PaymentFlowCard';
-import { sumPaidGuardPayouts } from '@/lib/payments/guardPaymentDisplay';
+import { loadGuardDashboardSummary } from '@/lib/guard-dashboard-summary';
+import type { GuardDashboardSummary } from '@/lib/guard-dashboard-summary';
 import { formatDateOnly } from '@/lib/date-only';
 
 import { Guard, JobAssignment, JobApplication, AvailableJob, AvailableJobWithDistance, ClientResponse, ShiftItem } from './types';
@@ -62,11 +63,13 @@ export default function GuardDashboardClient() {
   const router = useSafeRouter();
   const { loading: authLoading, allowed, roleSwitch, error: accessError, retry: retryAccess } = useGuardGuard();
   const [guard, setGuard] = useState<Guard | null>(null);
+  const [guardSummary, setGuardSummary] = useState<GuardDashboardSummary | null>(null);
   const [guardUserId, setGuardUserId] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<JobAssignment[]>([]);
   const [upcomingJobs, setUpcomingJobs] = useState<JobAssignment[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [responses, setResponses] = useState<ClientResponse[]>([]);
+  const [availableJobsCount, setAvailableJobsCount] = useState<number | null>(null);
   const [availableJobs, setAvailableJobs] = useState<AvailableJob[]>([]);
   const [availableJobsPage, setAvailableJobsPage] = useState(0);
   const [hasMoreAvailableJobs, setHasMoreAvailableJobs] = useState(true);
@@ -231,21 +234,7 @@ export default function GuardDashboardClient() {
         }
         return;
       }
-      const { data: paidPayouts, error: payoutError } = await supabase
-        .from('guard_payouts')
-        .select('status, amount, net_amount')
-        .eq('guard_id', data.id);
-
-      if (!isCurrent()) return;
-
-      setGuard({
-        ...data,
-        // Payout rows are the financial source of truth. Retain the legacy
-        // profile aggregate only if the protected payout query is unavailable.
-        total_earnings: payoutError
-          ? data.total_earnings
-          : sumPaidGuardPayouts(paidPayouts || []),
-      });
+      setGuard(data);
     } catch {
       if (!isCurrent()) return;
       setDataErrors(prev => [...prev, 'guard_profile']);
@@ -253,6 +242,24 @@ export default function GuardDashboardClient() {
       setDataLoadFailed(true);
     }
   }, [beginRead, traceLog]);
+  const loadGuardSummary = useCallback(async (userId: string) => {
+    if (readScopeRef.current.userId !== userId) return;
+    const isCurrent = beginRead('loadGuardSummary');
+    if (!isCurrent()) return;
+    setGuardSummary(null);
+    try {
+      const result = await supabase.from('guards').select('id').eq('user_id', userId).maybeSingle();
+      if (result.error || !result.data?.id) throw new Error('Guard account unavailable');
+      const summary = await loadGuardDashboardSummary(supabase, result.data.id);
+      if (!isCurrent()) return;
+      setGuardSummary(summary);
+      setDataErrors(previous => previous.filter(section => section !== 'activity_totals'));
+    } catch {
+      if (!isCurrent()) return;
+      setGuardSummary(null);
+      setDataErrors(previous => [...new Set([...previous, 'activity_totals'])]);
+    }
+  }, [beginRead]);
   const loadUserEntitlement = useCallback(async (userId: string) => {
     if (userId && readScopeRef.current.userId !== userId) return;
     const isCurrent = beginRead('loadUserEntitlement');
@@ -454,10 +461,11 @@ export default function GuardDashboardClient() {
   const loadAvailableJobs = useCallback(async (page: number = 0) => {
     const isCurrent = beginRead('loadAvailableJobs');
     if (!isCurrent()) return;
+    if (page === 0) setAvailableJobsCount(null);
     try {
       const from = page * AVAILABLE_JOBS_PAGE_SIZE;
       const to = from + AVAILABLE_JOBS_PAGE_SIZE - 1;
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from('jobs')
         .select(`
           id,
@@ -474,14 +482,15 @@ export default function GuardDashboardClient() {
           clients (
             company_name
           )
-        `)
+        `, { count: 'exact' })
         .eq('status', 'open')
         .eq('is_deleted', false)
         .gte('start_date', londonCalendarDate())
         .order('start_date', { ascending: true })
         .range(from, to);
       if (!isCurrent()) return;
-      if (error) throw error;
+      if (error || !Number.isSafeInteger(count) || count! < 0) throw new Error('Available job total could not be loaded');
+      setAvailableJobsCount(count);
       const fetched = (data || []).map(row => ({ ...row, clients: oneRelation(row.clients) }));
       traceLog('loadAvailableJobs', { page, count: fetched.length });
       if (page === 0) {
@@ -498,6 +507,7 @@ export default function GuardDashboardClient() {
     } catch {
       traceLog('loadAvailableJobs', { error: true });
       if (!isCurrent()) return;
+      setAvailableJobsCount(null);
       setDataErrors(prev => [...prev, 'available_jobs']);
     }
   }, [beginRead, traceLog]);
@@ -512,6 +522,7 @@ export default function GuardDashboardClient() {
     setIsAdmin(adminMode);
     await Promise.all([
       loadGuardProfile(userId, adminMode),
+      loadGuardSummary(userId),
       loadJobAssignments(userId),
       loadJobApplications(userId),
       loadClientResponses(userId),
@@ -523,7 +534,7 @@ export default function GuardDashboardClient() {
     if (!isCurrent()) return;
     traceLog('loadDashboardDataComplete', { userId });
     setLoading(false);
-  }, [beginRead, traceLog, loadGuardProfile, loadUserEntitlement, loadJobAssignments, loadJobApplications, loadClientResponses, loadContactSubmissions, loadOpenTicketCount, loadAvailableJobs]);
+  }, [beginRead, traceLog, loadGuardProfile, loadGuardSummary, loadUserEntitlement, loadJobAssignments, loadJobApplications, loadClientResponses, loadContactSubmissions, loadOpenTicketCount, loadAvailableJobs]);
 
   useEffect(() => {
     let mounted = true;
@@ -538,6 +549,10 @@ export default function GuardDashboardClient() {
         if (scope.userId === userId) return;
         scope.active = true;
         scope.userId = userId;
+        setGuardSummary(null);
+        setGuard(null);
+        setAssignments([]);
+        setApplications([]);
         const epoch = ++scope.epoch;
         // Run database work after the auth callback releases the session lock.
         const timer = setTimeout(async () => {
@@ -565,6 +580,10 @@ export default function GuardDashboardClient() {
         }, 0);
         pendingLoads.add(timer);
       } else if (event === 'SIGNED_OUT') {
+        setGuardSummary(null);
+        setGuard(null);
+        setAssignments([]);
+        setApplications([]);
         scope.epoch++;
         scope.active = false;
         scope.userId = null;
@@ -587,13 +606,14 @@ export default function GuardDashboardClient() {
     const resolvedUserId = guardUserId;
     const channel = supabase
       .channel('guard-dashboard-live-v2')
-      .on('postgres_changes', { event: '*', schema: 'app', table: 'job_assignments' }, () => loadJobAssignments(resolvedUserId))
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'job_assignments' }, () => { loadJobAssignments(resolvedUserId); loadGuardSummary(resolvedUserId); })
+      .on('postgres_changes', { event: '*', schema: 'app', table: 'guard_payouts' }, () => loadGuardSummary(resolvedUserId))
       .on('postgres_changes', { event: '*', schema: 'app', table: 'job_applications' }, () => loadJobApplications(resolvedUserId))
       .on('postgres_changes', { event: '*', schema: 'app', table: 'client_responses' }, () => loadClientResponses(resolvedUserId))
       .on('postgres_changes', { event: '*', schema: 'app', table: 'jobs' }, () => loadAvailableJobs(0))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [guardUserId, isAdmin, loadJobAssignments, loadJobApplications, loadClientResponses, loadAvailableJobs]);
+  }, [guardUserId, isAdmin, loadJobAssignments, loadJobApplications, loadClientResponses, loadAvailableJobs, loadGuardSummary]);
 
   useEffect(() => {
     if (!guardUserId) return;
@@ -923,11 +943,18 @@ export default function GuardDashboardClient() {
       .slice(0, 5);
   }, [applications, assignments]);
 
+  useEffect(() => {
+    if (!guardUserId || isAdmin) return;
+    const refresh = () => { void loadGuardSummary(guardUserId); };
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, [guardUserId, isAdmin, loadGuardSummary]);
+
   const stats = useMemo(() => {
     const confirmed = assignments.filter(a => a.status === 'confirmed').length;
     const pendingApps = applications.filter(a => a.status === 'pending').length;
-    const completed = guard?.total_jobs_completed || 0;
-    const totalEarnings = Number(guard?.total_earnings || 0).toFixed(2);
+    const completed = guardSummary?.completed ?? '—';
+    const totalEarnings = guardSummary ? `£${guardSummary.earned.toFixed(2)}` : '—';
     const today = new Date().toISOString().split('T')[0];
     const todayShifts = upcomingJobs.filter(j => (j.jobs as any)?.start_date === today).length;
     const nextShift = upcomingJobs.length > 0 ? upcomingJobs[0] : null;
@@ -935,14 +962,14 @@ export default function GuardDashboardClient() {
       ? formatDateOnly((nextShift.jobs as any)?.start_date, { day: 'numeric', month: 'short' })
       : null;
     return [
-      { label: 'Available Jobs', value: availableJobs.length, icon: 'ri-briefcase-line', color: 'teal', trend: 'open now' },
+      { label: 'Available Jobs', value: availableJobsCount ?? '—', icon: 'ri-briefcase-line', color: 'teal', trend: 'open now' },
       { label: 'Applications', value: applications.length, icon: 'ri-send-plane-line', color: 'blue', trend: pendingApps > 0 ? `${pendingApps} pending` : undefined },
       { label: 'Confirmed', value: confirmed, icon: 'ri-checkbox-circle-line', color: 'emerald', trend: todayShifts > 0 ? `${todayShifts} today` : undefined },
       { label: 'Upcoming', value: upcomingJobs.length, icon: 'ri-calendar-line', color: 'amber', trend: nextShiftLabel || undefined },
       { label: 'Completed', value: completed, icon: 'ri-check-double-line', color: 'purple', trend: 'all time' },
-      { label: 'Earnings', value: `£${totalEarnings}`, icon: 'ri-money-pound-circle-line', color: 'emerald', trend: 'lifetime' },
+      { label: 'Earnings', value: totalEarnings, icon: 'ri-money-pound-circle-line', color: 'emerald', trend: 'lifetime' },
     ];
-  }, [availableJobs, applications, assignments, upcomingJobs, guard]);
+  }, [availableJobsCount, applications, assignments, upcomingJobs, guardSummary]);
 
   const jobsWithDistance: AvailableJobWithDistance[] = useMemo(() => {
     const gLat = guard?.home_latitude;
@@ -1137,6 +1164,7 @@ export default function GuardDashboardClient() {
                 onClick={() => {
                   setDataErrors([]);
                   if (guardUserId) {
+                    loadGuardSummary(guardUserId);
                     loadJobAssignments(guardUserId);
                     loadJobApplications(guardUserId);
                     loadClientResponses(guardUserId);
@@ -1280,6 +1308,7 @@ export default function GuardDashboardClient() {
           {guard && !isAdmin && (
             <ProfileHeroCard
               guard={guard}
+              completedShifts={guardSummary?.completed}
               planName={userEntitlement?.plan_name}
               subscriptionStatus={userEntitlement?.subscription_status}
             />
@@ -1360,7 +1389,7 @@ export default function GuardDashboardClient() {
               {guard && guardUserId && (
                 <PaymentFlowCard guardId={guard.id} guardUserId={guardUserId} />
               )}
-              <EarningsMiniPanel guard={guard} assignments={assignments} />
+              <EarningsMiniPanel summary={guardSummary} assignments={assignments} />
               <CompliancePanel guard={guard} />
             </div>
           </div>
