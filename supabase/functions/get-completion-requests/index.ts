@@ -1,10 +1,16 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 
-const allowedOrigins = ['https://quickguard.uk', 'https://www.quickguard.uk'];
-function corsHeaders(origin: string | null) {
+// Preview uses this exact shared host. Do not allow arbitrary Readdy subdomains
+// or treat an allowed browser origin as authentication/record ownership.
+const allowedOrigins = new Set([
+  'https://quickguard.uk',
+  'https://www.quickguard.uk',
+  'https://preview.amazingsite.co',
+]);
+function corsHeaders(origin: string | null): Record<string, string> {
   return {
-    'Access-Control-Allow-Origin': origin && allowedOrigins.includes(origin) ? origin : 'https://quickguard.uk',
+    ...(origin && allowedOrigins.has(origin) ? { 'Access-Control-Allow-Origin': origin } : {}),
     'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
@@ -13,8 +19,10 @@ function corsHeaders(origin: string | null) {
 }
 
 serve(async (req) => {
-  const headers = { ...corsHeaders(req.headers.get('Origin')), 'Content-Type': 'application/json' };
+  const origin = req.headers.get('Origin');
+  const headers = { ...corsHeaders(origin), 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
   const respond = (body: unknown, status: number) => new Response(JSON.stringify(body), { status, headers });
+  if (origin && !allowedOrigins.has(origin)) return respond({ error: 'Origin not allowed' }, 403);
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers });
   if (req.method !== 'POST') return respond({ error: 'Method not allowed' }, 405);
   try {
