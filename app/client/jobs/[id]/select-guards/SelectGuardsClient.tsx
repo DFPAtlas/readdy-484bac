@@ -131,6 +131,8 @@ function mapSelectionError(message: string): string {
   if (m.includes("client_not_found")) return "Client account not found.";
   if (m.includes("job_not_owned")) return "Job not found or you do not own it.";
   if (m.includes("job_already_paid")) return "This job has already been paid. Selection is no longer available.";
+  if (m.includes("job_not_selectable")) return "This job is no longer open for guard selection. Refresh your jobs list.";
+  if (m.includes("application_not_selectable")) return "A selected application is no longer available. Refresh the applicants and choose again.";
   if (m.includes("not_an_applicant")) return "One of the selected guards did not apply to this job.";
   if (m.includes("guard_not_found")) return "A selected guard could not be found.";
   if (m.includes("guard_inactive")) return "A selected guard is no longer active.";
